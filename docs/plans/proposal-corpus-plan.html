@@ -1,0 +1,507 @@
+<title>Proposal Corpus Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: runbook, same system as the Vulcan SOF Agent Playbook. Phase rail left, prompt blocks right. */
+  :root {
+    --bg: #f6f5f0; --surface: #fdfcf8; --ink: #1f2219; --ink-2: #4e5346; --ink-3: #7b8072; --line: #d9d8cc;
+    --accent: #5b6a35; --accent-ink: #ffffff; --accent-soft: #e9ecd9;
+    --code-bg: #26291f; --code-ink: #e8e7da; --code-dim: #a7ab97; --warn: #9a5b1f; --warn-soft: #f4e6d3;
+    --display: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #181a14; --surface: #1f2219; --ink: #e8e7da; --ink-2: #bfc1ae; --ink-3: #8a8e7c; --line: #33372b;
+      --accent: #a9bb6a; --accent-ink: #1a1d12; --accent-soft: #2b3121;
+      --code-bg: #101209; --code-ink: #dcdbcc; --code-dim: #858a74; --warn: #d9a05a; --warn-soft: #3a2d1a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #181a14; --surface: #1f2219; --ink: #e8e7da; --ink-2: #bfc1ae; --ink-3: #8a8e7c; --line: #33372b;
+    --accent: #a9bb6a; --accent-ink: #1a1d12; --accent-soft: #2b3121;
+    --code-bg: #101209; --code-ink: #dcdbcc; --code-dim: #858a74; --warn: #d9a05a; --warn-soft: #3a2d1a;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 64px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+  header.top { grid-column: 1 / -1; padding-block: 40px 28px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  h1 { font-family: var(--display); font-weight: 600; font-size: 40px; line-height: 1.1; margin: 8px 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .lede { max-width: 66ch; color: var(--ink-2); font-size: 16px; margin: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 18px; font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+  .meta b { color: var(--ink-2); font-weight: 500; }
+  nav.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start; }
+  @media (max-width: 860px) { nav.rail { position: static; } }
+  nav.rail .eyebrow { margin-bottom: 10px; }
+  nav.rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  nav.rail a { display: grid; grid-template-columns: 24px 1fr; gap: 8px; padding: 6px 8px; border-radius: 6px; color: var(--ink-2); text-decoration: none; font-size: 13.5px; line-height: 1.3; }
+  nav.rail a:hover { background: var(--accent-soft); color: var(--ink); }
+  nav.rail a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  nav.rail a .n { font-family: var(--mono); font-size: 12px; color: var(--ink-3); padding-top: 2px; }
+  main { min-width: 0; }
+  .howto { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; margin-block: 28px 8px; max-width: 72ch; }
+  .howto h2 { font-family: var(--display); font-size: 20px; margin: 0 0 8px; }
+  .howto ul { margin: 0; padding-left: 20px; color: var(--ink-2); }
+  .howto li + li { margin-top: 4px; }
+  .tree { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; background: var(--accent-soft); border-radius: 6px; padding: 12px 14px; margin: 10px 0 0; overflow-x: auto; color: var(--ink); white-space: pre; }
+  table.reg { border-collapse: collapse; width: 100%; font-size: 13.5px; margin-top: 10px; }
+  table.reg th, table.reg td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.reg th { font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; color: var(--ink-3); font-weight: 500; }
+  table.reg td:first-child { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+  .tablewrap { overflow-x: auto; }
+  section.phase { padding-block: 36px; border-bottom: 1px solid var(--line); scroll-margin-top: 16px; }
+  section.phase:last-of-type { border-bottom: 0; }
+  .phase-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .phase-num { font-family: var(--mono); font-size: 13px; color: var(--accent-ink); background: var(--accent); padding: 3px 8px; border-radius: 4px; letter-spacing: 0.04em; }
+  .phase-num.human { background: var(--warn); }
+  h2.phase-title { font-family: var(--display); font-weight: 600; font-size: 27px; margin: 0; line-height: 1.2; text-wrap: balance; }
+  .brief { max-width: 68ch; color: var(--ink-2); margin: 12px 0 0; }
+  .brief p { margin: 0 0 8px; }
+  .depends { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); margin-top: 8px; }
+  .prompt { margin-top: 18px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: var(--code-bg); }
+  .prompt-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .prompt-bar .label { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--code-dim); }
+  .copy { font-family: var(--sans); font-size: 13px; font-weight: 500; color: var(--code-ink); background: transparent; border: 1px solid rgba(255,255,255,0.22); border-radius: 5px; padding: 5px 11px; cursor: pointer; }
+  .copy:hover { background: rgba(255,255,255,0.08); }
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy.done { border-color: var(--accent); color: var(--accent); }
+  pre.body { margin: 0; padding: 16px 18px 18px; font-family: var(--mono); font-size: 13px; line-height: 1.55; color: var(--code-ink); white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: auto; }
+  .note { display: flex; gap: 10px; align-items: flex-start; background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 10px 14px; border-radius: 0 6px 6px 0; margin-top: 16px; max-width: 72ch; color: var(--ink-2); font-size: 14px; }
+  .note b { color: var(--ink); font-weight: 600; }
+
+  /* "Your part" boxes: the human's steps, visually distinct from the agent prompt */
+  .you { margin-top: 16px; max-width: 72ch; border: 1.5px solid var(--warn); border-radius: 8px; background: var(--surface); overflow: hidden; }
+  .you-bar { display: flex; align-items: center; gap: 10px; padding: 7px 14px; background: var(--warn-soft); border-bottom: 1px solid var(--warn); }
+  .you-bar .badge { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: var(--warn); padding: 2px 7px; border-radius: 3px; }
+  .you-bar .when { font-size: 13px; color: var(--ink-2); }
+  .you ol { margin: 0; padding: 12px 14px 12px 32px; color: var(--ink-2); font-size: 14px; }
+  .you li + li { margin-top: 5px; }
+  .setup { padding-block: 28px 8px; }
+  .setup h2 { font-family: var(--display); font-size: 24px; margin: 0 0 6px; }
+  .setup > p { max-width: 68ch; color: var(--ink-2); margin: 0 0 14px; }
+  .setup h3 { font-family: var(--sans); font-weight: 600; font-size: 15px; margin: 18px 0 6px; }
+  .setup ol, .setup ul { margin: 0; padding-left: 22px; color: var(--ink-2); max-width: 72ch; }
+  .setup li + li { margin-top: 5px; }
+  .checklist { margin-top: 36px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px; max-width: 72ch; }
+  .checklist h2 { font-family: var(--display); font-size: 22px; margin: 0 0 10px; }
+  .checklist ol { margin: 0; padding-left: 22px; color: var(--ink-2); }
+  .checklist li + li { margin-top: 6px; }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; }
+  @media (prefers-reduced-motion: no-preference) { .copy { transition: border-color .15s, color .15s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Companion plan · velocity-bd-team repo · corpus/</div>
+    <h1>Proposal Corpus Plan</h1>
+    <p class="lede">Six phases that turn a curated Drive folder of past submissions, plus a hand-built register of outcomes and strength ratings, into retrieval the reviewer and the drafter can use. The result: when the scanner judges a new call, it sees what Velocity submitted to similar calls before, how strong the team thought each was, and whether it won.</p>
+    <div class="meta">
+      <span><b>Plugs into</b> Vulcan SOF Agent Playbook Phase 0 (the <code>proposals</code> table) and Phase 6 (the <code>past_experience_block</code> slot)</span>
+      <span><b>Human work</b> Phase A is yours; everything after it is the bot's</span>
+      <span><b>Written</b> 2026-10-15</span>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Phases">
+    <div class="eyebrow">Phases</div>
+    <ol>
+      <li><a href="#conv"><span class="n">—</span><span>Drive conventions</span></a></li>
+      <li><a href="#setup"><span class="n">YOU</span><span>Your setup, step by step</span></a></li>
+      <li><a href="#pa"><span class="n">A</span><span>Register &amp; conventions</span></a></li>
+      <li><a href="#pb"><span class="n">B</span><span>Drive sync</span></a></li>
+      <li><a href="#pc"><span class="n">C</span><span>Extract, embed, brief</span></a></li>
+      <li><a href="#pd"><span class="n">D</span><span>Retrieval in review</span></a></li>
+      <li><a href="#pe"><span class="n">E</span><span>Exemplars for drafting</span></a></li>
+      <li><a href="#pf"><span class="n">F</span><span>Keep it current</span></a></li>
+      <li><a href="#done"><span class="n">✓</span><span>Acceptance checklist</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <div class="howto" id="conv">
+      <h2>Drive conventions the bot is written against</h2>
+      <ul>
+        <li>Documents live in your Drive folder; the bot reads, never writes there.</li>
+        <li>Hand-entered metadata (outcome, strength, exemplar flag) lives in the Register sheet inside that folder; the bot syncs it into the ledger.</li>
+        <li>Folder name = <code>YYYY-MM-DD_portal_short-title</code> using the submission date; it is also the <code>submission_id</code> in the Register and the ledger.</li>
+        <li>Portal slugs: <code>vulcan-sof</code>, <code>sam-gov</code>, <code>nstxl</code>, <code>diu</code>, <code>afwerx</code>, <code>iarpa</code>, <code>space-force</code>, <code>doe-sbir</code>, <code>bidnet-co</code>, <code>bidnet-fl</code>, <code>other</code>.</li>
+      </ul>
+      <div class="tree">BD Proposal Corpus/
+  00 README                         conventions (Google Doc)
+  00 Proposal Register              the hand-built sheet (columns below)
+  01 Company Reference/             reusable: capabilities, boilerplate, past-performance write-ups, bios, win themes
+  Submissions/
+    2026-05-13_vulcan-sof_jatf-26-collective-autonomy/
+      00_solicitation/              the call / RFI / BAA text, attachments, amendments, Q&amp;A
+      01_submitted/                 final as-submitted files only (technical-volume.pdf, cost-volume.xlsx, quad-chart.pptx …)
+      02_working/                   optional: drafts, outlines, internal review notes
+      03_outcome/                   award notice, debrief, evaluator comments, rejection email, score sheets
+    2026-04-28_vulcan-sof_tactical-edge-pnt/
+    2025-11-02_sam-gov_af-sbir-251-xyz/</div>
+      <div class="tablewrap">
+      <table class="reg">
+        <thead><tr><th>Register column</th><th>Values</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr><td>submission_id</td><td>folder name, exactly</td><td>primary key</td></tr>
+          <tr><td>title · portal · agency</td><td>portal uses the slug list</td><td>retrieval filters, dashboard</td></tr>
+          <tr><td>solicitation_id</td><td>topic number, notice ID, or Vulcan collectionUuid</td><td>linking a new call to a past one</td></tr>
+          <tr><td>type</td><td>sbir_1 · sbir_2 · sbir_3 · sttr · rfi · white_paper · baa · pitch · rfp · ota · other</td><td>retrieval, dashboard</td></tr>
+          <tr><td>role · partners</td><td>prime / sub; teaming partners</td><td>context</td></tr>
+          <tr><td>submitted_date · due_date</td><td>YYYY-MM-DD</td><td>recency weighting</td></tr>
+          <tr><td>requested_value</td><td>number or blank</td><td>dashboard</td></tr>
+          <tr><td><b>outcome</b></td><td>won · lost · no_award · pending · withdrawn · shortlisted</td><td><b>training signal</b></td></tr>
+          <tr><td>outcome_date · award_value</td><td></td><td>dashboard</td></tr>
+          <tr><td><b>strength_rating</b></td><td>1–5, your judgment at submission time</td><td><b>training signal</b></td></tr>
+          <tr><td>strength_reason</td><td>one or two sentences</td><td>shown to the reviewer</td></tr>
+          <tr><td>why_won_or_lost</td><td>debrief in your words, or "no debrief"</td><td>shown to the reviewer</td></tr>
+          <tr><td><b>use_as_exemplar</b></td><td>yes / no</td><td><b>which proposals the bot imitates</b></td></tr>
+          <tr><td>themes</td><td>free keywords: C2, autonomy, NLP, modernization, edge AI</td><td>retrieval boost</td></tr>
+          <tr><td>drive_link</td><td>link to the submission folder</td><td>sync check</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    <section class="setup" id="setup">
+      <h2>Your setup, step by step</h2>
+      <p>This plan has more human work than the scanner playbook, and all of it is front-loaded. Steps 1–2 happen before Phase A; step 3 is the hand-curation that happens after the bot pre-fills the Register.</p>
+
+      <h3>1. Build the Drive folder (before Phase A)</h3>
+      <ol>
+        <li>In Google Drive (Velocity account), create a folder named <code>BD Proposal Corpus</code>. Don't put it inside another shared folder; a top-level My Drive or Shared Drive folder is easiest to find.</li>
+        <li>Inside it create two folders: <code>01 Company Reference</code> and <code>Submissions</code>. Leave the README and Register for the bot to create in Phase A.</li>
+        <li>Into <code>01 Company Reference</code>, upload the reusable material: capabilities statement, boilerplate, past-performance write-ups, personnel bios, win themes. Use current, curated versions of these; nothing from the old Yukon project goes on the work Drive. (The repo keeps its own copy of the old knowledge-base files under <code>reference/yukon/knowledge-base/</code> purely as the Writer's fallback until this folder is populated.)</li>
+        <li>For each past submission, inside <code>Submissions</code> create one folder named <code>YYYY-MM-DD_portal_short-title</code> using the date you submitted and a slug from the list above (e.g. <code>2026-05-13_vulcan-sof_jatf-26-collective-autonomy</code>). Lowercase, hyphens, no spaces.</li>
+        <li>Inside each, create <code>00_solicitation</code>, <code>01_submitted</code>, <code>02_working</code>, <code>03_outcome</code>. Empty subfolders are fine.</li>
+        <li>Put the as-submitted files in <code>01_submitted</code>, renamed to describe the volume (<code>technical-volume.pdf</code>, <code>cost-volume.xlsx</code>, <code>quad-chart.pptx</code>, <code>white-paper.pdf</code>). For Vulcan, export or screenshot the on-portal submission to PDF and include it; the narrative text otherwise never reaches the corpus.</li>
+        <li>Put the call/RFI/BAA text and attachments in <code>00_solicitation</code>, anything the government sent back in <code>03_outcome</code>, drafts in <code>02_working</code> if you want to keep them.</li>
+        <li>Do the Vulcan submissions first (JATF-26 Collective Autonomy, Tactical Edge PNT, Vigilant Eagle 27 are the known ones), then anything that won, then the rest as time allows. The bot handles folders being added later.</li>
+      </ol>
+
+      <h3>2. Folder ID and access (before Phase A)</h3>
+      <ol>
+        <li>Open <code>BD Proposal Corpus</code> in the browser. The URL ends with <code>/folders/&lt;long id&gt;</code>; copy that id.</li>
+        <li>Add to the repo's <code>.env</code>: <code>CORPUS_DRIVE_FOLDER_ID=&lt;that id&gt;</code>.</li>
+        <li>Confirm <code>gog</code> can see it from a terminal: <code>gog drive ls &lt;that id&gt; --account david@velocityexplorations.com</code> (or the equivalent list command). If the folder is in a Shared Drive and it isn't listed, share the folder with the account <code>gog</code> is authenticated as.</li>
+      </ol>
+
+      <h3>3. Fill the Register (after Phase A pre-fills it)</h3>
+      <p>The bot creates the sheet with one row per folder and the dates and portal already filled. You add the judgment. Work one row at a time, Vulcan rows first.</p>
+      <ul>
+        <li><b>outcome</b>: pick one. <code>pending</code> if you're waiting; <code>no_award</code> if the government never awarded anyone; <code>lost</code> if someone else won; <code>shortlisted</code> if you made a down-select but hadn't heard further; <code>withdrawn</code> if you pulled it. Never leave it blank.</li>
+        <li><b>strength_rating</b> (1–5): how strong you thought the submission was <i>when you sent it</i>, not in hindsight. 5 = we were the obvious fit and the writing was tight; 3 = credible but a stretch somewhere; 1 = we knew it was a long shot.</li>
+        <li><b>strength_reason</b>: one or two sentences on why. "Direct Echo C2 fit, had the right past performance" or "Needed a hardware partner we didn't have."</li>
+        <li><b>why_won_or_lost</b>: the debrief in your own words if you got one; what you believe if you didn't; <code>no debrief</code> if you have nothing. Don't skip it on losses; losses teach the bot more than wins.</li>
+        <li><b>use_as_exemplar</b>: <code>yes</code> only for submissions you'd be happy to have the bot write like. Usually that's wins plus one or two strong losses. Aim for 3–8 exemplars total, not everything.</li>
+        <li><b>themes</b>: a few comma-separated keywords (C2, autonomy, NLP, modernization, edge AI, PNT). These boost retrieval, so use the words you'd search for.</li>
+        <li><b>type</b>, <b>agency</b>, <b>solicitation_id</b>, <b>role</b>, <b>requested_value</b>: fill what you know; blanks are fine.</li>
+      </ul>
+      <p style="margin-top:10px">When you've done a batch, tell the agent to run <code>--sync-register</code>; it reports any row it couldn't accept and why.</p>
+    </section>
+
+    <!-- ───────────────────────── PHASE A ───────────────────────── -->
+    <section class="phase" id="pa">
+      <div class="phase-head"><span class="phase-num human">PHASE A · HUMAN + BOT</span><h2 class="phase-title">Register and conventions</h2></div>
+      <div class="brief">
+        <p>The bot scaffolds the Register sheet and the README, then syncs the sheet into the ledger and reports what doesn't line up. You fill in the rows. No record of outcomes exists today, so this phase is the first time win/loss gets written down anywhere; prioritize the Vulcan rows and anything that won.</p>
+        <div class="depends">Depends on: Playbook Phase 0 (the <code>proposals</code> table) and read access to the Drive folder. Produces: the Register sheet, <code>corpus/register.py</code>, <code>docs/CORPUS_CONVENTIONS.md</code>, a reconciliation report.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase A</span><button class="copy" type="button" data-copy="ca">Copy prompt</button></div>
+<pre class="body" id="ca">You are working in the `velocity-bd-team` repository. The ledger (PostgreSQL via DATABASE_URL, `ledger/queries.py`) already has a `proposals` table with columns: submission_id (PK), title, portal, agency, solicitation_id, type, role, partners, submitted_date, due_date, requested_value, outcome, outcome_date, award_value, strength_rating, strength_reason, why_won_or_lost, use_as_exemplar, themes, drive_link, brief, synced_at, updated_at; and `upsert_proposal(row)`, `list_proposals(...)`. This is Phase A of the Proposal Corpus plan: set up the hand-built register of past submissions and sync it into the ledger.
+
+## Context
+
+Velocity Explorations has submitted proposals, white papers, RFI responses and pitches to several government portals (Vulcan SOF, SAM.gov, NSTXL, DIU, AFWERX, and others). The documents are being curated by hand into a Google Drive folder, "BD Proposal Corpus", with this structure:
+
+  00 README · 00 Proposal Register (sheet) · 01 Company Reference/ · Submissions/&lt;YYYY-MM-DD_portal_short-title&gt;/{00_solicitation, 01_submitted, 02_working, 03_outcome}/
+
+Portal slugs: vulcan-sof, sam-gov, nstxl, diu, afwerx, iarpa, space-force, doe-sbir, bidnet-co, bidnet-fl, other.
+Type values: sbir_1, sbir_2, sbir_3, sttr, rfi, white_paper, baa, pitch, rfp, ota, other.
+Outcome values: won, lost, no_award, pending, withdrawn, shortlisted.
+
+No record of outcomes or strength ratings exists anywhere today. A human will type them into the Register. The bot's job is to make that easy and to keep the ledger in sync with it. Drive access: the folder ID comes from CORPUS_DRIVE_FOLDER_ID in .env; use whatever Google Drive/Sheets access this environment has (API with a service account, or a CLI). The bot never writes to Drive except to create the Register and README in this phase.
+
+## Tasks
+
+1. Create the Register sheet "00 Proposal Register" in the corpus folder (skip if it exists) with a header row of exactly these columns, in order: submission_id, title, portal, agency, solicitation_id, type, role, partners, submitted_date, due_date, requested_value, outcome, outcome_date, award_value, strength_rating, strength_reason, why_won_or_lost, use_as_exemplar, themes, drive_link. Add data validation dropdowns for portal, type, outcome (values above), strength_rating (1–5), use_as_exemplar (yes/no). Freeze the header row.
+2. Pre-populate one row per folder found under Submissions/: parse submission_id, submitted_date, and portal from the folder name, set drive_link to the folder, and leave everything else blank for the human. Never overwrite a row that already has a submission_id.
+3. Create "00 README" (Google Doc) describing the folder conventions, file-naming rule inside 01_submitted/ (describe the volume, not the version: technical-volume.pdf, cost-volume.xlsx, cover-letter.pdf, quad-chart.pptx, white-paper.pdf), and what each Register column means and why outcome, strength_rating and use_as_exemplar matter most. Mirror the same text into `docs/CORPUS_CONVENTIONS.md` in the repo.
+4. `corpus/register.py` — `sync_register()`: read the sheet, validate each row (submission_id matches `^\d{4}-\d{2}-\d{2}_[a-z-]+_[a-z0-9-]+$`; enum columns within their value sets; strength_rating 1–5 or blank; dates parse), `upsert_proposal` each valid row with synced_at = now, and print a report: rows synced, rows skipped with the reason and row number, Submissions/ folders with no Register row, Register rows with no folder.
+5. Add `--sync-register` to `run.py` (or a `corpus/cli.py`) so this can be run on demand and in the daily job.
+
+## Done when
+
+- The Register exists with the header, dropdowns, and one pre-filled row per Submissions/ folder; you show a screenshot or the first five rows.
+- `sync_register()` on the pre-filled sheet reports every row synced and zero mismatches; `SELECT submission_id, portal, outcome FROM proposals` shows them.
+- Deliberately break one row (bad portal slug, strength_rating 7) and re-sync: the report names the row and the reason, and the ledger row is unchanged.
+- `docs/CORPUS_CONVENTIONS.md` exists and matches the README.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">before, during and after Phase A</span></div>
+        <ol>
+          <li>Before: setup steps 1 and 2 are done (folder built, <code>CORPUS_DRIVE_FOLDER_ID</code> in <code>.env</code>, <code>gog</code> can list the folder).</li>
+          <li>During: the bot will ask permission to create the Register sheet and README in Drive; approve. This is the only time it writes to Drive except for Phase F's register rows.</li>
+          <li>After: open the Register and fill the judgment columns following setup step 3. Vulcan rows first, then wins.</li>
+          <li>Tell the agent "register filled, sync it". Fix any rows it reports (usually a typo in a dropdown value) and sync again.</li>
+          <li>The validation test: change one row's portal to <code>vulcan</code> (wrong slug) and strength to <code>7</code>, ask for a sync, confirm both are reported, then fix them.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE B ───────────────────────── -->
+    <section class="phase" id="pb">
+      <div class="phase-head"><span class="phase-num">PHASE B</span><h2 class="phase-title">Drive sync</h2></div>
+      <div class="brief">
+        <p>Mirrors the corpus folder to local disk, incrementally, and records every document in the ledger with its subfolder role so later phases know a file in <code>01_submitted/</code> is an exemplar candidate and a file in <code>03_outcome/</code> is a debrief.</p>
+        <div class="depends">Depends on: Phase A. Produces: <code>proposal_documents</code> table, <code>corpus/drive_sync.py</code>, <code>data/corpus/</code> mirror.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase B</span><button class="copy" type="button" data-copy="cb">Copy prompt</button></div>
+<pre class="body" id="cb">You are working in the `velocity-bd-team` repository. Phase A created `corpus/register.py` (syncs the "00 Proposal Register" sheet into the ledger's `proposals` table) and `docs/CORPUS_CONVENTIONS.md` (folder layout: Submissions/&lt;submission_id&gt;/{00_solicitation,01_submitted,02_working,03_outcome}/ plus 01 Company Reference/). This is Phase B: mirror the Drive corpus to local disk and record every document in the ledger.
+
+## Context
+
+Drive is the source of truth for documents; the bot only reads it. The local mirror under `data/corpus/` (git-ignored) exists so extraction and embedding (Phase C) can run without re-downloading. Sync must be incremental: compare Drive's modifiedTime and md5Checksum (or size) with what was recorded last time.
+
+Google-native files (Docs, Sheets, Slides) must be exported: Docs → .docx, Sheets → .xlsx, Slides → .pptx. Binary uploads (.pdf, .docx, .xlsx, .pptx) download as-is. Skip anything else (images, zips) but record it so the report shows what was ignored.
+
+## Tasks
+
+1. Add a migration for a `proposal_documents` table: id (PK), submission_id (FK to proposals; NULL for files under 01 Company Reference/), subfolder ('solicitation','submitted','working','outcome','reference'), filename, drive_file_id, mime_type, size, drive_modified_at, local_path, checksum, downloaded_at, extracted_at, chunk_count, skipped_reason. Update `docs/LEDGER_SCHEMA.md`.
+2. `corpus/drive_sync.py` — `sync_drive()`: walk the corpus folder (CORPUS_DRIVE_FOLDER_ID), map each file to its submission_id and subfolder from its path, download or export new/changed files to `data/corpus/&lt;submission_id&gt;/&lt;subfolder&gt;/&lt;filename&gt;` (or `data/corpus/_reference/`), upsert `proposal_documents`, and clear extracted_at on changed files so Phase C re-processes them. Rate-limit Drive calls politely and retry on 429/5xx with backoff. Files whose folder has no `proposals` row are still mirrored but logged as orphans.
+3. Report at the end: files new / updated / unchanged / skipped (with reasons) / orphaned, per submission; total bytes.
+4. Add `--sync-drive` to the corpus CLI; make the daily job run `--sync-register --sync-drive`.
+
+## Done when
+
+- First run mirrors every submission folder; `SELECT submission_id, subfolder, COUNT(*) FROM proposal_documents GROUP BY 1,2` matches what you see in Drive for three submissions you spot-check.
+- Second run reports everything unchanged and downloads nothing.
+- Edit one Google Doc in Drive and re-run: only that file is re-exported and its extracted_at is NULL.
+- A Google Sheet in 01_submitted/ arrives locally as .xlsx; an image file is listed as skipped with the reason.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">after Phase B</span></div>
+        <ol>
+          <li>Pick three submission folders in Drive and compare their file counts per subfolder to the agent's table. Report any file it missed.</li>
+          <li>For the change test: open any Google Doc in the corpus, add a space, remove it (that's enough to bump modifiedTime), then tell the agent to re-sync.</li>
+          <li>If it reports orphaned folders (no Register row), add the rows; if it reports Register rows with no folder, create the folders or delete the rows.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE C ───────────────────────── -->
+    <section class="phase" id="pc">
+      <div class="phase-head"><span class="phase-num">PHASE C</span><h2 class="phase-title">Extract, embed, and brief</h2></div>
+      <div class="brief">
+        <p>Turns documents into searchable chunks with the Register metadata attached to every chunk, so a search can say "only winning, exemplar-flagged, Vulcan submissions". Embeddings go into the same Postgres via pgvector, keeping the one-database rule. Each submission also gets a one-paragraph brief, which is what the reviewer actually reads.</p>
+        <div class="depends">Depends on: Phase B. Produces: <code>proposal_chunks</code> table (pgvector), <code>corpus/extract.py</code>, <code>corpus/embed.py</code>, <code>proposals.brief</code> filled.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase C</span><button class="copy" type="button" data-copy="cc">Copy prompt</button></div>
+<pre class="body" id="cc">You are working in the `velocity-bd-team` repository. Phases A–B populated the ledger's `proposals` table (register metadata: portal, type, outcome, strength_rating, use_as_exemplar, themes, …) and `proposal_documents` (one row per mirrored file with submission_id, subfolder, local_path, extracted_at, chunk_count) with files under `data/corpus/`. This is Phase C: extract text, chunk, embed, and write a one-paragraph brief per submission.
+
+## Context
+
+The one-database rule: embeddings live in the same PostgreSQL as everything else, using the pgvector extension (enable it on the hosted instance; Neon and Supabase both support it). For local SQLite development, store vectors as JSON text and do brute-force cosine in Python; the query interface must be identical.
+
+Embedding model: use whatever embedding endpoint this environment has, behind `corpus/embed.py: embed(texts: list[str]) -> list[list[float]]`, with the model name and dimension recorded in config so a model change triggers a full re-embed. The reference implementation used Ollama `nomic-embed-text` (768 dims) locally; that is an acceptable fallback.
+
+Chunking: ~2000 characters per chunk, split on paragraph boundaries where possible, 200-character overlap. Keep chunks from `01_submitted/` and `03_outcome/` always; chunk `00_solicitation/` too (it teaches "what was asked"); chunk `02_working/` only if the file is under 50 pages. Reference documents (`_reference/`) are chunked with submission_id NULL.
+
+## Tasks
+
+1. `corpus/extract.py` — text extraction for .docx (python-docx, include table cell text), .pdf (pypdf or pdfplumber; fall back to OCR only if a page yields no text and an OCR tool is available), .pptx (slide text + notes), .xlsx (sheet name + cell text, row by row). Return plain text. Save it next to the file as `.txt` so re-chunking doesn't re-extract.
+2. Migration: `proposal_chunks(id PK, document_id FK, submission_id, subfolder, chunk_index, text, embedding vector(DIM) | TEXT, portal, outcome, strength_rating, use_as_exemplar, type, themes, submitted_date)` — the register columns are denormalized onto every chunk so filtering is one query. Index: ivfflat or hnsw on embedding (Postgres only). Update `docs/LEDGER_SCHEMA.md`.
+3. `corpus/ingest.py` — for every document with extracted_at NULL: extract, chunk, embed in batches of 32, insert chunks, set extracted_at and chunk_count. Re-ingest deletes the document's old chunks first. Log per document: filename, chunks, seconds.
+4. Briefs: for every proposal with brief NULL (or `--rebrief`), build a prompt from up to the first 6000 characters of 01_submitted/ text plus the register row, and ask the LLM for one paragraph: what was proposed, to whom, the core technical approach, the claimed differentiators, and (if outcome is known) the outcome in one clause. Store in `proposals.brief`. Keep under 120 words.
+5. `corpus/search.py` — `search(query, k=8, portal=None, outcome=None, exemplar_only=False, subfolders=None) -> list[chunk + score]` using cosine similarity, with the same signature on Postgres and SQLite.
+6. Add `--ingest` and `--rebrief` to the corpus CLI; the daily job runs `--ingest` after the drive sync.
+
+## Done when
+
+- Every `proposal_documents` row that was not skipped has extracted_at set and chunk_count &gt; 0; you show totals by subfolder.
+- `search("autonomous collective behavior for small units", portal="vulcan-sof")` returns chunks from the expected Vulcan submissions first; you show the top 3 with score, submission_id, subfolder.
+- `search(..., exemplar_only=True, outcome="won")` returns only chunks whose denormalized flags match (show the query and rows).
+- Every proposal has a brief; you show three, and they read as accurate summaries of the submitted documents.
+- Re-running `--ingest` with nothing changed processes zero documents.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">before and after Phase C</span></div>
+        <ol>
+          <li>Before: pgvector is enabled on the Postgres instance (playbook setup step 2) and Ollama is running with <code>nomic-embed-text</code> pulled (<code>ollama pull nomic-embed-text</code>), unless the agent is using another embedding endpoint.</li>
+          <li>After: read the three briefs the agent shows against your memory of those proposals. A brief that gets the agency, the approach, or the outcome wrong means the extraction missed the main document; tell the agent which file it should have read.</li>
+          <li>Try one search of your own in words you'd actually use, e.g. "PNT at the tactical edge", and confirm the right submission comes first.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE D ───────────────────────── -->
+    <section class="phase" id="pd">
+      <div class="phase-head"><span class="phase-num">PHASE D</span><h2 class="phase-title">Retrieval in review</h2></div>
+      <div class="brief">
+        <p>Fills the <code>past_experience_block</code> slot the reviewer has been carrying empty since Playbook Phase 6. The reviewer now sees the most similar past submissions with their outcome and strength rating, plus one line of portal history, and is told how to weigh them.</p>
+        <div class="depends">Depends on: Phase C and Playbook Phase 6. Produces: <code>corpus/past_experience.py</code> wired into <code>review/reviewer.py</code>.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase D</span><button class="copy" type="button" data-copy="cd">Copy prompt</button></div>
+<pre class="body" id="cd">You are working in the `velocity-bd-team` repository. `review/reviewer.py` has `review_calls(rows, model_client, past_experience_fn=None, feedback_examples_block="")`; `past_experience_fn(row) -> str` is currently never supplied. The corpus component (Phases A–C) provides `corpus/search.py: search(query, k, portal, outcome, exemplar_only, subfolders)` over chunks that carry denormalized register metadata (portal, outcome, strength_rating, use_as_exemplar, type, submitted_date), and `proposals.brief` holds a one-paragraph summary per past submission. This is Phase D: give the reviewer memory of past submissions.
+
+## Context
+
+When the scanner evaluates a new call, the reviewer should see: the most similar past submissions, each with its outcome and the team's strength rating, and a one-line history of how Velocity has done on this portal. Won and strongly-rated submissions are positive evidence of fit; lost or weak ones are still evidence the team considered the area relevant, just weaker. Absence of any similar submission is not negative evidence.
+
+The block must stay short: the review prompt already carries the company profile and recent human decisions, and the model has a 35-second budget.
+
+## Tasks
+
+1. `corpus/past_experience.py` — `build_block(row) -> str`:
+   - query = title + " " + description[:500] + " " + type
+   - `search(query, k=12, subfolders=["submitted","solicitation"])`; group hits by submission_id, keep the best score per submission, take the top 4 submissions.
+   - Score adjustment for ranking only: won ×1.3, shortlisted ×1.15, strength_rating 4–5 ×1.1, use_as_exemplar ×1.1, lost/no_award ×0.9, submitted more than 3 years ago ×0.9. Drop anything below 0.35 similarity before adjustment.
+   - Portal history line from `proposals`: count submitted, won, lost/no_award, pending for the call's portal slug (map "Vulcan SOF" → vulcan-sof, etc.).
+   - Render:
+
+     --- PAST EXPERIENCE ---
+     Portal history (vulcan-sof): 5 submitted · 1 won · 2 lost · 2 pending
+     Similar past submissions:
+     - [WON · strength 4/5 · 2026-05] JATF-26 Collective Autonomy Integration — &lt;brief, first 220 chars&gt;
+     - [PENDING · strength 3/5 · 2026-04] Tactical Edge PNT — &lt;brief…&gt;
+     Weigh won and strongly-rated submissions as positive evidence of fit. No similar submission is not negative evidence.
+     ---
+
+   - Return "" if there are no hits and no portal history. Never raise; on any error log and return "".
+2. Wire it in: `run.py` passes `past_experience_fn=corpus.past_experience.build_block` to `review_calls`. Add `--no-corpus` to disable it.
+3. Record which submissions were shown: add a `review_context` TEXT (JSON) column to `calls` holding the submission_ids and scores used, so the dashboard can show "similar past proposals" on a call. Update `docs/LEDGER_SCHEMA.md`.
+
+## Done when
+
+- For a kept Vulcan call, the DEBUG-logged review prompt contains a PAST EXPERIENCE block with a correct portal-history line (verify the counts against `proposals`) and up to four submissions with outcome and strength.
+- For a call with no related history (make one up with an unrelated title), the block is empty and the prompt is unchanged from Phase 6.
+- Re-review 10 previously reviewed calls with and without `--no-corpus`; show a table of verdict changes and, for each change, the past submissions that were shown. Changes should be explainable by the evidence shown.
+- `calls.review_context` is populated for reviewed rows.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">after Phase D</span></div>
+        <ol>
+          <li>Check the portal-history line against what you know: if it says "5 submitted · 1 won" for Vulcan and that's wrong, the Register is wrong, not the code.</li>
+          <li>Read the verdict-change table. For each call whose verdict changed, the agent shows which past submissions were used; decide whether the change was reasonable. If the bot became too generous because of one strong win, say so; the fix is lowering the "won" weight in the prompt.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE E ───────────────────────── -->
+    <section class="phase" id="pe">
+      <div class="phase-head"><span class="phase-num">PHASE E</span><h2 class="phase-title">Exemplars for drafting</h2></div>
+      <div class="brief">
+        <p>The same index, pointed at the other job: when someone (or the bot) drafts a response, pull the strongest winning sections on similar topics as examples to write like, plus the solicitation they answered so the pairing is visible. This phase exposes that as a function and a CLI; the drafting workflow itself is a later plan.</p>
+        <div class="depends">Depends on: Phase C. Produces: <code>corpus/exemplars.py</code>, a CLI, and a documented interface for the future drafter.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase E</span><button class="copy" type="button" data-copy="ce">Copy prompt</button></div>
+<pre class="body" id="ce">You are working in the `velocity-bd-team` repository. The corpus component provides `corpus/search.py: search(query, k, portal, outcome, exemplar_only, subfolders)` over chunks with denormalized register metadata, `proposals` rows with briefs, and `proposal_documents` with subfolder roles (solicitation, submitted, working, outcome, reference). This is Phase E: expose exemplar retrieval for proposal drafting.
+
+## Context
+
+A future drafting workflow will take a new call and produce a response. It needs, for a given topic and portal: the best past writing to imitate (sections from submissions the team flagged use_as_exemplar, preferring won), the solicitation text those sections answered (so the pairing "ask → answer" is visible), evaluator feedback from 03_outcome/ where it exists (what won or lost points), and reusable reference material from 01 Company Reference/ (capabilities, boilerplate, past-performance write-ups). This phase builds the retrieval interface only; it does not draft.
+
+## Tasks
+
+1. `corpus/exemplars.py`:
+   - `find_exemplars(query, portal=None, k=6, require_exemplar=True, prefer_won=True) -> list[Exemplar]` where Exemplar has submission_id, title, outcome, strength_rating, subfolder, filename, chunk_index, text, score, and `solicitation_excerpt` (the best-matching chunk from the same submission's 00_solicitation/, or None). Ranking: similarity × (won 1.3 / shortlisted 1.15 / pending 1.0 / lost 0.85) × (strength ≥4 1.1). Diversify: at most 2 chunks per submission.
+   - `find_feedback(query, portal=None, k=4)` — chunks from 03_outcome/ only, any outcome, so losses teach too.
+   - `find_reference(query, k=6)` — chunks with submission_id NULL (company reference material).
+   - `drafting_context(query, portal=None, budget_chars=12000) -> str` — renders the three above into one block with clear headings (EXEMPLAR PASSAGES — write like these / WHAT THE SOLICITATION ASKED / EVALUATOR FEEDBACK FROM PAST SUBMISSIONS / COMPANY REFERENCE MATERIAL), each entry labeled with submission_id, outcome, strength, filename, and truncated to fit the budget with the highest-ranked entries first.
+2. CLI: `python -m corpus.cli exemplars "&lt;query&gt;" --portal vulcan-sof` prints the rendered drafting_context; `--json` prints the raw Exemplar list.
+3. `docs/DRAFTING_INTERFACE.md` — the function signatures, the ranking rules, the rendered block format, and a note on where the future drafter should call it.
+
+## Done when
+
+- `exemplars "AI-enabled command and control for small units" --portal vulcan-sof` returns passages from exemplar-flagged submissions first, each paired with a solicitation excerpt where one exists; you show the top 3.
+- Flip use_as_exemplar to "no" on one of those submissions in the Register, re-sync, re-run: it drops out when require_exemplar=True and reappears with require_exemplar=False.
+- `find_feedback` on a topic with a lost submission that has a debrief in 03_outcome/ returns that debrief text.
+- `drafting_context` output stays under the character budget and every entry is labeled with submission_id and outcome.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">during Phase E</span></div>
+        <ol>
+          <li>Read the top three exemplar passages. They should be writing you'd be proud to reuse; if a weak section shows up, that submission's <code>use_as_exemplar</code> should probably be <code>no</code>.</li>
+          <li>The flag test: in the Register, change one exemplar's <code>use_as_exemplar</code> to <code>no</code>, tell the agent to sync and re-run, confirm it dropped out, then set it back.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE F ───────────────────────── -->
+    <section class="phase" id="pf">
+      <div class="phase-head"><span class="phase-num">PHASE F</span><h2 class="phase-title">Keep it current</h2></div>
+      <div class="brief">
+        <p>Closes the loop between the scanner and the corpus. A ✅ in Slack (or the dashboard) means a response went out, so the bot starts a Register row and reminds you to record the outcome later. Without this, the Register goes stale the week after you finish it.</p>
+        <div class="depends">Depends on: Phases A–D and Playbook Phase 8. Produces: a ✅ → Register hook, a monthly "outcomes pending" reminder, the daily corpus job.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase F</span><button class="copy" type="button" data-copy="cf">Copy prompt</button></div>
+<pre class="body" id="cf">You are working in the `velocity-bd-team` repository. The scanner sets `calls.human_status = 'submitted'` when the team reacts ✅ on a Slack card (or uses the dashboard). The corpus component syncs the "00 Proposal Register" sheet into `proposals` (`corpus/register.py`), mirrors Drive (`corpus/drive_sync.py`), and ingests documents (`corpus/ingest.py`). This is Phase F: keep the register and corpus current automatically.
+
+## Context
+
+The register was built by hand once; it must not go stale. Two things keep it alive: new submissions get a row the moment the team marks a call submitted, and the team is reminded, on a schedule, about rows whose outcome is still pending. The bot may write to the Register sheet for these two purposes only; it never touches document folders.
+
+## Tasks
+
+1. Submitted hook: in the feedback collection step, when a call transitions to human_status 'submitted', create a Register row (and the `proposals` row) with submission_id = `&lt;today&gt;_&lt;portal-slug&gt;_&lt;slugified title, ≤40 chars&gt;`, title, portal, solicitation_id (for Vulcan: the collectionUuid from the call id), due_date, type = 'other', outcome = 'pending', drive_link blank. Post a thread reply on the Slack card: "Added to the Proposal Register as &lt;submission_id&gt;. Create the folder Submissions/&lt;submission_id&gt;/ in the corpus and drop the submitted files in 01_submitted/." Idempotent: never create a second row for the same call id (store the call id in a new `proposals.source_call_id` column; update `docs/LEDGER_SCHEMA.md`).
+2. Monthly reminder (first Monday): list Register rows with outcome 'pending' and submitted_date older than 60 days, and rows whose folder exists but has an empty 01_submitted/, as one Slack message with direct links to the sheet rows. Skip the message when there is nothing to report.
+3. Daily corpus job: `--sync-register --sync-drive --ingest` (register first, so new metadata is on the chunks). Add to the scheduler from the playbook. Log a one-line summary to the `runs` table with portal = 'corpus'.
+4. Dashboard: on the `/proposals` page add an "Outcomes pending" tile and, on a call's detail, the "similar past proposals" from `calls.review_context`.
+
+## Done when
+
+- React ✅ on a test card, run `--feedback-only`: a new Register row and `proposals` row exist with outcome pending and the thread reply appears; a second `--feedback-only` creates nothing new.
+- Set one row's submitted_date to 90 days ago and run the reminder: the Slack message lists it; set it back and the reminder is silent.
+- The daily corpus job runs on schedule and shows as a `runs` row with portal 'corpus'.
+- `/proposals` shows the pending tile with the right count.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">during Phase F, and ongoing</span></div>
+        <ol>
+          <li>Test: react ✅ on any Slack card, tell the agent to run <code>--feedback-only</code>, and confirm a new row appeared at the bottom of the Register and a thread reply named it.</li>
+          <li>Reminder test: in the Register, set one pending row's <code>submitted_date</code> to 90 days ago, ask the agent to run the reminder, confirm the Slack message, then set the date back.</li>
+          <li>Ongoing, every time you submit something: create the <code>Submissions/&lt;submission_id&gt;/</code> folder the thread reply names, drop the files in <code>01_submitted</code>, and fill the row's judgment columns.</li>
+          <li>Ongoing, when the reminder arrives: update <code>outcome</code> on the rows it lists. That's the whole maintenance burden.</li>
+        </ol>
+      </div>
+    </section>
+
+    <div class="checklist" id="done">
+      <h2>Acceptance checklist for the corpus</h2>
+      <ol>
+        <li>The Register sheet has a row per Submissions/ folder and the ledger's <code>proposals</code> table mirrors it, with validation errors reported by row.</li>
+        <li>Every document in Drive is mirrored, extracted, chunked and embedded, with register metadata on every chunk; re-runs touch only what changed.</li>
+        <li>Every proposal has a one-paragraph brief that reads as an accurate summary.</li>
+        <li>The reviewer's prompt shows similar past submissions with outcome and strength, plus portal history, and verdict changes are explainable by what was shown.</li>
+        <li>Exemplar retrieval honors the <code>use_as_exemplar</code> flag and prefers wins; evaluator feedback from losses is retrievable too.</li>
+        <li>A ✅ creates a Register row; pending outcomes are surfaced monthly; the corpus job runs daily.</li>
+      </ol>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pre = document.getElementById(btn.dataset.copy);
+      const text = pre.innerText;
+      let ok = false;
+      try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { ok = false; }
+      if (!ok) {
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      const prev = btn.textContent;
+      btn.textContent = ok ? 'Copied' : 'Selected — press ⌘C';
+      btn.classList.add('done');
+      setTimeout(() => { btn.textContent = prev; btn.classList.remove('done'); }, 1800);
+    });
+  });
+</script>

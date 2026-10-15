@@ -1,0 +1,352 @@
+<title>Writer Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: runbook, same system as the Vulcan SOF Agent Playbook and Proposal Corpus Plan. */
+  :root {
+    --bg: #f6f5f0; --surface: #fdfcf8; --ink: #1f2219; --ink-2: #4e5346; --ink-3: #7b8072; --line: #d9d8cc;
+    --accent: #5b6a35; --accent-ink: #ffffff; --accent-soft: #e9ecd9;
+    --code-bg: #26291f; --code-ink: #e8e7da; --code-dim: #a7ab97; --warn: #9a5b1f; --warn-soft: #f4e6d3;
+    --display: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #181a14; --surface: #1f2219; --ink: #e8e7da; --ink-2: #bfc1ae; --ink-3: #8a8e7c; --line: #33372b;
+      --accent: #a9bb6a; --accent-ink: #1a1d12; --accent-soft: #2b3121;
+      --code-bg: #101209; --code-ink: #dcdbcc; --code-dim: #858a74; --warn: #d9a05a; --warn-soft: #3a2d1a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #181a14; --surface: #1f2219; --ink: #e8e7da; --ink-2: #bfc1ae; --ink-3: #8a8e7c; --line: #33372b;
+    --accent: #a9bb6a; --accent-ink: #1a1d12; --accent-soft: #2b3121;
+    --code-bg: #101209; --code-ink: #dcdbcc; --code-dim: #858a74; --warn: #d9a05a; --warn-soft: #3a2d1a;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 64px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+  header.top { grid-column: 1 / -1; padding-block: 40px 28px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  h1 { font-family: var(--display); font-weight: 600; font-size: 40px; line-height: 1.1; margin: 8px 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .lede { max-width: 66ch; color: var(--ink-2); font-size: 16px; margin: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 18px; font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+  .meta b { color: var(--ink-2); font-weight: 500; }
+  nav.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start; }
+  @media (max-width: 860px) { nav.rail { position: static; } }
+  nav.rail .eyebrow { margin-bottom: 10px; }
+  nav.rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  nav.rail a { display: grid; grid-template-columns: 24px 1fr; gap: 8px; padding: 6px 8px; border-radius: 6px; color: var(--ink-2); text-decoration: none; font-size: 13.5px; line-height: 1.3; }
+  nav.rail a:hover { background: var(--accent-soft); color: var(--ink); }
+  nav.rail a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  nav.rail a .n { font-family: var(--mono); font-size: 12px; color: var(--ink-3); padding-top: 2px; }
+  main { min-width: 0; }
+  .howto { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; margin-block: 28px 8px; max-width: 72ch; }
+  .howto h2 { font-family: var(--display); font-size: 20px; margin: 0 0 8px; }
+  .howto ul { margin: 0; padding-left: 20px; color: var(--ink-2); }
+  .howto li + li { margin-top: 4px; }
+  table.reg { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 10px 0 4px; }
+  table.reg th, table.reg td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.reg th { font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; color: var(--ink-3); font-weight: 500; }
+  .tablewrap { overflow-x: auto; }
+  section.phase { padding-block: 36px; border-bottom: 1px solid var(--line); scroll-margin-top: 16px; }
+  section.phase:last-of-type { border-bottom: 0; }
+  .phase-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .phase-num { font-family: var(--mono); font-size: 13px; color: var(--accent-ink); background: var(--accent); padding: 3px 8px; border-radius: 4px; letter-spacing: 0.04em; }
+  h2.phase-title { font-family: var(--display); font-weight: 600; font-size: 27px; margin: 0; line-height: 1.2; text-wrap: balance; }
+  .brief { max-width: 68ch; color: var(--ink-2); margin: 12px 0 0; }
+  .brief p { margin: 0 0 8px; }
+  .depends { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); margin-top: 8px; }
+  .prompt { margin-top: 18px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: var(--code-bg); }
+  .prompt-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .prompt-bar .label { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--code-dim); }
+  .copy { font-family: var(--sans); font-size: 13px; font-weight: 500; color: var(--code-ink); background: transparent; border: 1px solid rgba(255,255,255,0.22); border-radius: 5px; padding: 5px 11px; cursor: pointer; }
+  .copy:hover { background: rgba(255,255,255,0.08); }
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy.done { border-color: var(--accent); color: var(--accent); }
+  pre.body { margin: 0; padding: 16px 18px 18px; font-family: var(--mono); font-size: 13px; line-height: 1.55; color: var(--code-ink); white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: auto; }
+  .you { margin-top: 16px; max-width: 72ch; border: 1.5px solid var(--warn); border-radius: 8px; background: var(--surface); overflow: hidden; }
+  .you-bar { display: flex; align-items: center; gap: 10px; padding: 7px 14px; background: var(--warn-soft); border-bottom: 1px solid var(--warn); }
+  .you-bar .badge { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: var(--warn); padding: 2px 7px; border-radius: 3px; }
+  .you-bar .when { font-size: 13px; color: var(--ink-2); }
+  .you ol { margin: 0; padding: 12px 14px 12px 32px; color: var(--ink-2); font-size: 14px; }
+  .you li + li { margin-top: 5px; }
+  .checklist { margin-top: 36px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px; max-width: 72ch; }
+  .checklist h2 { font-family: var(--display); font-size: 22px; margin: 0 0 10px; }
+  .checklist ol { margin: 0; padding-left: 22px; color: var(--ink-2); }
+  .checklist li + li { margin-top: 6px; }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; }
+  @media (prefers-reduced-motion: no-preference) { .copy { transition: border-color .15s, color .15s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Companion plan · velocity-bd-team repo · drafting/ · Writer agent</div>
+    <h1>Writer Plan</h1>
+    <p class="lede">Five phases that port the proven RFP response pipeline into the new repo: same phase sequence and prompts, new plumbing. Inputs come from the ledger and the corpus, outputs go to the corpus Drive folder and the <code>proposals</code> table, and the first milestone is a real end-to-end run on a real pursued call, which the old pipeline never had.</p>
+    <div class="meta">
+      <span><b>Depends on</b> Playbook Phases 0 and 8 (a pursued call in the ledger) and Corpus Phase E (<code>drafting_context</code>)</span>
+      <span><b>Source</b> reference/yukon/rfp_response_agent.py and reference/yukon/templates/</span>
+      <span><b>Written</b> 2026-10-15</span>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Phases">
+    <div class="eyebrow">Phases</div>
+    <ol>
+      <li><a href="#keep"><span class="n">—</span><span>Keep vs. replace</span></a></li>
+      <li><a href="#w0"><span class="n">W0</span><span>Port the pipeline</span></a></li>
+      <li><a href="#w1"><span class="n">W1</span><span>Inputs from ledger &amp; corpus</span></a></li>
+      <li><a href="#w2"><span class="n">W2</span><span>Outputs, progress, Slack</span></a></li>
+      <li><a href="#w3"><span class="n">W3</span><span>First live run</span></a></li>
+      <li><a href="#w4"><span class="n">W4</span><span>Exemplar-driven drafting</span></a></li>
+      <li><a href="#done"><span class="n">✓</span><span>Acceptance checklist</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <div class="howto" id="keep">
+      <h2>Keep versus replace</h2>
+      <ul>
+        <li>The old script is <code>reference/yukon/rfp_response_agent.py</code> (1,868 lines). Its phase prompts are the product of many sessions of tuning and carry seven upgrades from May 2026: terminology extraction, evidence-first drafting, page budgets, an alignment assessment, a 4-pass multi-perspective review, a compliance check, and a 6-document delivery.</li>
+        <li>It was syntax-checked but never run end-to-end on a live opportunity. Treat the prompts as trusted and the plumbing as untested.</li>
+      </ul>
+      <div class="tablewrap">
+      <table class="reg">
+        <thead><tr><th>Keep as-is</th><th>Replace</th></tr></thead>
+        <tbody>
+          <tr><td>Phase order: 1 scrape listing · 2 attachments · 3 retrieval · 4 requirements · 4.5 alignment · 5 outline · 6 draft · 6.5 review ×4 · 6.75 compliance · 7 checklist · 7.5 polish · 8 deliver</td><td><code>claude -p</code> subprocess with Popen keepalive polling → Anthropic API with streaming and a per-phase timeout</td></tr>
+          <tr><td>Every phase prompt, verbatim, including the <code>---CORRECTED DRAFT---</code> separator convention</td><td><code>--opp-json</code> argument and Prospector <code>draft_runs</code> API → read the call from the ledger by id</td></tr>
+          <tr><td><code>data/templates/*.md</code> and <code>TEMPLATE_MAP</code> (opp type → template)</td><td>ChromaDB <code>_query_chroma</code> → the Librarian's <code>corpus.exemplars.drafting_context()</code></td></tr>
+          <tr><td>Knowledge-base injection (<code>_apply_company_ctx</code>), now reading from the corpus reference material</td><td>Ad-hoc Drive folder → <code>Submissions/&lt;submission_id&gt;/02_working/</code> per the corpus convention, plus a <code>proposals</code> row</td></tr>
+          <tr><td>Slack thread progress messages</td><td>Progress to Yukon's API → the <code>runs</code> table with <code>component = 'writer'</code></td></tr>
+          <tr><td>SAM.gov attachment download (needed for SAM calls; Vulcan has attachments on the call page)</td><td><code>unmapped_types.log</code> → a <code>proposals.type</code> value and a Slack note when no template matches</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    <!-- ───────────────────────── W0 ───────────────────────── -->
+    <section class="phase" id="w0">
+      <div class="phase-head"><span class="phase-num">PHASE W0</span><h2 class="phase-title">Port the pipeline</h2></div>
+      <div class="brief">
+        <p>A mechanical port: every phase becomes a pure function (text in, text out) calling one shared LLM client, with the old prompts copied verbatim. No ledger, no corpus, no Drive yet; the pipeline runs from a JSON file to a local folder so it can be tested without touching anything live.</p>
+        <div class="depends">Depends on: the repo (Playbook Phase 0) and <code>reference/yukon/</code>. Produces: <code>drafting/pipeline.py</code>, <code>drafting/llm.py</code>, <code>drafting/templates/</code>, a file-in/folder-out CLI.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase W0</span><button class="copy" type="button" data-copy="c0">Copy prompt</button></div>
+<pre class="body" id="c0">You are working in the `velocity-bd-team` repository as the Writer agent. You own `drafting/`. This is Writer Phase W0 of 4: port the proven RFP response pipeline from `reference/yukon/rfp_response_agent.py` into `drafting/` with the same phases and the same prompts, but with clean plumbing. Read AGENTS.md first; work on a branch `writer/w0-port` and open a PR.
+
+## Context
+
+The reference script generates a complete proposal response in phases: 1 scrape the listing page, 2 download attachments (SAM.gov only), 3 retrieve similar past submissions, 4 extract requirements (including a "SOLICITATION TERMINOLOGY & KEYWORDS — SOURCE OF TRUTH" section), 4.5 alignment assessment, 5 outline with page budget, 6 draft with evidence-first rules, 6.5 four sequential review passes (government evaluator, second evaluator, company leadership, capability verification), 6.75 mechanical compliance check (outputs a report and a corrected draft split on `---CORRECTED DRAFT---`), 7 submission checklist, 7.5 format polish, 8 deliver. Templates per opportunity type live in `reference/yukon/templates/` and are chosen by `TEMPLATE_MAP`.
+
+The phase prompts are trusted; copy them verbatim. The plumbing is not: it shells out to `claude -p` with a Popen keepalive loop, takes the opportunity as a JSON argument, queries ChromaDB directly, and reports progress to a web API that no longer exists. Replace all of that. The pipeline has never been run end-to-end live, so expect to find bugs in phase hand-offs; fix plumbing bugs, do not rewrite prompts.
+
+## Tasks
+
+1. `drafting/llm.py` — `generate(prompt, system="", model=None, max_tokens=8000, timeout=600, phase_label="") -> str` using the Anthropic API (ANTHROPIC_API_KEY) with streaming so long phases don't idle a connection; model default claude-sonnet-5-5, overridable per call; retries once on transient errors; logs prompt length, output length, and seconds per call; raises a `PhaseError` with the phase label on failure. Never log prompt contents above DEBUG.
+2. `drafting/templates/` — copy every `.md` from `reference/yukon/templates/` and port `TEMPLATE_MAP` into `drafting/templates/__init__.py` as `select_template(opp_type) -> (name, text, is_fallback)`.
+3. `drafting/prompts.py` — every phase prompt from the reference, verbatim, as functions that take their inputs and return the prompt string. Keep the phase numbers in the function names (`p4_requirements`, `p45_alignment`, `p5_outline`, `p6_draft`, `p65_review_pass(n)`, `p675_compliance`, `p7_checklist`, `p75_polish`).
+4. `drafting/pipeline.py` — `run_pipeline(inputs: DraftInputs, out_dir: Path, hooks: Hooks) -> DraftOutputs` where DraftInputs holds: title, portal, opp_type, agency, due_date, url, description, listing_text, attachments (list of {name, text}), past_experience (str), company_context (str), template (name, text). Each phase is a function `phase_xx(inputs, state, out_dir, hooks) -> state`; the pipeline runs them in order, writes each phase's output to `out_dir` with the same filenames as the reference (`requirements.md`, `alignment.md`, `outline.md`, `draft.md`, `draft_review_pass{1-4}.md`, `draft_v2.md`, `compliance_report.md`, `draft_v3.md`, `checklist.md`, `draft_final.md`), and calls `hooks.progress(phase, status, message)` before and after each. A phase failure logs, records it, and continues with the previous best draft (the reference's fallback chain `draft_final → draft_v3 → draft_v2 → draft`). Support `--from-phase` to resume from saved files.
+5. `drafting/cli.py` — `python -m drafting.cli --inputs inputs.json --out data/drafting/&lt;slug&gt;/ [--from-phase 5] [--model ...]`. Hooks print to stdout. No ledger, corpus, Drive, or Slack in this phase.
+6. Tests: one unit test per phase using a fake `generate` that returns canned text, asserting the right files are written and the fallback chain works when a phase raises; one test that `select_template` maps every TEMPLATE_MAP key and falls back to `full_proposal`.
+
+## Done when
+
+- `python -m drafting.cli --inputs tests/fixtures/sample_inputs.json --out data/drafting/sample/` runs every phase with the real API on a small fixture (a short fake solicitation) and writes all the files listed above; you show the directory listing and the per-phase timing.
+- `--from-phase 6.5` re-runs only the review passes from the saved draft.
+- Tests pass. The PR touches only `drafting/` and `tests/`.
+- A diff of each prompt function's output against the reference prompt text shows no wording changes (show the diff command and its empty result).</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">after W0</span></div>
+        <ol>
+          <li>Read <code>draft.md</code> from the fixture run. It will be about a fake solicitation, so judge only whether it reads like the old pipeline's output (structure, evidence markers, terminology section). If it doesn't, the port lost something.</li>
+          <li>Merge the PR as Coordinator once tests pass.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── W1 ───────────────────────── -->
+    <section class="phase" id="w1">
+      <div class="phase-head"><span class="phase-num">PHASE W1</span><h2 class="phase-title">Inputs from the ledger and the corpus</h2></div>
+      <div class="brief">
+        <p>Replaces the JSON file with a call id. The Writer reads the pursued call from <code>calls</code>, pulls the listing text (and attachments for SAM.gov) itself, and gets its past-experience block from the Librarian's <code>drafting_context()</code> instead of querying a vector store directly.</p>
+        <div class="depends">Depends on: W0, Playbook Phase 8 (calls with <code>human_status = 'pursue'</code>), Corpus Phase E. Produces: <code>drafting/inputs.py</code>, <code>--call-id</code>.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase W1</span><button class="copy" type="button" data-copy="c1">Copy prompt</button></div>
+<pre class="body" id="c1">You are working in the `velocity-bd-team` repository as the Writer agent. Phase W0 produced `drafting/pipeline.py` with `run_pipeline(inputs: DraftInputs, out_dir, hooks)` and a CLI that takes an inputs JSON file. This is Writer Phase W1: build the inputs from the ledger and the corpus instead. Branch `writer/w1-inputs`.
+
+## Context
+
+The ledger's `calls` table holds every scraped opportunity (id like `vulcan-&lt;uuid&gt;`, portal, title, type, department, due_date, url, description, extra JSON, human_status, human_notes). A call is ready to draft when `human_status = 'pursue'`. The Librarian's `corpus/exemplars.py` provides `drafting_context(query, portal=None, budget_chars=12000) -> str` (exemplar passages, the solicitations they answered, evaluator feedback, company reference material). The corpus's `_reference/` text (capabilities, boilerplate, bios, win themes) replaces the old knowledge-base injection.
+
+Listing text: for Vulcan SOF, the call page requires login; reuse `portals/vulcan_sof/auth.login` and the same page-text extraction the scraper uses, via a function the portal agent exposes as `PORTAL["fetch_full_text"](page, url) -> {"text": str, "attachments": [{"name", "url"}]}`. If a portal doesn't expose it, fall back to `description`. For SAM.gov, port the attachment download from the reference (`phase_download_attachments`) behind the same interface, to be wired when that portal agent exists.
+
+## Tasks
+
+1. `drafting/inputs.py` — `build_inputs(call_id) -> DraftInputs`: load the call; refuse with a clear message if human_status isn't 'pursue' (override with `--force`); map `calls.type` to `opp_type` using the reference's `_resolve_opp_type` logic; fetch full listing text and attachment text through the portal's `fetch_full_text` with a 120s cap, caching under `data/drafting/&lt;call_id&gt;/source/`; build `past_experience` from `drafting_context(title + description, portal=slug)`; build `company_context` from the corpus reference material (fall back to `reference/yukon/knowledge-base/*.md` if the corpus isn't ingested yet); select the template.
+2. Ask the portal agents, via a GitHub issue per portal, to expose `fetch_full_text` in their `PORTAL` dict; implement the Vulcan one yourself in this PR only if the Vulcan agent agrees in the issue, otherwise fall back to description and note it.
+3. CLI: `python -m drafting.cli --call-id vulcan-… --out data/drafting/&lt;call_id&gt;/`. Keep `--inputs` for fixtures. Write the resolved `DraftInputs` to `source/inputs.json` so a run is reproducible.
+4. Record `human_notes` from the call in the inputs and pass it into the alignment prompt as "Team notes on this pursuit:", because the person who marked it pursue usually said why.
+
+## Done when
+
+- For a real call with human_status 'pursue', `--call-id` produces `source/inputs.json` showing listing text longer than the description, a non-empty past_experience block naming real submission_ids, the chosen template, and the team notes.
+- For a call with human_status null, the CLI refuses with a message naming the call and the status; `--force` proceeds.
+- The resulting `requirements.md` references terminology that appears in the listing text but not in the short description (proof the full text was used).
+- The GitHub issues to portal agents exist.</pre>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── W2 ───────────────────────── -->
+    <section class="phase" id="w2">
+      <div class="phase-head"><span class="phase-num">PHASE W2</span><h2 class="phase-title">Outputs, progress, and Slack</h2></div>
+      <div class="brief">
+        <p>Where the drafts go and how the team watches. Outputs land in the corpus Drive folder under the submission's <code>02_working/</code>, so the Librarian's conventions hold from the first draft; a <code>proposals</code> row is created; progress is a <code>runs</code> row plus a Slack thread under the call's card, with the keepalive behavior the old pipeline needed for 20-minute phases.</p>
+        <div class="depends">Depends on: W1, Corpus Phase A (Register), Playbook Phase 8 (Slack). Produces: <code>drafting/deliver.py</code>, <code>drafting/progress.py</code>, the "Draft" trigger.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase W2</span><button class="copy" type="button" data-copy="c2">Copy prompt</button></div>
+<pre class="body" id="c2">You are working in the `velocity-bd-team` repository as the Writer agent. Phases W0–W1 produced a pipeline that drafts from a `--call-id` into a local folder. This is Writer Phase W2: deliver outputs to the right places, report progress, and let the team trigger a draft. Branch `writer/w2-deliver`.
+
+## Context
+
+Corpus conventions: each submission has a Drive folder `Submissions/&lt;submission_id&gt;/{00_solicitation,01_submitted,02_working,03_outcome}/` where `submission_id = YYYY-MM-DD_portal_short-title`, and a row in the Register sheet and the ledger's `proposals` table. The Writer's drafts are working documents, so they go in `02_working/`. The Librarian's `corpus/register.py` can create a Register row (`create_register_row(fields)`) and `ledger.queries.upsert_proposal` writes the table. Slack delivery (`slack/sink.py`) posts one card per call and stores `calls.slack_channel` / `slack_ts`; the Writer reports into that card's thread. Phases can run 5–20 minutes each, so the old pipeline posted a keepalive ("⏳ Still drafting… (3m elapsed)") every 60 seconds; keep that.
+
+## Tasks
+
+1. `drafting/progress.py` — a `Hooks` implementation that: creates a `runs` row with component 'writer' and the call id in stage_counts at start and finishes it at the end; posts one thread reply per phase start/finish under the call's Slack card; while any single LLM call runs longer than 60s, posts "⏳ Still &lt;phase&gt;… (Nm elapsed)" every 60s on a background timer; posts a final summary with links.
+2. `drafting/deliver.py` — at the end of a run: compute `submission_id` (today's date, portal slug, slugified title ≤40 chars; reuse an existing `proposals.source_call_id` match if one exists so re-drafts don't create duplicates); create the Drive folder tree if absent; upload to `02_working/` the six documents the reference delivered (Requirements Analysis, Alignment Assessment, Proposal Outline, Draft Response, Compliance Report, Submission Checklist) as Google Docs converted from markdown, plus the source listing text to `00_solicitation/` if that folder is empty; create the Register row and `upsert_proposal` with outcome 'pending', type from opp_type, source_call_id = call id; store the folder link in `calls.extra["draft_folder"]`.
+3. Trigger: a Slack reaction ✍️ (`:writing_hand:`) on a call card, or the dashboard's "Draft" button, sets `calls.extra["draft_requested_at"]`; a `python -m drafting.cli --pending` run picks up every call with that flag and no completed writer run, drafts it, and clears the flag. Add `--pending` to the daily schedule after the scanner. Never draft a call that isn't human_status 'pursue', even if flagged.
+4. Idempotence: re-running for the same call reuses the submission folder and overwrites the working docs; it never creates a second Register row.
+
+## Done when
+
+- A real run from `--call-id` ends with: a Drive folder in the corpus with six docs in `02_working/`, a Register row and `proposals` row with outcome pending and source_call_id set, a `runs` row with component 'writer' and status completed, and a Slack thread under the call's card showing phase messages, at least one keepalive, and a final summary with the folder link.
+- Running it again for the same call updates the docs in place and creates no new rows (show counts before and after).
+- React ✍️ on a card whose call is 'pursue', run `--pending`: it drafts. React ✍️ on one that is not 'pursue': it is skipped with a thread reply explaining why.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">during W2</span></div>
+        <ol>
+          <li>Add ✍️ to the emoji the team knows: "✍️ on a card = draft a response for this".</li>
+          <li>After the first delivery, open the Drive folder and confirm the six docs are readable Google Docs, not raw markdown.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── W3 ───────────────────────── -->
+    <section class="phase" id="w3">
+      <div class="phase-head"><span class="phase-num">PHASE W3</span><h2 class="phase-title">First live run and the fix list</h2></div>
+      <div class="brief">
+        <p>The milestone the old pipeline never reached. Pick one real pursued call, run the whole thing, and read every document. The output of this phase is a prioritized fix list, not features. Expect hand-off bugs between phases and prompts that behave differently on real solicitation lengths than on fixtures.</p>
+        <div class="depends">Depends on: W2 and at least one call marked pursue. Produces: a reviewed draft set, <code>docs/WRITER_FINDINGS.md</code>, fixes merged.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase W3</span><button class="copy" type="button" data-copy="c3">Copy prompt</button></div>
+<pre class="body" id="c3">You are working in the `velocity-bd-team` repository as the Writer agent. Phases W0–W2 produced a complete pipeline from a pursued call to six delivered documents. This is Writer Phase W3: the first full run on a real opportunity, and the fixes it reveals. Branch `writer/w3-live-fixes`.
+
+## Context
+
+The pipeline's prompts were tuned over many sessions but the full sequence has never run end-to-end on a live solicitation; the last attempt timed out in the review phase at 76K-character prompts and was never retried. Your job is to run it for real, measure it, read the output critically, and fix plumbing and prompt-size problems. Do not rewrite the substance of the prompts; if a prompt needs a substantive change, propose it in the findings document instead.
+
+## Tasks
+
+1. Run `--call-id &lt;the call David names&gt;` with full logging. Record per phase: input chars, output chars, seconds, model, retries. Save to `data/drafting/&lt;call_id&gt;/metrics.json`.
+2. Read every output document and write `docs/WRITER_FINDINGS.md` with sections: What worked · Hand-off bugs (a phase consumed the wrong file, lost a section, etc.) · Prompt-size problems (any phase whose prompt exceeded 60K chars; propose chunking or trimming for the review passes, which concatenate draft + outline + requirements) · Quality issues in the draft (unsupported claims without `[NEEDS EVIDENCE:]` markers, terminology mismatches the compliance phase missed, page-budget misses) · Proposed prompt changes (for David to approve; not applied) · Cost and time for the run.
+3. Fix every hand-off bug and prompt-size problem in this PR. For the review passes, if the concatenated prompt exceeds the threshold, pass the outline and requirements as summaries (generate once, reuse) rather than in full.
+4. Re-run from the earliest affected phase with `--from-phase`, confirm the fixes, and update metrics.json.
+5. Add a `--budget` guard: estimate total tokens before starting from the listing and attachment sizes, and refuse (with the estimate) above a configurable cap unless `--force`.
+
+## Done when
+
+- `metrics.json` shows every phase completed on the real call, with no phase over the prompt-size threshold after fixes.
+- `docs/WRITER_FINDINGS.md` exists with all six sections filled from the actual run, and David has read it.
+- The delivered Draft Response is one David would be willing to hand to a human editor as a starting point. He decides; you report.
+- Total wall-clock time and API cost for the run are stated.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">before and after W3</span></div>
+        <ol>
+          <li>Before: pick the call. A real, current Vulcan call you'd genuinely consider pursuing, marked 👍 in Slack. Not a closed one; the point is to catch problems on something you might actually submit.</li>
+          <li>After: read the Draft Response and the Alignment Assessment yourself, as the proposal lead, not as a reviewer of the code. Mark anything you'd be embarrassed to send. That list is what W4 and the Reviewer learn from.</li>
+          <li>Read <code>docs/WRITER_FINDINGS.md</code> and approve or reject each proposed prompt change; the agent won't change prompt substance without you.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── W4 ───────────────────────── -->
+    <section class="phase" id="w4">
+      <div class="phase-head"><span class="phase-num">PHASE W4</span><h2 class="phase-title">Exemplar-driven drafting</h2></div>
+      <div class="brief">
+        <p>The first genuinely new capability, and the reason the corpus exists: the draft phase writes in the voice of your strongest winning submissions, the alignment phase cites real past performance with outcomes, and the review passes check the draft against evaluator feedback you actually received. Only worth doing once W3's fix list is closed and the Register has a few rated, outcome-known rows.</p>
+        <div class="depends">Depends on: W3, Corpus Phases C–E with exemplars flagged. Produces: exemplar injection in phases 4.5, 6 and 6.5; a before/after comparison.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase W4</span><button class="copy" type="button" data-copy="c4">Copy prompt</button></div>
+<pre class="body" id="c4">You are working in the `velocity-bd-team` repository as the Writer agent. Phases W0–W3 produced a pipeline that runs end-to-end on live calls, with a findings document and approved prompt changes. This is Writer Phase W4: make the corpus shape the writing. Branch `writer/w4-exemplars`.
+
+## Context
+
+The Librarian's `corpus/exemplars.py` provides `find_exemplars(query, portal, k, require_exemplar=True, prefer_won=True)` (passages from submissions the team flagged as exemplars, each paired with the solicitation excerpt it answered), `find_feedback(query, portal, k)` (evaluator feedback and debriefs from `03_outcome/`, wins and losses), and `find_reference(query, k)` (company material). The Register carries outcome and strength_rating per submission. Until now the Writer used only the combined `drafting_context()` block in the retrieval phase. This phase threads targeted retrieval into the phases where it changes the writing.
+
+## Tasks
+
+1. Phase 4.5 alignment: replace the generic past-experience block with `find_exemplars` results filtered to won/shortlisted plus `find_reference` past-performance write-ups, and instruct the prompt to cite them by submission title with outcome ("as demonstrated in &lt;title&gt; (won, 2026)"). Never cite a lost submission as past performance; losses may inform gaps only.
+2. Phase 6 draft: for each major outline section, retrieve up to two exemplar passages on that section's topic and pass them under "WRITE IN THIS VOICE — passages from our strongest submissions (do not copy; match tone, structure, and specificity)". Keep the total exemplar text under 8K chars per section call; if the draft is generated in one call, cap at 12K total and prefer section-level generation when the outline has more than six sections.
+3. Phase 6.5 review pass 1 (government evaluator): add `find_feedback` results under "EVALUATOR FEEDBACK WE HAVE RECEIVED BEFORE — check the draft against each point", so the review catches the mistakes that cost points last time.
+4. Record in `runs.stage_counts` which submission_ids were used in each phase, and write them to the Alignment Assessment document's footer so a human can see the lineage.
+5. Comparison: re-run the W3 call with `--no-exemplars` and with exemplars, from phase 4.5. Produce `docs/WRITER_EXEMPLAR_COMPARISON.md` with side-by-side excerpts of the alignment and two draft sections, and the metrics for both runs.
+
+## Done when
+
+- The Alignment Assessment cites at least one real won submission by title, and no lost one as past performance.
+- Two draft sections visibly follow exemplar structure and specificity in the comparison document; David judges which run reads better and says so in the document.
+- Review pass 1 output references at least one item from real evaluator feedback when such feedback exists in the corpus.
+- Prompt sizes stay under the W3 threshold; metrics for both runs are recorded.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">before and after W4</span></div>
+        <ol>
+          <li>Before: the Register needs at least three rows with <code>use_as_exemplar = yes</code> and known outcomes, and ideally one <code>03_outcome/</code> folder with real evaluator feedback. Without that, this phase has nothing to learn from.</li>
+          <li>After: read the comparison document and write one paragraph at the top saying which run you'd send and why. That judgment is the acceptance test.</li>
+        </ol>
+      </div>
+    </section>
+
+    <div class="checklist" id="done">
+      <h2>Acceptance checklist for the Writer</h2>
+      <ol>
+        <li>Every phase prompt from the reference pipeline survives the port with no wording change; the plumbing is API-based, resumable, and tested.</li>
+        <li>A draft starts from a call id, reads the full listing, and takes its memory from the corpus rather than a private vector store.</li>
+        <li>Outputs follow the corpus folder convention and create exactly one Register row per pursuit; progress is visible in Slack and in <code>runs</code>.</li>
+        <li>One real pursued call has been drafted end to end, measured, read by David, and the findings closed.</li>
+        <li>Exemplars, real past performance with outcomes, and real evaluator feedback shape the alignment, the draft, and the first review pass, with lineage recorded.</li>
+      </ol>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pre = document.getElementById(btn.dataset.copy);
+      const text = pre.innerText;
+      let ok = false;
+      try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { ok = false; }
+      if (!ok) {
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      const prev = btn.textContent;
+      btn.textContent = ok ? 'Copied' : 'Selected — press ⌘C';
+      btn.classList.add('done');
+      setTimeout(() => { btn.textContent = prev; btn.classList.remove('done'); }, 1800);
+    });
+  });
+</script>

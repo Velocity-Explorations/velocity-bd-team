@@ -1,0 +1,4 @@
+# Python 3.11+
+psycopg[binary]>=3.2
+python-dotenv>=1.0
+pytest>=8

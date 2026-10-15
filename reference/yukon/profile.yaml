@@ -1,0 +1,217 @@
+# Yukon Profile — Velocity Explorations
+name: Velocity Explorations
+
+company_meta:
+  legal_name: "Velocity Explorations, Inc."
+  short_name: "Velocity Explorations"
+  cage: "9KCQ5"
+  uei: "HFEDQFZUJSZ6"
+  duns: "11-909-2408"
+  business_size: "Small Business (WOSB)"
+  poc_name: "Alec Leeseberg"
+  poc_title: "President"
+  poc_email: "alec@velocityexplorations.com"
+  poc_phone: "(888) 780-1888"
+  naics_display: "541511, 541512, 541715"
+  company_description: "a small defense technology company specializing in AI/ML, command & control (Echo C2), and software modernization"
+discord_channel: "1483802601265959023"  # #bd-opportunities thread under #velocity
+discord_webhook: ""
+slack_channel: "C0AN8AMM4AW"  # #bd-prospector (Velocity Slack)
+google_drive_folder_id: "1LbHUGFrwhiwOfW6FlV1wF-n4rnslPiJm"
+google_drive_account: "david@velocityexplorations.com"
+
+# NAICS codes — Velocity's core competencies (software dev, AI/ML, R&D only)
+# Removed: 541330 (Engineering Services) — catches hardware/physical contracts
+# Removed: 561990 (All Other Support Services) — catches admin/logistics noise
+naics:
+  - 541511  # Custom Computer Programming Services
+  - 541512  # Computer Systems Design Services
+  - 541513  # Computer Facilities Management Services
+  - 541715  # Research and Development in the Physical; Engineering; and Life Sciences
+  - 541519  # Other Computer Related Services
+
+# Tight keywords for DoD scrape portals (NSTXL, DIU) — no NAICS gating
+scrape_keywords:
+  - artificial intelligence
+  - machine learning
+  - autonomous systems
+  - command and control
+  - computer vision
+  - natural language processing
+  - COBOL modernization
+  - legacy modernization
+  - transcription
+  - translation
+  - sensor fusion
+  - C5ISR
+  - software defined
+  - AI hardware
+  - edge AI
+  - autonomous vehicle
+  - multi-agent
+
+# State/local bid keywords (BidNet CO + FL) — IT/software/data focus, no defense-specific terms
+bidnet_keywords:
+  - software modernization
+  - legacy modernization
+  - system modernization
+  - artificial intelligence
+  - machine learning
+  - data analytics
+  - data platform
+  - cloud migration
+  - managed services
+  - IT services
+  - information technology
+  - software development
+  - application development
+  - cybersecurity
+  - DevSecOps
+  - ERP
+  - COBOL
+  - database modernization
+  - digital transformation
+  - software as a service
+  - SaaS
+  - data migration
+  - data conversion
+  - web development
+  - website redesign
+  - network infrastructure
+
+# Broader keywords — used with NAICS-gated portals (SAM.gov) where NAICS is primary filter
+# Keywords — Velocity focus areas
+keywords:
+  - AI
+  - artificial intelligence
+  - machine learning
+  - autonomous systems
+  - C2
+  - command and control
+  - ECHO
+  - COBOL modernization
+  - legacy modernization
+  - computer vision
+  - NLP
+  - natural language processing
+  - edge computing
+  - SBIR
+  - STTR
+  - software development
+  - DevSecOps
+  - cloud migration
+  - data analytics
+  - transcription
+  - translation
+  - situational awareness
+  - sensor fusion
+  - autonomous vehicle
+  - navigation
+  - communications intelligence
+  - warfighter
+  - defense AI
+
+# Set-asides Velocity qualifies for
+set_asides:
+  - SB     # Small Business
+  - SDVOSB # Service-Disabled Veteran-Owned Small Business (verify eligibility)
+  - VOSB   # Veteran-Owned Small Business (verify eligibility)
+
+portals:
+
+  # --- NIGHTLY ---
+  - id: sam_gov
+    name: SAM.gov
+    url: https://api.sam.gov/opportunities/v2/search
+    cadence: nightly
+    type: api
+    auth: true  # requires SAM_GOV_API_KEY in .env
+
+  # --- WEEKLY ---
+  - id: vulcan_sof
+    name: Vulcan SOF
+    url: https://vulcan-sof.com
+    cadence: weekly
+    type: scrape
+    auth: true  # requires VULCAN_SOF_USERNAME + VULCAN_SOF_PASSWORD in .env
+
+  - id: nstxl
+    name: NSTXL
+    url: https://nstxl.org/opportunities/
+    cadence: weekly
+    type: scrape
+    auth: false
+
+  # Army SBIR — topics are fully JS-rendered, no accessible API/RSS
+  # All Army SBIR solicitations also appear on SAM.gov (ptype=s) — covered there
+  # - id: army_sbir (SKIP — covered by SAM.gov nightly scan)
+
+  - id: diu
+    name: DIU
+    url: https://www.diu.mil/work-with-us
+    cadence: weekly
+    type: scrape
+    auth: false
+
+  - id: iarpa
+    name: IARPA
+    url: https://www.iarpa.gov/research-programs
+    cadence: weekly
+    type: scrape
+    auth: false
+
+  - id: strikewerx
+    name: AFWERX / STRIKEWERX
+    url: https://www.strikewerx.com/opportunities
+    cadence: weekly
+    type: scrape
+    auth: false
+
+  - id: ac_cto
+    name: AC CTO / APFIT
+    url: https://ac.cto.mil/apfit/
+    cadence: weekly
+    type: scrape
+    auth: false
+
+  - id: doe_sbir
+    name: DOE Science SBIR
+    url: https://science.osti.gov/sbir/Funding-Opportunities
+    cadence: weekly
+    type: scrape
+    auth: false
+
+  - id: space_force
+    name: Space Force
+    url: https://my.spaceforce.mil/Articles
+    cadence: weekly
+    type: scrape
+    auth: false
+
+  - id: bidnet_colorado
+    name: BidNet Colorado
+    url: https://www.bidnetdirect.com/colorado/solicitations/open-bids
+    cadence: weekly
+    type: scrape
+    auth: false
+
+  - id: bidnet_florida
+    name: BidNet Florida
+    url: https://www.bidnetdirect.com/florida/solicitations/open-bids
+    cadence: weekly
+    type: scrape
+    auth: false
+
+  - id: space_florida
+    name: Space Florida
+    url: https://www.spaceflorida.gov/solicitations
+    cadence: weekly
+    type: scrape
+    auth: false
+
+  - id: nasa_forecast
+    name: NASA Acquisition Forecast
+    url: https://www.hq.nasa.gov/office/procurement/forecast/AcqForecastNew.xlsx
+    cadence: weekly
+    type: scrape
+    auth: false

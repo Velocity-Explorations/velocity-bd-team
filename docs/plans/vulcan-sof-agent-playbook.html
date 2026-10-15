@@ -1,0 +1,953 @@
+<title>Vulcan SOF Agent Playbook</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: runbook. Sticky phase rail on the left at desktop, single column on phones.
+     Each phase = brief for David + one copyable prompt block for the Grok agent. */
+  :root {
+    --bg: #f6f5f0;
+    --surface: #fdfcf8;
+    --ink: #1f2219;
+    --ink-2: #4e5346;
+    --ink-3: #7b8072;
+    --line: #d9d8cc;
+    --accent: #5b6a35;
+    --accent-ink: #ffffff;
+    --accent-soft: #e9ecd9;
+    --code-bg: #26291f;
+    --code-ink: #e8e7da;
+    --code-dim: #a7ab97;
+    --warn: #9a5b1f;
+    --warn-soft: #f4e6d3;
+    --display: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #181a14; --surface: #1f2219; --ink: #e8e7da; --ink-2: #bfc1ae; --ink-3: #8a8e7c; --line: #33372b;
+      --accent: #a9bb6a; --accent-ink: #1a1d12; --accent-soft: #2b3121;
+      --code-bg: #101209; --code-ink: #dcdbcc; --code-dim: #858a74; --warn: #d9a05a; --warn-soft: #3a2d1a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #181a14; --surface: #1f2219; --ink: #e8e7da; --ink-2: #bfc1ae; --ink-3: #8a8e7c; --line: #33372b;
+    --accent: #a9bb6a; --accent-ink: #1a1d12; --accent-soft: #2b3121;
+    --code-bg: #101209; --code-ink: #dcdbcc; --code-dim: #858a74; --warn: #d9a05a; --warn-soft: #3a2d1a;
+  }
+
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 64px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+
+  header.top { grid-column: 1 / -1; padding-block: 40px 28px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  h1 { font-family: var(--display); font-weight: 600; font-size: 40px; line-height: 1.1; margin: 8px 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .lede { max-width: 66ch; color: var(--ink-2); font-size: 16px; margin: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 18px; font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+  .meta b { color: var(--ink-2); font-weight: 500; }
+  .meta a { color: var(--accent); }
+
+  nav.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start; }
+  @media (max-width: 860px) { nav.rail { position: static; } }
+  nav.rail .eyebrow { margin-bottom: 10px; }
+  nav.rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  nav.rail a { display: grid; grid-template-columns: 24px 1fr; gap: 8px; padding: 6px 8px; border-radius: 6px; color: var(--ink-2); text-decoration: none; font-size: 13.5px; line-height: 1.3; }
+  nav.rail a:hover { background: var(--accent-soft); color: var(--ink); }
+  nav.rail a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  nav.rail a .n { font-family: var(--mono); font-size: 12px; color: var(--ink-3); padding-top: 2px; }
+
+  main { min-width: 0; }
+  .howto { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; margin-block: 28px 8px; max-width: 72ch; }
+  .howto h2 { font-family: var(--display); font-size: 20px; margin: 0 0 8px; }
+  .howto ul { margin: 0; padding-left: 20px; color: var(--ink-2); }
+  .howto li + li { margin-top: 4px; }
+  .tree { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; background: var(--accent-soft); border-radius: 6px; padding: 12px 14px; margin: 10px 0 0; overflow-x: auto; color: var(--ink); white-space: pre; }
+
+  section.phase { padding-block: 36px; border-bottom: 1px solid var(--line); scroll-margin-top: 16px; }
+  section.phase:last-of-type { border-bottom: 0; }
+  .phase-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .phase-num { font-family: var(--mono); font-size: 13px; color: var(--accent-ink); background: var(--accent); padding: 3px 8px; border-radius: 4px; letter-spacing: 0.04em; }
+  h2.phase-title { font-family: var(--display); font-weight: 600; font-size: 27px; margin: 0; line-height: 1.2; text-wrap: balance; }
+  .brief { max-width: 68ch; color: var(--ink-2); margin: 12px 0 0; }
+  .brief p { margin: 0 0 8px; }
+  .depends { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); margin-top: 8px; }
+
+  .prompt { margin-top: 18px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: var(--code-bg); }
+  .prompt-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .prompt-bar .label { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--code-dim); }
+  .copy { font-family: var(--sans); font-size: 13px; font-weight: 500; color: var(--code-ink); background: transparent; border: 1px solid rgba(255,255,255,0.22); border-radius: 5px; padding: 5px 11px; cursor: pointer; }
+  .copy:hover { background: rgba(255,255,255,0.08); }
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy.done { border-color: var(--accent); color: var(--accent); }
+  pre.body { margin: 0; padding: 16px 18px 18px; font-family: var(--mono); font-size: 13px; line-height: 1.55; color: var(--code-ink); white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: auto; }
+
+  .note { display: flex; gap: 10px; align-items: flex-start; background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 10px 14px; border-radius: 0 6px 6px 0; margin-top: 16px; max-width: 72ch; color: var(--ink-2); font-size: 14px; }
+  .note b { color: var(--ink); font-weight: 600; }
+
+  /* "Your part" boxes: the human's steps, visually distinct from the agent prompt */
+  .you { margin-top: 16px; max-width: 72ch; border: 1.5px solid var(--warn); border-radius: 8px; background: var(--surface); overflow: hidden; }
+  .you-bar { display: flex; align-items: center; gap: 10px; padding: 7px 14px; background: var(--warn-soft); border-bottom: 1px solid var(--warn); }
+  .you-bar .badge { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: var(--warn); padding: 2px 7px; border-radius: 3px; }
+  .you-bar .when { font-size: 13px; color: var(--ink-2); }
+  .you ol { margin: 0; padding: 12px 14px 12px 32px; color: var(--ink-2); font-size: 14px; }
+  .you li + li { margin-top: 5px; }
+  .you p { margin: 0; padding: 12px 14px; color: var(--ink-2); font-size: 14px; }
+  .setup { padding-block: 28px 8px; }
+  .setup h2 { font-family: var(--display); font-size: 24px; margin: 0 0 6px; }
+  .setup > p { max-width: 68ch; color: var(--ink-2); margin: 0 0 14px; }
+  .setup h3 { font-family: var(--sans); font-weight: 600; font-size: 15px; margin: 18px 0 6px; }
+  .setup ol { margin: 0; padding-left: 22px; color: var(--ink-2); max-width: 72ch; }
+  .setup li + li { margin-top: 5px; }
+  table.reg { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 6px 0 4px; }
+  table.reg th, table.reg td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.reg th { font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; color: var(--ink-3); font-weight: 500; }
+  .tablewrap { overflow-x: auto; }
+
+  .checklist { margin-top: 36px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px; max-width: 72ch; }
+  .checklist h2 { font-family: var(--display); font-size: 22px; margin: 0 0 10px; }
+  .checklist ol { margin: 0; padding-left: 22px; color: var(--ink-2); }
+  .checklist li + li { margin-top: 6px; }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; }
+  @media (prefers-reduced-motion: no-preference) { .copy { transition: border-color .15s, color .15s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Handoff spec · Grok agent · velocity-bd-team repo</div>
+    <h1>Vulcan SOF Agent Playbook</h1>
+    <p class="lede">Ten self-contained prompts that take an agent from an empty repository to a scheduled scanner that logs into Vulcan SOF, scrapes open calls, judges fit, delivers results to Slack, learns from the team's reactions, and shows everything in a dashboard. One repo, one database as the contract between every part. Each prompt restates its own context, so it can be pasted into a fresh session.</p>
+    <div class="meta">
+      <span><b>Companion plan</b> Proposal Corpus (training on past submissions) lives on its own page and plugs into Phase 6</span>
+      <span><b>Derived from</b> the retired Yukon scanner, including every fix that cost us a hung scan</span>
+      <span><b>Written</b> 2026-10-15</span>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Phases">
+    <div class="eyebrow">Phases</div>
+    <ol>
+      <li><a href="#team"><span class="n">—</span><span>The team of agents</span></a></li>
+      <li><a href="#setup"><span class="n">YOU</span><span>Your setup, step by step</span></a></li>
+      <li><a href="#p0"><span class="n">00</span><span>Repo &amp; ledger foundation</span></a></li>
+      <li><a href="#p1"><span class="n">01</span><span>Browser &amp; reconnaissance</span></a></li>
+      <li><a href="#p2"><span class="n">02</span><span>Login with email OTP</span></a></li>
+      <li><a href="#p3"><span class="n">03</span><span>Session persistence</span></a></li>
+      <li><a href="#p4"><span class="n">04</span><span>Enumerate &amp; scrape calls</span></a></li>
+      <li><a href="#p5"><span class="n">05</span><span>Relevance filter &amp; blocklist</span></a></li>
+      <li><a href="#p6"><span class="n">06</span><span>LLM fit review</span></a></li>
+      <li><a href="#p7"><span class="n">07</span><span>Orchestration &amp; resilience</span></a></li>
+      <li><a href="#p8"><span class="n">08</span><span>Slack delivery &amp; feedback</span></a></li>
+      <li><a href="#p9"><span class="n">09</span><span>Dashboard scaffold</span></a></li>
+      <li><a href="#done"><span class="n">✓</span><span>Acceptance checklist</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <div class="howto">
+      <h2>How to use this</h2>
+      <ul>
+        <li>Run the phases in order. Each one builds on files and database tables the previous phase produced, and each prompt says what it expects to already exist.</li>
+        <li>Paste one prompt per session or turn. Every prompt carries its own context block, so nothing depends on the agent remembering earlier chats.</li>
+        <li>Each prompt ends with explicit "Done when" criteria. Don't move on until the agent has shown the evidence those criteria ask for.</li>
+        <li>The ledger (Phase 0) is the spine. Every later phase reads and writes it; nothing passes between stages as loose JSON files.</li>
+        <li>The prompts say "whatever mail / model / alert access this environment has" so they work for any agent. Put the concrete answers in <code>AGENTS.md</code> once (block below) and every phase inherits them.</li>
+        <li>Anything you have to do yourself is in an orange <b>Your part</b> box. The setup section right below collects the ones that happen before a phase starts; the boxes inside each phase cover what you do during and after it.</li>
+      </ul>
+      <div class="tree">## Environment specifics (David's PC, Windows)
+- Shell: PowerShell. Python 3.11+ in a venv at .venv. Use pathlib everywhere; never hard-code / or \.
+- Mail and Drive access: the `gog` CLI (install the Windows release, run `gog auth` as david@velocityexplorations.com).
+  OTP mailbox: gog gmail search / gog gmail read --account david@velocityexplorations.com
+  Drive: gog drive (list / download / export) for the corpus folder
+  If gog is unavailable on this machine, implement the same calls with the Gmail and Drive APIs behind the same function signatures.
+- LLM for review and briefs: Anthropic API via ANTHROPIC_API_KEY
+  (claude-haiku-5-5 for per-call review, claude-sonnet-5-5 for proposal briefs)
+- Embeddings: Ollama for Windows, nomic-embed-text at http://localhost:11434 (768 dims)
+- Alerts and delivery: Slack — SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
+- Scheduler: Windows Task Scheduler, created by a PowerShell script in scripts/ (Register-ScheduledTask); never overlapping runs.
+- Playwright's Chromium shows up as chrome.exe in Task Manager.
+
+## Prerequisites you create by hand
+- Before Phase 0: hosted Postgres (Neon/Supabase), DATABASE_URL, pgvector enabled
+- Before Phase 1: .env with VULCAN_SOF_USERNAME / PASSWORD / VULCAN_OTP_MAILBOX
+- Before Phase 8: a Slack app (chat:write, reactions:read, channels:history), bot token, channel ID
+- Before Corpus A: the Drive folder built, its folder ID in CORPUS_DRIVE_FOLDER_ID</div>
+      <div class="tree">velocity-bd-team/
+  ledger/              schema.sql · migrate.py · db.py · queries.py        Phase 0
+  portals/vulcan_sof/  browser · recon · otp · auth · session · scrape    Phases 1–5
+                       keywords.yaml · filter.py
+  review/              reviewer.py · feedback.py                          Phases 6, 8
+  slack/               sink.py                                            Phase 8
+  corpus/              (Proposal Corpus plan)
+  dashboard/           Next.js app reading the same database              Phase 9
+  run.py               orchestration                                      Phase 7
+  docs/                LEDGER_SCHEMA.md · RUNBOOK.md
+  data/                git-ignored: cookies, caches, samples, logs</div>
+    </div>
+
+    <section class="setup" id="team">
+      <h2>The team of agents</h2>
+      <p>One agent per portal, a coordinator over them, and a few specialists that own the parts of the pipeline every portal shares. Each agent owns a directory; everyone else changes that directory only through a pull request. The ledger is the only thing they all touch, and only the coordinator changes its schema.</p>
+      <div class="tablewrap">
+      <table class="reg">
+        <thead><tr><th>Agent</th><th>Owns</th><th>Job</th><th>Builds</th></tr></thead>
+        <tbody>
+          <tr><td><b>Coordinator</b></td><td><code>run.py</code>, <code>ledger/</code>, <code>AGENTS.md</code>, <code>docs/</code>, the scheduler</td><td>Runs the pipeline, watches the <code>runs</code> table, alerts on failures, merges PRs, is the only one who changes the schema, keeps <code>docs/STATUS.md</code> current</td><td>Phases 0, 7</td></tr>
+          <tr><td><b>Portal agents</b> (one each: Vulcan SOF first, then SAM.gov, NSTXL, DIU, AFWERX…)</td><td><code>portals/&lt;slug&gt;/</code></td><td>Log in, scrape, filter for that portal; produce <code>calls</code> rows in the shared record shape; fix the scraper when the site changes</td><td>Phases 1–5 per portal</td></tr>
+          <tr><td><b>Reviewer</b></td><td><code>review/</code></td><td>The fit judgment every portal's calls pass through: the review prompt, few-shot feedback, calibration against <code>human_status</code>; reports precision/recall monthly</td><td>Phases 6, 8 (feedback half)</td></tr>
+          <tr><td><b>Librarian</b></td><td><code>corpus/</code></td><td>Drive sync, register sync, extraction, embeddings, exemplar retrieval; keeps the past-proposal memory accurate</td><td>Proposal Corpus plan A–F</td></tr>
+          <tr><td><b>Writer</b></td><td><code>drafting/</code></td><td>Turns a pursued call plus exemplars into a draft response (the old RFP pipeline: requirements → alignment → outline → draft → review → compliance); never touches the scanner</td><td>Writer Plan W0–W4 (its own page)</td></tr>
+          <tr><td><b>Dashboard</b></td><td><code>dashboard/</code>, <code>slack/</code></td><td>Everything the humans see: Slack cards, the web app, the triage action</td><td>Phases 8 (delivery half), 9</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <h3>Two cautions</h3>
+      <ol>
+        <li><b>Don't start with six agents.</b> Every agent adds coordination cost. Start with the Coordinator and the Vulcan portal agent (that's this playbook, Phases 0–7), add the Reviewer at Phase 6 if you want it separated, and bring in the Librarian, Dashboard, and Writer as their plans begin. Add the second portal agent only after Vulcan runs unattended for a few weeks.</li>
+        <li><b>Specialize by what changes independently, not by what sounds tidy.</b> Portals change on their own schedule, so one agent each is right. The review prompt, the corpus, and the dashboard each change for their own reasons too. Splitting further (a "QA agent", a "schema agent") adds overhead without a boundary that earns it; those are the Coordinator's job.</li>
+      </ol>
+      <h3>Who's missing on purpose</h3>
+      <ol>
+        <li>A <b>Capture agent</b> (go/no-go recommendation with pricing, teaming, and bid-strategy) is a plausible seventh role once the Writer exists and the corpus has outcomes to learn from. Not before.</li>
+        <li>A <b>Compliance agent</b> (checks a draft against every "shall" in the solicitation) is already a phase inside the Writer's pipeline; it only becomes its own agent if the Writer gets too large.</li>
+      </ol>
+    </section>
+
+    <section class="setup" id="setup">
+      <h2>Your setup, step by step</h2>
+      <p>Everything here is yours to do; the agent can't. Do the first three before Phase 0. The Slack app can wait until Phase 8.</p>
+
+      <h3>1. Project folder and first conversation (before Phase 0)</h3>
+      <ol>
+        <li>Copy <code>velocity-bd-team.zip</code> from the shared network folder to the PC and extract it to e.g. <code>C:\Users\&lt;you&gt;\velocity-bd-team</code>. It contains <code>reference/yukon/</code> (the proven Yukon code, secrets-scanned, with an INDEX.md) and <code>docs/plans/</code> (offline copies of these three plan pages). Open that folder in VS Code. Nothing inside depends on its path.</li>
+        <li>Open a Claude Code conversation in that folder. Paste the kickoff prompt below first, then the Phase 0 prompt, in the same conversation. Neither needs access to the old Yukon project.</li>
+        <li>When Claude Code asks permission to run <code>git init</code>, install packages, or create files, approve.</li>
+      </ol>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Kickoff prompt · paste before Phase 0</span><button class="copy" type="button" data-copy="ck">Copy prompt</button></div>
+<pre class="body" id="ck">Create a new repository `velocity-bd-team` in this directory. I will paste a "Phase 0" prompt next that defines the layout and the database schema; follow it exactly. Before that, do two things:
+
+(a) The directory `reference/yukon/` already exists in this folder: read-only prior art from the retired Yukon scanner (11 source files, a templates/ folder, a knowledge-base/ folder, and INDEX.md describing each). Nothing in the repo may import from it. Read INDEX.md, confirm it lists every file present (it should: 24 files in all), and grep the directory for anything secret-looking (xoxb-, sk-ant-, AKIA, a literal password=) — expect none; report if you find any and stop.
+
+(b) Write `AGENTS.md` at the repo root for the agent that will build the remaining phases. Include:
+    - the repo layout and what each directory is for;
+    - the rule that components communicate only through the ledger database (no HTTP between them);
+    - the rule to never use Playwright's "networkidle" on Vulcan SOF (domcontentloaded + fixed waits, every wait with a timeout);
+    - how to run `python -m ledger.migrate` and `pytest`;
+    - that `data/` and `.env` are never committed, and that no agent may print, log, or echo the value of any environment variable (log the key name only) or paste a credential anywhere;
+    - that `reference/yukon/` is proven prior art to read before implementing a phase;
+    - that each phase prompt it receives is self-contained;
+    - a "Working alongside other agents" section, verbatim:
+
+      ## Working alongside other agents
+      Several agents work in this repo: a Coordinator, one agent per portal, and specialists
+      for review, corpus, drafting, and dashboard. Rules:
+      1. Ownership. Each top-level directory has one owning agent, listed in docs/OWNERS.md.
+         Change a directory you don't own only through a pull request to its owner.
+      2. Branches. Never commit to main. Work on `&lt;agent&gt;/&lt;short-task&gt;` (e.g. vulcan-sof/fix-deadline-regex),
+         open a PR, and the Coordinator merges. Keep PRs to one concern.
+      3. Schema. Only the Coordinator changes the ledger schema, via numbered files in
+         ledger/migrations/ (NNN_description.sql), additive only: add tables or columns, never
+         rename or drop without a deprecation note and a release gap. Every schema PR updates
+         docs/LEDGER_SCHEMA.md in the same commit. If you need a column, open an issue
+         describing the query you want to run; don't add it yourself.
+      4. Shared record shape. Portal agents write `calls` rows using only the shared columns.
+         Portal-specific fields go in `calls.extra` (JSON) with a documented key prefix
+         (e.g. "vulcan_"), never in new columns.
+      5. Runs. Every component records what it did in the `runs` table under its own
+         `component` value. The Coordinator reads `runs`; nobody else needs to be told.
+      6. Data. Each component keeps its files under data/&lt;component&gt;/. Don't read or write
+         another component's files; if you need its output, it belongs in the ledger.
+      7. One pipeline at a time. run.py takes a lock file; test a single portal with
+         `run.py --portal &lt;slug&gt; --dry-run`, never by running the full pipeline concurrently.
+      8. Status. The Coordinator keeps docs/STATUS.md (what's live, what's in progress, known
+         breakages). Read it before starting work; update it in your PR if your change affects it.
+      9. Asking. Questions for another agent go in a GitHub issue labeled with that agent's
+         name, not in a code comment and not in Slack.
+
+    - this environment block, verbatim:
+
+      ## Environment specifics (David's PC, Windows)
+      - Shell: PowerShell. Python 3.11+ in a venv at .venv. Use pathlib everywhere; never hard-code / or \.
+      - Mail and Drive access: the `gog` CLI (install the Windows release, run `gog auth` as david@velocityexplorations.com).
+        OTP mailbox: gog gmail search / gog gmail read --account david@velocityexplorations.com
+        Drive: gog drive (list / download / export) for the corpus folder
+        If gog is unavailable on this machine, implement the same calls with the Gmail and Drive APIs behind the same function signatures.
+      - LLM for review and briefs: Anthropic API via ANTHROPIC_API_KEY
+        (claude-haiku-5-5 for per-call review, claude-sonnet-5-5 for proposal briefs)
+      - Embeddings: Ollama for Windows, nomic-embed-text at http://localhost:11434 (768 dims)
+      - Alerts and delivery: Slack — SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
+      - Scheduler: Windows Task Scheduler, created by a PowerShell script in scripts/ (Register-ScheduledTask); never overlapping runs.
+      - Playwright's Chromium shows up as chrome.exe in Task Manager.
+
+(c) Write `docs/OWNERS.md` mapping directories to owning agents: run.py, ledger/, docs/, scheduler → Coordinator; portals/vulcan_sof/ → Vulcan SOF agent (one entry per portal as they're added); review/ → Reviewer; corpus/ → Librarian; drafting/ → Writer; dashboard/ and slack/ → Dashboard agent. And an empty `docs/STATUS.md` with headings Live / In progress / Known breakages.
+
+Confirm all three are done, then wait for the Phase 0 prompt.</pre>
+      </div>
+
+      <h3>2. Hosted Postgres (before Phase 0)</h3>
+      <ol>
+        <li>Go to neon.tech (or supabase.com), sign up with your Velocity Google account, create a project named <code>velocity-bd-team</code>. Region: US East.</li>
+        <li>Copy the connection string. Neon shows it on the project dashboard; Supabase under Project Settings → Database → Connection string (URI). It looks like <code>postgresql://user:password@host/dbname?sslmode=require</code>.</li>
+        <li>Enable pgvector: open the SQL editor in the same dashboard and run <code>CREATE EXTENSION IF NOT EXISTS vector;</code>. On Supabase it's also under Database → Extensions → search "vector" → enable.</li>
+        <li>Create a file named <code>.env</code> in the project folder containing <code>DATABASE_URL=&lt;that connection string&gt;</code>. Never commit this file; Phase 0 git-ignores it.</li>
+      </ol>
+
+      <h3>3. Vulcan credentials and OTP mailbox (before Phase 1)</h3>
+      <ol>
+        <li>Add to <code>.env</code>: <code>VULCAN_SOF_USERNAME=</code>, <code>VULCAN_SOF_PASSWORD=</code>, <code>VULCAN_OTP_MAILBOX=david@velocityexplorations.com</code>.</li>
+        <li>Confirm <code>gog</code> can read that mailbox from a terminal: <code>gog gmail search "from:notifications@vulcan-sof.com" --max 3 --account david@velocityexplorations.com</code>. If it prompts to re-authenticate, do it now, not during Phase 2.</li>
+        <li>Add <code>ANTHROPIC_API_KEY=</code> to <code>.env</code> (console.anthropic.com → API keys). Phase 6 needs it.</li>
+      </ol>
+
+      <h3>4. Slack app (before Phase 8)</h3>
+      <ol>
+        <li>Go to api.slack.com/apps → Create New App → From scratch. Name: <code>BD Team</code>. Pick the Velocity workspace.</li>
+        <li>Left menu → OAuth &amp; Permissions → Scopes → Bot Token Scopes → add: <code>chat:write</code>, <code>chat:write.public</code>, <code>reactions:read</code>, <code>channels:history</code>. If the target channel is private, also add <code>groups:history</code>.</li>
+        <li>Top of the same page → Install to Workspace → Allow. Copy the <b>Bot User OAuth Token</b> (starts with <code>xoxb-</code>).</li>
+        <li>In Slack, open the channel the cards should go to (a new <code>#bd-team</code> is cleanest), type <code>/invite @BD Team</code>.</li>
+        <li>Get the channel ID: click the channel name at the top → scroll to the bottom of the details panel → copy the ID (starts with <code>C</code>).</li>
+        <li>Add to <code>.env</code>: <code>SLACK_BOT_TOKEN=xoxb-…</code> and <code>SLACK_CHANNEL_ID=C…</code>.</li>
+      </ol>
+
+      <h3>5. Handoff to the Grok bot (after the phases you want Claude Code to do)</h3>
+      <ol>
+        <li>Push the repo to GitHub (private). Claude Code can do this if you ask: "create a private GitHub repo and push".</li>
+        <li>Give the Grok bot access to the repo.</li>
+        <li>Do not send it any secret in a message. The bot reads secrets from the environment it runs in. If it runs on your PC, they are already in <code>.env</code> there (or in 1Password via <code>op run --env-file .env -- …</code>, with <code>.env</code> holding only <code>op://</code> references). If it runs on a hosted platform, enter the values in that platform's secrets settings yourself. If the platform has no secret store, don't run it there.</li>
+        <li>Use dedicated credentials where possible so each can be revoked alone: a separate Anthropic key named <code>bd-team</code>, a Postgres role scoped to the ledger, the bot-specific Slack token, and Drive sharing limited to the corpus folder. Vulcan is the exception; the bot acts as you there.</li>
+        <li>Tell it which phase to start at and paste that phase's prompt. Nothing else from this page is needed.</li>
+      </ol>
+    </section>
+
+    <!-- ───────────────────────── PHASE 0 ───────────────────────── -->
+    <section class="phase" id="p0">
+      <div class="phase-head"><span class="phase-num">PHASE 00</span><h2 class="phase-title">Repo and ledger foundation</h2></div>
+      <div class="brief">
+        <p>Everything else writes into the database this phase creates, and the dashboard reads from it, so the schema is the one contract in the system. It's designed wider than "scraped calls" on purpose: it already has a <code>proposals</code> table for the Proposal Corpus plan, so that work slots in without a migration later.</p>
+        <p>Postgres is specified because the dashboard needs to reach the database from wherever it's hosted. A free Neon or Supabase instance is enough. SQLite remains available for local development only.</p>
+        <div class="depends">Depends on: nothing. Produces: the repository, <code>DATABASE_URL</code>, the schema, a migration runner, query helpers, and <code>docs/LEDGER_SCHEMA.md</code>.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase 00</span><button class="copy" type="button" data-copy="c0">Copy prompt</button></div>
+<pre class="body" id="c0">You are building `velocity-bd-team`, a single repository that will hold a government-opportunity scanner, an LLM reviewer, a Slack delivery/feedback loop, a past-proposal corpus, and a dashboard. This is Phase 0 of 9: create the repository and the shared database ("the ledger") that every later phase reads and writes. No scraping happens in this phase.
+
+## Context
+
+Velocity Explorations is a small defense software company. The scanner will log into portals such as Vulcan SOF (USSOCOM's industry engagement site), scrape open "calls," filter and review them for fit, and surface them to the team. The team's decisions flow back into the database. A dashboard later reads the same database directly; there is no API layer between components. The database is therefore the one contract in the system, and its schema must be documented well enough that someone could build a dashboard from the document alone.
+
+Database: PostgreSQL, reached via a `DATABASE_URL` in `.env` (a hosted free-tier instance such as Neon or Supabase is expected). Code must also run against SQLite (`DATABASE_URL=sqlite:///data/dev.db`) for local tests, so write portable SQL: TEXT/INTEGER/REAL/TIMESTAMP columns, no Postgres-only types except where noted, JSON stored as TEXT.
+
+## Tasks
+
+1. Initialize the repo with this layout (create empty packages where noted):
+   ledger/ (schema.sql, migrate.py, db.py, queries.py), portals/vulcan_sof/, review/, slack/, corpus/, dashboard/ (empty for now), docs/, data/ (git-ignored), run.py (stub), README.md, .env.example, .gitignore (data/, .env, __pycache__, node_modules), pyproject.toml or requirements.txt (Python 3.11+).
+2. `ledger/schema.sql` — three tables, every timestamp ISO-8601 UTC text:
+
+   runs(
+     id INTEGER PRIMARY KEY (autoincrement/serial), component TEXT (e.g. 'vulcan_sof','review','corpus','pipeline'),
+     portal TEXT, started_at, finished_at,
+     status TEXT CHECK IN ('running','completed','skipped_timeout','error'),
+     stage_counts TEXT (JSON: {"fetched":N,"filtered":N,"reviewed":N,"new":N}),
+     error TEXT, log_path TEXT, dry_run INTEGER DEFAULT 0 )
+
+   calls(
+     id TEXT PRIMARY KEY,                 -- e.g. "vulcan-&lt;collectionUuid&gt;"; stable across runs
+     portal TEXT, title TEXT, type TEXT, department TEXT, naics_code TEXT, set_aside TEXT,
+     posted_date TEXT, due_date TEXT, description TEXT, url TEXT, source_type TEXT,
+     first_seen_at, last_seen_at, first_run_id INTEGER, last_run_id INTEGER,
+     filter_result TEXT CHECK IN ('pending','kept','rejected') DEFAULT 'pending',
+     filter_reason TEXT, match_tier TEXT, matched_keywords TEXT (JSON array),
+     ai_verdict TEXT CHECK IN ('yes','no','maybe') NULL, ai_reasoning TEXT, reviewed_at,
+     slack_channel TEXT, slack_ts TEXT, posted_at,
+     human_status TEXT CHECK IN ('pursue','not_relevant','submitted','dismissed') NULL,
+     human_by TEXT, human_at, human_notes TEXT,
+     extra TEXT (JSON; portal-specific fields with a key prefix such as "vulcan_"; never add portal-specific columns),
+     updated_at )
+
+   proposals(                             -- past submissions; filled by the Proposal Corpus plan
+     submission_id TEXT PRIMARY KEY,      -- "YYYY-MM-DD_portal_short-title", matches a Drive folder name
+     title, portal, agency, solicitation_id, type, role, partners, submitted_date, due_date,
+     requested_value TEXT, outcome TEXT CHECK IN ('won','lost','no_award','pending','withdrawn','shortlisted') NULL,
+     outcome_date, award_value TEXT, strength_rating INTEGER (1–5), strength_reason TEXT,
+     why_won_or_lost TEXT, use_as_exemplar INTEGER DEFAULT 0, themes TEXT, drive_link TEXT,
+     brief TEXT,                          -- one-paragraph summary generated later
+     synced_at, updated_at )
+
+   Add indexes on calls(portal, first_seen_at), calls(human_status), calls(ai_verdict), proposals(portal, outcome).
+3. `ledger/migrations/001_initial.sql` holds the schema above; `ledger/migrate.py` applies every `NNN_*.sql` in order that isn't yet recorded in a `schema_migrations` table. Running it twice is a no-op. Works against both Postgres and SQLite. Later schema changes are new numbered files, additive only (see AGENTS.md).
+4. `ledger/db.py` — `connect()` returning a DB-API connection from DATABASE_URL (psycopg for postgres://, sqlite3 for sqlite://), a `tx()` context manager that commits/rolls back, and a tiny `q(sql, params)` helper that normalizes the `?` vs `%s` placeholder difference so queries.py is written once.
+5. `ledger/queries.py` — the functions later phases will call. Implement and unit-test each:
+   runs:  `start_run(portal, dry_run) -> id`, `finish_run(id, status, stage_counts, error=None, log_path=None)`
+   calls: `upsert_call(record, run_id) -> bool is_new` (insert if absent and set first_seen/first_run; otherwise update scraped fields and last_seen/last_run, NEVER touching filter_*, ai_*, slack_*, human_* columns),
+          `set_filter(id, result, reason=None, tier=None, keywords=None)`, `set_review(id, verdict, reasoning)`,
+          `set_slack(id, channel, ts)`, `set_human(id, status, by, at)`, `append_note(id, text, by, at)` (appends with timestamp),
+          `calls_for_review(run_id)` (kept, unreviewed), `new_calls(run_id)` (first_run_id = run_id and verdict in yes/maybe),
+          `pending_feedback()` (slack_ts set, human_status null), `recent_decisions(limit=20)`,
+          `export_csv(path)`.
+   proposals: `upsert_proposal(row)`, `list_proposals(portal=None, outcome=None)`.
+6. `docs/LEDGER_SCHEMA.md` — every table, every column, allowed values, which component writes it, and a short "how to build a dashboard against this" section with three example queries (new calls this week, triage backlog, win rate by portal).
+7. `README.md` — purpose, layout, setup (.env, migrate), and the rule that components communicate only through the ledger.
+
+## Done when
+
+- `python -m ledger.migrate` succeeds against the real DATABASE_URL and again against `sqlite:///data/dev.db`; the second invocation on each reports nothing to do.
+- Tests (pytest, SQLite) cover: upsert_call returns True then False for the same id and does not overwrite human_notes on the second call; set_human + append_note round-trip; new_calls only returns calls first seen in the given run; recent_decisions orders newest first.
+- You show the output of `\dt` (or equivalent) on the Postgres instance listing runs, calls, proposals, schema_migrations.
+- `docs/LEDGER_SCHEMA.md` exists and its three example queries run.
+- The repo has an initial commit; `data/` and `.env` are absent from it.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">before and after Phase 0</span></div>
+        <ol>
+          <li>Before: setup steps 1 and 2 above are done; <code>.env</code> has <code>DATABASE_URL</code>.</li>
+          <li>During: approve package installs and file creation when asked.</li>
+          <li>After: open your Postgres dashboard's table view and confirm <code>runs</code>, <code>calls</code>, <code>proposals</code>, <code>schema_migrations</code> exist.</li>
+          <li>After: skim <code>docs/LEDGER_SCHEMA.md</code>. If a column name reads wrong to you, say so now; renaming is cheap before Phase 4 and expensive after.</li>
+          <li>If the final schema differs from this plan, paste <code>ledger/migrations/001_initial.sql</code> into a Claude conversation along with the playbook link and ask for Phases 4–9 and the companion plans to be reconciled. Any Claude session can do this from the artifact links; it doesn't need the old Yukon folder.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE 1 ───────────────────────── -->
+    <section class="phase" id="p1">
+      <div class="phase-head"><span class="phase-num">PHASE 01</span><h2 class="phase-title">Browser and reconnaissance</h2></div>
+      <div class="brief">
+        <p>Gets Playwright in place and proves the agent can reach the portal headlessly before anything touches credentials. The input dump at the end is what every selector in Phase 2 is written against, so insist on seeing it.</p>
+        <div class="depends">Depends on: Phase 0. Produces: browser helper, config loader, login-page screenshot and input inventory.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase 01</span><button class="copy" type="button" data-copy="c1">Copy prompt</button></div>
+<pre class="body" id="c1">You are working in the `velocity-bd-team` repository. Phase 0 created the layout (ledger/, portals/vulcan_sof/, review/, slack/, corpus/, dashboard/, docs/, data/) and a config pattern where settings come from `.env`. This is Phase 1 of 9: install browser automation and confirm headless access to the Vulcan SOF portal. Do not attempt to log in yet.
+
+## Context
+
+Vulcan SOF (https://vulcan-sof.com) is USSOCOM's industry engagement portal where SOF organizations post "calls" (problem statements, RFIs, prototype opportunities). It is an Angular single-page app served under /login/ng2/. Key URLs:
+
+- Login page:     https://vulcan-sof.com/login/ng2/auth/login
+- Calls listing:  https://vulcan-sof.com/login/ng2/search/calls
+- Call detail:    links whose href contains collectionUuid=&lt;uuid&gt;
+
+Authentication is username + password followed by a 6-digit one-time code emailed to the account owner (Phase 2). The reference implementation used Python 3.11 with Playwright and headless Chromium; use the same unless the runtime forbids it.
+
+Two rules that apply to every phase, learned from a scan that hung for three days:
+1. NEVER wait for Playwright's "networkidle" state on this site. The Angular app keeps background XHR/WebSocket traffic alive, so networkidle never fires. Use wait_for_load_state("domcontentloaded") followed by a fixed wait_for_timeout() of 1.5–3 seconds.
+2. Every navigation and every wait gets an explicit timeout. Nothing may block indefinitely.
+
+## Tasks
+
+1. Add to `.env.example` and the config loader: VULCAN_SOF_USERNAME, VULCAN_SOF_PASSWORD, VULCAN_OTP_MAILBOX (the address the OTP is sent to). Parse `.env` line by line; a missing key must produce a clear error naming the key, never a stack trace.
+2. `portals/vulcan_sof/browser.py` — `launch()` returning (playwright, browser, context, page) with chromium, headless=True, 15-second launch timeout; `close_all()` that closes everything without raising; and a module-level `_active_browser` reference plus `force_close()` that closes it from another thread without raising (Phase 7 relies on this).
+3. Install Playwright and the Chromium binary. Verify with a one-line launch/close script.
+4. `portals/vulcan_sof/recon.py`:
+   - Navigate to the login URL (30s), wait domcontentloaded (15s), then 2s.
+   - Save a full-page screenshot to `data/recon_login.png`.
+   - Collect every &lt;input&gt; as {type, name, id, placeholder, aria-label, autocomplete, visible: el.offsetParent !== null} and every &lt;button&gt; as {text, type, disabled}. Print as JSON and save to `data/recon_login.json`.
+   - Print the final URL and the first 300 characters of document.body.innerText.
+5. Run recon.py and show me the output.
+
+## Done when
+
+- Launch/close smoke test passes; you state the Playwright and Chromium versions.
+- `data/recon_login.png` visibly shows the Vulcan login form.
+- `data/recon_login.json` is in your reply, with at least one input of type="password". Report which input looks like the username field and why (type, name, placeholder, or position before the password field).</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">before and after Phase 1</span></div>
+        <ol>
+          <li>Before: setup step 3 is done (Vulcan credentials and OTP mailbox in <code>.env</code>).</li>
+          <li>After: open <code>data/recon_login.png</code> yourself and confirm it is the Vulcan login form, not an error page, a maintenance notice, or a Cloudflare challenge. If it isn't, tell the agent what you see.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE 2 ───────────────────────── -->
+    <section class="phase" id="p2">
+      <div class="phase-head"><span class="phase-num">PHASE 02</span><h2 class="phase-title">Login with email OTP</h2></div>
+      <div class="brief">
+        <p>The hardest phase. The login form has no stable IDs, the password field may only appear after the username is filled, and the OTP submit button stays disabled until Angular validates the field. The prompt spells out every workaround the reference implementation needed.</p>
+        <p>The OTP source is the one thing the Grok environment will do differently. The old scanner read Gmail through the <code>gog</code> CLI; the prompt makes the mailbox reader a pluggable interface.</p>
+        <div class="depends">Depends on: Phase 1. Produces: otp.py, auth.py, a confirmed logged-in session.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase 02</span><button class="copy" type="button" data-copy="c2">Copy prompt</button></div>
+<pre class="body" id="c2">You are working in the `velocity-bd-team` repository. Phase 1 produced `portals/vulcan_sof/browser.py` (headless Chromium launch/close), config loading from `.env` (VULCAN_SOF_USERNAME, VULCAN_SOF_PASSWORD, VULCAN_OTP_MAILBOX), and `data/recon_login.json`, an inventory of the login form's inputs and buttons. Read that JSON before writing selectors. This is Phase 2 of 9: implement login, including the emailed one-time code.
+
+## Context
+
+Vulcan SOF (https://vulcan-sof.com) is an Angular SPA under /login/ng2/.
+- Login page:    https://vulcan-sof.com/login/ng2/auth/login
+- Calls listing: https://vulcan-sof.com/login/ng2/search/calls  (only reachable when logged in)
+
+Auth flow: enter username and password, press Enter. The account requires 2FA, so the page then shows a one-time-code screen. The code is emailed to the account's address from notifications@vulcan-sof.com with subject "Vulcan - OTP Code". The body contains the line "YOUR AUTHENTICATION CODE: 123456" (six digits). It usually arrives within 10–30 seconds.
+
+Rules for every phase: never use wait_for_load_state("networkidle") on this site; use "domcontentloaded" plus a fixed wait_for_timeout(). Every navigation and wait has an explicit timeout.
+
+## What the reference implementation learned (apply all of it)
+
+Form discovery:
+- Anchor on `input[type='password']` first; it is the one stable element.
+- Username field selector cascade, first match wins: `input[type='email']`, `input[name*='email']`, `input[name*='user']`, `input[placeholder*='email' i]`, `input[placeholder*='user' i]`, `input[placeholder*='@']`, `input[autocomplete='username']`, `input[autocomplete='email']`.
+- Fallback: the &lt;input&gt; immediately preceding the password field in DOM order.
+- The password field may not be visible until the username is filled. After filling the username, if the password input is not visible, wait up to 10s for `input[type='password']:visible`.
+- Fill password, press Enter, wait 3s.
+
+OTP detection:
+- Record `login_triggered_at = time.time()` immediately before filling the username.
+- After submitting, read `document.body.innerText`. If it contains "passcode", "one-time", or "verification" (case-insensitive), the OTP screen is showing.
+
+OTP entry (Angular quirks):
+- Code input cascade: `input[name*='otp']`, `input[name*='code']`, `input[name*='passcode']`, `input[type='tel']`, `input[type='number']`, `input[type='text']`, any `input`.
+- Click it, triple-click to select existing content, then TYPE the code with ~80ms per-character delay. Do not use fill(); Angular's validators do not fire on it.
+- Wait ~800ms. In page JavaScript, find the submit button whose trimmed lowercase text is one of "verify", "verify code", "submit", "confirm", "continue", else the first button with type="submit". Set `disabled = false`, remove the `disabled` attribute, click. If none found, press Enter in the code input.
+- Wait for domcontentloaded (15s, swallow timeout) then 3s.
+
+`is_logged_in(page)`: False if the URL contains "login" and not "home"; False if the first 200 characters of body innerText contain "sign in" or "log in"; otherwise True.
+
+## Tasks
+
+1. `portals/vulcan_sof/otp.py` — `get_otp(sent_after: float, max_wait: int = 90) -> str | None`. Poll every 5 seconds until max_wait: search the mailbox (VULCAN_OTP_MAILBOX) for messages from notifications@vulcan-sof.com with subject "Vulcan - OTP Code" received in the last 5 minutes, newest first. Reject any message received before `sent_after`. Extract with regex `YOUR AUTHENTICATION CODE:\s*(\d{6})`, return the last match. Every mailbox call has its own 15s timeout; every failure (tool missing, timeout, non-zero exit, no match) logs and continues polling. Return None on overall timeout.
+   Implement against whatever mail access this environment has (Gmail API, IMAP, or a CLI). The reference used: `gog gmail search "from:notifications@vulcan-sof.com subject:'Vulcan - OTP Code' newer_than:5m" --max 1 --account &lt;mailbox&gt;` then `gog gmail read &lt;thread_id&gt; --account &lt;mailbox&gt;`.
+2. `portals/vulcan_sof/auth.py` — `login(page, context, username, password) -> bool` implementing everything above, with INFO logging at each step (page URL, which selector matched, OTP required yes/no, post-OTP URL). On failure log the URL and first 150 characters of body text, return False. Never log the password; logging the OTP code is acceptable.
+3. `portals/vulcan_sof/test_login.py` — launches, calls login(), on success navigates to the calls listing, waits domcontentloaded + 3s, saves `data/after_login.png`, prints the URL and the count of anchors whose href contains "collectionUuid".
+
+## Done when
+
+- `test_login.py` returns True and prints the calls-listing URL with a collectionUuid anchor count greater than zero (proves we are past auth, not just past the form).
+- You show log lines for: username selector used, OTP required yes/no, OTP retrieval time in seconds, post-OTP URL.
+- A deliberate wrong-password run returns False cleanly with a logged reason and no exception.</pre>
+      </div>
+      <div class="note"><span>⚠</span><div><b>Mailbox access is the gating dependency.</b> Before handing over this phase, confirm the Grok agent can read the inbox that receives Vulcan's OTP. If it can't, the OTP will have to be relayed by a human and the 90-second window lengthened.</div></div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">during Phase 2</span></div>
+        <ol>
+          <li>The first run burns a real OTP. Stay near the <code>david@velocityexplorations.com</code> inbox so you can see the email arrive; the agent should pick it up without you, but if the 90-second window expires just tell it to rerun.</li>
+          <li>Vulcan may also email a "new device sign-in" notice. Ignore it.</li>
+          <li>After success: open <code>data/after_login.png</code> and confirm it shows the calls list.</li>
+          <li>Wrong-password test: temporarily change <code>VULCAN_SOF_PASSWORD</code> in <code>.env</code> to something wrong, tell the agent to run the test, then restore it. Don't let the agent guess passwords; three bad attempts may lock the account.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE 3 ───────────────────────── -->
+    <section class="phase" id="p3">
+      <div class="phase-head"><span class="phase-num">PHASE 03</span><h2 class="phase-title">Session persistence</h2></div>
+      <div class="brief">
+        <p>Saving cookies after a successful login means the weekly scan almost never needs an OTP, and protects the time budget: a fresh OTP login can eat a minute of a five-minute run.</p>
+        <div class="depends">Depends on: Phase 2. Produces: session.py, data/vulcan_cookies.json, cookie-first login.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase 03</span><button class="copy" type="button" data-copy="c3">Copy prompt</button></div>
+<pre class="body" id="c3">You are working in the `velocity-bd-team` repository. Phases 1–2 produced `portals/vulcan_sof/` with `browser.py`, `otp.py`, and `auth.py` whose `login(page, context, username, password) -> bool` performs username/password + OTP login, plus an `is_logged_in(page)` helper. This is Phase 3 of 9: persist the browser session so repeat runs skip the emailed one-time code.
+
+## Context
+
+Vulcan SOF (https://vulcan-sof.com) requires an emailed OTP on each fresh login, but its session cookies remain valid for a while afterward. The reference implementation saved the Playwright context cookies to `data/vulcan_cookies.json` after every successful login and after every successful scrape, and on the next run loaded them before trying the password at all. In practice this skipped the OTP on most weekly runs.
+
+Calls listing URL (requires login): https://vulcan-sof.com/login/ng2/search/calls
+
+Rules for every phase: never use "networkidle"; use "domcontentloaded" plus a fixed wait. Every wait has a timeout.
+
+## Tasks
+
+1. `portals/vulcan_sof/session.py`:
+   - `save_cookies(context)` — writes `context.cookies()` as JSON to `data/vulcan_cookies.json`, creating the directory if needed. Never raises; logs on failure.
+   - `load_cookies(context) -> bool` — if the file exists with a non-empty list, `context.add_cookies(...)` and return True; else False. Never raises.
+2. Make `auth.login()` cookie-first:
+   a. If `load_cookies(context)` is True, go to the calls listing (20s), wait 3s, call `is_logged_in(page)`. If True, log "Session restored from cookies — no OTP needed" and return True.
+   b. If restore fails for any reason, log that the saved cookies expired and fall through to the password + OTP path.
+   c. After a successful password/OTP login, `save_cookies(context)` before returning True.
+3. Add `--fresh` to `test_login.py` that deletes the cookie file first.
+
+## Done when
+
+- Run 1 (`--fresh`): log shows the password path, an OTP retrieved, login success; `data/vulcan_cookies.json` now exists.
+- Run 2 (no flag, immediately after): log shows "Session restored from cookies — no OTP needed", no mailbox query occurs, collectionUuid anchor count &gt; 0.
+- Run 3: write `[]` into the cookie file and run again; log shows the fallback to password + OTP and the file is rewritten with a non-empty list.
+- Report wall-clock time of Run 1 versus Run 2.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">during Phase 3</span></div>
+        <ol>
+          <li>Run 1 (<code>--fresh</code>) triggers another real OTP; be near the inbox again.</li>
+          <li>Runs 2 and 3 need nothing from you. Confirm Run 2's log says "Session restored from cookies" and that no OTP email arrived for it.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE 4 ───────────────────────── -->
+    <section class="phase" id="p4">
+      <div class="phase-head"><span class="phase-num">PHASE 04</span><h2 class="phase-title">Enumerate and scrape calls</h2></div>
+      <div class="brief">
+        <p>The core data-collection step. Every scraped call goes straight into the ledger's <code>calls</code> table via <code>upsert_call</code>, which is also where dedup comes from: a call is "new" if this run is the first to see it. The field names match the schema from Phase 0 exactly.</p>
+        <div class="depends">Depends on: Phase 3. Produces: scrape.py, rows in <code>calls</code>, sample page text for regex verification.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase 04</span><button class="copy" type="button" data-copy="c4">Copy prompt</button></div>
+<pre class="body" id="c4">You are working in the `velocity-bd-team` repository. Phases 0–3 produced the ledger (`ledger/queries.py` with `start_run`, `finish_run`, `upsert_call(record, run_id) -> is_new`) and `portals/vulcan_sof/` with a cookie-first `auth.login()`, `browser.launch()/close_all()`, and `session.save_cookies()`. This is Phase 4 of 9: enumerate every open call and scrape each detail page into the ledger.
+
+## Context
+
+Vulcan SOF (https://vulcan-sof.com) is an Angular SPA. After login:
+- Calls listing: https://vulcan-sof.com/login/ng2/search/calls — every open call is an &lt;a&gt; whose href contains `collectionUuid=`; the anchor's trimmed innerText is the title.
+- Call detail pages render content as plain text sections. Fields are extracted from `document.body.innerText` with regexes; there are no reliable CSS hooks.
+
+Rules for every phase: never use "networkidle"; use "domcontentloaded" plus a fixed wait. Every navigation has a timeout. The whole run (login + listing + all detail pages) must finish in under 300 seconds, so keep per-page waits short.
+
+## Record (keys match the ledger's `calls` columns)
+
+{
+  "id":          "vulcan-&lt;collectionUuid&gt;",
+  "title":       string,                 # anchor text from the listing
+  "portal":      "Vulcan SOF",
+  "type":        string,                 # first line after "Engagement Objective(s):", else "Open Call"
+  "department":  "USSOCOM / SOF Enterprise",
+  "naics_code":  "",  "set_aside": "",   # Vulcan publishes neither
+  "posted_date": string,                 # text after "Open Date:", ≤40 chars
+  "due_date":    string,                 # text after "Deadline:", ≤40 chars
+  "description": string,
+  "url":         string,
+  "source_type": "regular"
+}
+
+Extraction regexes (Python `re`) against body innerText:
+- due_date:     `Deadline[:\s]*([^\n]+(?:MDT|MST|EST|UTC|202[0-9]))`   → group(1).strip()[:40]
+- posted_date:  `Open Date[:\s]*([^\n]+(?:MDT|MST|EST|UTC|202[0-9]))`  → group(1).strip()[:40]
+- type:         `Engagement Objectives?[:\s]*\n((?:[^\n]+\n?){1,5})`   → first line of group(1), [:60]; default "Open Call"
+- description:  try `Bottom Line Upfront\s*\n+([\s\S]{100,600}?)(?:\n\n|\Z)` then `Problem Statement\s*\n+([\s\S]{100,600}?)(?:\n\n|\Z)`; group(1).strip()[:400]; fallback body[200:600].strip()
+- id:           `collectionUuid=([a-f0-9-]{36})` from the URL → "vulcan-" + uuid; if absent, "vulcan-" + a stable hash of the URL
+
+## Tasks
+
+1. `portals/vulcan_sof/scrape.py`:
+   - `list_calls(page) -> list[{"title","href"}]`: goto listing (20s), domcontentloaded (10s) + 3s, evaluate `document.querySelectorAll('a[href*="collectionUuid"]')` into {text: innerText.trim(), href: a.href}, drop empties, log the count.
+   - `scrape_call(page, href, title) -> dict | None`: goto (15s), domcontentloaded (10s), wait 1.5s, read body innerText, apply the rules, return the record. Any exception: WARNING with the title's first 40 chars and the error, return None. One bad page never aborts the run.
+   - `scrape_all(page, run_id) -> dict`: list, scrape sequentially with 0.3s between pages, log progress every 10, call `upsert_call(record, run_id)` for each, and return {"found": N, "scraped": N, "new": N, "failed": N}.
+2. `portals/vulcan_sof/run_scrape.py` — launches, logs in cookie-first, `start_run("Vulcan SOF")`, scrape_all, save cookies, `finish_run` with stage counts, then prints: found/scraped/new/failed, elapsed seconds, and the fill rate for due_date, posted_date, type, description (percentage of this run's rows where the field is non-empty and not the fallback).
+3. For the first three calls only, save full body innerText to `data/samples/call_&lt;n&gt;.txt` so the regexes can be verified against real page text.
+
+## Done when
+
+- The ledger has one `calls` row per listed call and a `runs` row with status completed and stage_counts filled; you show `SELECT COUNT(*) FROM calls` and the runs row.
+- You print the fill-rate table. If due_date or description is below 80%, open a sample file, show the text around "Deadline" / "Bottom Line Upfront", and propose an adjusted regex rather than accepting empty fields.
+- You show three complete rows; I can open their `url` in a browser and match title, deadline, and description by eye.
+- A second immediate run reports new = 0 and updates last_seen_at without changing first_seen_at (show both timestamps for one row).
+- Elapsed time is under 240 seconds.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">after Phase 4</span></div>
+        <ol>
+          <li>Log into vulcan-sof.com in your own browser. Open the three <code>url</code> values the agent shows and compare title, deadline, and the Bottom Line Upfront text to the rows. Report any mismatch.</li>
+          <li>If a fill rate is under 80%, the agent will show you text from a sample file; confirm which line is the real deadline or description so it can fix the regex.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE 5 ───────────────────────── -->
+    <section class="phase" id="p5">
+      <div class="phase-head"><span class="phase-num">PHASE 05</span><h2 class="phase-title">Relevance filter and blocklist</h2></div>
+      <div class="brief">
+        <p>Cheap, deterministic screening before any LLM call. The old scanner did this in two places with hard-coded lists; here it's one configurable pass driven by <code>keywords.yaml</code>, with results written to the <code>filter_*</code> columns so the dashboard can show why something was rejected.</p>
+        <div class="depends">Depends on: Phase 4. Produces: keywords.yaml, filter.py, populated filter columns.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase 05</span><button class="copy" type="button" data-copy="c5">Copy prompt</button></div>
+<pre class="body" id="c5">You are working in the `velocity-bd-team` repository. Phase 4 populates the ledger's `calls` table (columns include id, title, description, filter_result, filter_reason, match_tier, matched_keywords) and `ledger/queries.py` has `set_filter(id, result, reason=None, tier=None, keywords=None)`. This is Phase 5 of 9: apply a deterministic relevance filter to scraped calls before any LLM review. Vulcan records carry no NAICS code, so relevance is judged on title + description only.
+
+## Context
+
+Calls are screened for Velocity Explorations: a small defense software company doing AI/ML development, command-and-control (C2) software, legacy system modernization, NLP/transcription/translation, computer vision, autonomy software, DevSecOps and cloud migration, under SBIR/STTR and OTA vehicles. It does NOT do hardware manufacturing, construction, facilities, IT help-desk/admin support, medical devices, training services, event participation, logistics, or parts procurement.
+
+## Tasks
+
+1. `portals/vulcan_sof/keywords.yaml` with three lists:
+   `broad_keywords` (loose; keeps anything plausibly in-lane): ai, artificial intelligence, machine learning, software, data, cyber, cloud, modernization, command and control, c2, nlp, autonomous, autonomy, digital, information, analytics, agentic, esof, engage sof, warfighter, joint, experimentation, computing, algorithm, automation, intelligence, help desk, privacy, opsec, c5isr, isr, sensor, network, communications, pcte, training system, simulation.
+   `tight_keywords` (strong match): artificial intelligence, machine learning, autonomous systems, command and control, computer vision, natural language processing, cobol modernization, legacy modernization, transcription, translation, sensor fusion, c5isr, software defined, ai hardware, edge ai, autonomous vehicle, multi-agent.
+   `blocklist_patterns` (regex, case-insensitive; any match rejects): `\brepair\b`, `\bspare parts\b`, `\bparts kit\b`, `\bnsn\s+\d`, `\b\d{4}-\d{2,}-\d{2,}-\d{2,}\b`, `\bhose assembly\b`, `\bcircuit card\b`, `\bconstruction\b.*\b(facility|building|pavement|airfield|runway)\b`, `\bindustry day\b`, `\breverse industry day\b`, `\bconference\b.*\bregistration\b`, `\bdocument destruction\b`, `\bmedical cart\b`, `\bboiler replacement\b`, `\bfuel supplier\b`, `\bdredging\b`, `\bappraisal service\b`, `\bplc training\b`.
+2. `portals/vulcan_sof/filter.py` — `filter_calls(rows, keywords_path) -> (kept, rejected)` where search_text = (title + " " + description).lower():
+   - Reject with reason "blocklist: &lt;pattern&gt;" if any blocklist pattern matches.
+   - Else reject with reason "no keyword match" if no broad_keyword is a substring.
+   - Else keep, with match_tier "tight" if any tight_keyword matches else "broad", and matched_keywords listing every hit.
+   - Write each outcome with `set_filter(...)`. Substring matching on lowercased text is intentional; note the known weakness that "ai" matches "maintain"; the tight tier and the LLM phase handle that.
+3. `portals/vulcan_sof/run_filter.py` — filters every row with filter_result = 'pending' (or `--all` to re-filter everything, e.g. after a keywords change) and prints: total, kept-tight, kept-broad, rejected-blocklist, rejected-no-keyword, and a table of every rejected title with its reason.
+
+## Done when
+
+- After running, no row has filter_result = 'pending'; kept + rejected equals the input count.
+- You show the summary and the full rejection table. Any call about software, AI, data, or C2 that was rejected is a bug in the pattern that rejected it.
+- You show five kept rows with match_tier and matched_keywords so I can judge whether "broad" lets through obvious noise.
+- Changing a keyword in keywords.yaml and re-running with `--all` changes the result without a code edit.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">after Phase 5</span></div>
+        <ol>
+          <li>Read the rejection table. Any software, AI, data, or C2 call in it is a false rejection; name it and the agent fixes the pattern.</li>
+          <li>Read the five "broad" keeps. If they're obvious noise, say so; the fix is usually removing a two-letter keyword like <code>ai</code> or <code>c2</code> from <code>broad_keywords</code>.</li>
+          <li>From now on <code>portals/vulcan_sof/keywords.yaml</code> is yours to edit directly; it's plain YAML, one keyword per line.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE 6 ───────────────────────── -->
+    <section class="phase" id="p6">
+      <div class="phase-head"><span class="phase-num">PHASE 06</span><h2 class="phase-title">LLM fit review</h2></div>
+      <div class="brief">
+        <p>The "review listings" step. Strict <code>VERDICT</code>/<code>REASON</code> contract, fail-safe default to <code>maybe</code> so a model hiccup never silently discards a lead. Two slots are left open on purpose: <code>past_experience_block</code> gets filled by the Proposal Corpus plan, and <code>feedback_examples_block</code> by Phase 8.</p>
+        <div class="depends">Depends on: Phase 5. Produces: review/reviewer.py, populated ai_verdict / ai_reasoning columns.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase 06</span><button class="copy" type="button" data-copy="c6">Copy prompt</button></div>
+<pre class="body" id="c6">You are working in the `velocity-bd-team` repository. The ledger's `calls` table has filter_result, match_tier, ai_verdict, ai_reasoning, reviewed_at columns; `ledger/queries.py` has `calls_for_review(run_id)` (kept, unreviewed rows) and `set_review(id, verdict, reasoning)`. This is Phase 6 of 9: have an LLM judge each surviving call for fit and record a verdict with reasoning.
+
+## Context
+
+Use this company profile verbatim as the context block of every review prompt:
+
+---
+Velocity Explorations is a small defense technology company focused on:
+- Software development and AI/ML development for DoD and government
+- Legacy system modernization (COBOL, AS/400, mainframe → modern web/cloud)
+- Command and control (C2) systems — Echo C2 AI is their flagship product
+- Natural language processing, transcription, translation for operational environments
+- Computer vision, autonomous systems software
+- DevSecOps, cloud migration, data analytics platforms
+- SBIR/STTR contracts and OTA agreements
+
+Velocity IS a registered member of the S2MARTS and SpEC OTA consortia (managed by NSTXL) and can submit to their opportunities.
+
+Velocity does NOT do: hardware development or manufacturing; physical construction or facilities work; IT management or administrative support services; medical devices or healthcare equipment; training/education services; events or conference participation; logistics, supply chain, or parts procurement; financial software unrelated to defense.
+
+A good opportunity for Velocity involves: building software, developing AI/ML models, modernizing legacy systems, creating C2 tools, or conducting R&amp;D in AI/autonomy/NLP.
+---
+
+Two optional slots exist in the prompt. Leave them as empty strings for now but keep them as parameters: `past_experience_block` (similar past proposals with outcomes, supplied later by the corpus component) and `feedback_examples_block` (recent human decisions, supplied by Phase 8).
+
+## Review prompt template (fill the braces)
+
+{company_context}{past_experience_block}{feedback_examples_block}
+
+Evaluate this government opportunity for Velocity Explorations:
+
+Title: {title}
+Portal: {portal}
+Type: {type}
+NAICS: {naics_code}
+Agency: {department}
+Description: {description[:500]}
+
+Respond with exactly this format (no other text):
+VERDICT: yes|no|maybe
+REASON: [one sentence explaining why]
+
+Use "yes" if clearly relevant, "no" if clearly not, "maybe" if uncertain.
+If past experience shows similar work has been pursued or won, weight that positively.
+
+## Tasks
+
+1. `review/reviewer.py` — `review_calls(rows, model_client, past_experience_fn=None, feedback_examples_block="") -> (passed, dropped)`:
+   - For each row build the prompt (call `past_experience_fn(row)` for the block if provided), call the model with a 35-second timeout, retry once after 1 second on any error or empty response.
+   - Parse line by line: "VERDICT:" sets the verdict if yes/no/maybe; "REASON:" sets the reason. Unparseable → verdict "maybe", reason "Could not parse LLM response". Both attempts failed → "maybe", "Review error: &lt;first 80 chars&gt;". The fail-safe is always "maybe", never "no": a model outage must not discard leads.
+   - `set_review(id, verdict, reason)` for every row. "no" → dropped; "yes"/"maybe" → passed. Sleep 0.5s between calls. Log "AI review [verdict]: &lt;title&gt;" per row and "→ Dropped: &lt;reason&gt;" per no.
+2. `review/run_review.py` — reviews `calls_for_review(run_id)` for the latest run (or `--run-id`), with `--limit N`, and prints title | match_tier | verdict | reason for each, totals per verdict, elapsed time. Log the full rendered prompt at DEBUG for the first row.
+
+## Done when
+
+- `run_review.py --limit 5` shows five rows with well-formed verdicts and one-sentence reasons; the ledger rows have ai_verdict, ai_reasoning, reviewed_at set.
+- The full run completes; you report yes/maybe/no counts and elapsed time.
+- You show every "no" with its reason. A "no" on anything clearly software, AI, data, or C2 is a prompt problem to fix before moving on.
+- Simulate a model failure (bad key or unreachable endpoint) on a 2-row run: both come through as "maybe" with a "Review error" reason, no crash.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">before and after Phase 6</span></div>
+        <ol>
+          <li>Before: <code>ANTHROPIC_API_KEY</code> is in <code>.env</code> (setup step 3).</li>
+          <li>After: read every "no" and its reason. This is the single most important review you do in the whole build; a bad "no" here means a missed opportunity every week.</li>
+          <li>Model-failure test: temporarily set <code>ANTHROPIC_API_KEY=bad</code> in <code>.env</code>, let the agent run, then restore it.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE 7 ───────────────────────── -->
+    <section class="phase" id="p7">
+      <div class="phase-head"><span class="phase-num">PHASE 07</span><h2 class="phase-title">Orchestration, resilience, and schedule</h2></div>
+      <div class="brief">
+        <p>Ties the pieces into one command that runs unattended weekly. The hard timeout with a forced browser kill is the single most important safeguard; it's what turned a three-day hang into a logged five-minute skip. Run state lives in the <code>runs</code> table, so the dashboard can show scan history without reading log files.</p>
+        <div class="depends">Depends on: Phases 0–6. Produces: run.py, scheduled job, failure alert, docs/RUNBOOK.md.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase 07</span><button class="copy" type="button" data-copy="c7">Copy prompt</button></div>
+<pre class="body" id="c7">You are working in the `velocity-bd-team` repository. Phases 0–6 produced: the ledger (`ledger/queries.py`: start_run, finish_run, upsert_call, set_filter, set_review, calls_for_review, new_calls), `portals/vulcan_sof/` (browser with force_close, cookie-first auth, scrape_all(page, run_id), filter_calls), and `review/reviewer.py` (review_calls). Each stage currently has its own run_*.py. This is Phase 7 of 9: wire them into one resilient, schedulable command.
+
+## Context
+
+In production this runs weekly, unattended. The reference implementation learned that browser automation against this site can hang forever (its Angular app never reaches a quiet network state), so it wrapped the entire fetch in a hard 300-second timeout, force-closed the browser on expiry, and recorded that as a skipped run rather than an error that blocks the next one. All run state goes to the ledger's `runs` table so a dashboard can show scan history.
+
+## Tasks
+
+1. `run.py` with flags: `--portal &lt;slug&gt;` (one portal; default all registered), `--dry-run` (do everything in a transaction that is rolled back at the end, print what would have been written), `--skip-fetch` (skip the browser; re-run filter/review on rows still pending, for cheap testing), `--no-review` (skip Phase 6; set every kept row's verdict to "maybe", reasoning "LLM review disabled"), `--limit N`. Take a lock file (`data/pipeline.lock`) so two pipelines never run at once; exit with a clear message if it's held.
+   Portals are discovered through `portals/registry.py`: each portal package exposes `PORTAL = {"slug": "vulcan_sof", "name": "Vulcan SOF", "fetch": fn(page, run_id), "filter": fn(rows), "fetch_timeout": 300, "needs_browser": True}` and the registry imports every package under `portals/`. Adding a portal must not require editing `run.py`; a future portal agent only adds a package.
+2. Fetch stage with a hard timeout:
+   - Run login + scrape_all in a worker thread; wait with a 300-second timeout.
+   - On timeout: ERROR "FETCH TIMEOUT: Vulcan SOF exceeded 300s — skipping", call `browser.force_close()`, finish_run with status 'skipped_timeout', continue to later stages with whatever rows were upserted before the timeout.
+   - On any other exception: log the first 200 characters, finish_run with status 'error', continue likewise.
+   - On success: save cookies.
+3. Pipeline: start_run → fetch → filter (pending rows) → review (kept, unreviewed rows) → collect new calls (`new_calls(run_id)`: first seen this run, verdict yes/maybe) → digest → finish_run with stage_counts {"fetched","filtered","reviewed","new"} and log_path. Each stage logs one line: `STAGE: N rows (12.3s)`.
+4. Digest: print to stdout, sorted yes first then maybe then by due_date ascending: verdict, title, due date, URL, reason. (Phase 8 sends this to Slack.)
+5. Logging: every run writes `data/logs/run_YYYY-MM-DD_HHMM.log` in addition to stdout; store its path in runs.log_path.
+6. Scheduling: a PowerShell script `scripts/install-schedule.ps1` that registers a Windows Task Scheduler task (Register-ScheduledTask) running `run.py` inside the venv weekly, with "do not start a new instance" set so runs never overlap, plus the lock file as a second guard. Include an uninstall script.
+7. Failure notification: if fetch times out or errors, or login returns False, send a short alert through whatever channel this agent already uses to reach people. Include the stage, the error, and the log path.
+8. `docs/RUNBOOK.md` — how to run manually, flags, how to re-trigger an OTP login, where logs are, what each runs.status means.
+
+## Done when
+
+- `run.py --dry-run` completes end to end, prints the digest and stage summaries, and the ledger's row counts are unchanged afterward.
+- A real run followed immediately by another: the second run's `runs` row shows new = 0 and the digest is empty.
+- Simulated hang: temporarily set the fetch timeout to 10s and insert a 30s sleep in scrape_all. Show the FETCH TIMEOUT line, confirm with `ps` (or equivalent) that no Chromium process remains, and show the `runs` row with status 'skipped_timeout'. Restore the real values.
+- The scheduled job is installed; show its definition and the first log file it produced.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">during Phase 7</span></div>
+        <ol>
+          <li>Decide the weekly run time (e.g. Monday 06:00) and tell the agent.</li>
+          <li>When it writes <code>scripts/install-schedule.ps1</code>, run it yourself from an elevated PowerShell, or approve the agent running it. Confirm in Task Scheduler (<code>taskschd.msc</code>) that a task named <code>velocity-bd-team</code> exists with the weekly trigger, and right-click → Run once to see it work.</li>
+          <li>Simulated-hang test: let the agent do it, then check yourself with <code>Get-Process chrome -ErrorAction SilentlyContinue</code> in PowerShell (or Task Manager) that no Chromium is left running. Make sure it restores the real timeout afterwards (ask to see the diff).</li>
+          <li>The failure alert will arrive wherever the agent chose; confirm you actually received one during the hang test.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE 8 ───────────────────────── -->
+    <section class="phase" id="p8">
+      <div class="phase-head"><span class="phase-num">PHASE 08</span><h2 class="phase-title">Slack delivery and feedback</h2></div>
+      <div class="brief">
+        <p>The interim answer to "where do results go and how do we tell the bot what we think" until the dashboard takes over. One Slack card per new call, emoji reactions as the feedback channel, polled at the start of every run so no public webhook is needed. Decisions land in the ledger's <code>human_*</code> columns and flow back into the Phase 6 reviewer as few-shot examples, which is how the bot gets smarter from your reactions. The team already triages this way, so keep the same emoji.</p>
+        <div class="depends">Depends on: Phase 7. Produces: slack/sink.py, review/feedback.py, populated slack_* and human_* columns.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase 08</span><button class="copy" type="button" data-copy="c8">Copy prompt</button></div>
+<pre class="body" id="c8">You are working in the `velocity-bd-team` repository. `run.py` (Phase 7) runs fetch → filter → review and collects new calls from the ledger. The ledger's `calls` table has slack_channel, slack_ts, posted_at, human_status (pursue | not_relevant | submitted | dismissed), human_by, human_at, human_notes columns, and `ledger/queries.py` has set_slack, set_human, append_note, pending_feedback (slack_ts set, human_status null), recent_decisions(limit). `review/reviewer.py` accepts a `feedback_examples_block` string that is currently always empty. This is Phase 8 of 9: deliver new calls to Slack, collect the team's reactions as feedback, and feed that feedback into the reviewer.
+
+## Context
+
+There is no dashboard yet (Phase 9 scaffolds one). Slack is the delivery and feedback surface in the meantime, using reactions the team already uses:
+
+  👍 (+1)               → human_status "pursue"
+  👎 (-1)               → "not_relevant"
+  ✅ (white_check_mark)  → "submitted"   (a response was submitted)
+  ❌ (x)                → "dismissed"   (delete the bot message and ignore the call)
+
+A reply in a card's thread beginning with "note:" is stored as free-text notes on that call. These notes are the most valuable training signal because they say *why*.
+
+No public webhook: the bot polls Slack for reactions and thread replies at the start of every run and in a lightweight daily job. Config: SLACK_BOT_TOKEN and SLACK_CHANNEL_ID in .env. Bot scopes: chat:write, reactions:read, channels:history (groups:history for a private channel), chat:write.public if the bot hasn't joined the channel.
+
+## Tasks
+
+1. `slack/sink.py`:
+   - `post_call(row) -> ts`: one Block Kit message per new call. Header with a verdict badge (🟢 yes / 🟡 maybe) and the title linked to the URL; fields Due, Type, Match tier; the AI reason; a context line with the call id. Then `set_slack(id, channel, ts)`.
+   - `post_run_summary(run)`: calls scanned, new, yes/maybe counts, elapsed, and "react 👍 👎 ✅ ❌ on any card; reply 'note: …' in its thread to explain".
+   - `collect_feedback()`: for every `pending_feedback()` row, `reactions.get` on its message; map the first matching reaction (priority ❌ &gt; ✅ &gt; 👎 &gt; 👍) via `set_human(id, status, user_id, ts)`. Then `conversations.replies` on the thread; store replies beginning with "note:" (case-insensitive) via `append_note`. For ❌, also `chat.delete` the bot message. Sleep 0.3s between API calls; honor Retry-After on 429.
+   - Every Slack call has a 15s timeout, logs failures (status + first 200 chars), and never raises into run.py.
+2. `review/feedback.py` — `build_examples_block(limit=20) -> str` from `recent_decisions()`:
+
+   --- RECENT HUMAN DECISIONS (examples of what the team considers relevant) ---
+   - [PURSUE] &lt;title&gt; — &lt;human_notes or ai_reasoning&gt;
+   - [NOT RELEVANT] &lt;title&gt; — &lt;human_notes or ai_reasoning&gt;
+   ---
+
+   pursue/submitted → PURSUE; not_relevant/dismissed → NOT RELEVANT. Return "" when there are no decisions.
+3. Integrate into `run.py` in this order: `collect_feedback()` first (so this run's review sees the newest decisions) → fetch → filter → review with `feedback_examples_block=build_examples_block()` → `post_call` for each new call → `post_run_summary`. Honor `--dry-run` (print rendered cards, no Slack calls) and add `--feedback-only` (collect_feedback only; this is what the daily job calls). Add that daily job to the scheduler from Phase 7.
+
+## Done when
+
+- `run.py --dry-run` prints the rendered card text for each new call and makes no Slack calls (prove it by pointing SLACK_BOT_TOKEN at an invalid value and showing no errors).
+- A real run posts one card per new call plus a summary; you show one card's Block Kit payload and its ledger row with slack_ts and posted_at filled.
+- I react 👎 on one card and reply "note: hardware-heavy, not us" in its thread. `run.py --feedback-only` then shows that row with human_status = not_relevant, my user ID, and the note. I react ❌ on another; its message disappears and the row reads dismissed.
+- The next full run's review prompt (DEBUG log for one row) contains the RECENT HUMAN DECISIONS block with those two entries.
+- An immediate second full run posts nothing new and the summary says 0 new.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">before and during Phase 8</span></div>
+        <ol>
+          <li>Before: setup step 4 is done (Slack app installed, bot invited to the channel, token and channel ID in <code>.env</code>).</li>
+          <li>After the first real run posts cards: in Slack, react 👎 on one card and reply in its thread with <code>note: hardware-heavy, not us</code>. React ❌ on a different card.</li>
+          <li>Tell the agent "feedback test done, run --feedback-only". Confirm the ❌ card disappeared and the agent shows your two decisions in the ledger.</li>
+          <li>Tell the team the four emoji and the <code>note:</code> convention; it's also in the run summary message.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ───────────────────────── PHASE 9 ───────────────────────── -->
+    <section class="phase" id="p9">
+      <div class="phase-head"><span class="phase-num">PHASE 09</span><h2 class="phase-title">Dashboard scaffold</h2></div>
+      <div class="brief">
+        <p>A minimal web app in the same repo that reads the ledger directly. Three read pages and one write action (triage), so that once it's hosted in the Velocity domain it can take over from Slack reactions without any change to the scanner. Where it gets hosted is still open; this phase makes it runnable locally and deployable from the <code>dashboard/</code> subdirectory, and stops there.</p>
+        <div class="depends">Depends on: Phase 8. Produces: dashboard/ (Next.js), docs/DASHBOARD.md.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Phase 09</span><button class="copy" type="button" data-copy="c9">Copy prompt</button></div>
+<pre class="body" id="c9">You are working in the `velocity-bd-team` repository. The ledger (PostgreSQL via DATABASE_URL; schema in `docs/LEDGER_SCHEMA.md`) has tables runs, calls, proposals. The scanner (run.py) writes calls and runs; Slack reactions set calls.human_status. This is Phase 9 of 9: scaffold a dashboard in `dashboard/` that reads the ledger directly and can eventually replace Slack as the triage surface. Hosting location is not decided yet; make it run locally and be deployable from the subdirectory, nothing more.
+
+## Context
+
+Internal BD tool for a small team. No API layer: the app queries the database directly with the same DATABASE_URL. Keep it boring and fast: server-rendered pages, minimal client JS. Use Next.js (App Router, TypeScript) with a thin Postgres client (postgres.js or node-postgres); no ORM required. Read `docs/LEDGER_SCHEMA.md` and reuse its example queries.
+
+## Tasks
+
+1. `dashboard/` — Next.js app with its own package.json, reading DATABASE_URL from `dashboard/.env.local` (git-ignored). Add a `dashboard/README.md` with run and deploy-from-subdirectory notes (Vercel "Root Directory" or equivalent).
+2. Pages:
+   - `/` Review queue — calls with ai_verdict in (yes, maybe) and human_status null, newest first. Columns: verdict badge, title (links to url), due date, match tier, AI reason, first seen. Filter by portal and verdict. Row action buttons: Pursue / Not relevant / Submitted / Dismiss.
+   - `/calls` — all calls with filters (portal, filter_result, ai_verdict, human_status) and text search on title; shows filter_reason for rejected rows and human_notes.
+   - `/runs` — scan history: started/finished, portal, status, stage counts, link to log path; the most recent run's status prominently at the top.
+   - `/proposals` — the past-submission register from the `proposals` table: title, portal, type, submitted date, outcome, strength rating, exemplar flag; summary tiles for win rate by portal. Shows an empty state until the Proposal Corpus plan fills it.
+3. One write action: a server action that sets human_status, human_by (the viewer's name from a simple env-configured allowlist or a header; no auth system yet), human_at, and optionally appends a note. It writes the same columns Slack reactions write, so either surface can be used.
+4. Theme: readable in light and dark; tabular numerals for dates and counts; nothing fancy.
+5. `docs/DASHBOARD.md` — pages, the write action, and a note that moving triage off Slack means removing the Slack reaction mapping in `slack/sink.py` or leaving both active (they are compatible).
+
+## Done when
+
+- `npm run dev` in `dashboard/` serves all four pages against the real ledger; you show screenshots of `/` and `/runs` with real rows.
+- Clicking "Not relevant" on a review-queue row updates the ledger (show the row before and after) and the row leaves the queue.
+- `/proposals` renders its empty state cleanly with zero rows.
+- `npm run build` succeeds with no type errors.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">during Phase 9</span></div>
+        <ol>
+          <li>Give the agent the names to allow for triage (it will put them in an env var); no login system yet.</li>
+          <li>Open <code>http://localhost:3000</code>, click through the four pages, click "Not relevant" on one review-queue row, and confirm it leaves the queue.</li>
+          <li>Hosting in the Velocity domain is a later decision; nothing is needed now. When you pick a host, the deploy is "root directory = dashboard/, env var = DATABASE_URL".</li>
+        </ol>
+      </div>
+    </section>
+
+    <div class="checklist" id="done">
+      <h2>Acceptance checklist for the whole build</h2>
+      <ol>
+        <li>One repo; every component talks only through the ledger; <code>docs/LEDGER_SCHEMA.md</code> is accurate enough to build the dashboard from.</li>
+        <li>Fresh-machine login succeeds via password + emailed OTP; the next run restores from cookies without touching the mailbox.</li>
+        <li>Every open call on the listing page lands in <code>calls</code>; deadline and description fill rates above 80%, verified against three detail pages by eye.</li>
+        <li>Filtering is driven by <code>keywords.yaml</code> and the rejection table contains no obvious software/AI/C2 calls.</li>
+        <li>LLM review returns strict <code>VERDICT</code>/<code>REASON</code> pairs and degrades to <code>maybe</code>, never <code>no</code>, on model failure.</li>
+        <li>A forced hang produces a logged timeout within 300 s, leaves no Chromium process behind, records <code>skipped_timeout</code>, and the next scheduled run proceeds.</li>
+        <li>Repeat runs surface nothing twice; <code>first_seen_at</code> is stable.</li>
+        <li>A Slack reaction updates the ledger within one run cycle and appears in the next review prompt as an example.</li>
+        <li>The dashboard shows the review queue, calls, runs, and proposals from the same database, and its triage action writes the same columns Slack does.</li>
+      </ol>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pre = document.getElementById(btn.dataset.copy);
+      const text = pre.innerText;
+      let ok = false;
+      try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { ok = false; }
+      if (!ok) {
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      const prev = btn.textContent;
+      btn.textContent = ok ? 'Copied' : 'Selected — press ⌘C';
+      btn.classList.add('done');
+      setTimeout(() => { btn.textContent = prev; btn.classList.remove('done'); }, 1800);
+    });
+  });
+</script>

@@ -1,0 +1,17 @@
+# Never committed
+data/
+.env
+.env.*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Playwright and local state
+playwright-state/
+*.log
+
+# Node
+node_modules/
