@@ -53,7 +53,7 @@ def test_description_survives_long_first_paragraph_and_numbered_heading() -> Non
     body = f"Deadline:\n30 OCT 2026 : 21:59 MDT\nProblem Statement\n\n{long_para}\n\nThe objective is X.\n"
     f = scrape.extract_fields(body)
     assert f["description"].startswith("The U.S. military must be prepared")
-    assert len(f["description"]) == 400 and "\n" not in f["description"]
+    assert 400 < len(f["description"]) <= 1500 and "\n" not in f["description"]
     assert f["description_is_fallback"] == ""
 
     numbered = ("Problem Statement\n\n1. Problem Statement & Executive Summary\n\n"

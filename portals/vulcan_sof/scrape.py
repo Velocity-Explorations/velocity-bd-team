@@ -38,12 +38,13 @@ OPEN_RE = re.compile(r"Open Date[:\s]*([^\n]+(?:MDT|MST|EST|UTC|202[0-9]))")
 TYPE_RE = re.compile(r"Engagement Objectives?[:\s]*\n((?:[^\n]+\n?){1,5})")
 # The spec's patterns required a blank line within 600 characters of the heading. On real
 # pages the first paragraph is often 700 to 1,250 characters with no break, so instead we
-# take up to 1,500 characters after the heading, collapse whitespace, and keep 400.
+# take up to 2,500 characters after the heading, collapse whitespace, and keep 1,500.
 DESC_RES = [
-    re.compile(r"Bottom Line Upfront\s*\n+([\s\S]{1,1500})"),
-    re.compile(r"Problem Statement\s*\n+([\s\S]{1,1500})"),
+    re.compile(r"Bottom Line Upfront\s*\n+([\s\S]{1,2500})"),
+    re.compile(r"Problem Statement\s*\n+([\s\S]{1,2500})"),
 ]
 DESC_MIN_CHARS = 40
+DESC_MAX_CHARS = 1500   # was 400; the reviewer kept calling the text truncated
 CLOSED_RE = re.compile(r"This call has closed", re.I)
 UUID_RE = re.compile(r"collectionUuid=([a-f0-9-]{36})")
 RENDERED_JS = "() => /Deadline|Open Date|Problem Statement/.test(document.body ? document.body.innerText : '')"
@@ -73,7 +74,7 @@ def extract_fields(body: str) -> dict[str, str]:
     for pattern in DESC_RES:
         m = pattern.search(body)
         if m:
-            candidate = " ".join(m.group(1).split())[:400]
+            candidate = " ".join(m.group(1).split())[:DESC_MAX_CHARS]
             if len(candidate) >= DESC_MIN_CHARS:
                 description = candidate
                 break

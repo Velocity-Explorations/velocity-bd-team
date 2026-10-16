@@ -23,14 +23,14 @@ class FakeModel:
 
 
 ROW = {"id": "vulcan-1", "title": "AI Digital Scribe", "portal": "Vulcan SOF", "type": "OTA Prototype",
-       "naics_code": "", "department": "USSOCOM / SOF Enterprise", "description": "x" * 700, "match_tier": "tight"}
+       "naics_code": "", "department": "USSOCOM / SOF Enterprise", "description": "x" * 1700, "match_tier": "tight"}
 
 
 def test_build_prompt_has_context_fields_and_truncates_description() -> None:
     p = reviewer.build_prompt(ROW)
     assert p.startswith("Velocity Explorations is a small defense technology company")
     assert "Title: AI Digital Scribe" in p and "Agency: USSOCOM / SOF Enterprise" in p
-    assert "Description: " + "x" * 500 + "\n" in p and "x" * 501 not in p
+    assert "Description: " + "x" * 1500 + "\n" in p and "x" * 1501 not in p
     assert p.rstrip().endswith("weight that positively.")
     with_blocks = reviewer.build_prompt(ROW, "PAST\n", "FEEDBACK\n")
     assert "PAST\nFEEDBACK\n" in with_blocks

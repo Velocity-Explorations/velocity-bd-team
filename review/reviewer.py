@@ -25,6 +25,7 @@ RETRY_DELAY_S = 1.0
 BETWEEN_CALLS_S = 0.5
 VERDICTS = ("yes", "no", "maybe")
 UNPARSEABLE_REASON = "Could not parse LLM response"
+DESCRIPTION_CHARS = 1500   # the spec said 500; the ledger now stores 1,500 and the model asked for more
 
 # Company profile, used verbatim in every review prompt.
 COMPANY_CONTEXT = """Velocity Explorations is a small defense technology company focused on:
@@ -109,7 +110,7 @@ def build_prompt(row: Mapping[str, Any], past_experience_block: str = "", feedba
         type=row.get("type") or "",
         naics_code=row.get("naics_code") or "",
         department=row.get("department") or "",
-        description=(row.get("description") or "")[:500],
+        description=(row.get("description") or "")[:DESCRIPTION_CHARS],
     )
 
 
