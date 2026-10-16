@@ -157,9 +157,11 @@ def scrape_call(page: Page, href: str, title: str, sample_path: Path | None = No
         return None
 
 
-def scrape_all(page: Page, run_id: int, save_samples: bool = True) -> dict[str, int]:
+def scrape_all(page: Page, run_id: int, save_samples: bool = True, limit: int | None = None) -> dict[str, int]:
     """List, scrape each call, upsert into the ledger. Never aborts on a single bad page."""
     calls = list_calls(page)
+    if limit is not None:
+        calls = calls[:limit]
     counts = {"found": len(calls), "scraped": 0, "new": 0, "failed": 0}
     started = time.time()
     for n, call in enumerate(calls, start=1):

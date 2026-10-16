@@ -11,6 +11,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 
 ## In progress
 
+- Phase 7 (pipeline): `python run.py` runs every registered portal (fetch under a hard timeout,
+  filter, review, digest) and writes data/logs/run_*.log. Scheduled weekly (Monday 06:00) via
+  scripts/install-schedule.ps1 as of 2026-10-16. Failure alerts go to Slack once SLACK_CHANNEL_ID
+  is set; until then they are log warnings.
+
 - Phase 2 (Vulcan SOF login): working as of 2026-10-16. Username, password, then the emailed
   code read over Gmail IMAP (VELOCITY_GMAIL_APP_USERNAME + VELOCITY_GMAIL_APP_PASSWORD; gog CLI
   is used instead when installed). Calls listing reachable, 120 call links seen.

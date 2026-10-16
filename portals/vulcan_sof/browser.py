@@ -13,6 +13,8 @@ Playwright's Chromium shows up as chrome.exe in Task Manager.
 """
 from __future__ import annotations
 
+import subprocess
+import sys
 import threading
 from typing import Any
 
@@ -71,22 +73,58 @@ def close_all(
             _active_browser = None
 
 
-def force_close() -> bool:
+def force_close(kill_orphans: bool = True) -> bool:
     """Close the active browser from any thread. Never raises. Returns True if one was open.
 
-    Used by the pipeline's watchdog (Phase 7) when a portal run overruns its budget. The
-    sync Playwright API is not thread-safe, so the close may be refused by the driver; the
-    attempt is still made and the reference is dropped either way. A browser that
-    survives this is a chrome.exe process the scheduler's cleanup step must end.
+    Used by the pipeline's watchdog when a portal run overruns its budget. The sync
+    Playwright API refuses calls from a thread other than the one that launched the
+    browser, so the close is best effort. Afterwards, on Windows, any Chromium that Playwright launched
+    (chrome.exe under the ms-playwright directory, never the user's own Chrome) is killed
+    so a hung browser cannot outlive the run.
     """
     global _active_browser
     with _lock:
         browser = _active_browser
         _active_browser = None
-    if browser is None:
-        return False
-    _quiet(browser.close)
-    return True
+    had_browser = browser is not None
+    if browser is not None:
+        # From the owning thread this closes cleanly. From another thread Playwright's
+        # sync API refuses the call (caught here) and the process kill below takes over.
+        _quiet(browser.close)
+    if kill_orphans:
+        kill_playwright_chromium()
+    return had_browser
+
+
+def kill_playwright_chromium() -> None:
+    """Terminate chrome.exe processes that live under the ms-playwright browser cache. Never raises."""
+    if sys.platform != "win32":
+        return
+    script = (
+        "Get-Process chrome -ErrorAction SilentlyContinue | "
+        "Where-Object { $_.Path -like '*ms-playwright*' } | "
+        "Stop-Process -Force -ErrorAction SilentlyContinue"
+    )
+    try:
+        subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True, timeout=20)
+    except Exception:
+        pass
+
+
+def playwright_chromium_pids() -> list[int]:
+    """PIDs of Playwright-launched chrome.exe processes (Windows), for the hang check."""
+    if sys.platform != "win32":
+        return []
+    script = (
+        "Get-Process chrome -ErrorAction SilentlyContinue | "
+        "Where-Object { $_.Path -like '*ms-playwright*' } | "
+        "ForEach-Object { $_.Id }"
+    )
+    try:
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True, text=True, timeout=20)
+        return [int(x) for x in out.stdout.split() if x.strip().isdigit()]
+    except Exception:
+        return []
 
 
 def _quiet(fn: Any) -> None:

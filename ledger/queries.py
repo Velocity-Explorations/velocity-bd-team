@@ -190,8 +190,13 @@ def calls_for_review(run_id: int) -> list[dict[str, Any]]:
         ))
 
 
-def calls_where(portal: str | None = None, filter_result: str | None = None) -> list[dict[str, Any]]:
-    """All calls, optionally narrowed by portal and/or filter_result ('pending', 'kept', 'rejected')."""
+def calls_where(
+    portal: str | None = None,
+    filter_result: str | None = None,
+    reviewed: bool | None = None,
+) -> list[dict[str, Any]]:
+    """All calls, narrowed by portal, filter_result ('pending', 'kept', 'rejected') and/or
+    whether an AI verdict exists (reviewed=False means ai_verdict IS NULL)."""
     clauses: list[str] = []
     params: list[Any] = []
     if portal is not None:
@@ -200,6 +205,10 @@ def calls_where(portal: str | None = None, filter_result: str | None = None) -> 
     if filter_result is not None:
         clauses.append("filter_result = ?")
         params.append(filter_result)
+    if reviewed is True:
+        clauses.append("ai_verdict IS NOT NULL")
+    elif reviewed is False:
+        clauses.append("ai_verdict IS NULL")
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     with tx() as conn:
         return rows(q(conn, f"SELECT * FROM calls{where} ORDER BY first_seen_at, id", params))

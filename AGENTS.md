@@ -17,14 +17,14 @@ that share one SQLite ledger database.
 | run.py | Pipeline entry point. Takes a lock file so only one pipeline runs at a time. `run.py --portal <slug> --dry-run` tests one portal. |
 | config.py | Settings loader. `require("KEY")` raises a ConfigError naming the key; `python -m config` lists which keys are set, never values. |
 | ledger/ | The shared database: connection helpers, `migrate.py`, and `migrations/` (numbered `NNN_description.sql`, additive only). |
-| portals/<slug>/ | One adapter per portal (first: `portals/vulcan_sof/`). Logs in, lists calls, extracts details, writes `calls` rows. |
+| portals/<slug>/ | One adapter per portal (first: `portals/vulcan_sof/`). Logs in, lists calls, extracts details, writes `calls` rows. Exposes a `PORTAL` dict that `portals/registry.py` discovers; run.py never names a portal. |
 | review/ | Per-call review: regex blocklist, then LLM verdict. Writes verdicts to the ledger. |
 | corpus/ | Past-submission corpus: Drive sync, text extraction, chunking, embeddings. |
 | drafting/ | Proposal briefs and response drafts built from reviewed calls and the corpus. |
 | dashboard/ | Read-only view over the ledger. |
 | slack/ | Alerts, delivery, and reaction handling. |
 | scripts/ | PowerShell helpers, including the Task Scheduler registration script. |
-| docs/ | OWNERS.md, STATUS.md, LEDGER_SCHEMA.md, plans/. |
+| docs/ | OWNERS.md, STATUS.md, LEDGER_SCHEMA.md, RUNBOOK.md, plans/. |
 | tests/ | pytest suite. Every phase adds tests before code. |
 | data/ | Runtime files, one subdirectory per component (`data/<component>/`). Never committed. |
 | reference/yukon/ | Read-only prior art from the retired Yukon scanner. Never imported. |

@@ -67,7 +67,9 @@ def connect(url: str | None = None) -> Any:
         target = sqlite_path(url)
         if isinstance(target, Path):
             target.parent.mkdir(parents=True, exist_ok=True)
-        return sqlite3.connect(str(target))
+        # check_same_thread=False: the pipeline's fetch worker thread shares the dry-run
+        # connection with the main thread; they never use it at the same time.
+        return sqlite3.connect(str(target), check_same_thread=False)
     import psycopg
 
     return psycopg.connect(url)
@@ -77,9 +79,36 @@ def is_sqlite(conn: Any) -> bool:
     return isinstance(conn, sqlite3.Connection)
 
 
+# When set, every tx() hands out this one connection and never commits. dry_run_session()
+# owns it and rolls everything back at the end.
+_shared: Any = None
+
+
+@contextmanager
+def dry_run_session(url: str | None = None) -> Iterator[Any]:
+    """Run a whole pipeline against one connection and roll it back at the end."""
+    global _shared
+    conn = connect(url)
+    _shared = conn
+    try:
+        yield conn
+    finally:
+        _shared = None
+        try:
+            conn.rollback()
+        finally:
+            conn.close()
+
+
 @contextmanager
 def tx(url: str | None = None) -> Iterator[Any]:
-    """Connection scoped to one transaction: commit on success, roll back on error, always close."""
+    """Connection scoped to one transaction: commit on success, roll back on error, always close.
+
+    Inside dry_run_session() the shared connection is yielded instead and nothing commits.
+    """
+    if _shared is not None and url is None:
+        yield _shared
+        return
     conn = connect(url)
     try:
         yield conn
