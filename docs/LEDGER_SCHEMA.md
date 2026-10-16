@@ -80,7 +80,7 @@ the component that owns them. A component never writes another group's columns.
 | human_by | TEXT | who decided (Slack user id or name) | same |
 | human_at | TEXT timestamp | when they decided | same |
 | human_notes | TEXT | newline-separated lines `[<timestamp> <by>] <text>` | `append_note` |
-| extra | TEXT JSON | object of portal-specific fields, keys prefixed by portal (for example `vulcan_collection_uuid`) | portal adapter |
+| extra | TEXT JSON | object of portal-specific fields, keys prefixed by portal. Vulcan SOF writes `vulcan_closed` (bool, the page says the call has closed) and `vulcan_description_fallback` (bool, no Problem Statement text was found) | portal adapter |
 | updated_at | TEXT timestamp, not null | touched by every write | every writer |
 
 Indexes: `(portal, first_seen_at)`, `(human_status)`, `(ai_verdict)`.

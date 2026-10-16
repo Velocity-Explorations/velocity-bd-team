@@ -174,6 +174,12 @@ def calls_for_review(run_id: int) -> list[dict[str, Any]]:
         ))
 
 
+def calls_in_run(run_id: int) -> list[dict[str, Any]]:
+    """Every call seen (inserted or refreshed) by this run."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM calls WHERE last_run_id = ? ORDER BY first_seen_at, id", (run_id,)))
+
+
 def new_calls(run_id: int) -> list[dict[str, Any]]:
     """Calls first seen in this run whose verdict is yes or maybe: what gets posted to Slack."""
     with tx() as conn:

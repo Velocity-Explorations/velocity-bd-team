@@ -15,6 +15,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   code read over Gmail IMAP (VELOCITY_GMAIL_APP_USERNAME + VELOCITY_GMAIL_APP_PASSWORD; gog CLI
   is used instead when installed). Calls listing reachable, 120 call links seen.
 - Phase 3 (session persistence): cookies saved to data/vulcan_cookies.json after each successful
-  login and restored first on the next run; verified 2026-10-16. Phase 4 scrapes the listing.
+  login and restored first on the next run; verified 2026-10-16.
+- Phase 4 (Vulcan SOF scrape): `python -m portals.vulcan_sof.run_scrape` writes every listed call
+  (60 on 2026-10-16, 18 open and 42 closed; closed flagged in extra.vulcan_closed) in about 170 s
+  with 100% field fill. Phase 5 adds the filter.
 
 ## Known breakages
