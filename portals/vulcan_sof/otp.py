@@ -5,7 +5,7 @@
 Mail access is one of two backends, picked at call time:
 
 - gog CLI (preferred, see AGENTS.md): ``gog gmail search`` then ``gog gmail read``.
-- Gmail IMAP (fallback when gog is absent): needs VULCAN_OTP_IMAP_PASSWORD, a Google
+- Gmail IMAP (fallback when gog is absent): needs VELOCITY_GMAIL_APP_PASSWORD, a Google
   app password for the mailbox. Standard library only.
 
 Both expose the same shape: ``fetch(mailbox) -> list[OtpMessage]`` newest first. Every
@@ -37,6 +37,7 @@ OTP_SUBJECT = "Vulcan - OTP Code"
 CODE_RE = re.compile(r"YOUR AUTHENTICATION CODE:\s*(\d{6})")
 CALL_TIMEOUT_S = 15
 POLL_SECONDS = 5
+CLOCK_SKEW_S = 30   # mail timestamps are whole seconds and the sender's clock is not ours
 IMAP_HOST = "imap.gmail.com"
 
 
@@ -66,7 +67,7 @@ def is_stale(msg: OtpMessage, sent_after: float) -> bool:
         received_day = datetime.fromtimestamp(msg.received_at, tz=timezone.utc).date()
         trigger_day = datetime.fromtimestamp(sent_after, tz=timezone.utc).date()
         return received_day < trigger_day
-    return msg.received_at < sent_after
+    return msg.received_at < sent_after - CLOCK_SKEW_S
 
 
 def get_otp(
@@ -111,12 +112,12 @@ def default_fetcher() -> Fetcher:
     if shutil.which("gog"):
         log.info("OTP backend: gog CLI")
         return fetch_via_gog
-    if get("VULCAN_OTP_IMAP_PASSWORD"):
+    if get("VELOCITY_GMAIL_APP_PASSWORD"):
         log.info("OTP backend: Gmail IMAP")
         return fetch_via_imap
     raise ConfigError(
         "No mailbox access for the OTP: install the gog CLI (AGENTS.md) or set "
-        "VULCAN_OTP_IMAP_PASSWORD in .env for Gmail IMAP."
+        "VELOCITY_GMAIL_APP_PASSWORD in .env for Gmail IMAP."
     )
 
 
@@ -181,11 +182,12 @@ def message_text(msg: Message) -> str:
 
 
 def fetch_via_imap(mailbox: str) -> list[OtpMessage]:
-    password = require("VULCAN_OTP_IMAP_PASSWORD")
+    account = get("VELOCITY_GMAIL_APP_USERNAME") or mailbox
+    password = re.sub(r"\s+", "", require("VELOCITY_GMAIL_APP_PASSWORD"))   # Google shows it in spaced groups
     since = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%d-%b-%Y")
     conn = imaplib.IMAP4_SSL(IMAP_HOST, timeout=CALL_TIMEOUT_S)
     try:
-        conn.login(mailbox, password)
+        conn.login(account, password)
         conn.select("INBOX", readonly=True)
         status, data = conn.search(None, "FROM", f'"{OTP_SENDER}"', "SUBJECT", f'"{OTP_SUBJECT}"', "SINCE", since)
         if status != "OK":

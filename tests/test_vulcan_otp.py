@@ -19,7 +19,7 @@ def test_extract_code_last_match_and_none() -> None:
 
 def test_get_otp_returns_fresh_code_and_skips_stale(monkeypatch: pytest.MonkeyPatch) -> None:
     sent_after = time.time()
-    stale = otp.OtpMessage(body="YOUR AUTHENTICATION CODE: 000000", received_at=sent_after - 60)
+    stale = otp.OtpMessage(body="YOUR AUTHENTICATION CODE: 000000", received_at=sent_after - 120)
     fresh = otp.OtpMessage(body=BODY, received_at=sent_after + 10)
     calls: list[int] = []
 
@@ -68,7 +68,8 @@ def test_day_precision_staleness() -> None:
     yesterday = midnight_same_day - 86_400
     assert otp.is_stale(otp.OtpMessage(body="", received_at=midnight_same_day, day_precision=True), noon) is False
     assert otp.is_stale(otp.OtpMessage(body="", received_at=yesterday, day_precision=True), noon) is True
-    assert otp.is_stale(otp.OtpMessage(body="", received_at=noon - 1), noon) is True
+    assert otp.is_stale(otp.OtpMessage(body="", received_at=noon - 1), noon) is False   # within clock skew
+    assert otp.is_stale(otp.OtpMessage(body="", received_at=noon - 120), noon) is True
     assert otp.is_stale(otp.OtpMessage(body="", received_at=None), noon) is False
 
 
@@ -92,4 +93,4 @@ def test_default_fetcher_without_access_names_remedy(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(otp, "get", lambda key, default=None: None)
     with pytest.raises(otp.ConfigError) as exc:
         otp.default_fetcher()
-    assert "gog" in str(exc.value) and "VULCAN_OTP_IMAP_PASSWORD" in str(exc.value)
+    assert "gog" in str(exc.value) and "VELOCITY_GMAIL_APP_PASSWORD" in str(exc.value)

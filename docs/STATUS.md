@@ -11,7 +11,8 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 
 ## In progress
 
-- Phase 1 (Vulcan SOF recon): Playwright 1.64 with Chromium 156 installed; headless load of the
-  login page confirmed on 2026-10-16 (data/recon_login.png). Login itself is Phase 2.
+- Phase 2 (Vulcan SOF login): working as of 2026-10-16. Username, password, then the emailed
+  code read over Gmail IMAP (VELOCITY_GMAIL_APP_USERNAME + VELOCITY_GMAIL_APP_PASSWORD; gog CLI
+  is used instead when installed). Calls listing reachable, 120 call links seen. Phase 3 scrapes it.
 
 ## Known breakages

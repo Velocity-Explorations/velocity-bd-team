@@ -113,6 +113,8 @@ for review, corpus, drafting, and dashboard. Rules:
   OTP mailbox: gog gmail search / gog gmail read --account david@velocityexplorations.com
   Drive: gog drive (list / download / export) for the corpus folder
   If gog is unavailable on this machine, implement the same calls with the Gmail and Drive APIs behind the same function signatures.
+  Current state (2026-10-16): gog is not installed. OTP mail is read over Gmail IMAP with a Google app password
+  (VELOCITY_GMAIL_APP_USERNAME, VELOCITY_GMAIL_APP_PASSWORD in .env); portals/vulcan_sof/otp.py switches to gog automatically once it is on PATH.
 - LLM for review and briefs: Anthropic API via ANTHROPIC_API_KEY
   (claude-haiku-5-5 for per-call review, claude-sonnet-5-5 for proposal briefs)
 - Embeddings: Ollama for Windows, nomic-embed-text at http://localhost:11434 (768 dims)
