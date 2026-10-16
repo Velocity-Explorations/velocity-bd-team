@@ -22,7 +22,7 @@ that share one SQLite ledger database.
 | corpus/ | Past-submission corpus: Drive sync, text extraction, chunking, embeddings. |
 | drafting/ | Proposal briefs and response drafts built from reviewed calls and the corpus. |
 | dashboard/ | Read-only view over the ledger. |
-| slack/ | Alerts, delivery, and reaction handling. |
+| slack/ | `alerts.py` (failure alerts), `sink.py` (cards, run summary, reaction and note collection). |
 | scripts/ | PowerShell helpers, including the Task Scheduler registration script. |
 | docs/ | OWNERS.md, STATUS.md, LEDGER_SCHEMA.md, RUNBOOK.md, plans/. |
 | tests/ | pytest suite. Every phase adds tests before code. |
@@ -43,7 +43,7 @@ disagree, Phase 0 wins and this file gets updated in the same PR.
    waits, and give every wait, click, and navigation an explicit timeout.
 3. `data/` and `.env` are never committed. Both are in .gitignore; do not remove them.
 4. Never print, log, echo, or write the value of any environment variable. Log the key
-   name only ("SLACK_BOT_TOKEN present: yes"). Never paste a credential into a file,
+   name only ("BD_SLACK_BOT_TOKEN present: yes"). Never paste a credential into a file,
    commit, issue, PR, log, test fixture, or chat reply, even a partial one.
 5. `reference/yukon/` is proven prior art. Read the relevant file (see its INDEX.md)
    before implementing a phase. Copy the ideas that worked; do not import the code.
@@ -118,6 +118,6 @@ for review, corpus, drafting, and dashboard. Rules:
 - LLM for review and briefs: Anthropic API via ANTHROPIC_API_KEY
   (claude-haiku-5-5 for per-call review, claude-sonnet-5-5 for proposal briefs)
 - Embeddings: Ollama for Windows, nomic-embed-text at http://localhost:11434 (768 dims)
-- Alerts and delivery: Slack: SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
+- Alerts and delivery: Slack: BD_SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
 - Scheduler: Windows Task Scheduler, created by a PowerShell script in scripts/ (Register-ScheduledTask); never overlapping runs.
 - Playwright's Chromium shows up as chrome.exe in Task Manager.

@@ -7,6 +7,8 @@
     python run.py --no-review              # kept rows get verdict "maybe", reasoning "LLM review disabled"
     python run.py --limit 5                # cap scraped and reviewed rows
     python run.py --fetch-timeout 10       # override every portal's fetch budget (testing)
+    python run.py --feedback-only          # pull Slack reactions and notes into the ledger, nothing else
+    python run.py --deliver-run 12         # re-post run 12's cards after a Slack failure
 
 A lock file (data/pipeline.lock) stops two pipelines running at once. The fetch stage runs
 in a worker thread under a hard timeout; on expiry the browser is force-closed and the run
@@ -16,6 +18,7 @@ writes data/logs/run_YYYY-MM-DD_HHMM.log and a `runs` row.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import subprocess
@@ -28,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from ledger.db import dry_run_session
-from ledger.queries import calls_where, finish_run, new_calls, set_review, start_run
+from ledger.queries import calls_where, finish_run, get_run, new_calls, set_review, start_run
 from portals import registry
 from portals.registry import Portal
 
@@ -91,14 +94,14 @@ def release_lock(path: Path | None = None) -> None:
 
 # ---------------------------------------------------------------------------- logging
 
-def setup_logging(log_dir: Path | None = None) -> Path:
+def setup_logging(log_dir: Path | None = None, debug: bool = False) -> Path:
     log_dir = log_dir or LOG_DIR
     log_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
     path = log_dir / f"run_{stamp}.log"
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
     root = logging.getLogger()
-    root.setLevel(logging.INFO)
+    root.setLevel(logging.DEBUG if debug else logging.INFO)
     for handler in list(root.handlers):
         root.removeHandler(handler)
     for handler in (logging.StreamHandler(sys.stdout), logging.FileHandler(path, encoding="utf-8")):
@@ -169,10 +172,73 @@ def run_review(portal: Portal, limit: int | None, no_review: bool) -> int:
         for row in rows:
             set_review(row["id"], "maybe", NO_REVIEW_REASON)
         return len(rows)
+    from review.feedback import build_examples_block
     from review.reviewer import AnthropicModel, review_calls
 
-    review_calls(rows, AnthropicModel())
+    examples = build_examples_block()
+    log.info("REVIEW: feedback examples block is %d chars", len(examples))
+    review_calls(rows, AnthropicModel(), feedback_examples_block=examples)
     return len(rows)
+
+
+def deliver(portal: Portal, fresh: list[dict[str, Any]], counts: dict[str, int], elapsed: float, dry_run: bool) -> int:
+    """Post one card per new call and a run summary. In dry-run, print the cards instead."""
+    from slack.sink import card_text, post_call, post_run_summary
+
+    if dry_run:
+        print(f"\n===== DRY RUN: would post {len(fresh)} card(s) to Slack =====")
+        for row in fresh:
+            print(card_text(row))
+            print()
+        return 0
+    posted = sum(1 for row in fresh if post_call(row))
+    post_run_summary({
+        "portal": portal.name,
+        "scanned": counts.get("fetched", 0),
+        "new": len(fresh),
+        "yes": sum(1 for r in fresh if r.get("ai_verdict") == "yes"),
+        "maybe": sum(1 for r in fresh if r.get("ai_verdict") == "maybe"),
+        "elapsed": elapsed,
+    })
+    return posted
+
+
+def redeliver(run_id: int) -> int:
+    """Post the cards of a run whose Slack delivery failed (rows still without slack_ts)."""
+    from slack.sink import post_call, post_run_summary
+
+    run = get_run(run_id)
+    if run is None:
+        print(f"no run {run_id}")
+        return 2
+    pending = [r for r in new_calls(run_id) if not r.get("slack_ts")]
+    posted = sum(1 for row in pending if post_call(row))
+    counts = json.loads(run.get("stage_counts") or "{}")
+    post_run_summary({
+        "portal": run.get("portal") or "Pipeline",
+        "scanned": counts.get("fetched", 0),
+        "new": len(pending),
+        "yes": sum(1 for r in pending if r.get("ai_verdict") == "yes"),
+        "maybe": sum(1 for r in pending if r.get("ai_verdict") == "maybe"),
+        "elapsed": 0.0,
+    })
+    print(f"deliver-run {run_id}: {posted} of {len(pending)} card(s) posted")
+    return 0 if posted == len(pending) else 1
+
+
+def feedback_pass(dry_run: bool) -> list[dict[str, Any]]:
+    """Pull reactions and notes from Slack into the ledger. Skipped in dry-run (no Slack calls)."""
+    if dry_run:
+        log.info("FEEDBACK: skipped (--dry-run makes no Slack calls)")
+        return []
+    from slack.sink import collect_feedback
+
+    t0 = time.time()
+    changes = collect_feedback()
+    log.info("FEEDBACK: %d change(s) (%.1fs)", len(changes), time.time() - t0)
+    for c in changes:
+        print(f"  feedback: {c['id']} | {c['title'][:60]} | status={c['status']} by={c['by']} notes={c['notes']}")
+    return changes
 
 
 def digest_lines(rows: list[dict[str, Any]]) -> list[str]:
@@ -238,6 +304,10 @@ def run_portal(portal: Portal, args: argparse.Namespace, log_path: Path) -> dict
         counts["new"] = len(fresh)
         log.info("NEW: %d rows", counts["new"])
         print_digest(portal.name, fresh)
+
+        t0 = time.time()
+        posted = deliver(portal, fresh, counts, time.time() - started, args.dry_run)
+        log.info("DELIVER: %d card(s) (%.1fs)", posted, time.time() - t0)
     except Exception as exc:
         status, error = "error", f"{type(exc).__name__}: {str(exc)[:200]}"
         log.error("PIPELINE ERROR in %s: %s", portal.name, error)
@@ -263,6 +333,9 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--no-review", action="store_true", help="skip the LLM; kept rows become 'maybe'")
     parser.add_argument("--limit", type=int, help="cap scraped and reviewed rows")
     parser.add_argument("--fetch-timeout", type=int, help="override the per-portal fetch timeout in seconds")
+    parser.add_argument("--feedback-only", action="store_true", help="only pull Slack reactions and notes into the ledger")
+    parser.add_argument("--debug", action="store_true", help="DEBUG logging (includes the first review prompt)")
+    parser.add_argument("--deliver-run", type=int, metavar="N", help="re-post run N's new calls that never reached Slack, then exit")
     return parser.parse_args(argv)
 
 
@@ -274,12 +347,19 @@ def main(argv: list[str] | None = None) -> int:
         print(exc)
         return 3
     try:
-        log_path = setup_logging()
+        log_path = setup_logging(debug=args.debug)
         log.info("Pipeline start; log %s; args %s", log_path, vars(args))
+        if args.feedback_only:
+            changes = feedback_pass(dry_run=False)
+            print(f"feedback-only: {len(changes)} change(s) recorded")
+            return 0
+        if args.deliver_run:
+            return redeliver(args.deliver_run)
         portals_to_run = [registry.get(args.portal)] if args.portal else registry.discover()
         if not portals_to_run:
             log.error("No portals registered under portals/")
             return 1
+        feedback_pass(args.dry_run)   # before review, so this run's prompt sees the newest decisions
         if args.dry_run:
             with dry_run_session():
                 results = run_all(portals_to_run, args, log_path)

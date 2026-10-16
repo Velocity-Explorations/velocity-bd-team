@@ -44,7 +44,14 @@ def isolated(ledger_db: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(pipeline, "LOCK_FILE", tmp_path / "pipeline.lock")
     monkeypatch.setattr(pipeline, "LOG_DIR", tmp_path / "logs")
     monkeypatch.setattr(pipeline, "alert", lambda text: alerts.append(text))
+    import slack.sink as sink
+    monkeypatch.setattr(sink, "collect_feedback", lambda *a, **k: [])
+    monkeypatch.setattr(sink, "post_call", lambda row, client=None: posted.append(row["id"]) or "1.0")
+    monkeypatch.setattr(sink, "post_run_summary", lambda summary, client=None: summaries.append(summary) or "1.1")
     alerts: list[str] = []
+    posted: list[str] = []
+    summaries: list[dict] = []
+    pipeline._test_capture = {"alerts": alerts, "posted": posted, "summaries": summaries}   # type: ignore[attr-defined]
     return alerts
 
 
@@ -61,11 +68,15 @@ def test_full_run_then_rerun(isolated, monkeypatch: pytest.MonkeyPatch, capsys) 
     edge = lq.get_call("fake-0")
     assert edge and edge["ai_verdict"] == "maybe" and edge["ai_reasoning"] == pipeline.NO_REVIEW_REASON
 
+    assert pipeline._test_capture["posted"] == ["fake-0"]   # type: ignore[attr-defined]
+    assert pipeline._test_capture["summaries"][0]["new"] == 1   # type: ignore[attr-defined]
+
     assert pipeline.main(["--no-review"]) == 0
     out = capsys.readouterr().out
     assert "0 new call(s)" in out and "(nothing new)" in out
     run2 = lq.get_run(2)
     assert run2 and '"new": 0' in run2["stage_counts"]
+    assert pipeline._test_capture["posted"] == ["fake-0"] and pipeline._test_capture["summaries"][1]["new"] == 0   # type: ignore[attr-defined]
 
 
 def test_dry_run_leaves_ledger_unchanged(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
@@ -74,6 +85,8 @@ def test_dry_run_leaves_ledger_unchanged(isolated, monkeypatch: pytest.MonkeyPat
     assert pipeline.main(["--dry-run", "--no-review"]) == 0
     out = capsys.readouterr().out
     assert "DRY RUN: nothing was committed" in out and "DIGEST: Fake: 1 new call(s)" in out
+    assert "would post 1 card(s)" in out and "[MAYBE] Edge AI thing" in out
+    assert pipeline._test_capture["posted"] == [] and pipeline._test_capture["summaries"] == []   # type: ignore[attr-defined]
     assert _counts() == before
 
 
@@ -138,3 +151,25 @@ def test_registry_discovers_vulcan_sof() -> None:
     assert "vulcan_sof" in slugs
     vulcan = registry.get("vulcan_sof")
     assert vulcan.name == "Vulcan SOF" and vulcan.fetch_timeout == 300 and vulcan.needs_browser
+
+
+def test_feedback_only_runs_collect_and_exits(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    import slack.sink as sink
+    monkeypatch.setattr(sink, "collect_feedback", lambda *a, **k: [{"id": "x", "title": "T", "status": "pursue", "by": "U1", "notes": []}])
+    assert pipeline.main(["--feedback-only"]) == 0
+    out = capsys.readouterr().out
+    assert "feedback-only: 1 change(s) recorded" in out and "status=pursue by=U1" in out
+    assert lq.latest_run_id() is None   # no runs row for a feedback pass
+
+
+def test_deliver_run_reposts_only_undelivered(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
+    import slack.sink as sink
+    monkeypatch.setattr(sink, "post_call", lambda row, client=None: None)   # Slack down
+    assert pipeline.main(["--no-review"]) == 0
+    assert lq.get_call("fake-0")["slack_ts"] is None   # type: ignore[index]
+    monkeypatch.setattr(sink, "post_call", lambda row, client=None: pipeline._test_capture["posted"].append(row["id"]) or "9.9")   # type: ignore[attr-defined]
+    assert pipeline.main(["--deliver-run", "1"]) == 0
+    assert "deliver-run 1: 1 of 1 card(s) posted" in capsys.readouterr().out
+    assert pipeline._test_capture["posted"] == ["fake-0"]   # type: ignore[attr-defined]
+    assert pipeline.main(["--deliver-run", "99"]) == 2

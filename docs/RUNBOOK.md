@@ -22,12 +22,33 @@ LLM review of any new kept rows, then the digest on stdout.
 | `--no-review` | No LLM. Kept, unreviewed rows get verdict `maybe` with reasoning "LLM review disabled". |
 | `--limit N` | Scrape at most N calls and review at most N rows. |
 | `--fetch-timeout S` | Override every portal's fetch budget (default 300 s from its PORTAL dict). For testing the timeout path. |
+| `--feedback-only` | Only pull Slack reactions and thread notes into the ledger. This is what the daily task runs. |
+| `--debug` | DEBUG logging, which includes the first rendered review prompt. |
+| `--deliver-run N` | Re-post run N's new calls that never reached Slack (for example after `not_in_channel`), then exit. |
 
 Exit codes: 0 all portals completed, 1 at least one portal did not complete, 2 unknown
 portal slug, 3 another pipeline holds the lock.
 
 Only one pipeline runs at a time. `data/pipeline.lock` holds the owning pid; a lock whose
 pid is dead or that is older than two hours is treated as stale and replaced.
+
+## Slack delivery and feedback
+
+Every full run posts one card per new call (verdict yes or maybe) to SLACK_CHANNEL_ID, then a
+one-line summary. The team answers on the card:
+
+| reaction | human_status | effect |
+|---|---|---|
+| thumbs up | pursue | |
+| thumbs down | not_relevant | |
+| white check mark | submitted | a response went in |
+| x | dismissed | the card is deleted |
+
+A thread reply starting with `note:` is stored on the call's human_notes. Several reactions
+on one card resolve in the order x, check mark, thumbs down, thumbs up. The pipeline polls
+for all of this at the start of every run and in the daily "velocity-bd-team feedback" task
+(`run.py --feedback-only`). Decisions feed the next review as a RECENT HUMAN DECISIONS block
+in the prompt. A dry run prints the cards instead of posting and makes no Slack calls.
 
 ## Logs
 
@@ -52,7 +73,7 @@ could not be rolled back, which should never happen; normally a dry run leaves n
 ## Failure alerts
 
 When fetch times out, fetch errors, login returns False, or a later stage raises, the
-pipeline posts one line to Slack (SLACK_BOT_TOKEN and SLACK_CHANNEL_ID in `.env`) with the
+pipeline posts one line to Slack (BD_SLACK_BOT_TOKEN and SLACK_CHANNEL_ID in `.env`) with the
 portal, the stage, the error and the log path. Without those two settings the alert is
 written to the log at WARNING instead, and the run continues.
 

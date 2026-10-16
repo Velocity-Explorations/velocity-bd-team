@@ -8,7 +8,9 @@
 param(
     [string]$TaskName = "velocity-bd-team pipeline",
     [string]$Day = "Monday",
-    [string]$At = "06:00"
+    [string]$At = "06:00",
+    [string]$FeedbackTaskName = "velocity-bd-team feedback",
+    [string]$FeedbackAt = "18:00"
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,3 +38,14 @@ Write-Host "  trigger:  weekly, $Day at $At"
 Write-Host "  overlap:  $($task.Settings.MultipleInstances) (plus data\pipeline.lock)"
 Write-Host "  state:    $($task.State)"
 Write-Host "Start it now with:  Start-ScheduledTask -TaskName '$TaskName'"
+
+# Daily feedback poll: pulls Slack reactions and thread notes into the ledger.
+$fbAction = New-ScheduledTaskAction -Execute $python -Argument "run.py --feedback-only" -WorkingDirectory $repo
+$fbTrigger = New-ScheduledTaskTrigger -Daily -At $FeedbackAt
+$fbSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 20) `
+    -StartWhenAvailable -RunOnlyIfNetworkAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+Register-ScheduledTask -TaskName $FeedbackTaskName -Action $fbAction -Trigger $fbTrigger -Settings $fbSettings `
+    -Description "velocity-bd-team: collect Slack reactions and notes into the ledger." -Force | Out-Null
+Write-Host "Registered '$FeedbackTaskName'"
+Write-Host "  runs:     $python run.py --feedback-only"
+Write-Host "  trigger:  daily at $FeedbackAt"

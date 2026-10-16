@@ -2,7 +2,7 @@
 
     send_alert("FETCH TIMEOUT ...")  -> True when posted
 
-Needs SLACK_BOT_TOKEN and SLACK_CHANNEL_ID. When either is missing, or Slack fails, the
+Needs BD_SLACK_BOT_TOKEN and SLACK_CHANNEL_ID. When either is missing, or Slack fails, the
 alert is logged at WARNING and the function returns False. It never raises and never logs
 the token. Standard library only.
 """
@@ -22,10 +22,10 @@ TIMEOUT_S = 15
 
 
 def send_alert(text: str, channel: str | None = None) -> bool:
-    token = get("SLACK_BOT_TOKEN")
+    token = get("BD_SLACK_BOT_TOKEN")
     channel = channel or get("SLACK_CHANNEL_ID")
     if not token or not channel:
-        log.warning("Alert not sent (SLACK_BOT_TOKEN or SLACK_CHANNEL_ID missing): %s", text[:200])
+        log.warning("Alert not sent (BD_SLACK_BOT_TOKEN or SLACK_CHANNEL_ID missing): %s", text[:200])
         return False
     body = json.dumps({"channel": channel, "text": text}).encode("utf-8")
     request = urllib.request.Request(

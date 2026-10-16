@@ -1,0 +1,27 @@
+{
+  "display_information": {
+    "name": "BD Bot",
+    "description": "Posts new government opportunities and collects the team's reactions."
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "BD Bot",
+      "always_online": false
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "chat:write",
+        "reactions:read",
+        "channels:history",
+        "channels:join"
+      ]
+    }
+  },
+  "settings": {
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}

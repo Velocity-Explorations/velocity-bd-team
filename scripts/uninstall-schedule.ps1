@@ -2,14 +2,16 @@
 #
 #   .\scripts\uninstall-schedule.ps1
 param(
-    [string]$TaskName = "velocity-bd-team pipeline"
+    [string[]]$TaskNames = @("velocity-bd-team pipeline", "velocity-bd-team feedback")
 )
 
 $ErrorActionPreference = "Stop"
-$task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-if ($null -eq $task) {
-    Write-Host "No task named '$TaskName' is registered."
-    exit 0
+foreach ($name in $TaskNames) {
+    $task = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+    if ($null -eq $task) {
+        Write-Host "No task named '$name' is registered."
+        continue
+    }
+    Unregister-ScheduledTask -TaskName $name -Confirm:$false
+    Write-Host "Removed '$name'."
 }
-Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-Write-Host "Removed '$TaskName'."
