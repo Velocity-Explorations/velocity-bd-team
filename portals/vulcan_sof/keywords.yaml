@@ -1,0 +1,88 @@
+# Relevance filter for Velocity Explorations. Edit this file, then re-run
+#   python -m portals.vulcan_sof.run_filter --all
+# Matching is plain substring on lowercased title + description. Known weakness: short
+# words match inside longer ones ("ai" in "maintain"); the tight tier and the LLM review
+# absorb that. Blocklist entries are regular expressions, matched case-insensitively.
+
+broad_keywords:
+  - ai
+  - artificial intelligence
+  - machine learning
+  - software
+  - data
+  - cyber
+  - cloud
+  - modernization
+  - command and control
+  - c2
+  - nlp
+  - autonomous
+  - autonomy
+  - digital
+  - information
+  - analytics
+  - agentic
+  - esof
+  - engage sof
+  - warfighter
+  - joint
+  - experimentation
+  - computing
+  - algorithm
+  - automation
+  - intelligence
+  - help desk
+  - privacy
+  - opsec
+  - c5isr
+  - isr
+  - sensor
+  - network
+  - communications
+  - pcte
+  - training system
+  - simulation
+  # added 2026-10-16 after the first live run rejected in-lane software calls
+  - cryptograph
+  - zero trust
+  - analysis
+  - optimization
+
+tight_keywords:
+  - artificial intelligence
+  - machine learning
+  - autonomous systems
+  - command and control
+  - computer vision
+  - natural language processing
+  - cobol modernization
+  - legacy modernization
+  - transcription
+  - translation
+  - sensor fusion
+  - c5isr
+  - software defined
+  - ai hardware
+  - edge ai
+  - autonomous vehicle
+  - multi-agent
+
+blocklist_patterns:
+  - '\brepair\b'
+  - '\bspare parts\b'
+  - '\bparts kit\b'
+  - '\bnsn\s+\d'
+  - '\b\d{4}-\d{2,}-\d{2,}-\d{2,}\b'
+  - '\bhose assembly\b'
+  - '\bcircuit card\b'
+  - '\bconstruction\b.*\b(facility|building|pavement|airfield|runway)\b'
+  - '\bindustry day\b'
+  - '\breverse industry day\b'
+  - '\bconference\b.*\bregistration\b'
+  - '\bdocument destruction\b'
+  - '\bmedical cart\b'
+  - '\bboiler replacement\b'
+  - '\bfuel supplier\b'
+  - '\bdredging\b'
+  - '\bappraisal service\b'
+  - '\bplc training\b'

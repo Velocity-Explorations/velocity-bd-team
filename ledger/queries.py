@@ -174,6 +174,21 @@ def calls_for_review(run_id: int) -> list[dict[str, Any]]:
         ))
 
 
+def calls_where(portal: str | None = None, filter_result: str | None = None) -> list[dict[str, Any]]:
+    """All calls, optionally narrowed by portal and/or filter_result ('pending', 'kept', 'rejected')."""
+    clauses: list[str] = []
+    params: list[Any] = []
+    if portal is not None:
+        clauses.append("portal = ?")
+        params.append(portal)
+    if filter_result is not None:
+        clauses.append("filter_result = ?")
+        params.append(filter_result)
+    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+    with tx() as conn:
+        return rows(q(conn, f"SELECT * FROM calls{where} ORDER BY first_seen_at, id", params))
+
+
 def calls_in_run(run_id: int) -> list[dict[str, Any]]:
     """Every call seen (inserted or refreshed) by this run."""
     with tx() as conn:
