@@ -13,6 +13,8 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 
 - Phase 2 (Vulcan SOF login): working as of 2026-10-16. Username, password, then the emailed
   code read over Gmail IMAP (VELOCITY_GMAIL_APP_USERNAME + VELOCITY_GMAIL_APP_PASSWORD; gog CLI
-  is used instead when installed). Calls listing reachable, 120 call links seen. Phase 3 scrapes it.
+  is used instead when installed). Calls listing reachable, 120 call links seen.
+- Phase 3 (session persistence): cookies saved to data/vulcan_cookies.json after each successful
+  login and restored first on the next run; verified 2026-10-16. Phase 4 scrapes the listing.
 
 ## Known breakages

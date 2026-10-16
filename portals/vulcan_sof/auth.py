@@ -16,9 +16,11 @@ from typing import Any
 from playwright.sync_api import BrowserContext, ElementHandle, Page
 
 from portals.vulcan_sof.otp import get_otp
+from portals.vulcan_sof.session import load_cookies, save_cookies
 
 log = logging.getLogger("vulcan_sof.auth")
 
+APP_PREFIX = "/login/ng2/"
 LOGIN_URL = "https://vulcan-sof.com/login/ng2/auth/login"
 CALLS_URL = "https://vulcan-sof.com/login/ng2/search/calls"
 
@@ -77,7 +79,12 @@ def body_text(page: Page, limit: int) -> str:
 
 
 def is_logged_in(page: Page) -> bool:
-    url = page.url.lower()
+    """True unless the URL or the top of the page says we are on the sign-in flow.
+
+    The whole Angular app is served under /login/ng2/, so that prefix is dropped before
+    the word "login" is tested; otherwise the calls listing itself would count as logged out.
+    """
+    url = page.url.lower().replace(APP_PREFIX, "/")
     if "login" in url and "home" not in url:
         return False
     head = body_text(page, 200).lower()
@@ -138,14 +145,35 @@ def _settle(page: Page, after_ms: int) -> None:
     page.wait_for_timeout(after_ms)
 
 
-def login(page: Page, context: BrowserContext, username: str, password: str) -> bool:
-    """Full login. Returns True when the calls listing is reachable. Never raises."""
+def login(page: Page, context: BrowserContext | None, username: str, password: str) -> bool:
+    """Cookie-first login. Returns True when the calls listing is reachable. Never raises."""
     try:
-        return _login(page, username, password)
+        if context is not None and _restore_session(page, context):
+            return True
+        ok = _login(page, username, password)
+        if ok and context is not None:
+            save_cookies(context)
+        return ok
     except Exception as exc:
         log.error("Login failed with %s: %s", type(exc).__name__, str(exc)[:200])
         _log_failure_context(page)
         return False
+
+
+def _restore_session(page: Page, context: BrowserContext) -> bool:
+    """Load saved cookies and see whether the calls listing opens without signing in."""
+    if not load_cookies(context):
+        return False
+    try:
+        page.goto(CALLS_URL, timeout=20_000, wait_until="domcontentloaded")
+        page.wait_for_timeout(3_000)
+        if is_logged_in(page):
+            log.info("Session restored from cookies, no OTP needed")
+            return True
+        log.info("Saved cookies expired (landed on %s); logging in with password", page.url)
+    except Exception as exc:
+        log.info("Saved cookies unusable (%s: %s); logging in with password", type(exc).__name__, str(exc)[:120])
+    return False
 
 
 def _login(page: Page, username: str, password: str) -> bool:

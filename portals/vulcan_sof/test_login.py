@@ -12,11 +12,13 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
 
 from config import ConfigError, require
 from portals.vulcan_sof.auth import login, open_calls
 from portals.vulcan_sof.browser import close_all, launch
+from portals.vulcan_sof.session import clear_cookies
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCREENSHOT = REPO_ROOT / "data" / "after_login.png"
@@ -25,8 +27,12 @@ SCREENSHOT = REPO_ROOT / "data" / "after_login.png"
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Vulcan SOF live login check")
     parser.add_argument("--bad-password", action="store_true", help="use a wrong password to prove a clean failure")
+    parser.add_argument("--fresh", action="store_true", help="delete the saved cookies first, forcing password + OTP")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    started = time.time()
+    if args.fresh:
+        clear_cookies()
 
     try:
         username = require("VULCAN_SOF_USERNAME")
@@ -52,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     finally:
         close_all(pw, browser, context, page)
+        print(f"wall clock: {time.time() - started:.1f} s")
 
 
 if __name__ == "__main__":
