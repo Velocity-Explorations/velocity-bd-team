@@ -70,6 +70,22 @@ def finish_run(
         )
 
 
+def latest_run_id(portal: str | None = None, component: str | None = None) -> int | None:
+    """Id of the most recent run, optionally for one portal or component."""
+    clauses: list[str] = []
+    params: list[Any] = []
+    if portal is not None:
+        clauses.append("portal = ?")
+        params.append(portal)
+    if component is not None:
+        clauses.append("component = ?")
+        params.append(component)
+    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+    with tx() as conn:
+        row = one(q(conn, f"SELECT id FROM runs{where} ORDER BY id DESC LIMIT 1", params))
+        return int(row["id"]) if row else None
+
+
 def get_run(run_id: int) -> dict[str, Any] | None:
     with tx() as conn:
         return one(q(conn, "SELECT * FROM runs WHERE id = ?", (run_id,)))

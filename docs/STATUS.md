@@ -21,6 +21,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   with 100% field fill.
 - Phase 5 (keyword filter): `python -m portals.vulcan_sof.run_filter` (add `--all` after editing
   portals/vulcan_sof/keywords.yaml). On 2026-10-16: 60 rows, 58 kept (6 tight, 52 broad), 2 rejected.
-  The `ai` substring keeps most rows in broad; the LLM review (Phase 6) is the real gate.
+  The `ai` substring keeps most rows in broad; the LLM review is the real gate.
+- Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
+  with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
+  "maybe" with a "Review error" reason, never "no".
 
 ## Known breakages

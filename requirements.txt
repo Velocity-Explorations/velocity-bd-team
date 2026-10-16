@@ -2,4 +2,5 @@
 psycopg[binary]>=3.2
 playwright>=1.47
 pyyaml>=6
+anthropic>=1.0
 pytest>=8
