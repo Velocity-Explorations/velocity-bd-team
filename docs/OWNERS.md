@@ -6,6 +6,7 @@ pull request to its owner (see AGENTS.md, "Working alongside other agents").
 | Path | Owner |
 |---|---|
 | run.py | Coordinator |
+| config.py | Coordinator |
 | ledger/ | Coordinator |
 | docs/ | Coordinator |
 | scripts/ (scheduler) | Coordinator |

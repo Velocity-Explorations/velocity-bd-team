@@ -15,6 +15,7 @@ that share one SQLite ledger database.
 | Path | Purpose |
 |---|---|
 | run.py | Pipeline entry point. Takes a lock file so only one pipeline runs at a time. `run.py --portal <slug> --dry-run` tests one portal. |
+| config.py | Settings loader. `require("KEY")` raises a ConfigError naming the key; `python -m config` lists which keys are set, never values. |
 | ledger/ | The shared database: connection helpers, `migrate.py`, and `migrations/` (numbered `NNN_description.sql`, additive only). |
 | portals/<slug>/ | One adapter per portal (first: `portals/vulcan_sof/`). Logs in, lists calls, extracts details, writes `calls` rows. |
 | review/ | Per-call review: regex blocklist, then LLM verdict. Writes verdicts to the ledger. |

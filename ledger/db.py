@@ -14,7 +14,6 @@ Never log or print DATABASE_URL: it carries the password.
 """
 from __future__ import annotations
 
-import os
 import sqlite3
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -31,21 +30,11 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _load_env() -> None:
-    try:
-        from dotenv import load_dotenv
-    except ImportError:
-        return
-    load_dotenv(REPO_ROOT / ".env", override=False)
-
-
 def database_url() -> str:
-    """DATABASE_URL from the environment or .env. Raises if absent."""
-    _load_env()
-    url = os.environ.get("DATABASE_URL", "").strip()
-    if not url:
-        raise RuntimeError("DATABASE_URL is not set. Put it in .env (see .env.example).")
-    return url
+    """DATABASE_URL from the environment or .env. Raises ConfigError naming the key if absent."""
+    from config import require
+
+    return require("DATABASE_URL").strip()
 
 
 def dialect_of(url: str) -> str:

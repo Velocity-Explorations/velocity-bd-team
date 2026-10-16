@@ -11,6 +11,7 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 
 ## In progress
 
-- Phase 1 (Vulcan SOF adapter): not started.
+- Phase 1 (Vulcan SOF recon): Playwright 1.64 with Chromium 156 installed; headless load of the
+  login page confirmed on 2026-10-16 (data/recon_login.png). Login itself is Phase 2.
 
 ## Known breakages
