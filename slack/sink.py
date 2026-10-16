@@ -195,7 +195,8 @@ def collect_feedback(client: SlackClient | None = None, sleep: Callable[[float],
         # Cards decided recently still get polled: notes often arrive after the reaction,
         # and a later X should still dismiss. Only X can override an existing decision.
         pending_ids = {r["id"] for r in pending}
-        decided = [r for r in recent_decisions(RECENT_DECIDED_LIMIT) if r.get("slack_ts") and r["id"] not in pending_ids]
+        decided = [r for r in recent_decisions(RECENT_DECIDED_LIMIT)
+                   if r.get("slack_ts") and r["id"] not in pending_ids and r.get("human_status") != "dismissed"]   # dismissed cards are deleted
     except Exception as exc:
         log.warning("collect_feedback: ledger read failed: %s: %s", type(exc).__name__, str(exc)[:200])
         return changes

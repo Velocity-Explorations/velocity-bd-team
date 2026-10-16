@@ -169,3 +169,12 @@ def test_decided_cards_still_collect_notes_and_late_x(ledger_db: str, monkeypatc
     assert q and q["human_status"] == "dismissed"
     assert ("chat.delete", {"channel": "C123", "ts": "vulcan-q.ts"}, True) in client.calls
     assert sorted(c["id"] for c in changes) == ["vulcan-p", "vulcan-q"]
+
+
+def test_dismissed_cards_are_not_polled(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
+    _seed_posted("vulcan-z", "Z")
+    lq.set_human("vulcan-z", "dismissed", "UDAVID")
+    client = FakeClient()
+    assert sink.collect_feedback(client, sleep=lambda s: None) == []
+    assert client.calls == []
