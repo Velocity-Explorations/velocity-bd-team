@@ -112,9 +112,10 @@ def test_collect_feedback_reaction_note_and_dismiss(ledger_db: str, monkeypatch:
 
     a = lq.get_call("vulcan-a")
     assert a and a["human_status"] == "not_relevant" and a["human_by"] == "UDAVID" and a["human_at"]
-    assert a["human_notes"] == ("[2023-11-14T22:13:21Z UDAVID] hardware-heavy, not us
-"
-                                "[2023-11-14T22:13:22Z UOTHER] Just to note, this one seems hardware heavy")
+    assert a["human_notes"] == (
+        "[2023-11-14T22:13:21Z UDAVID] hardware-heavy, not us"
+        + "\n[2023-11-14T22:13:22Z UOTHER] Just to note, this one seems hardware heavy"
+    )
     b = lq.get_call("vulcan-b")
     assert b and b["human_status"] == "dismissed"
     assert ("chat.delete", {"channel": "C123", "ts": "vulcan-b.ts"}, True) in client.calls
