@@ -11,7 +11,8 @@ import argparse
 import sys
 
 from ledger.queries import calls_where
-from portals.vulcan_sof.filter import KEYWORDS_PATH, REASON_NO_KEYWORD, Decision, filter_calls
+from portals.shared.keyword_filter import REASON_NO_KEYWORD, Decision, filter_calls
+from portals.vulcan_sof.portal import KEYWORDS_PATH
 from portals.vulcan_sof.scrape import PORTAL
 
 

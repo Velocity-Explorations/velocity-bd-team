@@ -15,7 +15,7 @@ from typing import Any
 
 from playwright.sync_api import Page
 
-from portals.vulcan_sof.browser import close_all, launch
+from portals.shared.browser import close_all, launch
 
 LOGIN_URL = "https://vulcan-sof.com/login/ng2/auth/login"
 REPO_ROOT = Path(__file__).resolve().parents[2]

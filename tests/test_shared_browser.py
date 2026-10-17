@@ -1,7 +1,7 @@
 """Smoke tests that start real headless Chromium. They need `playwright install chromium`."""
 from __future__ import annotations
 
-from portals.vulcan_sof import browser
+from portals.shared import browser
 
 
 def test_launch_and_close_all() -> None:

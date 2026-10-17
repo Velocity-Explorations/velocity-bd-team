@@ -1,16 +1,21 @@
-"""Fetch the Vulcan SOF one-time code from the OTP mailbox.
+"""Read a portal's emailed sign-in code from the mailbox it is sent to.
 
-    code = get_otp(sent_after=time.time())   # polls up to 90 s, returns "123456" or None
+    VULCAN_OTP = OtpSource(portal="Vulcan SOF", sender="notifications@vulcan-sof.com",
+                           subject="Vulcan - OTP Code",
+                           pattern=re.compile(r"YOUR AUTHENTICATION CODE:\\s*(\\d{6})"),
+                           mailbox_key="VULCAN_OTP_MAILBOX")
+    code = get_otp(VULCAN_OTP, sent_after=time.time())   # polls up to 90 s; "123456" or None
 
+Each portal describes its code mail once, as an OtpSource; everything else is shared.
 Mail access is one of two backends, picked at call time:
 
 - gog CLI (preferred, see AGENTS.md): ``gog gmail search`` then ``gog gmail read``.
-- Gmail IMAP (fallback when gog is absent): needs VELOCITY_GMAIL_APP_PASSWORD, a Google
-  app password for the mailbox. Standard library only.
+- Gmail IMAP (when gog is absent): logs in as VELOCITY_GMAIL_APP_USERNAME with
+  VELOCITY_GMAIL_APP_PASSWORD, a Google app password. Standard library only.
 
 Both expose the same shape: ``fetch(mailbox) -> list[OtpMessage]`` newest first. Every
 mailbox call has its own 15 s timeout, and every failure logs and keeps polling.
-Logging the six-digit code is acceptable; nothing else from the mailbox is logged.
+Logging the code itself is acceptable; nothing else from the mailbox is logged.
 """
 from __future__ import annotations
 
@@ -26,19 +31,28 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.message import Message
+from functools import partial
 from html import unescape
 
 from config import ConfigError, get, require
 
-log = logging.getLogger("vulcan_sof.otp")
+log = logging.getLogger("portals.otp")
 
-OTP_SENDER = "notifications@vulcan-sof.com"
-OTP_SUBJECT = "Vulcan - OTP Code"
-CODE_RE = re.compile(r"YOUR AUTHENTICATION CODE:\s*(\d{6})")
 CALL_TIMEOUT_S = 15
 POLL_SECONDS = 5
 CLOCK_SKEW_S = 30   # mail timestamps are whole seconds and the sender's clock is not ours
 IMAP_HOST = "imap.gmail.com"
+
+
+@dataclass(frozen=True)
+class OtpSource:
+    """Where one portal's sign-in code arrives and how to find it in the mail."""
+
+    portal: str                # for log lines, e.g. "Vulcan SOF"
+    sender: str                # From address of the code mail
+    subject: str               # its subject line
+    pattern: re.Pattern[str]   # group(1) is the code
+    mailbox_key: str           # setting that names the mailbox the code is sent to
 
 
 @dataclass
@@ -54,9 +68,9 @@ class OtpMessage:
 Fetcher = Callable[[str], list[OtpMessage]]
 
 
-def extract_code(text: str) -> str | None:
-    """The last six-digit authentication code in the text, or None."""
-    found = CODE_RE.findall(text or "")
+def extract_code(text: str, pattern: re.Pattern[str]) -> str | None:
+    """The last code the pattern finds in the text, or None."""
+    found = pattern.findall(text or "")
     return found[-1] if found else None
 
 
@@ -71,6 +85,7 @@ def is_stale(msg: OtpMessage, sent_after: float) -> bool:
 
 
 def get_otp(
+    source: OtpSource,
     sent_after: float,
     max_wait: int = 90,
     mailbox: str | None = None,
@@ -78,10 +93,10 @@ def get_otp(
     sleep: Callable[[float], None] = time.sleep,
 ) -> str | None:
     """Poll the mailbox until a code newer than ``sent_after`` appears, or ``max_wait`` passes."""
-    mailbox = mailbox or require("VULCAN_OTP_MAILBOX")
-    fetch = fetch or default_fetcher()
+    mailbox = mailbox or require(source.mailbox_key)
+    fetch = fetch or default_fetcher(source)
     deadline = time.time() + max_wait
-    log.info("Waiting for OTP in mailbox (max %ds, poll every %ds)", max_wait, POLL_SECONDS)
+    log.info("Waiting for the %s sign-in code (max %ds, poll every %ds)", source.portal, max_wait, POLL_SECONDS)
     while time.time() < deadline:
         sleep(POLL_SECONDS)
         remaining = int(deadline - time.time())
@@ -91,32 +106,32 @@ def get_otp(
             log.warning("Mailbox fetch failed (%s: %s); retrying, %ds left", type(exc).__name__, str(exc)[:120], remaining)
             continue
         if not messages:
-            log.info("No OTP mail yet, %ds left", remaining)
+            log.info("No code mail yet, %ds left", remaining)
             continue
         for msg in messages:
             if is_stale(msg, sent_after):
-                log.info("Skipping OTP mail received before login was triggered")
+                log.info("Skipping code mail received before login was triggered")
                 continue
-            code = extract_code(msg.body)
+            code = extract_code(msg.body, source.pattern)
             if code:
-                log.info("Got OTP %s", code)
+                log.info("Got %s code %s", source.portal, code)
                 return code
-            log.info("OTP mail found but no code in body; retrying, %ds left", remaining)
-    log.warning("OTP timeout: no code within %ds", max_wait)
+            log.info("Code mail found but no code in body; retrying, %ds left", remaining)
+    log.warning("Code timeout: no %s code within %ds", source.portal, max_wait)
     return None
 
 
 # ------------------------------------------------------------------ backend selection
 
-def default_fetcher() -> Fetcher:
+def default_fetcher(source: OtpSource) -> Fetcher:
     if shutil.which("gog"):
-        log.info("OTP backend: gog CLI")
-        return fetch_via_gog
+        log.info("Code mail backend: gog CLI")
+        return partial(fetch_via_gog, source)
     if get("VELOCITY_GMAIL_APP_PASSWORD"):
-        log.info("OTP backend: Gmail IMAP")
-        return fetch_via_imap
+        log.info("Code mail backend: Gmail IMAP")
+        return partial(fetch_via_imap, source)
     raise ConfigError(
-        "No mailbox access for the OTP: install the gog CLI (AGENTS.md) or set "
+        "No mailbox access for sign-in codes: install the gog CLI (AGENTS.md) or set "
         "VELOCITY_GMAIL_APP_PASSWORD in .env for Gmail IMAP."
     )
 
@@ -149,8 +164,8 @@ def parse_gog_search(stdout: str) -> list[tuple[str, float | None]]:
     return out
 
 
-def fetch_via_gog(mailbox: str) -> list[OtpMessage]:
-    query = f"from:{OTP_SENDER} subject:'{OTP_SUBJECT}' newer_than:5m"
+def fetch_via_gog(source: OtpSource, mailbox: str) -> list[OtpMessage]:
+    query = f"from:{source.sender} subject:'{source.subject}' newer_than:5m"
     stdout = _run_gog(["gmail", "search", query, "--max", "3", "--account", mailbox])
     messages: list[OtpMessage] = []
     for thread_id, received in parse_gog_search(stdout):
@@ -181,7 +196,7 @@ def message_text(msg: Message) -> str:
     return unescape(stripped)
 
 
-def fetch_via_imap(mailbox: str) -> list[OtpMessage]:
+def fetch_via_imap(source: OtpSource, mailbox: str) -> list[OtpMessage]:
     account = get("VELOCITY_GMAIL_APP_USERNAME") or mailbox
     password = re.sub(r"\s+", "", require("VELOCITY_GMAIL_APP_PASSWORD"))   # Google shows it in spaced groups
     since = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%d-%b-%Y")
@@ -189,7 +204,7 @@ def fetch_via_imap(mailbox: str) -> list[OtpMessage]:
     try:
         conn.login(account, password)
         conn.select("INBOX", readonly=True)
-        status, data = conn.search(None, "FROM", f'"{OTP_SENDER}"', "SUBJECT", f'"{OTP_SUBJECT}"', "SINCE", since)
+        status, data = conn.search(None, "FROM", f'"{source.sender}"', "SUBJECT", f'"{source.subject}"', "SINCE", since)
         if status != "OK":
             raise RuntimeError(f"IMAP search returned {status}")
         ids = data[0].split()[-3:]

@@ -76,13 +76,14 @@ written to the log at WARNING instead, and the run continues.
 ## Re-triggering an OTP login
 
 Vulcan SOF asks for an emailed six-digit code on a fresh login and remembers the browser
-for a while after. Saved cookies live in `data/vulcan_cookies.json`.
+for a while after. Saved cookies live in `data/vulcan_sof/cookies.json`; every portal keeps
+its own in `data/<slug>/cookies.json`.
 
 - To force a fresh login: delete the cookie file, or run
   `python -m portals.vulcan_sof.test_login --fresh`. The code is read automatically from
   the OTP mailbox over IMAP (VELOCITY_GMAIL_APP_USERNAME and VELOCITY_GMAIL_APP_PASSWORD).
 - If the login keeps failing at the passcode step, check that the app password still works:
-  `python -c "from portals.vulcan_sof import otp; print(len(otp.fetch_via_imap('david@velocityexplorations.com')))"`
+  `python -c "from config import require; from portals.shared import otp; from portals.vulcan_sof.auth import VULCAN_OTP; print(len(otp.fetch_via_imap(VULCAN_OTP, require(VULCAN_OTP.mailbox_key))))"`
   should print a number, not an authentication error.
 - Vulcan may skip the code entirely when it has seen this machine recently. That is normal.
 

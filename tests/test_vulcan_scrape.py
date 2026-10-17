@@ -5,7 +5,8 @@ from collections.abc import Iterator
 import pytest
 
 from ledger import queries as lq
-from portals.vulcan_sof import browser, scrape
+from portals.shared import browser
+from portals.vulcan_sof import scrape
 from portals.vulcan_sof.run_scrape import fill_rates
 
 BODY = (

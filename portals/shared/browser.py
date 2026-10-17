@@ -1,10 +1,10 @@
-"""Headless Chromium for the Vulcan SOF adapter.
+"""Headless Chromium for any portal adapter that needs a browser.
 
-Rules for every caller (from the 2026-04-18 three-day hang, see
+Rules for every caller (from the 2026-04-18 three-day hang on Vulcan SOF, see
 reference/yukon/2026-04-18_vulcan-sof-hanging.md):
 
-- Never wait for "networkidle" on this site. The Angular app keeps XHR and WebSocket
-  traffic alive, so it never fires. Use wait_for_load_state("domcontentloaded") plus a
+- Never wait for "networkidle". Single-page apps such as Vulcan SOF's Angular site keep XHR
+  and WebSocket traffic alive, so it never fires. Use wait_for_load_state("domcontentloaded") plus a
   fixed wait_for_timeout() of 1500 to 3000 ms.
 - Every navigation and every wait carries an explicit timeout. The page defaults set
   here (DEFAULT_TIMEOUT_MS, NAV_TIMEOUT_MS) are a floor, not a licence to omit them.

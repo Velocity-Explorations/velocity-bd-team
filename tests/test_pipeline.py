@@ -28,8 +28,9 @@ def fake_portal(behaviour: str = "ok", timeout: int = 300) -> Portal:
         return {"found": len(titles), "scraped": len(titles), "new": new, "failed": 0}
 
     def filt(rows_):
-        from portals.vulcan_sof.filter import filter_calls
-        return filter_calls(rows_)
+        from portals.shared.keyword_filter import filter_calls
+        from portals.vulcan_sof.portal import KEYWORDS_PATH
+        return filter_calls(rows_, KEYWORDS_PATH)
 
     return Portal(slug="fake", name="Fake", fetch=fetch, filter=filt, fetch_timeout=timeout, needs_browser=False)
 
@@ -94,7 +95,7 @@ def test_fetch_timeout_is_skipped_not_fatal(isolated, monkeypatch: pytest.Monkey
     monkeypatch.setattr(registry, "discover", lambda: [fake_portal("hang")])
     monkeypatch.setattr(pipeline, "FORCE_CLOSE_GRACE_S", 0)
     killed: list[bool] = []
-    monkeypatch.setattr("portals.vulcan_sof.browser.force_close", lambda kill_orphans=True: killed.append(True))
+    monkeypatch.setattr("portals.shared.browser.force_close", lambda kill_orphans=True: killed.append(True))
     code = pipeline.main(["--fetch-timeout", "1", "--no-review"])
     assert code == 1
     run = lq.get_run(1)
@@ -148,7 +149,7 @@ def test_digest_order() -> None:
 
 def test_registry_discovers_vulcan_sof() -> None:
     slugs = [p.slug for p in registry.discover()]
-    assert "vulcan_sof" in slugs
+    assert "vulcan_sof" in slugs and "shared" not in slugs
     vulcan = registry.get("vulcan_sof")
     assert vulcan.name == "Vulcan SOF" and vulcan.fetch_timeout == 300 and vulcan.needs_browser
 

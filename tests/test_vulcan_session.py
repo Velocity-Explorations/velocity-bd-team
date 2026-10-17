@@ -1,3 +1,4 @@
+"""Vulcan SOF's own session rules: where its cookies live and what counts as logged in."""
 from __future__ import annotations
 
 import json
@@ -6,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from portals.vulcan_sof import auth, browser, session
+from portals.shared import browser
+from portals.vulcan_sof import auth
 
 
 @pytest.fixture(scope="module")
@@ -18,38 +20,8 @@ def ctx() -> Iterator[tuple[object, object]]:
         browser.close_all(pw, b, context, page)
 
 
-def test_save_and_load_round_trip(ctx, tmp_path: Path) -> None:
-    context, _ = ctx
-    context.add_cookies([{"name": "sid", "value": "abc", "domain": "example.invalid", "path": "/"}])
-    path = tmp_path / "cookies.json"
-    assert session.save_cookies(context, path) is True
-    saved = json.loads(path.read_text(encoding="utf-8"))
-    assert any(c["name"] == "sid" for c in saved)
-
-    context.clear_cookies()
-    assert context.cookies() == []
-    assert session.load_cookies(context, path) is True
-    assert any(c["name"] == "sid" and c["value"] == "abc" for c in context.cookies())
-
-
-def test_load_handles_missing_empty_and_garbage(ctx, tmp_path: Path) -> None:
-    context, _ = ctx
-    assert session.load_cookies(context, tmp_path / "missing.json") is False
-    empty = tmp_path / "empty.json"
-    empty.write_text("[]", encoding="utf-8")
-    assert session.load_cookies(context, empty) is False
-    garbage = tmp_path / "garbage.json"
-    garbage.write_text("not json", encoding="utf-8")
-    assert session.load_cookies(context, garbage) is False
-    session.clear_cookies(tmp_path / "never-existed.json")   # must not raise
-
-
-def test_save_never_raises(tmp_path: Path) -> None:
-    class Broken:
-        def cookies(self) -> list:
-            raise RuntimeError("context closed")
-
-    assert session.save_cookies(Broken(), tmp_path / "x.json") is False   # type: ignore[arg-type]
+def test_vulcan_cookies_live_in_its_own_data_folder() -> None:
+    assert auth.COOKIE_FILE.parts[-3:] == ("data", "vulcan_sof", "cookies.json")
 
 
 def test_is_logged_in_ignores_app_prefix(ctx, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -67,9 +39,9 @@ def test_is_logged_in_ignores_app_prefix(ctx, monkeypatch: pytest.MonkeyPatch) -
 
 def test_login_restores_from_cookies_without_password(ctx, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     context, page = ctx
-    cookie_path = tmp_path / "cookies.json"
-    cookie_path.write_text(json.dumps([{"name": "sid", "value": "x", "domain": "vulcan-sof.com", "path": "/"}]), encoding="utf-8")
-    monkeypatch.setattr(auth, "load_cookies", lambda c: session.load_cookies(c, cookie_path))
+    cookie_file = tmp_path / "cookies.json"
+    cookie_file.write_text(json.dumps([{"name": "sid", "value": "x", "domain": "vulcan-sof.com", "path": "/"}]), encoding="utf-8")
+    monkeypatch.setattr(auth, "COOKIE_FILE", cookie_file)
     monkeypatch.setattr(page, "goto", lambda url, **kw: page.set_content("<html><body><h1>Calls</h1></body></html>"))
     monkeypatch.setattr(type(page), "url", property(lambda self: "https://vulcan-sof.com/login/ng2/search/calls"))
 

@@ -121,7 +121,7 @@ def run_fetch(portal: Portal, run_id: int, timeout_s: int, limit: int | None) ->
     def worker() -> None:
         try:
             if portal.needs_browser:
-                from portals.vulcan_sof.browser import close_all, launch
+                from portals.shared.browser import close_all, launch
 
                 pw, browser, context, page = launch()
                 try:
@@ -141,7 +141,7 @@ def run_fetch(portal: Portal, run_id: int, timeout_s: int, limit: int | None) ->
 
     if thread.is_alive():
         log.error("FETCH TIMEOUT: %s exceeded %ds, skipping", portal.name, timeout_s)
-        from portals.vulcan_sof.browser import force_close
+        from portals.shared.browser import force_close
 
         force_close()
         thread.join(FORCE_CLOSE_GRACE_S)

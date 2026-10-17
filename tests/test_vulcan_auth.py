@@ -6,7 +6,8 @@ from collections.abc import Iterator
 
 import pytest
 
-from portals.vulcan_sof import auth, browser
+from portals.shared import browser
+from portals.vulcan_sof import auth
 
 LOGIN_HTML = """
 <html><body>

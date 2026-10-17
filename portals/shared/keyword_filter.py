@@ -1,6 +1,6 @@
-"""Deterministic relevance filter for scraped calls, applied before any LLM review.
+"""Keyword relevance filter shared by every portal, applied before any LLM review.
 
-    kept, rejected = filter_calls(rows, keywords_path)
+    kept, rejected = filter_calls(rows, keywords_path)   # each portal passes its own keywords.yaml
 
 Each row needs id, title and description. Decisions are written to the ledger with
 set_filter(). Order of rules: blocklist regex rejects; no broad keyword rejects; otherwise
@@ -19,8 +19,6 @@ from typing import Any
 import yaml
 
 from ledger.queries import set_filter
-
-KEYWORDS_PATH = Path(__file__).resolve().parent / "keywords.yaml"
 
 REASON_NO_KEYWORD = "no keyword match"
 
@@ -42,7 +40,7 @@ class Decision:
     keywords: list[str] = field(default_factory=list)
 
 
-def load_keywords(path: Path = KEYWORDS_PATH) -> Keywords:
+def load_keywords(path: Path) -> Keywords:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     for key in ("broad_keywords", "tight_keywords", "blocklist_patterns"):
         if not isinstance(data.get(key), list):
@@ -72,7 +70,7 @@ def decide(row: Mapping[str, Any], kw: Keywords) -> Decision:
     return Decision(row["id"], title, "kept", tier="tight" if tight_hits else "broad", keywords=hits)
 
 
-def filter_calls(rows: Iterable[Mapping[str, Any]], keywords_path: Path = KEYWORDS_PATH) -> tuple[list[Decision], list[Decision]]:
+def filter_calls(rows: Iterable[Mapping[str, Any]], keywords_path: Path) -> tuple[list[Decision], list[Decision]]:
     """Decide every row, write each decision to the ledger, return (kept, rejected)."""
     kw = load_keywords(keywords_path)
     kept: list[Decision] = []

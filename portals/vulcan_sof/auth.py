@@ -10,15 +10,27 @@ for networkidle. The password is never logged. The six-digit code may be.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any
 
 from playwright.sync_api import BrowserContext, ElementHandle, Page
 
-from portals.vulcan_sof.otp import get_otp
-from portals.vulcan_sof.session import load_cookies, save_cookies
+from portals.shared.otp import OtpSource, get_otp
+from portals.shared.session import cookie_path, load_cookies, save_cookies
 
 log = logging.getLogger("vulcan_sof.auth")
+
+SLUG = "vulcan_sof"
+COOKIE_FILE = cookie_path(SLUG)   # data/vulcan_sof/cookies.json
+# How Vulcan SOF's emailed sign-in code arrives; the shared helper does the rest.
+VULCAN_OTP = OtpSource(
+    portal="Vulcan SOF",
+    sender="notifications@vulcan-sof.com",
+    subject="Vulcan - OTP Code",
+    pattern=re.compile(r"YOUR AUTHENTICATION CODE:\s*(\d{6})"),
+    mailbox_key="VULCAN_OTP_MAILBOX",
+)
 
 APP_PREFIX = "/login/ng2/"
 LOGIN_URL = "https://vulcan-sof.com/login/ng2/auth/login"
@@ -152,7 +164,7 @@ def login(page: Page, context: BrowserContext | None, username: str, password: s
             return True
         ok = _login(page, username, password)
         if ok and context is not None:
-            save_cookies(context)
+            save_cookies(context, COOKIE_FILE)
         return ok
     except Exception as exc:
         log.error("Login failed with %s: %s", type(exc).__name__, str(exc)[:200])
@@ -162,7 +174,7 @@ def login(page: Page, context: BrowserContext | None, username: str, password: s
 
 def _restore_session(page: Page, context: BrowserContext) -> bool:
     """Load saved cookies and see whether the calls listing opens without signing in."""
-    if not load_cookies(context):
+    if not load_cookies(context, COOKIE_FILE):
         return False
     try:
         page.goto(CALLS_URL, timeout=20_000, wait_until="domcontentloaded")
@@ -216,7 +228,7 @@ def _login(page: Page, username: str, password: str) -> bool:
     if otp_screen_showing(page):
         log.info("OTP required: yes")
         started = time.time()
-        code = get_otp(sent_after=login_triggered_at)
+        code = get_otp(VULCAN_OTP, sent_after=login_triggered_at)
         if code is None:
             log.error("OTP not received; aborting login")
             _log_failure_context(page)

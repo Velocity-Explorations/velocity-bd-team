@@ -16,9 +16,9 @@ import time
 from pathlib import Path
 
 from config import ConfigError, require
-from portals.vulcan_sof.auth import login, open_calls
-from portals.vulcan_sof.browser import close_all, launch
-from portals.vulcan_sof.session import clear_cookies
+from portals.shared.browser import close_all, launch
+from portals.shared.session import clear_cookies
+from portals.vulcan_sof.auth import COOKIE_FILE, login, open_calls
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCREENSHOT = REPO_ROOT / "data" / "after_login.png"
@@ -32,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     started = time.time()
     if args.fresh:
-        clear_cookies()
+        clear_cookies(COOKIE_FILE)
 
     try:
         username = require("VULCAN_SOF_USERNAME")

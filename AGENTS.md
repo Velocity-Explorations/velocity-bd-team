@@ -17,7 +17,8 @@ that share one SQLite ledger database.
 | run.py | Pipeline entry point. Takes a lock file so only one pipeline runs at a time. `run.py --portal <slug> --dry-run` tests one portal. |
 | config.py | Settings loader. `require("KEY")` raises a ConfigError naming the key; `python -m config` lists which keys are set, never values. |
 | ledger/ | The shared database: connection helpers, `migrate.py`, and `migrations/` (numbered `NNN_description.sql`, additive only). |
-| portals/<slug>/ | One adapter per portal (first: `portals/vulcan_sof/`). Logs in, lists calls, extracts details, writes `calls` rows. Exposes a `PORTAL` dict that `portals/registry.py` discovers; run.py never names a portal. |
+| portals/<slug>/ | One adapter per portal (first: `portals/vulcan_sof/`). Logs in, lists calls, extracts details, writes `calls` rows. Exposes a `PORTAL` dict that `portals/registry.py` discovers; run.py never names a portal. Keeps only what is specific to that portal, including its `keywords.yaml`. |
+| portals/shared/ | Helpers every adapter reuses: `browser` (headless Chromium), `session` (saved cookies in `data/<slug>/cookies.json`), `otp` (emailed sign-in codes, described per portal as an `OtpSource`), `keyword_filter`. Not a portal. |
 | review/ | Per-call review: regex blocklist, then LLM verdict. Writes verdicts to the ledger. |
 | corpus/ | Past-submission corpus: Drive sync, text extraction, chunking, embeddings. |
 | drafting/ | Proposal briefs and response drafts built from reviewed calls and the corpus. |

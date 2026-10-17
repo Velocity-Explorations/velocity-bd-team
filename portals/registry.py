@@ -9,7 +9,9 @@
         "needs_browser": True,           # False: fetch is called with page=None
     }
 
-Adding a portal means adding a package; run.py never changes.
+Adding a portal means adding a package; run.py never changes. portals/shared/ holds the
+helpers adapters reuse (browser, saved sessions, emailed sign-in codes, keyword filter); it
+defines no PORTAL, so discovery skips it.
 """
 from __future__ import annotations
 

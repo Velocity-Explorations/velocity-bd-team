@@ -14,10 +14,10 @@ import traceback
 
 from config import ConfigError, require
 from ledger.queries import calls_in_run, finish_run, start_run
-from portals.vulcan_sof.auth import login
-from portals.vulcan_sof.browser import close_all, launch
+from portals.shared.browser import close_all, launch
+from portals.shared.session import save_cookies
+from portals.vulcan_sof.auth import COOKIE_FILE, login
 from portals.vulcan_sof.scrape import DEFAULT_TYPE, PORTAL, scrape_all
-from portals.vulcan_sof.session import save_cookies
 
 log = logging.getLogger("vulcan_sof.run")
 
@@ -64,7 +64,7 @@ def main() -> int:
             print("login failed; see log")
             return 1
         counts = scrape_all(page, run_id)
-        save_cookies(context)
+        save_cookies(context, COOKIE_FILE)
         finish_run(run_id, "completed", counts)
     except Exception:
         finish_run(run_id, "error", counts, error=traceback.format_exc()[-2000:])

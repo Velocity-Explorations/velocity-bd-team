@@ -11,6 +11,7 @@ pull request to its owner (see AGENTS.md, "Working alongside other agents").
 | docs/ | Coordinator |
 | scripts/ (scheduler) | Coordinator |
 | portals/registry.py | Coordinator |
+| portals/shared/ | Coordinator |
 | portals/vulcan_sof/ | Vulcan SOF agent |
 | review/ | Reviewer |
 | corpus/ | Librarian |

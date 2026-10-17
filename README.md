@@ -11,7 +11,8 @@ dashboard.
 |---|---|
 | run.py | Pipeline entry point. `python run.py --portal vulcan_sof --dry-run` tests one portal. |
 | ledger/ | The shared database: `db.py` (connections), `migrate.py` (migrations), `queries.py` (every query any component uses), `schema.sql` (current schema), `migrations/`. |
-| portals/<slug>/ | One adapter per portal. |
+| portals/<slug>/ | One adapter per portal: only what is specific to that portal, plus its keywords.yaml. |
+| portals/shared/ | Helpers every adapter reuses: browser, saved sessions, emailed sign-in codes, keyword filter. |
 | review/ | Per-call review, regex gate then LLM verdict. |
 | slack/ | Alerts, cards for new calls, thread notes. Decisions are made on the dashboard. |
 | corpus/ | Past-proposal corpus: Drive sync, extraction, embeddings. |

@@ -26,8 +26,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 2 (Vulcan SOF login): working as of 2026-10-16. Username, password, then the emailed
   code read over Gmail IMAP (VELOCITY_GMAIL_APP_USERNAME + VELOCITY_GMAIL_APP_PASSWORD; gog CLI
   is used instead when installed). Calls listing reachable, 120 call links seen.
-- Phase 3 (session persistence): cookies saved to data/vulcan_cookies.json after each successful
+- Phase 3 (session persistence): cookies saved to data/vulcan_sof/cookies.json after each successful
   login and restored first on the next run; verified 2026-10-16.
+- Shared portal helpers (2026-10-17): browser, saved sessions, emailed sign-in codes and the
+  keyword filter live in portals/shared/ for every adapter; Vulcan SOF keeps only its own
+  login, scraping and keywords.yaml.
 - Phase 4 (Vulcan SOF scrape): `python -m portals.vulcan_sof.run_scrape` writes every listed call
   (60 on 2026-10-16, 18 open and 42 closed; closed flagged in extra.vulcan_closed) in about 170 s
   with 100% field fill. Descriptions are stored at up to 1,500 characters (widened from 400 on 2026-10-16).
