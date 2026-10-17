@@ -81,7 +81,8 @@ def test_build_record_matches_ledger_columns() -> None:
     assert set(rec) - {"id"} == set(lq.SCRAPED_COLUMNS)
     assert rec["portal"] == "Vulcan SOF" and rec["department"] == "USSOCOM / SOF Enterprise"
     assert rec["source_type"] == "regular" and rec["naics_code"] == "" and rec["set_aside"] == ""
-    assert rec["extra"] == {"vulcan_description_fallback": False, "vulcan_closed": False}
+    assert rec["extra"]["vulcan_description_fallback"] is False and rec["extra"]["vulcan_closed"] is False
+    assert rec["extra"]["vulcan_objectives"] == ["OTA Prototype", "Tech Experimentation"]
 
 
 def test_fill_rates_exclude_fallbacks() -> None:
@@ -149,3 +150,46 @@ def test_scrape_all_counts_and_upserts(page, ledger_db: str, monkeypatch: pytest
     row = lq.get_call("vulcan-0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b")
     assert row is not None and row["first_run_id"] == run1 and row["last_run_id"] == run2
     assert [r["id"] for r in lq.calls_in_run(run2)] == [row["id"]]
+
+
+PAGE = (
+    "Me ▼\nExpeditionary Basing Power Generation and Distribution\nSUBMIT A SCOUT CARD TO:\nACTIVE CALL\nFullscreen\n"
+    "Engagement Objectives:\nCRADA\nMarket Research\nOTA Prototype\n"
+    "Open Date:\n04 Oct 2026 : 22:00 MDT\nDeadline:\n30 OCT 2026 : 21:59 MDT\n\nDays\n13\nHours\n15\n"
+    "Documents:\n Power Generation and Distribution TIIs\n"
+    "Files Required for Submission:\nWhite Paper Template (See template)\nQuad Chart Template (See template)\n"
+    "Tags\nPower & Energy\nEnergy Storage\n"
+    "Problem Statement\n\nThe U.S. military must be prepared to fight and win in a constant state of contest unseen "
+    "during the last 25 years of warfare, and needs mission critical energy without reliance on bulk fuel.\n\n"
+    "Additional Instructions\n\nAll submissions must be UNCLASSIFIED.\n\nCreate a Vulcan Scout Card and upload a white paper.\n"
+    "This call has closed.\n Submissions are no longer accepted. \n1\nRecent Activity\n2\nSubmit Existing Card(s)\n"
+    "Image\tName\tOrganization\tCreated by\nEcho C2 AI\tVelocity Explorations\tSomeone Named\n"
+)
+
+
+def test_extract_sections_reads_each_labelled_section() -> None:
+    s = scrape.extract_sections(PAGE)
+    assert s["objectives"] == ["CRADA", "Market Research", "OTA Prototype"]
+    assert s["documents"] == ["Power Generation and Distribution TIIs"]
+    assert s["files_required"] == ["White Paper Template (See template)", "Quad Chart Template (See template)"]
+    assert s["tags"] == ["Power & Energy", "Energy Storage"]
+    assert s["instructions"] == "All submissions must be UNCLASSIFIED. Create a Vulcan Scout Card and upload a white paper."
+
+
+def test_extract_sections_never_reads_past_the_instructions() -> None:
+    s = scrape.extract_sections(PAGE)
+    assert "Someone Named" not in s["instructions"] and "Recent Activity" not in s["instructions"]
+
+
+def test_extract_sections_tolerates_missing_sections() -> None:
+    s = scrape.extract_sections("Engagement Objectives:\nTech Experimentation\nOpen Date:\n01 Jun 2026 : 09:00 MDT\n")
+    assert s == {"objectives": ["Tech Experimentation"], "documents": [], "files_required": [], "tags": [], "instructions": ""}
+
+
+def test_build_record_carries_the_sections_in_extra() -> None:
+    rec = scrape.build_record(URL, "Power", PAGE)
+    extra = rec["extra"]
+    assert extra["vulcan_files_required"] == ["White Paper Template (See template)", "Quad Chart Template (See template)"]
+    assert extra["vulcan_objectives"][0] == "CRADA" and extra["vulcan_tags"] == ["Power & Energy", "Energy Storage"]
+    assert extra["vulcan_instructions"].startswith("All submissions must be UNCLASSIFIED.")
+    assert extra["vulcan_closed"] is True

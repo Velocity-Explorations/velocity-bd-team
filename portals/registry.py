@@ -7,6 +7,9 @@
         "filter": fn(rows) -> (kept, rejected),
         "fetch_timeout": 300,            # seconds; the pipeline force-closes the browser after this
         "needs_browser": True,           # False: fetch is called with page=None
+        "keywords": Path,                # optional: this portal's keywords.yaml
+        "how_to_submit": "one line",     # optional: how a response is submitted
+        "notes": Path,                   # optional: NOTES.md, what the assistant should know
     }
 
 Adding a portal means adding a package; run.py never changes. portals/shared/ holds the
@@ -20,6 +23,7 @@ import logging
 import pkgutil
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import portals
@@ -37,6 +41,9 @@ class Portal:
     filter: Callable[[list[dict[str, Any]]], tuple[list[Any], list[Any]]]
     fetch_timeout: int = 300
     needs_browser: bool = True
+    keywords: Path | None = None
+    how_to_submit: str = ""
+    notes: Path | None = None
 
 
 def _from_dict(spec: dict[str, Any], module_name: str) -> Portal:
@@ -50,6 +57,9 @@ def _from_dict(spec: dict[str, Any], module_name: str) -> Portal:
         filter=spec["filter"],
         fetch_timeout=int(spec.get("fetch_timeout", 300)),
         needs_browser=bool(spec.get("needs_browser", True)),
+        keywords=Path(spec["keywords"]) if spec.get("keywords") else None,
+        how_to_submit=str(spec.get("how_to_submit") or ""),
+        notes=Path(spec["notes"]) if spec.get("notes") else None,
     )
 
 

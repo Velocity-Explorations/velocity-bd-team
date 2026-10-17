@@ -28,6 +28,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   is used instead when installed). Calls listing reachable, 120 call links seen.
 - Phase 3 (session persistence): cookies saved to data/vulcan_sof/cookies.json after each successful
   login and restored first on the next run; verified 2026-10-16.
+- Portal assistant, step 1 (2026-10-17): read tools in assistant/ (explain, brief, deadlines,
+  scraper health, weekly summary, portal profile, settings preview, tuning report), daily
+  deadline reminders, the Monday summary and the scraper watch. No model connected yet.
 - Shared portal helpers (2026-10-17): browser, saved sessions, emailed sign-in codes and the
   keyword filter live in portals/shared/ for every adapter; Vulcan SOF keeps only its own
   login, scraping and keywords.yaml.

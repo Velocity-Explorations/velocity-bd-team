@@ -17,6 +17,11 @@ from portals.vulcan_sof.scrape import scrape_all
 log = logging.getLogger("vulcan_sof.portal")
 
 KEYWORDS_PATH = Path(__file__).resolve().parent / "keywords.yaml"   # this portal's filter settings
+NOTES_PATH = Path(__file__).resolve().parent / "NOTES.md"           # what the assistant should know
+HOW_TO_SUBMIT = (
+    "Submit a Vulcan Scout Card from the call's page: create one or submit an existing card, "
+    "with the files the call asks for."
+)
 
 
 class LoginFailed(RuntimeError):
@@ -43,4 +48,7 @@ PORTAL = {
     "filter": filter_rows,
     "fetch_timeout": 300,
     "needs_browser": True,
+    "keywords": KEYWORDS_PATH,
+    "how_to_submit": HOW_TO_SUBMIT,
+    "notes": NOTES_PATH,
 }

@@ -104,6 +104,13 @@ The task runs as the current user with an interactive logon, so it fires only wh
 user is logged on (locked screen is fine). `.env` and the cookie file are read from this
 repo as usual. To run while logged off, re-register with a password-backed principal.
 
+## Portal assistant
+
+Try any tool from the command line, for example `python -m assistant explain <call id>` or
+`python -m assistant deadlines`; `python -m assistant tools` lists them all. Two scheduled
+jobs post to Slack: deadline reminders daily at 08:00 and the weekly summary on Mondays at
+09:00. Every scan also alerts when it reads too many pages badly. Details in docs/ASSISTANT.md.
+
 ## Dashboard
 
 ```powershell

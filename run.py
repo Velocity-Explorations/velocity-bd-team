@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import os
 import subprocess
 import sys
@@ -43,6 +44,8 @@ STALE_LOCK_S = 2 * 60 * 60
 FORCE_CLOSE_GRACE_S = 10
 NO_REVIEW_REASON = "LLM review disabled"
 VERDICT_ORDER = {"yes": 0, "maybe": 1}
+BAD_PAGES_MIN = 3          # alert when at least this many pages read badly...
+BAD_PAGES_SHARE = 0.10     # ...and at least this share of the scan
 
 log = logging.getLogger("pipeline")
 
@@ -153,6 +156,17 @@ def run_fetch(portal: Portal, run_id: int, timeout_s: int, limit: int | None) ->
         log.debug("%s", result.get("trace", ""))
         return "error", empty, message
     return "completed", dict(result["counts"]), None
+
+
+def watch_quality(portal: Portal, run_id: int, log_path: Path) -> None:
+    """Alert when a completed scan read too many pages badly (no deadline or description found)."""
+    from assistant.tools import fetch_quality
+
+    quality = fetch_quality(run_id)
+    if quality["count"] >= max(BAD_PAGES_MIN, math.ceil(BAD_PAGES_SHARE * quality["total"])):
+        alert(f"velocity-bd-team: {portal.name} scan read {quality['count']} of {quality['total']} pages badly "
+              f"(no deadline or description found), for example: {', '.join(quality['examples'])}. "
+              f"The page layout may have changed. Log: {log_path}")
 
 
 def run_filter(portal: Portal) -> int:
@@ -291,6 +305,8 @@ def run_portal(portal: Portal, args: argparse.Namespace, log_path: Path) -> dict
             log.info("FETCH: %d rows (%.1fs) status=%s", counts["fetched"], time.time() - t0, status)
             if status != "completed":
                 alert(f"velocity-bd-team: {portal.name} fetch {status}. {error}. Log: {log_path}")
+            elif not args.dry_run:
+                watch_quality(portal, run_id, log_path)
 
         t0 = time.time()
         counts["filtered"] = run_filter(portal)

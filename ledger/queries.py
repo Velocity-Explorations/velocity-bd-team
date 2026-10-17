@@ -86,6 +86,14 @@ def latest_run_id(portal: str | None = None, component: str | None = None) -> in
         return int(row["id"]) if row else None
 
 
+def recent_runs(component: str | None = None, limit: int = 10) -> list[dict[str, Any]]:
+    """Newest runs first, optionally for one component (a portal's slug, "slack", ...)."""
+    where = " WHERE component = ?" if component else ""
+    params: list[Any] = [component] if component else []
+    with tx() as conn:
+        return rows(q(conn, f"SELECT * FROM runs{where} ORDER BY id DESC LIMIT ?", [*params, limit]))
+
+
 def get_run(run_id: int) -> dict[str, Any] | None:
     with tx() as conn:
         return one(q(conn, "SELECT * FROM runs WHERE id = ?", (run_id,)))

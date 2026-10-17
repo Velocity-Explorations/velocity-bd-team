@@ -14,6 +14,7 @@ dashboard.
 | portals/<slug>/ | One adapter per portal: only what is specific to that portal, plus its keywords.yaml. |
 | portals/shared/ | Helpers every adapter reuses: browser, saved sessions, emailed sign-in codes, keyword filter. |
 | review/ | Per-call review, regex gate then LLM verdict. |
+| assistant/ | The portal assistant's toolbox and its scheduled Slack posts. See docs/ASSISTANT.md. |
 | slack/ | Alerts, cards for new calls, thread notes. Decisions are made on the dashboard. |
 | corpus/ | Past-proposal corpus: Drive sync, extraction, embeddings. |
 | dashboard/ | Next.js triage dashboard over the ledger: review queue, all calls, runs, proposals. See docs/DASHBOARD.md. |

@@ -212,6 +212,17 @@ def summary_text(summary: dict[str, Any]) -> str:
     )
 
 
+def post_text(text: str, client: SlackClient | None = None) -> str | None:
+    """Post a plain message to the team channel. Returns its ts, or None when it was not sent."""
+    client = client or SlackClient()
+    channel = channel_id()
+    if not channel:
+        log.warning("post_text skipped: SLACK_CHANNEL_ID missing")
+        return None
+    payload = client.call("chat.postMessage", {"channel": channel, "text": text, "unfurl_links": False})
+    return str(payload.get("ts")) if payload else None
+
+
 def post_run_summary(summary: dict[str, Any], client: SlackClient | None = None) -> str | None:
     client = client or SlackClient()
     channel = channel_id()

@@ -152,6 +152,8 @@ def test_registry_discovers_vulcan_sof() -> None:
     assert "vulcan_sof" in slugs and "shared" not in slugs
     vulcan = registry.get("vulcan_sof")
     assert vulcan.name == "Vulcan SOF" and vulcan.fetch_timeout == 300 and vulcan.needs_browser
+    assert vulcan.keywords and vulcan.keywords.name == "keywords.yaml" and vulcan.keywords.exists()
+    assert vulcan.notes and vulcan.notes.exists() and "Scout Card" in vulcan.how_to_submit
 
 
 def test_feedback_only_runs_collect_and_exits(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
@@ -174,3 +176,15 @@ def test_deliver_run_reposts_only_undelivered(isolated, monkeypatch: pytest.Monk
     assert "deliver-run 1: 1 of 1 card(s) posted" in capsys.readouterr().out
     assert pipeline._test_capture["posted"] == ["fake-0"]   # type: ignore[attr-defined]
     assert pipeline.main(["--deliver-run", "99"]) == 2
+
+
+def test_watch_alerts_when_a_scan_reads_pages_badly(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fetch(page, run_id, limit=None):
+        for n in range(4):
+            lq.upsert_call({"id": f"bad-{n}", "portal": "Fake", "title": f"Page {n}", "description": "software"}, run_id)
+        return {"found": 4, "scraped": 4, "new": 4, "failed": 0}
+
+    flaky = Portal(slug="fake", name="Fake", fetch=fetch, filter=lambda rows: ([], []), needs_browser=False)
+    monkeypatch.setattr(registry, "discover", lambda: [flaky])
+    assert pipeline.main(["--no-review"]) == 0
+    assert any("read 4 of 4 pages badly" in a and "Page 0" in a for a in isolated)

@@ -47,6 +47,21 @@ DESC_MIN_CHARS = 40
 DESC_MAX_CHARS = 1500   # was 400; the reviewer kept calling the text truncated
 CLOSED_RE = re.compile(r"This call has closed", re.I)
 UUID_RE = re.compile(r"collectionUuid=([a-f0-9-]{36})")
+
+# Labelled sections of a call page, in page order. Each list section runs until the next
+# label; "Additional Instructions" runs until the footer, which lists people's scout cards
+# and must never be stored.
+SECTION_KEYS = {
+    "Engagement Objectives:": "objectives",
+    "Documents:": "documents",
+    "Files Required for Submission:": "files_required",
+    "Tags": "tags",
+}
+SECTION_BOUNDARIES = set(SECTION_KEYS) | {
+    "Open Date:", "Deadline:", "Problem Statement", "Bottom Line Upfront", "Additional Instructions",
+}
+INSTRUCTION_STOPS = {"This call has closed.", "Recent Activity", "Submit Existing Card(s)", "Submit a new Card"}
+INSTRUCTIONS_MAX_CHARS = 1200
 RENDERED_JS = "() => /Deadline|Open Date|Problem Statement/.test(document.body ? document.body.innerText : '')"
 RENDER_EXTRA_WAIT_MS = 6_000
 
@@ -88,8 +103,35 @@ def extract_fields(body: str) -> dict[str, str]:
     }
 
 
+def extract_sections(body: str) -> dict[str, Any]:
+    """Objectives, documents, required files and tags as lists; the submission instructions as text."""
+    found: dict[str, Any] = {"objectives": [], "documents": [], "files_required": [], "tags": []}
+    current: str | None = None
+    instructions: list[str] = []
+    reading_instructions = False
+    for raw in (body or "").splitlines():
+        line = raw.strip()
+        if reading_instructions:
+            if line in INSTRUCTION_STOPS or re.fullmatch(r"\d+", line):
+                break   # the footer: step numbers, then the scout-card table with people's names
+            if line:
+                instructions.append(line)
+            continue
+        if line == "Additional Instructions":
+            reading_instructions = True
+            continue
+        if line in SECTION_BOUNDARIES:
+            current = SECTION_KEYS.get(line)
+            continue
+        if current and line:
+            found[current].append(line)
+    found["instructions"] = " ".join(" ".join(instructions).split())[:INSTRUCTIONS_MAX_CHARS]
+    return found
+
+
 def build_record(url: str, title: str, body: str) -> dict[str, Any]:
     fields = extract_fields(body)
+    sections = extract_sections(body)
     return {
         "id": call_id_for(url),
         "title": title,
@@ -106,6 +148,11 @@ def build_record(url: str, title: str, body: str) -> dict[str, Any]:
         "extra": {
             "vulcan_description_fallback": bool(fields["description_is_fallback"]),
             "vulcan_closed": bool(fields["closed"]),
+            "vulcan_objectives": sections["objectives"],
+            "vulcan_documents": sections["documents"],
+            "vulcan_files_required": sections["files_required"],
+            "vulcan_tags": sections["tags"],
+            "vulcan_instructions": sections["instructions"],
         },
     }
 
