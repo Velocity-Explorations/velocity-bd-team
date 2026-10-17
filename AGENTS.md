@@ -21,10 +21,10 @@ that share one SQLite ledger database.
 | review/ | Per-call review: regex blocklist, then LLM verdict. Writes verdicts to the ledger. |
 | corpus/ | Past-submission corpus: Drive sync, text extraction, chunking, embeddings. |
 | drafting/ | Proposal briefs and response drafts built from reviewed calls and the corpus. |
-| dashboard/ | Read-only view over the ledger. |
+| dashboard/ | Next.js triage dashboard reading the ledger directly (docs/DASHBOARD.md). Its own package.json; run npm commands inside dashboard/. |
 | slack/ | `alerts.py` (failure alerts), `sink.py` (cards, run summary, reaction and note collection). |
 | scripts/ | PowerShell helpers, including the Task Scheduler registration script. |
-| docs/ | OWNERS.md, STATUS.md, LEDGER_SCHEMA.md, RUNBOOK.md, plans/. |
+| docs/ | OWNERS.md, STATUS.md, LEDGER_SCHEMA.md, RUNBOOK.md, DASHBOARD.md, plans/. |
 | tests/ | pytest suite. Every phase adds tests before code. |
 | data/ | Runtime files, one subdirectory per component (`data/<component>/`). Never committed. |
 | reference/yukon/ | Read-only prior art from the retired Yukon scanner. Never imported. |

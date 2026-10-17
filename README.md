@@ -15,8 +15,8 @@ dashboard.
 | review/ | Per-call review, regex gate then LLM verdict. |
 | slack/ | Alerts, delivery, reaction handling. |
 | corpus/ | Past-proposal corpus: Drive sync, extraction, embeddings. |
-| dashboard/ | Read-only view over the ledger. |
-| docs/ | LEDGER_SCHEMA.md, OWNERS.md, STATUS.md, plans/. |
+| dashboard/ | Next.js triage dashboard over the ledger: review queue, all calls, runs, proposals. See docs/DASHBOARD.md. |
+| docs/ | LEDGER_SCHEMA.md, DASHBOARD.md, RUNBOOK.md, OWNERS.md, STATUS.md, plans/. |
 | tests/ | pytest suite, runs on SQLite. |
 | data/ | Runtime files per component. Git-ignored. |
 | reference/yukon/ | Read-only prior art from the retired Yukon scanner. Never imported. |

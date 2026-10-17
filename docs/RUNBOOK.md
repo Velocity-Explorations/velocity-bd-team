@@ -107,6 +107,16 @@ The task runs as the current user with an interactive logon, so it fires only wh
 user is logged on (locked screen is fine). `.env` and the cookie file are read from this
 repo as usual. To run while logged off, re-register with a password-backed principal.
 
+## Dashboard
+
+```powershell
+cd dashboard
+npm run dev      # http://localhost:3000
+```
+
+It reads `dashboard/.env.local` (DATABASE_URL, DASHBOARD_USERS). Pages, the decision buttons and
+how they coexist with Slack are in docs/DASHBOARD.md.
+
 ## Running the stages separately
 
 The stage commands from earlier phases still work and share the same ledger:

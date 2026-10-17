@@ -18,6 +18,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 8 (Slack delivery and feedback): cards and a summary per run, reactions and `note:` replies
   polled into the ledger (`run.py --feedback-only`, daily task), decisions fed to the reviewer.
   Live on 2026-10-16.
+- Phase 9 (dashboard): Next.js 16.4 app in dashboard/, run locally with `npm run dev`. Review
+  queue with Pursue / Not relevant / Submitted / Dismiss writing the same columns as Slack, plus
+  all calls, runs and proposals. Not deployed anywhere yet; hosting is undecided.
 
 - Phase 2 (Vulcan SOF login): working as of 2026-10-16. Username, password, then the emailed
   code read over Gmail IMAP (VELOCITY_GMAIL_APP_USERNAME + VELOCITY_GMAIL_APP_PASSWORD; gog CLI

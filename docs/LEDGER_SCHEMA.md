@@ -79,7 +79,7 @@ the component that owns them. A component never writes another group's columns.
 | human_status | TEXT | NULL, `pursue`, `not_relevant`, `submitted`, `dismissed` | Slack feedback or dashboard (`set_human`) |
 | human_by | TEXT | who decided (Slack user id or name) | same |
 | human_at | TEXT timestamp | when they decided | same |
-| human_notes | TEXT | newline-separated lines `[<timestamp> <by>] <text>` | `append_note` |
+| human_notes | TEXT | newline-separated lines `[<timestamp> <by>] <text>` | `append_note`, Slack thread replies, the dashboard's decide action |
 | extra | TEXT JSON | object of portal-specific fields, keys prefixed by portal. Vulcan SOF writes `vulcan_closed` (bool, the page says the call has closed) and `vulcan_description_fallback` (bool, no Problem Statement text was found) | portal adapter |
 | updated_at | TEXT timestamp, not null | touched by every write | every writer |
 
@@ -131,7 +131,8 @@ the timestamp. Nothing else reads it.
 
 ## How to build a dashboard against this
 
-Connect with DATABASE_URL and read the tables directly; no API exists or is planned.
+`dashboard/` is the working example (see DASHBOARD.md). Connect with DATABASE_URL and read the
+tables directly; no API exists or is planned.
 Treat the ledger as read-only from the dashboard except for the `human_*` columns on
 `calls`, which the dashboard may set through `set_human` and `append_note` (or the
 equivalent UPDATE) so decisions made on the dashboard flow back the same way Slack

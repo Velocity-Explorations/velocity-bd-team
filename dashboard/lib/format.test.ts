@@ -1,0 +1,48 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { formatAgo, formatDuration, formatTime, isoNow, parseStageCounts } from "./format.ts";
+
+test("isoNow matches the ledger format: second precision, Z suffix", () => {
+  assert.equal(isoNow(new Date("2026-10-17T09:44:33.789Z")), "2026-10-17T09:44:33Z");
+});
+
+test("formatTime renders in the configured zone with its abbreviation", () => {
+  assert.equal(formatTime("2026-10-16T11:35:06Z", "America/Denver"), "2026-10-16 05:35 MDT");
+  assert.equal(formatTime("2026-12-01T12:00:00Z", "America/Denver"), "2026-12-01 05:00 MST");
+  assert.equal(formatTime("2026-10-16T11:35:06Z", "UTC"), "2026-10-16 11:35 UTC");
+});
+
+test("formatTime returns an empty string for missing or invalid input", () => {
+  assert.equal(formatTime(null, "UTC"), "");
+  assert.equal(formatTime(undefined, "UTC"), "");
+  assert.equal(formatTime("not a date", "UTC"), "");
+});
+
+test("formatDuration", () => {
+  assert.equal(formatDuration("2026-10-16T11:35:06Z", "2026-10-16T11:37:55Z"), "2m 49s");
+  assert.equal(formatDuration("2026-10-16T11:35:06Z", "2026-10-16T11:35:51Z"), "45s");
+  assert.equal(formatDuration("2026-10-16T10:00:00Z", "2026-10-16T11:02:05Z"), "1h 02m");
+  assert.equal(formatDuration("2026-10-16T11:35:06Z", null), "");
+});
+
+test("formatAgo", () => {
+  const now = new Date("2026-10-17T12:00:00Z");
+  assert.equal(formatAgo("2026-10-17T11:59:30Z", now), "just now");
+  assert.equal(formatAgo("2026-10-17T11:48:00Z", now), "12 min ago");
+  assert.equal(formatAgo("2026-10-17T09:00:00Z", now), "3 h ago");
+  assert.equal(formatAgo("2026-10-15T12:00:00Z", now), "2 d ago");
+  assert.equal(formatAgo(null, now), "");
+});
+
+test("parseStageCounts keeps numeric entries in order and tolerates junk", () => {
+  assert.deepEqual(parseStageCounts('{"fetched": 60, "filtered": 0, "reviewed": 3, "new": 1}'), [
+    ["fetched", 60],
+    ["filtered", 0],
+    ["reviewed", 3],
+    ["new", 1],
+  ]);
+  assert.deepEqual(parseStageCounts('{"found": 60, "note": "x"}'), [["found", 60]]);
+  assert.deepEqual(parseStageCounts(null), []);
+  assert.deepEqual(parseStageCounts("garbage"), []);
+  assert.deepEqual(parseStageCounts("[1, 2]"), []);
+});
