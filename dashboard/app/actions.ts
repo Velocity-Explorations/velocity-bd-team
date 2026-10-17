@@ -19,30 +19,36 @@ function backTo(returnTo: string, key: "notice" | "error", message: string): nev
 }
 
 /**
- * Record a triage decision from the review queue. Writes human_status, human_by and
- * human_at (the columns a Slack reaction writes) and appends the optional note. A row that
- * was decided elsewhere in the meantime is left as it is.
+ * Record or change a decision (the review queue's buttons, and the change control on
+ * /calls). Writes human_status, human_by and human_at and appends the optional note. The
+ * form carries the decision the page showed ("expected", empty for undecided); if the call
+ * changed since, nothing is written.
  */
 export async function decide(formData: FormData): Promise<void> {
   const returnTo = safeReturnTo(formData.get("return_to"));
   const id = String(formData.get("id") ?? "").trim();
   const status = formData.get("status");
+  const expectedField = String(formData.get("expected") ?? "");
   const note = String(formData.get("note") ?? "").slice(0, MAX_NOTE_CHARS);
-  if (!id || !isDecision(status)) backTo(returnTo, "error", "That decision was not recognised.");
+  if (!id || !isDecision(status)) backTo(returnTo, "error", "Choose a decision first.");
+  if (expectedField && !isDecision(expectedField)) backTo(returnTo, "error", "That form is out of date. Reload and try again.");
+  const expected = isDecision(expectedField) ? expectedField : null;
 
   const viewer = await currentViewer();
   if (!viewer) backTo(returnTo, "error", "Choose who you are (top right) before deciding.");
 
   let result: DecideResult;
   try {
-    result = await decideCall({ id, status, by: viewer, note, onlyIfUndecided: true });
+    result = await decideCall({ id, status, expected, by: viewer, note });
   } catch (err) {
     const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
     backTo(returnTo, "error", `Could not save the decision: ${detail}`);
   }
   revalidatePath("/");
   revalidatePath("/calls");
-  if (result.ok) backTo(returnTo, "notice", `${STATUS_LABELS[status]}: ${result.title}`);
+  if (result.ok) {
+    backTo(returnTo, "notice", result.plan === "note" ? `Note added: ${result.title}` : `${STATUS_LABELS[status]}: ${result.title}`);
+  }
   backTo(returnTo, "error", result.reason);
 }
 

@@ -155,10 +155,10 @@ def test_registry_discovers_vulcan_sof() -> None:
 
 def test_feedback_only_runs_collect_and_exits(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     import slack.sink as sink
-    monkeypatch.setattr(sink, "collect_feedback", lambda *a, **k: [{"id": "x", "title": "T", "status": "pursue", "by": "U1", "notes": []}])
+    monkeypatch.setattr(sink, "collect_feedback", lambda *a, **k: [{"id": "x", "title": "T", "notes": ["n"], "card_updated": True}])
     assert pipeline.main(["--feedback-only"]) == 0
     out = capsys.readouterr().out
-    assert "feedback-only: 1 change(s) recorded" in out and "status=pursue by=U1" in out
+    assert "feedback-only: 1 change(s) recorded" in out and "notes=1 card_updated=yes" in out
     assert lq.latest_run_id() is None   # no runs row for a feedback pass
 
 

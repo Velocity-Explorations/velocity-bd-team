@@ -95,8 +95,8 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
         <div className="empty">
           <p className="title">{filtered ? "No calls match these filters." : "Nothing waiting for a decision."}</p>
           <p className="muted">
-            New yes and maybe calls land here after each scan. A decision made here or with a Slack reaction takes
-            the call off this list.
+            New yes and maybe calls land here after each scan. Deciding takes a call off this list; change a decision
+            later on All calls.
           </p>
         </div>
       ) : (
@@ -135,6 +135,7 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
                     <td className="decide">
                       <form action={decide}>
                         <input type="hidden" name="id" value={r.id} />
+                        <input type="hidden" name="expected" value="" />
                         <input type="hidden" name="return_to" value={returnTo} />
                         <input type="text" name="note" maxLength={2000} placeholder="Note (optional)" aria-label={`Note on ${label}`} />
                         <div className="buttons">

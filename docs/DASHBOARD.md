@@ -1,15 +1,16 @@
 # Dashboard
 
 A Next.js app in `dashboard/` that reads the ledger directly, using the same DATABASE_URL as
-the pipeline. No API layer sits between them. It can replace Slack as the triage surface, or
-run beside it. How to run and deploy it is in [dashboard/README.md](../dashboard/README.md).
+the pipeline. No API layer sits between them. Since 2026-10-17 it is the only place triage
+decisions are made; Slack posts the cards and carries the discussion. How to run and deploy
+it is in [dashboard/README.md](../dashboard/README.md).
 
 ## Pages
 
 | Path | What it shows |
 |---|---|
-| `/` | **Review queue.** Calls with ai_verdict yes or maybe and no human decision, newest first: verdict, title linked to the portal, due date, match tier, the AI's reason, first seen, and four buttons (Pursue, Not relevant, Submitted, Dismiss) with an optional note. Filters: portal, verdict, and "open calls only", which hides calls a portal adapter flagged as closed. Counts at the top: waiting, yes, maybe, and new this week. |
-| `/calls` | **All calls**, newest first, up to 200 at a time. Filters: title text, portal, filter_result, ai_verdict (or not reviewed), human_status (or undecided). Shows the filter tier and filter_reason for rejected rows, the AI's reason behind a toggle, who decided and when, and every note. |
+| `/` | **Review queue.** Calls with ai_verdict yes or maybe and no decision yet, newest first: verdict, title linked to the portal, due date, match tier, the AI's reason, first seen, and four buttons (Pursue, Not relevant, Submitted, Dismiss) with an optional note. Filters: portal, verdict, and "open calls only", which hides calls a portal adapter flagged as closed. Counts at the top: waiting, yes, maybe, and new this week. |
+| `/calls` | **All calls**, newest first, up to 200 at a time. Filters: title text, portal, filter_result, ai_verdict (or not reviewed), human_status (or undecided). Shows the filter tier and filter_reason for rejected rows, the AI's reason behind a toggle, who decided and when, and every note. Each row has a "decide" or "change" control, for example to move a call from Pursue to Submitted, or to add a note to a decided call. |
 | `/runs` | **Scan history.** The most recent run sits at the top with its status, start time, duration, stage counts, error and log. Below it, the last 100 runs. A run still marked running two hours after it started is flagged as having no finish recorded. |
 | `/proposals` | **Past submissions** from the proposals table, with win rate by portal. Shows an empty state until the Proposal Corpus plan fills the table. |
 
@@ -27,7 +28,8 @@ there.
 
 ## The write action
 
-`decide` in `dashboard/app/actions.ts` is the dashboard's only write. One UPDATE on `calls`:
+`decide` in `dashboard/app/actions.ts` is the dashboard's only write, used by the queue's
+buttons and by the control on `/calls`. One UPDATE on `calls`:
 
 - `human_status`: pursue, not_relevant, submitted or dismissed
 - `human_by`: the viewer's name (see below)
@@ -35,12 +37,15 @@ there.
 - `human_notes`: when a note is typed, one line appended in the pipeline's `[at by] text`
   format, the same as `append_note()` and Slack thread replies
 
-These are the columns a Slack reaction writes, so the reviewer's RECENT HUMAN DECISIONS block
-learns from dashboard decisions exactly as it does from Slack ones.
+Saving the same decision with a note appends the note and leaves the decision, its author and
+its time alone. Saving the same decision with no note changes nothing.
 
-The action only changes undecided rows. If someone decided the call elsewhere after the page
-loaded, nothing is overwritten and the page says who decided it. After a successful decision
-the queue re-renders without the row and shows a one-line confirmation.
+Every form carries the decision the page showed. If the call was decided or changed by
+someone else after the page loaded, nothing is written and the page says what the call is
+now. A queue row therefore cannot overwrite a decision made in another tab.
+
+The reviewer's RECENT HUMAN DECISIONS block reads these columns, so every decision made here
+shapes the next review.
 
 ## Who is deciding
 
@@ -53,19 +58,22 @@ There is no login yet. Decisions are attributed by one of two means:
 2. **Header**. With DASHBOARD_USER_HEADER set, the viewer is taken from that request header
    only, as set by an access proxy, and must be on the allowlist when there is one.
 
-`human_by` therefore holds a name for dashboard decisions and a Slack user id for Slack ones.
-Writing `Name=<Slack id>` in DASHBOARD_USERS makes the dashboard show both under the name.
+`human_by` holds the person's name. Calls decided with Slack reactions before 2026-10-17 hold
+a Slack user id instead; writing `Name=<Slack id>` in DASHBOARD_USERS shows those under the
+name too.
 
-## Slack and the dashboard together
+## Slack's role
 
-Both write the same columns, so both can stay active:
+Slack informs; it does not decide.
 
-- A decision in either place takes the call off the dashboard queue.
-- Slack keeps polling decided cards for thread notes and for a later X reaction, which still
-  dismisses a call decided on the dashboard.
-- Dismiss on the dashboard does not delete the Slack card. The Slack poll stops checking
-  dismissed rows, so the card simply stays in the channel.
+- Each run posts one card per new yes or maybe call, then a summary that says to decide on
+  the dashboard. With DASHBOARD_URL set in the repo's `.env`, both link to it.
+- Reactions on cards are not read.
+- Every reply in a card's thread becomes a note on that call, before or after a decision.
+- Each feedback pass (at the start of every pipeline run, and the daily 18:00 task) edits any
+  card whose decision differs from the ledger. The card gains a first line such as
+  "Decision: Not relevant by David Wood" with the time, or loses it if a decision is cleared.
+  Cards are never deleted; a dismissed call's card says Dismissed.
 
-Moving triage off Slack entirely means removing the Slack reaction mapping in
-`slack/sink.py` (`REACTION_STATUS` and `collect_feedback`) and the card posting step in
-`run.py` (`deliver`). Leaving both active is equally valid: the two surfaces are compatible.
+Until the dashboard is hosted, only people who can open it can decide. Everyone else can
+still read the cards and add notes in their threads.

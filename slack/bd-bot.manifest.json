@@ -1,7 +1,7 @@
 {
   "display_information": {
     "name": "BD Bot",
-    "description": "Posts new government opportunities and collects the team's reactions."
+    "description": "Posts new government opportunities, collects thread notes, and shows the decisions made on the dashboard."
   },
   "features": {
     "bot_user": {
@@ -13,7 +13,6 @@
     "scopes": {
       "bot": [
         "chat:write",
-        "reactions:read",
         "channels:history",
         "channels:join"
       ]

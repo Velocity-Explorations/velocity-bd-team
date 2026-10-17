@@ -39,13 +39,13 @@ Write-Host "  overlap:  $($task.Settings.MultipleInstances) (plus data\pipeline.
 Write-Host "  state:    $($task.State)"
 Write-Host "Start it now with:  Start-ScheduledTask -TaskName '$TaskName'"
 
-# Daily feedback poll: pulls Slack reactions and thread notes into the ledger.
+# Daily Slack sync: thread replies into notes, dashboard decisions onto the cards.
 $fbAction = New-ScheduledTaskAction -Execute $python -Argument "run.py --feedback-only" -WorkingDirectory $repo
 $fbTrigger = New-ScheduledTaskTrigger -Daily -At $FeedbackAt
 $fbSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 20) `
     -StartWhenAvailable -RunOnlyIfNetworkAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 Register-ScheduledTask -TaskName $FeedbackTaskName -Action $fbAction -Trigger $fbTrigger -Settings $fbSettings `
-    -Description "velocity-bd-team: collect Slack reactions and notes into the ledger." -Force | Out-Null
+    -Description "velocity-bd-team: Slack thread notes into the ledger, decisions onto the cards." -Force | Out-Null
 Write-Host "Registered '$FeedbackTaskName'"
 Write-Host "  runs:     $python run.py --feedback-only"
 Write-Host "  trigger:  daily at $FeedbackAt"

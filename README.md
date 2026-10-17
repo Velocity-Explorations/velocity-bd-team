@@ -13,7 +13,7 @@ dashboard.
 | ledger/ | The shared database: `db.py` (connections), `migrate.py` (migrations), `queries.py` (every query any component uses), `schema.sql` (current schema), `migrations/`. |
 | portals/<slug>/ | One adapter per portal. |
 | review/ | Per-call review, regex gate then LLM verdict. |
-| slack/ | Alerts, delivery, reaction handling. |
+| slack/ | Alerts, cards for new calls, thread notes. Decisions are made on the dashboard. |
 | corpus/ | Past-proposal corpus: Drive sync, extraction, embeddings. |
 | dashboard/ | Next.js triage dashboard over the ledger: review queue, all calls, runs, proposals. See docs/DASHBOARD.md. |
 | docs/ | LEDGER_SCHEMA.md, DASHBOARD.md, RUNBOOK.md, OWNERS.md, STATUS.md, plans/. |

@@ -22,7 +22,7 @@ LLM review of any new kept rows, then the digest on stdout.
 | `--no-review` | No LLM. Kept, unreviewed rows get verdict `maybe` with reasoning "LLM review disabled". |
 | `--limit N` | Scrape at most N calls and review at most N rows. |
 | `--fetch-timeout S` | Override every portal's fetch budget (default 300 s from its PORTAL dict). For testing the timeout path. |
-| `--feedback-only` | Only pull Slack reactions and thread notes into the ledger. This is what the daily task runs. |
+| `--feedback-only` | Only sync Slack: thread replies into notes, decisions onto the cards. This is what the daily task runs. |
 | `--debug` | DEBUG logging, which includes the first rendered review prompt. |
 | `--deliver-run N` | Re-post run N's new calls that never reached Slack (for example after `not_in_channel`), then exit. |
 
@@ -35,20 +35,16 @@ pid is dead or that is older than two hours is treated as stale and replaced.
 ## Slack delivery and feedback
 
 Every full run posts one card per new call (verdict yes or maybe) to SLACK_CHANNEL_ID, then a
-one-line summary. The team answers on the card:
+one-line summary. Decisions are made on the dashboard (docs/DASHBOARD.md), not with
+reactions, which are not read.
 
-| reaction | human_status | effect |
-|---|---|---|
-| thumbs up | pursue | |
-| thumbs down | not_relevant | |
-| white check mark | submitted | a response went in |
-| x | dismissed | the card is deleted |
-
-Any reply in a card's thread is stored on the call's human_notes (a leading `note:` is dropped). Several reactions
-on one card resolve in the order x, check mark, thumbs down, thumbs up. The pipeline polls
-for all of this at the start of every run and in the daily "velocity-bd-team feedback" task
-(`run.py --feedback-only`). Decisions feed the next review as a RECENT HUMAN DECISIONS block
-in the prompt. A dry run prints the cards instead of posting and makes no Slack calls.
+Any reply in a card's thread is stored on the call's human_notes (a leading `note:` is
+dropped). The feedback pass also edits each card whose decision differs from the ledger, so
+the channel shows what was decided, by whom and when. It runs at the start of every pipeline
+run and in the daily "velocity-bd-team feedback" task (`run.py --feedback-only`). Decisions
+feed the next review as a RECENT HUMAN DECISIONS block in the prompt. A dry run prints the
+cards instead of posting and makes no Slack calls. Set DASHBOARD_URL in `.env` once the
+dashboard is hosted and cards and summaries link to it.
 
 ## Logs
 

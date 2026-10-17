@@ -76,8 +76,8 @@ the component that owns them. A component never writes another group's columns.
 | slack_channel | TEXT | channel id the card was posted to | Slack delivery (`set_slack`) |
 | slack_ts | TEXT | Slack message timestamp (its id) | Slack delivery |
 | posted_at | TEXT timestamp | | Slack delivery |
-| human_status | TEXT | NULL, `pursue`, `not_relevant`, `submitted`, `dismissed` | Slack feedback or dashboard (`set_human`) |
-| human_by | TEXT | who decided (Slack user id or name) | same |
+| human_status | TEXT | NULL, `pursue`, `not_relevant`, `submitted`, `dismissed` | the dashboard's decide action (`set_human` from Python); Slack reactions set it before 2026-10-17 |
+| human_by | TEXT | the deciding person's name; a Slack user id on calls decided by reaction before 2026-10-17 | same |
 | human_at | TEXT timestamp | when they decided | same |
 | human_notes | TEXT | newline-separated lines `[<timestamp> <by>] <text>` | `append_note`, Slack thread replies, the dashboard's decide action |
 | extra | TEXT JSON | object of portal-specific fields, keys prefixed by portal. Vulcan SOF writes `vulcan_closed` (bool, the page says the call has closed) and `vulcan_description_fallback` (bool, no Problem Statement text was found) | portal adapter |
@@ -87,8 +87,8 @@ Indexes: `(portal, first_seen_at)`, `(human_status)`, `(ai_verdict)`.
 
 Lifecycle of a row: portal adapter inserts it (`filter_result = 'pending'`); the filter
 sets `kept` or `rejected`; the Reviewer sets `ai_verdict` on kept rows; Slack delivery
-posts rows with verdict `yes` or `maybe` and records `slack_ts`; a person reacts or
-uses the dashboard and `human_status` is set. Later runs refresh only the scraped
+posts rows with verdict `yes` or `maybe` and records `slack_ts`; a person decides on the
+dashboard and `human_status` is set. Later runs refresh only the scraped
 fields and `last_seen_at`.
 
 ## Table: proposals
@@ -134,9 +134,9 @@ the timestamp. Nothing else reads it.
 `dashboard/` is the working example (see DASHBOARD.md). Connect with DATABASE_URL and read the
 tables directly; no API exists or is planned.
 Treat the ledger as read-only from the dashboard except for the `human_*` columns on
-`calls`, which the dashboard may set through `set_human` and `append_note` (or the
-equivalent UPDATE) so decisions made on the dashboard flow back the same way Slack
-reactions do. Use the `runs` table for health: the latest row per component tells you
+`calls`, which the dashboard sets with its decide action (the equivalent of `set_human`
+and `append_note`). Since 2026-10-17 the dashboard is the only place decisions are made;
+Slack reactions are no longer read. Use the `runs` table for health: the latest row per component tells you
 when it last ran and whether it finished.
 
 Timestamps are text, so "this week" is a text comparison against a cutoff the caller

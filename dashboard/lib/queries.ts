@@ -4,7 +4,7 @@
 import { sql } from "./db";
 import { isoNow } from "./format";
 import { escapeLike, isClosed, noteLine } from "./text";
-import type { Decision } from "./values";
+import { planDecision, type Decision } from "./values";
 
 // ------------------------------------------------------------------------------ calls
 
@@ -91,41 +91,48 @@ export async function listCalls(f: CallFilters, limit = 200): Promise<{ rows: Ca
   return { rows: [...rows], total: count[0]?.n ?? 0 };
 }
 
-export type DecideResult = { ok: true; title: string } | { ok: false; reason: string };
+export type DecideResult = { ok: true; title: string; plan: "decide" | "note" } | { ok: false; reason: string };
 
 /**
- * The dashboard's one write: the same columns a Slack reaction sets (human_status, human_by,
- * human_at), plus an optional note appended in append_note()'s format. With onlyIfUndecided,
- * a row someone already decided (for example from Slack) is left alone.
+ * The dashboard's one write, and since 2026-10-17 the only place decisions are made:
+ * human_status, human_by, human_at, plus an optional note appended in append_note()'s
+ * format. `expected` is the decision the page showed; if the call changed since (another
+ * tab, another person), nothing is written and the reason says what it is now.
  */
 export async function decideCall(input: {
   id: string;
   status: Decision;
+  expected: Decision | null;
   by: string;
   note: string;
-  onlyIfUndecided: boolean;
 }): Promise<DecideResult> {
+  const plan = planDecision(input.expected, input.status, input.note);
+  if (plan === "noop") return { ok: false, reason: "Nothing to save: choose a different decision or add a note." };
   const db = sql();
   const now = isoNow();
   const line = noteLine(now, input.by, input.note) || null;
+  const appendNote = db`human_notes = CASE
+      WHEN ${line}::text IS NULL THEN human_notes
+      ELSE COALESCE(NULLIF(human_notes, '') || chr(10), '') || ${line}::text
+    END`;
   const updated = await db<{ title: string | null }[]>`
     UPDATE calls
-    SET human_status = ${input.status},
-        human_by = ${input.by},
-        human_at = ${now},
+    SET ${plan === "decide" ? db`human_status = ${input.status}, human_by = ${input.by}, human_at = ${now},` : db``}
         updated_at = ${now},
-        human_notes = CASE
-          WHEN ${line}::text IS NULL THEN human_notes
-          ELSE COALESCE(NULLIF(human_notes, '') || chr(10), '') || ${line}::text
-        END
+        ${appendNote}
     WHERE id = ${input.id}
-      ${input.onlyIfUndecided ? db`AND human_status IS NULL` : db``}
+      AND human_status IS NOT DISTINCT FROM ${input.expected}::text
     RETURNING title`;
-  if (updated.length === 1) return { ok: true, title: updated[0].title ?? input.id };
+  if (updated.length === 1) return { ok: true, title: updated[0].title ?? input.id, plan };
   const [existing] = await db<{ human_status: string | null; human_by: string | null }[]>`
     SELECT human_status, human_by FROM calls WHERE id = ${input.id}`;
   if (!existing) return { ok: false, reason: "That call is no longer in the ledger." };
-  return { ok: false, reason: `Already decided (${existing.human_status}) by ${existing.human_by}. Nothing changed.` };
+  return {
+    ok: false,
+    reason: existing.human_status
+      ? `It was changed meanwhile to ${existing.human_status} by ${existing.human_by}. Nothing saved; reload and try again.`
+      : "Its decision was cleared meanwhile. Nothing saved; reload and try again.",
+  };
 }
 
 // ------------------------------------------------------------------------------- runs

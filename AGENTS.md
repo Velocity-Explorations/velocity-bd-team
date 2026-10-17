@@ -22,7 +22,7 @@ that share one SQLite ledger database.
 | corpus/ | Past-submission corpus: Drive sync, text extraction, chunking, embeddings. |
 | drafting/ | Proposal briefs and response drafts built from reviewed calls and the corpus. |
 | dashboard/ | Next.js triage dashboard reading the ledger directly (docs/DASHBOARD.md). Its own package.json; run npm commands inside dashboard/. |
-| slack/ | `alerts.py` (failure alerts), `sink.py` (cards, run summary, reaction and note collection). |
+| slack/ | `alerts.py` (failure alerts), `sink.py` (cards, run summary, thread notes, and editing cards to show decisions made on the dashboard). |
 | scripts/ | PowerShell helpers, including the Task Scheduler registration script. |
 | docs/ | OWNERS.md, STATUS.md, LEDGER_SCHEMA.md, RUNBOOK.md, DASHBOARD.md, plans/. |
 | tests/ | pytest suite. Every phase adds tests before code. |

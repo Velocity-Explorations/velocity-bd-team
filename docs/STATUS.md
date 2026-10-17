@@ -15,12 +15,13 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   filter, review, digest) and writes data/logs/run_*.log. Scheduled weekly (Monday 06:00) via
   scripts/install-schedule.ps1 as of 2026-10-16. Failure alerts go to Slack once SLACK_CHANNEL_ID
   is set; until then they are log warnings.
-- Phase 8 (Slack delivery and feedback): cards and a summary per run, reactions and `note:` replies
-  polled into the ledger (`run.py --feedback-only`, daily task), decisions fed to the reviewer.
-  Live on 2026-10-16.
-- Phase 9 (dashboard): Next.js 16.4 app in dashboard/, run locally with `npm run dev`. Review
-  queue with Pursue / Not relevant / Submitted / Dismiss writing the same columns as Slack, plus
-  all calls, runs and proposals. Not deployed anywhere yet; hosting is undecided.
+- Phase 8 (Slack delivery and feedback): cards and a summary per run; thread replies polled into
+  notes and cards edited to show decisions (`run.py --feedback-only`, daily task). Live on
+  2026-10-16. Since 2026-10-17 reactions are not read: decisions are made on the dashboard.
+- Phase 9 (dashboard): Next.js 16.4 app in dashboard/, run locally with `npm run dev`. The only
+  place decisions are made: review queue buttons, plus a change control on all calls. Runs and
+  proposals pages too. Not deployed anywhere yet; hosting is undecided, so for now only David
+  can decide.
 
 - Phase 2 (Vulcan SOF login): working as of 2026-10-16. Username, password, then the emailed
   code read over Gmail IMAP (VELOCITY_GMAIL_APP_USERNAME + VELOCITY_GMAIL_APP_PASSWORD; gog CLI

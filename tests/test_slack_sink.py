@@ -24,10 +24,23 @@ class FakeClient:
             return {"ok": True, "ts": f"17000.{len(self.calls):04d}", "channel": params["channel"]}
         return {"ok": True}
 
+    def methods(self) -> list[str]:
+        return [m for m, _, _ in self.calls]
+
+    def params_of(self, method: str) -> list[dict]:
+        return [p for m, p, _ in self.calls if m == method]
+
 
 ROW = {"id": "vulcan-1", "title": "AI <Scribe>", "url": "https://vulcan-sof.com/x", "ai_verdict": "yes",
        "ai_reasoning": "fits", "due_date": "01 NOV 2026", "type": "OTA Prototype", "match_tier": "tight", "portal": "Vulcan SOF"}
 
+
+@pytest.fixture(autouse=True)
+def no_dashboard_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sink, "dashboard_url", lambda: "")
+
+
+# ------------------------------------------------------------------------- cards
 
 def test_card_blocks_and_text() -> None:
     blocks = sink.card_blocks(ROW)
@@ -39,6 +52,26 @@ def test_card_blocks_and_text() -> None:
     assert json.dumps(blocks)   # serialisable
     text = sink.card_text(ROW)
     assert text.startswith("[YES] AI <Scribe>") and "id: vulcan-1" in text
+
+
+def test_card_links_to_the_dashboard_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sink, "dashboard_url", lambda: "https://bd.example.invalid")
+    context = sink.card_blocks(ROW)[-1]["elements"][0]["text"]
+    assert "<https://bd.example.invalid|Decide on the dashboard>" in context
+
+
+def test_render_card_shows_the_decision_first() -> None:
+    decided = {**ROW, "human_status": "not_relevant", "human_by": "David Wood", "human_at": "2026-10-17T10:32:57Z"}
+    blocks = sink.render_card(decided)
+    head = blocks[0]
+    assert head["block_id"] == "decision:not_relevant:2026-10-17T10:32:57Z"
+    text = head["text"]["text"]
+    assert "*Decision: Not relevant*" in text and "by David Wood" in text
+    assert "<!date^1792233177^{date_short_pretty} at {time}|2026-10-17 10:32 UTC>" in text
+    assert blocks[1:] == sink.card_blocks(decided)
+    assert sink.render_card(ROW) == sink.card_blocks(ROW)   # undecided: no decision block
+    legacy = {**ROW, "human_status": "pursue", "human_by": "U08V7ULPH1N", "human_at": "2026-10-16T12:15:17Z"}
+    assert "by <@U08V7ULPH1N>" in sink.render_card(legacy)[0]["text"]["text"]
 
 
 def test_post_call_sets_slack_columns(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -62,124 +95,121 @@ def test_post_call_failure_leaves_row_untouched(ledger_db: str, monkeypatch: pyt
     assert lq.get_call("vulcan-2")["slack_ts"] is None   # type: ignore[index]
 
 
-def test_summary_text() -> None:
-    text = sink.summary_text({"portal": "Vulcan SOF", "scanned": 60, "new": 3, "yes": 1, "maybe": 2, "elapsed": 171.4})
+def test_summary_points_to_the_dashboard(monkeypatch: pytest.MonkeyPatch) -> None:
+    summary = {"portal": "Vulcan SOF", "scanned": 60, "new": 3, "yes": 1, "maybe": 2, "elapsed": 171.4}
+    text = sink.summary_text(summary)
     assert text.startswith("*Vulcan SOF scan*: 60 calls scanned, 3 new (1 yes, 2 maybe), 171s.")
-    assert "note:" in text
+    assert "Decide on the dashboard" in text and "thread" in text and "React" not in text
+    monkeypatch.setattr(sink, "dashboard_url", lambda: "https://bd.example.invalid")
+    assert "<https://bd.example.invalid|the dashboard>" in sink.summary_text(summary)
 
 
-def test_status_from_reactions_priority() -> None:
-    assert sink.status_from_reactions([{"name": "+1", "users": ["U1"]}]) == ("pursue", "U1")
-    assert sink.status_from_reactions([{"name": "+1", "users": ["U1"]}, {"name": "x", "users": ["U2"]}]) == ("dismissed", "U2")
-    assert sink.status_from_reactions([{"name": "thumbsdown", "users": ["U3"]}, {"name": "white_check_mark", "users": ["U4"]}]) == ("submitted", "U4")
-    assert sink.status_from_reactions([{"name": "eyes", "users": ["U1"]}]) is None
-    assert sink.status_from_reactions([]) is None
+# ---------------------------------------------------------------------- feedback
 
-
-def _seed_posted(call_id: str, title: str) -> None:
+def _seed_posted(call_id: str, title: str, status: str | None = None, by: str | None = None) -> None:
     run = lq.start_run("Vulcan SOF")
     lq.upsert_call({"id": call_id, "portal": "Vulcan SOF", "title": title}, run)
     lq.set_review(call_id, "yes", "r")
     lq.set_slack(call_id, "C123", f"{call_id}.ts")
+    if status:
+        lq.set_human(call_id, status, by or "David Wood", "2026-10-17T10:00:00Z")
 
 
-def test_collect_feedback_reaction_note_and_dismiss(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def _thread(ts: str, *replies: dict, blocks: list | None = None) -> dict:
+    """conversations.replies payload: the card itself first, then the replies."""
+    return {"ok": True, "messages": [{"ts": ts, "bot_id": "B1", "blocks": blocks or []}, *replies]}
+
+
+def test_reactions_are_not_read_and_replies_become_notes(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
     _seed_posted("vulcan-a", "A")
-    _seed_posted("vulcan-b", "B")
-    _seed_posted("vulcan-c", "C")
-    client = FakeClient({
-        "reactions.get": [
-            {"ok": True, "message": {"reactions": [{"name": "-1", "users": ["UDAVID"]}]}},
-            {"ok": True, "message": {"reactions": [{"name": "x", "users": ["UDAVID"]}]}},
-            {"ok": True, "message": {"reactions": []}},
-        ],
-        "conversations.replies": [
-            {"ok": True, "messages": [
-                {"ts": "vulcan-a.ts", "text": "card"},
-                {"ts": "1700000001.000100", "user": "UDAVID", "text": "Note: hardware-heavy, not us"},
-                {"ts": "1700000002.000100", "user": "UOTHER", "text": "Just to note, this one seems hardware heavy"},
-                {"ts": "1700000003.000100", "user": "UBOT", "bot_id": "B1", "text": "bot echo, ignored"},
-                {"ts": "1700000004.000100", "user": "USYS", "subtype": "channel_join", "text": "joined"},
-            ]},
-            {"ok": True, "messages": [{"ts": "vulcan-b.ts", "text": "card"}]},
-            {"ok": True, "messages": [{"ts": "vulcan-c.ts", "text": "card"}]},
-        ],
-    })
-    sleeps: list[float] = []
-    changes = sink.collect_feedback(client, sleep=sleeps.append)
-    assert [c["id"] for c in changes] == ["vulcan-a", "vulcan-b"]
+    client = FakeClient({"conversations.replies": [_thread(
+        "vulcan-a.ts",
+        {"ts": "1700000001.000100", "user": "UDAVID", "text": "Note: hardware-heavy, not us"},
+        {"ts": "1700000002.000100", "user": "UOTHER", "text": "Just to note, this one seems hardware heavy"},
+        {"ts": "1700000003.000100", "user": "UBOT", "bot_id": "B1", "text": "bot echo, ignored"},
+        {"ts": "1700000004.000100", "user": "USYS", "subtype": "channel_join", "text": "joined"},
+    )]})
+    changes = sink.collect_feedback(client, sleep=lambda s: None)
 
+    assert "reactions.get" not in client.methods()
     a = lq.get_call("vulcan-a")
-    assert a and a["human_status"] == "not_relevant" and a["human_by"] == "UDAVID" and a["human_at"]
+    assert a and a["human_status"] is None
     assert a["human_notes"] == (
         "[2023-11-14T22:13:21Z UDAVID] hardware-heavy, not us"
         + "\n[2023-11-14T22:13:22Z UOTHER] Just to note, this one seems hardware heavy"
     )
-    b = lq.get_call("vulcan-b")
-    assert b and b["human_status"] == "dismissed"
-    assert ("chat.delete", {"channel": "C123", "ts": "vulcan-b.ts"}, True) in client.calls
-    c = lq.get_call("vulcan-c")
-    assert c and c["human_status"] is None
-    assert [m for m, _, _ in client.calls].count("chat.delete") == 1
-    assert all(s == sink.PAUSE_S for s in sleeps) and len(sleeps) >= 6
-    assert lq.pending_feedback()[0]["id"] == "vulcan-c"
+    assert changes == [{
+        "id": "vulcan-a", "title": "A", "card_updated": False,
+        "notes": ["hardware-heavy, not us", "Just to note, this one seems hardware heavy"],
+    }]
+    assert "chat.update" not in client.methods()   # undecided card already matches
 
 
-def test_collect_feedback_does_not_duplicate_notes(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_card_is_edited_once_to_show_a_dashboard_decision(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
+    _seed_posted("vulcan-b", "B", status="not_relevant")
+    client = FakeClient({"conversations.replies": [_thread("vulcan-b.ts")]})
+    changes = sink.collect_feedback(client, sleep=lambda s: None)
+
+    updates = client.params_of("chat.update")
+    assert len(updates) == 1 and updates[0]["channel"] == "C123" and updates[0]["ts"] == "vulcan-b.ts"
+    assert updates[0]["blocks"][0]["block_id"] == "decision:not_relevant:2026-10-17T10:00:00Z"
+    assert updates[0]["text"].startswith("Decision: Not relevant by David Wood")
+    assert changes == [{"id": "vulcan-b", "title": "B", "notes": [], "card_updated": True}]
+
+    again = FakeClient({"conversations.replies": [_thread("vulcan-b.ts", blocks=updates[0]["blocks"])]})
+    assert sink.collect_feedback(again, sleep=lambda s: None) == []
+    assert "chat.update" not in again.methods()
+
+
+def test_dismissed_on_the_dashboard_is_shown_not_deleted(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
+    _seed_posted("vulcan-c", "C", status="dismissed")
+    client = FakeClient({"conversations.replies": [_thread("vulcan-c.ts")]})
+    sink.collect_feedback(client, sleep=lambda s: None)
+    assert "chat.update" in client.methods() and "chat.delete" not in client.methods()
+    assert "Decision: Dismissed" in client.params_of("chat.update")[0]["blocks"][0]["text"]["text"]
+
+
+def test_a_cleared_decision_is_removed_from_the_card(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
     _seed_posted("vulcan-d", "D")
-    replies = {"ok": True, "messages": [{"ts": "vulcan-d.ts"}, {"ts": "1700000001.5", "user": "U1", "text": "note: keep an eye on this"}]}
-    client = FakeClient({"reactions.get": [{"ok": True, "message": {"reactions": []}}] * 2,
-                         "conversations.replies": [replies, replies]})
+    stale = sink.render_card({**lq.get_call("vulcan-d"), "human_status": "pursue", "human_by": "David Wood",   # type: ignore[dict-item]
+                              "human_at": "2026-10-17T09:00:00Z"})
+    client = FakeClient({"conversations.replies": [_thread("vulcan-d.ts", blocks=stale)]})
     sink.collect_feedback(client, sleep=lambda s: None)
-    sink.collect_feedback(client, sleep=lambda s: None)
-    notes = lq.get_call("vulcan-d")["human_notes"]   # type: ignore[index]
-    assert notes.count("keep an eye on this") == 1
+    updates = client.params_of("chat.update")
+    assert len(updates) == 1
+    assert not any(str(b.get("block_id", "")).startswith("decision:") for b in updates[0]["blocks"])
 
 
-def test_collect_feedback_survives_slack_failures(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cards_deleted_by_the_old_x_reaction_are_skipped(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
-    _seed_posted("vulcan-e", "E")
-    client = FakeClient({"reactions.get": [None], "conversations.replies": [None]})
-    assert sink.collect_feedback(client, sleep=lambda s: None) == []
-    assert lq.get_call("vulcan-e")["human_status"] is None   # type: ignore[index]
-
-
-def test_client_without_token_skips(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = sink.SlackClient(token="")
-    assert client.call("chat.postMessage", {"channel": "C1", "text": "x"}) is None
-
-
-def test_decided_cards_still_collect_notes_and_late_x(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
-    _seed_posted("vulcan-p", "P")
-    _seed_posted("vulcan-q", "Q")
-    lq.set_human("vulcan-p", "not_relevant", "UDAVID")   # decided earlier, note arrives later
-    lq.set_human("vulcan-q", "pursue", "UDAVID")         # decided earlier, X arrives later
-    client = FakeClient({
-        "reactions.get": [
-            {"ok": True, "message": {"reactions": [{"name": "-1", "users": ["UDAVID"]}, {"name": "+1", "users": ["UOTHER"]}]}},
-            {"ok": True, "message": {"reactions": [{"name": "+1", "users": ["UDAVID"]}, {"name": "x", "users": ["UDAVID"]}]}},
-        ],
-        "conversations.replies": [
-            {"ok": True, "messages": [{"ts": "vulcan-p.ts"}, {"ts": "1700000009.1", "user": "UDAVID", "text": "note: hardware-heavy, not us"}]},
-            {"ok": True, "messages": [{"ts": "vulcan-q.ts"}]},
-        ],
-    })
-    changes = sink.collect_feedback(client, sleep=lambda s: None)
-    p = lq.get_call("vulcan-p")
-    assert p and p["human_status"] == "not_relevant" and "hardware-heavy, not us" in p["human_notes"]
-    q = lq.get_call("vulcan-q")
-    assert q and q["human_status"] == "dismissed"
-    assert ("chat.delete", {"channel": "C123", "ts": "vulcan-q.ts"}, True) in client.calls
-    assert sorted(c["id"] for c in changes) == ["vulcan-p", "vulcan-q"]
-
-
-def test_dismissed_cards_are_not_polled(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
-    _seed_posted("vulcan-z", "Z")
-    lq.set_human("vulcan-z", "dismissed", "UDAVID")
+    _seed_posted("vulcan-e", "E", status="dismissed", by="U08V7ULPH1N")
     client = FakeClient()
     assert sink.collect_feedback(client, sleep=lambda s: None) == []
     assert client.calls == []
+
+
+def test_notes_are_not_duplicated_across_polls(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
+    _seed_posted("vulcan-f", "F")
+    reply = {"ts": "1700000001.5", "user": "U1", "text": "note: keep an eye on this"}
+    client = FakeClient({"conversations.replies": [_thread("vulcan-f.ts", reply), _thread("vulcan-f.ts", reply)]})
+    sink.collect_feedback(client, sleep=lambda s: None)
+    sink.collect_feedback(client, sleep=lambda s: None)
+    assert lq.get_call("vulcan-f")["human_notes"].count("keep an eye on this") == 1   # type: ignore[index]
+
+
+def test_an_unreadable_thread_changes_nothing(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
+    _seed_posted("vulcan-g", "G", status="pursue")
+    client = FakeClient({"conversations.replies": [None]})
+    assert sink.collect_feedback(client, sleep=lambda s: None) == []
+    assert client.methods() == ["conversations.replies"]   # no blind chat.update
+
+
+def test_client_without_token_skips() -> None:
+    client = sink.SlackClient(token="")
+    assert client.call("chat.postMessage", {"channel": "C1", "text": "x"}) is None

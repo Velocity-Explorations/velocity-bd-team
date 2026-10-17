@@ -370,6 +370,19 @@ details p {
   font-size: 0.88rem;
 }
 
+details.change form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+  min-width: 11rem;
+}
+
+details.change input[type="text"],
+details.change select {
+  font-size: 0.85rem;
+}
+
 ul.notes {
   margin: 0;
   padding: 0;

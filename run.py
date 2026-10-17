@@ -7,7 +7,7 @@
     python run.py --no-review              # kept rows get verdict "maybe", reasoning "LLM review disabled"
     python run.py --limit 5                # cap scraped and reviewed rows
     python run.py --fetch-timeout 10       # override every portal's fetch budget (testing)
-    python run.py --feedback-only          # pull Slack reactions and notes into the ledger, nothing else
+    python run.py --feedback-only          # Slack thread notes in, decisions out to the cards, nothing else
     python run.py --deliver-run 12         # re-post run 12's cards after a Slack failure
 
 A lock file (data/pipeline.lock) stops two pipelines running at once. The fetch stage runs
@@ -227,7 +227,7 @@ def redeliver(run_id: int) -> int:
 
 
 def feedback_pass(dry_run: bool) -> list[dict[str, Any]]:
-    """Pull reactions and notes from Slack into the ledger. Skipped in dry-run (no Slack calls)."""
+    """Pull Slack thread notes into the ledger and edit cards to show decisions. Skipped in dry-run."""
     if dry_run:
         log.info("FEEDBACK: skipped (--dry-run makes no Slack calls)")
         return []
@@ -237,7 +237,7 @@ def feedback_pass(dry_run: bool) -> list[dict[str, Any]]:
     changes = collect_feedback()
     log.info("FEEDBACK: %d change(s) (%.1fs)", len(changes), time.time() - t0)
     for c in changes:
-        print(f"  feedback: {c['id']} | {c['title'][:60]} | status={c['status']} by={c['by']} notes={c['notes']}")
+        print(f"  feedback: {c['id']} | {c['title'][:60]} | notes={len(c['notes'])} card_updated={'yes' if c['card_updated'] else 'no'}")
     return changes
 
 
@@ -333,7 +333,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--no-review", action="store_true", help="skip the LLM; kept rows become 'maybe'")
     parser.add_argument("--limit", type=int, help="cap scraped and reviewed rows")
     parser.add_argument("--fetch-timeout", type=int, help="override the per-portal fetch timeout in seconds")
-    parser.add_argument("--feedback-only", action="store_true", help="only pull Slack reactions and notes into the ledger")
+    parser.add_argument("--feedback-only", action="store_true", help="only sync Slack: thread notes in, decisions out to the cards")
     parser.add_argument("--debug", action="store_true", help="DEBUG logging (includes the first review prompt)")
     parser.add_argument("--deliver-run", type=int, metavar="N", help="re-post run N's new calls that never reached Slack, then exit")
     return parser.parse_args(argv)

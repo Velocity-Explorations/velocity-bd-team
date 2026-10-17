@@ -1,13 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { decide } from "../actions";
 import { Shell } from "@/components/Shell";
-import { Badge, TitleLink } from "@/components/bits";
+import { Badge, Flash, TitleLink } from "@/components/bits";
 import { displayPerson } from "@/lib/people";
 import { formatTime } from "@/lib/format";
 import { listCalls, portals, type CallFilters } from "@/lib/queries";
 import { displayTimeZone } from "@/lib/settings";
-import { firstParam, isClosed, parseNoteLine } from "@/lib/text";
-import { FILTER_RESULTS, HUMAN_STATUSES, pickAllowed, VERDICTS } from "@/lib/values";
+import { buildHref, firstParam, isClosed, parseNoteLine } from "@/lib/text";
+import { DECISIONS, FILTER_RESULTS, HUMAN_STATUSES, isDecision, pickAllowed, STATUS_LABELS, VERDICTS } from "@/lib/values";
 import { allowlist } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,13 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
   const tz = displayTimeZone();
   const users = allowlist();
   const filtered = Object.values(filters).some(Boolean);
+  const returnTo = buildHref("/calls", {
+    q: filters.q,
+    portal: filters.portal,
+    filter_result: filters.filterResult,
+    verdict: filters.verdict,
+    status: filters.status,
+  });
 
   return (
     <Shell current="calls">
@@ -45,6 +53,8 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
           </p>
         </div>
       </div>
+
+      <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} />
 
       <form className="filters" action="/calls">
         <label>
@@ -159,6 +169,26 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                           <span className="when">{formatTime(r.human_at, tz)}</span>
                         </div>
                       ) : null}
+                      <details className="change">
+                        <summary>{r.human_status ? "change" : "decide"}</summary>
+                        <form action={decide}>
+                          <input type="hidden" name="id" value={r.id} />
+                          <input type="hidden" name="expected" value={isDecision(r.human_status) ? r.human_status : ""} />
+                          <input type="hidden" name="return_to" value={returnTo} />
+                          <select name="status" defaultValue={isDecision(r.human_status) ? r.human_status : ""} required aria-label={`Decision on ${r.title ?? r.id}`}>
+                            <option value="" disabled>
+                              Choose
+                            </option>
+                            {DECISIONS.map((d) => (
+                              <option key={d.value} value={d.value}>
+                                {STATUS_LABELS[d.value]}
+                              </option>
+                            ))}
+                          </select>
+                          <input type="text" name="note" maxLength={2000} placeholder="Note (optional)" aria-label={`Note on ${r.title ?? r.id}`} />
+                          <button type="submit">Save</button>
+                        </form>
+                      </details>
                     </td>
                     <td>
                       {notes.length ? (

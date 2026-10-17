@@ -1,15 +1,15 @@
-"""Slack delivery of new calls and collection of the team's reactions as feedback.
+"""Slack informs; the dashboard decides (docs/DASHBOARD.md).
 
     ts = post_call(row)                  # one Block Kit card per new call, then set_slack()
-    post_run_summary(summary)            # one line per run
-    changes = collect_feedback()         # reactions and "note:" replies into the ledger
+    post_run_summary(summary)            # one line per run, pointing to the dashboard
+    changes = collect_feedback()         # thread replies into notes; cards show decisions
 
-Reactions on a card:  +1 -> pursue, -1 -> not_relevant, white_check_mark -> submitted,
-x -> dismissed (and the card is deleted). Priority when several are present: x, then
-white_check_mark, then -1, then +1. Every human reply in a card's thread is appended to
-the call's human_notes (a leading "note:" is stripped); the thread exists only for that
-call, so all of it is context. Cards already decided are still polled (the last 50): their notes
-are collected, and an X placed later still dismisses; other reactions no longer change them.
+Reactions on cards are not read: decisions are recorded on the dashboard. Every human reply
+in a card's thread is appended to the call's human_notes (a leading "note:" is stripped);
+the thread exists only for that call, so all of it is context. Each poll also edits any card
+whose decision differs from the ledger, so the channel shows what was decided, by whom and
+when. Undecided cards and the 50 most recently decided ones are polled. Cards the old
+X-reaction flow deleted (dismissed by a Slack user id) are skipped.
 
 Every Slack call has a 15 s timeout, honours Retry-After on 429, logs failures and never
 raises into the pipeline. The token is never logged.
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -28,7 +29,7 @@ from typing import Any
 
 from config import get
 from ledger.db import now_iso
-from ledger.queries import append_note, get_call, pending_feedback, recent_decisions, set_human, set_slack
+from ledger.queries import append_note, get_call, pending_feedback, recent_decisions, set_slack
 
 log = logging.getLogger("slack.sink")
 
@@ -36,20 +37,19 @@ API = "https://slack.com/api/"
 TIMEOUT_S = 15
 PAUSE_S = 0.3
 MAX_RETRY_AFTER_S = 60
-RECENT_DECIDED_LIMIT = 50   # decided cards still polled for late notes and a later X
+RECENT_DECIDED_LIMIT = 50   # decided cards still polled for late notes and decision changes
 
-# reaction name -> human_status, in priority order (first match wins)
-REACTION_STATUS: list[tuple[tuple[str, ...], str]] = [
-    (("x",), "dismissed"),
-    (("white_check_mark",), "submitted"),
-    (("-1", "thumbsdown"), "not_relevant"),
-    (("+1", "thumbsup"), "pursue"),
-]
 NOTE_PREFIX = "note:"
 BADGE = {"yes": "\U0001F7E2 yes", "maybe": "\U0001F7E1 maybe"}   # green and yellow circles
-SUMMARY_HINT = (
-    "React \U0001F44D \U0001F44E ✅ ❌ on any card; reply 'note: ...' in its thread to explain."
-)
+# human_status -> (emoji, label) for the decision line on a card
+DECISION_LABELS = {
+    "pursue": ("\U0001F44D", "Pursue"),
+    "not_relevant": ("\U0001F44E", "Not relevant"),
+    "submitted": ("✅", "Submitted"),
+    "dismissed": ("❌", "Dismissed"),
+}
+DECISION_BLOCK_PREFIX = "decision:"
+SLACK_USER_ID = re.compile(r"^[UW][A-Z0-9]{6,}$")
 
 
 class SlackClient:
@@ -100,11 +100,19 @@ def channel_id() -> str:
 
 # -------------------------------------------------------------------------- cards
 
+def dashboard_url() -> str:
+    """Where the dashboard is served (DASHBOARD_URL), or "" when it is not hosted yet."""
+    return (get("DASHBOARD_URL") or "").strip().rstrip("/")
+
+
 def card_blocks(row: dict[str, Any]) -> list[dict[str, Any]]:
     verdict = (row.get("ai_verdict") or "maybe").lower()
     title = (row.get("title") or "(untitled)").replace("<", "(").replace(">", ")")
     url = row.get("url") or ""
     header = f"{BADGE.get(verdict, verdict)}  <{url}|{title}>" if url else f"{BADGE.get(verdict, verdict)}  {title}"
+    context = f"id: `{row.get('id')}`  |  {row.get('portal') or ''}"
+    if dashboard_url():
+        context += f"  |  <{dashboard_url()}|Decide on the dashboard>"
     return [
         {"type": "section", "text": {"type": "mrkdwn", "text": header}},
         {"type": "section", "fields": [
@@ -113,8 +121,54 @@ def card_blocks(row: dict[str, Any]) -> list[dict[str, Any]]:
             {"type": "mrkdwn", "text": f"*Match tier*\n{row.get('match_tier') or 'n/a'}"},
         ]},
         {"type": "section", "text": {"type": "mrkdwn", "text": (row.get("ai_reasoning") or "(no reasoning)")[:2900]}},
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": f"id: `{row.get('id')}`  |  {row.get('portal') or ''}"}]},
+        {"type": "context", "elements": [{"type": "mrkdwn", "text": context}]},
     ]
+
+
+def decision_signature(row: dict[str, Any]) -> str | None:
+    """block_id of the decision line this card should carry, or None when undecided."""
+    status = row.get("human_status")
+    if not status:
+        return None
+    return f"{DECISION_BLOCK_PREFIX}{status}:{row.get('human_at') or ''}"[:255]
+
+
+def _who(by: str | None, slack: bool) -> str:
+    if not by:
+        return "someone"
+    return f"<@{by}>" if slack and SLACK_USER_ID.match(by) else by
+
+
+def _when(iso: str | None, slack: bool) -> str:
+    try:
+        moment = datetime.fromisoformat((iso or "").replace("Z", "+00:00"))
+    except ValueError:
+        return iso or ""
+    plain = moment.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    # Slack renders this in each reader's own time zone; the text after | is the fallback.
+    return f"<!date^{int(moment.timestamp())}^{{date_short_pretty}} at {{time}}|{plain}>" if slack else plain
+
+
+def decision_text(row: dict[str, Any], slack: bool = True) -> str:
+    status = row.get("human_status") or ""
+    emoji, label = DECISION_LABELS.get(status, ("", status))
+    by, at = _who(row.get("human_by"), slack), _when(row.get("human_at"), slack)
+    return f"{emoji} *Decision: {label}* by {by}, {at}".strip() if slack else f"Decision: {label} by {by}, {at}"
+
+
+def render_card(row: dict[str, Any]) -> list[dict[str, Any]]:
+    """The card as it should look now: the decision line first when there is one."""
+    signature = decision_signature(row)
+    if signature is None:
+        return card_blocks(row)
+    head = {"type": "section", "block_id": signature, "text": {"type": "mrkdwn", "text": decision_text(row)}}
+    return [head, *card_blocks(row)]
+
+
+def card_fallback_text(row: dict[str, Any]) -> str:
+    """Notification text for a card; starts with the decision when there is one."""
+    text = card_text(row)
+    return f"{decision_text(row, slack=False)}\n{text}" if row.get("human_status") else text
 
 
 def card_text(row: dict[str, Any]) -> str:
@@ -137,8 +191,8 @@ def post_call(row: dict[str, Any], client: SlackClient | None = None) -> str | N
         return None
     payload = client.call("chat.postMessage", {
         "channel": channel,
-        "text": card_text(row),
-        "blocks": card_blocks(row),
+        "text": card_fallback_text(row),
+        "blocks": render_card(row),
         "unfurl_links": False,
     })
     if not payload:
@@ -150,10 +204,11 @@ def post_call(row: dict[str, Any], client: SlackClient | None = None) -> str | N
 
 
 def summary_text(summary: dict[str, Any]) -> str:
+    where = f"<{dashboard_url()}|the dashboard>" if dashboard_url() else "the dashboard"
     return (
         f"*{summary.get('portal', 'Pipeline')} scan*: {summary.get('scanned', 0)} calls scanned, "
         f"{summary.get('new', 0)} new ({summary.get('yes', 0)} yes, {summary.get('maybe', 0)} maybe), "
-        f"{summary.get('elapsed', 0):.0f}s. {SUMMARY_HINT}"
+        f"{summary.get('elapsed', 0):.0f}s. Decide on {where}; reply in a card's thread to add a note."
     )
 
 
@@ -169,17 +224,6 @@ def post_run_summary(summary: dict[str, Any], client: SlackClient | None = None)
 
 # ------------------------------------------------------------------------ feedback
 
-def status_from_reactions(reactions: list[dict[str, Any]]) -> tuple[str, str] | None:
-    """(human_status, user_id) for the highest-priority recognised reaction, else None."""
-    by_name = {r.get("name", ""): r for r in reactions if r.get("name")}
-    for names, status in REACTION_STATUS:
-        for name in names:
-            reaction = by_name.get(name)
-            if reaction and reaction.get("users"):
-                return status, str(reaction["users"][0])
-    return None
-
-
 def _slack_ts_to_iso(ts: str) -> str:
     try:
         return datetime.fromtimestamp(float(ts), tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -187,24 +231,27 @@ def _slack_ts_to_iso(ts: str) -> str:
         return now_iso()
 
 
+def _deleted_by_old_flow(row: dict[str, Any]) -> bool:
+    """Before 2026-10-17 an X reaction dismissed the call (human_by = Slack id) and deleted the card."""
+    return row.get("human_status") == "dismissed" and bool(SLACK_USER_ID.match(row.get("human_by") or ""))
+
+
 def collect_feedback(client: SlackClient | None = None, sleep: Callable[[float], None] = time.sleep) -> list[dict[str, Any]]:
-    """Poll reactions and thread notes for every card awaiting a decision. Never raises."""
+    """Collect thread notes and bring cards in line with the ledger's decisions. Never raises."""
     client = client or SlackClient()
     changes: list[dict[str, Any]] = []
     try:
-        pending = pending_feedback()
-        # Cards decided recently still get polled: notes often arrive after the reaction,
-        # and a later X should still dismiss. Only X can override an existing decision.
-        pending_ids = {r["id"] for r in pending}
+        undecided = pending_feedback()
+        seen = {r["id"] for r in undecided}
         decided = [r for r in recent_decisions(RECENT_DECIDED_LIMIT)
-                   if r.get("slack_ts") and r["id"] not in pending_ids and r.get("human_status") != "dismissed"]   # dismissed cards are deleted
+                   if r.get("slack_ts") and r["id"] not in seen and not _deleted_by_old_flow(r)]
     except Exception as exc:
         log.warning("collect_feedback: ledger read failed: %s: %s", type(exc).__name__, str(exc)[:200])
         return changes
-    log.info("Feedback: %d card(s) awaiting a decision, %d decided card(s) rechecked for notes", len(pending), len(decided))
-    for row, is_pending in [(r, True) for r in pending] + [(r, False) for r in decided]:
+    log.info("Feedback: %d undecided and %d decided card(s) checked for notes and card edits", len(undecided), len(decided))
+    for row in undecided + decided:
         try:
-            change = _collect_one(row, client, sleep, is_pending)
+            change = _collect_one(row, client, sleep)
         except Exception as exc:   # one bad card never stops the poll
             log.warning("Feedback for %s failed: %s: %s", row.get("id"), type(exc).__name__, str(exc)[:200])
             continue
@@ -213,40 +260,43 @@ def collect_feedback(client: SlackClient | None = None, sleep: Callable[[float],
     return changes
 
 
-def _collect_one(row: dict[str, Any], client: SlackClient, sleep: Callable[[float], None], pending: bool = True) -> dict[str, Any] | None:
+def _collect_one(row: dict[str, Any], client: SlackClient, sleep: Callable[[float], None]) -> dict[str, Any] | None:
     channel, ts = row.get("slack_channel") or channel_id(), row.get("slack_ts") or ""
-    change: dict[str, Any] = {"id": row["id"], "title": row.get("title") or "", "status": None, "by": None, "notes": []}
+    change: dict[str, Any] = {"id": row["id"], "title": row.get("title") or "", "notes": [], "card_updated": False}
 
-    reactions = client.call("reactions.get", {"channel": channel, "timestamp": ts, "full": "true"}, post=False)
+    thread = client.call("conversations.replies", {"channel": channel, "ts": ts, "limit": 100}, post=False)
     sleep(PAUSE_S)
-    if reactions:
-        decision = status_from_reactions((reactions.get("message") or {}).get("reactions") or [])
-        if decision and (pending or (decision[0] == "dismissed" and row.get("human_status") != "dismissed")):
-            status, user = decision
-            set_human(row["id"], status, user, now_iso())
-            change["status"], change["by"] = status, user
-            log.info("Feedback: %s -> %s by %s", row["id"], status, user)
+    if not thread:
+        return None   # card unreadable this time: change nothing, try again next poll
+    messages = thread.get("messages") or []
+    current = get_call(row["id"]) or row
 
-    replies = client.call("conversations.replies", {"channel": channel, "ts": ts, "limit": 100}, post=False)
-    sleep(PAUSE_S)
-    if replies:
-        existing = (get_call(row["id"]) or {}).get("human_notes") or ""
-        for message in replies.get("messages") or []:
-            if str(message.get("ts")) == ts:
-                continue   # the card itself
-            if message.get("bot_id") or message.get("subtype"):
-                continue   # the bot's own messages and join/edit system notices
-            text = (message.get("text") or "").strip()
-            note = text[len(NOTE_PREFIX):].strip() if text.lower().startswith(NOTE_PREFIX) else text
-            if not note or note in existing:
-                continue
-            existing = append_note(row["id"], note, by=str(message.get("user") or "?"), at=_slack_ts_to_iso(str(message.get("ts"))))
-            change["notes"].append(note)
-            log.info("Feedback: note on %s: %s", row["id"], note[:80])
+    existing = current.get("human_notes") or ""
+    for message in messages:
+        if str(message.get("ts")) == ts:
+            continue   # the card itself
+        if message.get("bot_id") or message.get("subtype"):
+            continue   # the bot's own messages and join/edit system notices
+        text = (message.get("text") or "").strip()
+        note = text[len(NOTE_PREFIX):].strip() if text.lower().startswith(NOTE_PREFIX) else text
+        if not note or note in existing:
+            continue
+        existing = append_note(row["id"], note, by=str(message.get("user") or "?"), at=_slack_ts_to_iso(str(message.get("ts"))))
+        change["notes"].append(note)
+        log.info("Feedback: note on %s: %s", row["id"], note[:80])
 
-    if change["status"] == "dismissed":
-        if client.call("chat.delete", {"channel": channel, "ts": ts}):
-            log.info("Deleted dismissed card %s", row["id"])
-        sleep(PAUSE_S)
+    card = next((m for m in messages if str(m.get("ts")) == ts), None)
+    if card is not None:
+        shown = next((str(b.get("block_id")) for b in card.get("blocks") or []
+                      if str(b.get("block_id") or "").startswith(DECISION_BLOCK_PREFIX)), None)
+        wanted = decision_signature(current)
+        if shown != wanted:
+            edited = client.call("chat.update", {
+                "channel": channel, "ts": ts, "text": card_fallback_text(current), "blocks": render_card(current),
+            })
+            sleep(PAUSE_S)
+            if edited:
+                change["card_updated"] = True
+                log.info("Card for %s now shows: %s", row["id"], current.get("human_status") or "no decision")
 
-    return change if (change["status"] or change["notes"]) else None
+    return change if (change["notes"] or change["card_updated"]) else None
