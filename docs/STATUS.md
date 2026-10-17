@@ -5,8 +5,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 ## Live
 
 - Ledger (Phase 0), migration 001_initial applied to the hosted Supabase Postgres on
-  2026-10-16. Tables: calls, proposals, runs, schema_migrations. `python -m ledger.migrate`
-  is a no-op until a new migration lands. Connect through the Session pooler URL (the
+  2026-10-16, and 002_change_requests on 2026-10-17. Tables: calls, change_requests,
+  proposals, runs, schema_migrations. `python -m ledger.migrate` is a no-op until a new
+  migration lands. Connect through the Session pooler URL (the
   direct URL is IPv6-only and unreachable from David's network).
 
 ## In progress
@@ -31,6 +32,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Portal assistant, step 1 (2026-10-17): read tools in assistant/ (explain, brief, deadlines,
   scraper health, weekly summary, portal profile, settings preview, tuning report), daily
   deadline reminders, the Monday summary and the scraper watch. No model connected yet.
+- Portal assistant, step 2 (2026-10-17): approvals. Propose tools (keyword change, re-review,
+  scan now, start a draft, fault report) record requests in change_requests (migration 002);
+  the dashboard's Requests page approves or rejects them; `run.py --apply-requests` carries
+  them out every 15 minutes. Drafts wait for the Writer; fault reports wait for a GitHub
+  remote. The reminder and summary jobs moved from `python -m assistant` to run.py.
 - Shared portal helpers (2026-10-17): browser, saved sessions, emailed sign-in codes and the
   keyword filter live in portals/shared/ for every adapter; Vulcan SOF keeps only its own
   login, scraping and keywords.yaml.

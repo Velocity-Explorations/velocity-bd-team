@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `001_initial.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `002_change_requests.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -89,7 +89,8 @@ Lifecycle of a row: portal adapter inserts it (`filter_result = 'pending'`); the
 sets `kept` or `rejected`; the Reviewer sets `ai_verdict` on kept rows; Slack delivery
 posts rows with verdict `yes` or `maybe` and records `slack_ts`; a person decides on the
 dashboard and `human_status` is set. Later runs refresh only the scraped
-fields and `last_seen_at`.
+fields and `last_seen_at`. An approved keyword change (see `change_requests`) filters every
+stored call of its portal again, so `filter_result` can change on old rows.
 
 ## Table: proposals
 
@@ -124,6 +125,45 @@ One row per past submission, keyed by the Drive folder name. Filled by the corpu
 
 Index: `(portal, outcome)`.
 
+## Table: change_requests
+
+The portal assistant's approval queue (docs/ASSISTANT.md, "Approvals"). A propose tool
+records what it wants changed and a preview of the effect; a person approves or rejects it
+on the dashboard; `run.py --apply-requests` carries out approved requests. Added by
+`002_change_requests.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | the number people see, as in "request #12" | database |
+| kind | TEXT, not null | `keyword_change`, `rereview`, `scan`, `draft`, `fault_report` | propose tool (`create_request`) |
+| portal | TEXT | portal slug the request concerns, for example `vulcan_sof` | propose tool |
+| call_id | TEXT | `calls.id`, for `rereview` and `draft` | propose tool |
+| summary | TEXT, not null | one line in words, for example `Vulcan SOF keywords: add broad keyword 'digital twin'` | propose tool |
+| reason | TEXT | why the person asked, in their words | propose tool |
+| payload | TEXT JSON | what to do: `{"changes": {...}}` for a keyword change, with the lists `add_broad`, `remove_broad`, `add_tight`, `remove_tight`, `add_block`, `remove_block`; `{"context": "..."}` for a re-review; `{"notes": "..."}` for a draft; `{"title": "...", "body": "..."}` for a fault report; `{}` for a scan | propose tool |
+| preview | TEXT JSON | object with at least `text`: what approving would do, shown on the dashboard | propose tool |
+| status | TEXT, not null, default `proposed` | `proposed`, `approved`, `rejected`, `applying`, `applied`, `failed` | see the lifecycle below |
+| requested_by | TEXT, not null | who asked: a person's name, or `command line`; set by the code running the tool, never by the model | propose tool |
+| requested_at | TEXT timestamp, not null | | propose tool |
+| decided_by | TEXT | the name of the person who approved or rejected it | the dashboard's Requests page (`decide_request` from Python) |
+| decided_at | TEXT timestamp | | same |
+| decision_note | TEXT | optional note given with the decision | same |
+| applied_at | TEXT timestamp | when it was carried out | `run.py --apply-requests` (`finish_request`) |
+| result | TEXT | what happened, or `Waiting: ...` while an approved request cannot run yet | `run.py --apply-requests`; the Writer, for drafts |
+| updated_at | TEXT timestamp, not null | touched by every write | every writer |
+
+Index: `(status, id)`.
+
+Lifecycle of a row: a propose tool inserts it as `proposed`. A person approves it
+(`approved`) or rejects it (`rejected`) on the dashboard; that update is guarded on
+`status = 'proposed'`, so a request is decided once. `run.py --apply-requests` claims an
+approved row (`applying`, guarded on `status = 'approved'`), carries it out, and sets
+`applied` or `failed` with `result`. An approved request that cannot run yet (the scan
+machine is not on `main`, the repo has no GitHub remote) stays `approved`, and `result`
+says what it waits for. A row left `applying` by a job that stopped is marked `failed` on
+the next pass. Drafts stay `approved` for the Writer, which claims and finishes them the
+same way.
+
 ## Table: schema_migrations
 
 Bookkeeping for `ledger/migrate.py`. `version` is the migration filename, `applied_at`
@@ -135,7 +175,9 @@ the timestamp. Nothing else reads it.
 tables directly; no API exists or is planned.
 Treat the ledger as read-only from the dashboard except for the `human_*` columns on
 `calls`, which the dashboard sets with its decide action (the equivalent of `set_human`
-and `append_note`). Since 2026-10-17 the dashboard is the only place decisions are made;
+and `append_note`), and the decision columns of `change_requests` (`status` from
+`proposed` to `approved` or `rejected`, `decided_by`, `decided_at`, `decision_note`), which
+its Requests page sets (the equivalent of `decide_request`). Since 2026-10-17 the dashboard is the only place decisions are made;
 Slack reactions are no longer read. Use the `runs` table for health: the latest row per component tells you
 when it last ran and whether it finished.
 
@@ -158,12 +200,15 @@ ORDER BY first_seen_at DESC, id;
 ### Triage backlog
 
 Calls the Reviewer rated yes or maybe that nobody has decided on yet, soonest due first.
+A call that a later keyword change dropped keeps its verdict but leaves the backlog, which
+is why the query also asks for `filter_result = 'kept'`.
 
 ```sql
 SELECT id, portal, title, due_date, ai_verdict, posted_at
 FROM calls
 WHERE ai_verdict IN ('yes', 'maybe')
   AND human_status IS NULL
+  AND filter_result = 'kept'
 ORDER BY due_date, first_seen_at;
 ```
 

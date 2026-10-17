@@ -9,11 +9,20 @@
     python run.py --fetch-timeout 10       # override every portal's fetch budget (testing)
     python run.py --feedback-only          # Slack thread notes in, decisions out to the cards, nothing else
     python run.py --deliver-run 12         # re-post run 12's cards after a Slack failure
+    python run.py --wait-lock 30           # if another run holds the lock, wait up to 30 minutes for it
 
-A lock file (data/pipeline.lock) stops two pipelines running at once. The fetch stage runs
-in a worker thread under a hard timeout; on expiry the browser is force-closed and the run
-is recorded as skipped_timeout, and later stages still run on whatever was saved. Every run
-writes data/logs/run_YYYY-MM-DD_HHMM.log and a `runs` row.
+The portal assistant's scheduled jobs (docs/ASSISTANT.md) also run from here, because this
+is the one place that wires components together (AGENTS.md, hard rule 1):
+
+    python run.py --remind                 # Slack: calls marked Pursue and due within 14 days
+    python run.py --post-summary           # Slack: each portal's week and its scraper health
+    python run.py --apply-requests         # carry out change requests approved on the dashboard
+
+A lock file (data/pipeline.lock) stops two pipelines running at once; --apply-requests takes
+it too, and only when an approved request is ready. The fetch stage runs in a worker thread
+under a hard timeout; on expiry the browser is force-closed and the run is recorded as
+skipped_timeout, and later stages still run on whatever was saved. Every run writes
+data/logs/run_YYYY-MM-DD_HHMM.log and a `runs` row.
 """
 from __future__ import annotations
 
@@ -22,6 +31,7 @@ import json
 import logging
 import math
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -32,7 +42,19 @@ from pathlib import Path
 from typing import Any
 
 from ledger.db import dry_run_session
-from ledger.queries import calls_where, finish_run, get_run, new_calls, set_review, start_run
+from ledger.queries import (
+    calls_where,
+    claim_request,
+    finish_request,
+    finish_run,
+    get_call,
+    get_run,
+    list_requests,
+    new_calls,
+    note_request,
+    set_review,
+    start_run,
+)
 from portals import registry
 from portals.registry import Portal
 
@@ -46,6 +68,12 @@ NO_REVIEW_REASON = "LLM review disabled"
 VERDICT_ORDER = {"yes": 0, "maybe": 1}
 BAD_PAGES_MIN = 3          # alert when at least this many pages read badly...
 BAD_PAGES_SHARE = 0.10     # ...and at least this share of the scan
+LOCK_POLL_S = 15
+REMIND_DAYS = 14
+APPLY_KINDS = ("keyword_change", "rereview", "scan", "fault_report")   # drafts belong to the Writer
+SETTINGS_BRANCH = "main"
+GIT_TIMEOUT_S = 60
+ISSUE_TIMEOUT_S = 120
 
 log = logging.getLogger("pipeline")
 
@@ -71,13 +99,32 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
-def acquire_lock(path: Path | None = None) -> None:
+def acquire_lock(path: Path | None = None, wait_s: float = 0, poll_s: float = LOCK_POLL_S) -> None:
+    """Take the pipeline lock. While another live run holds it, wait up to wait_s, then raise LockHeld."""
     path = path or LOCK_FILE   # resolved at call time so tests can redirect it
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        age = time.time() - path.stat().st_mtime
+    deadline = time.time() + wait_s
+    while True:
         try:
-            holder = int(path.read_text(encoding="utf-8").split()[0])
+            _take_lock(path)
+            return
+        except LockHeld:
+            left = deadline - time.time()
+            if left <= 0:
+                raise
+            log.info("Lock held; waiting up to %.0f more seconds", left)
+            time.sleep(min(poll_s, left))
+
+
+def _take_lock(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        age: float | None = time.time() - path.stat().st_mtime
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:   # no lock, or its holder just released it
+        age, text = None, ""
+    if age is not None:
+        try:
+            holder = int(text.split()[0])
         except (ValueError, IndexError):
             holder = -1
         if age < STALE_LOCK_S and holder > 0 and _pid_alive(holder):
@@ -187,12 +234,19 @@ def run_review(portal: Portal, limit: int | None, no_review: bool) -> int:
             set_review(row["id"], "maybe", NO_REVIEW_REASON)
         return len(rows)
     from review.feedback import build_examples_block
-    from review.reviewer import AnthropicModel, review_calls
+    from review.reviewer import review_calls
 
     examples = build_examples_block()
     log.info("REVIEW: feedback examples block is %d chars", len(examples))
-    review_calls(rows, AnthropicModel(), feedback_examples_block=examples)
+    review_calls(rows, review_model(), feedback_examples_block=examples)
     return len(rows)
+
+
+def review_model() -> Any:
+    """The reviewer's model client. Tests replace this with a scripted one."""
+    from review.reviewer import AnthropicModel
+
+    return AnthropicModel()
 
 
 def deliver(portal: Portal, fresh: list[dict[str, Any]], counts: dict[str, int], elapsed: float, dry_run: bool) -> int:
@@ -285,6 +339,277 @@ def alert(text: str) -> None:
         log.warning("Alert failed: %s: %s", type(exc).__name__, str(exc)[:120])
 
 
+# ------------------------------------------------------------ assistant: scheduled posts
+
+def _console_logging() -> None:
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+
+
+def remind() -> int:
+    """Post the calls marked Pursue and due within REMIND_DAYS. Posts nothing when none are due."""
+    from assistant.tools import upcoming_deadlines
+    from slack.sink import post_text
+
+    _console_logging()
+    result = upcoming_deadlines(days=REMIND_DAYS)
+    if not result["calls"]:
+        print(f"No Pursue deadlines in the next {REMIND_DAYS} days; nothing to post.")
+        return 0
+    ts = post_text("*Deadline reminder*\n" + result["text"])
+    print(f"Posted {len(result['calls'])} reminder(s)" + ("" if ts else " (Slack did not accept the post; see the log)"))
+    return 0 if ts else 1
+
+
+def post_summary() -> int:
+    """Post each portal's weekly summary and scraper health as one message."""
+    from assistant.tools import scraper_health, weekly_summary
+    from slack.sink import post_text
+
+    _console_logging()
+    parts = [f"{weekly_summary(p.slug)['text']}\nScraper: {scraper_health(p.slug)['text']}" for p in registry.discover()]
+    if not parts:
+        print("No portals registered; nothing to post.")
+        return 0
+    ts = post_text("\n\n".join(parts))
+    print("Posted the weekly summary" + ("" if ts else " (Slack did not accept the post; see the log)"))
+    return 0 if ts else 1
+
+
+# ------------------------------------------------------- assistant: approved change requests
+# A propose tool records a request, a person approves it on the dashboard, and this carries
+# it out (docs/ASSISTANT.md, "Approvals"). An approved request that cannot run yet stays
+# approved with a "Waiting: ..." note and is tried again on the next pass.
+
+def today() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=GIT_TIMEOUT_S)
+
+
+def settings_waiting(path: Path) -> str | None:
+    """Why an approved settings change cannot be committed yet, or None when it can."""
+    if shutil.which("git") is None:
+        return "Waiting: git is not installed on the scan machine."
+    branch = git(path.parent, "rev-parse", "--abbrev-ref", "HEAD")
+    if branch.returncode != 0:
+        return f"Waiting: {path.name} is not in a git checkout."
+    name = branch.stdout.strip()
+    if name != SETTINGS_BRANCH:
+        return (f"Waiting: the scan machine is on branch {name}; approved settings are committed on "
+                f"{SETTINGS_BRANCH} only.")
+    if git(path.parent, "status", "--porcelain", "--", path.name).stdout.strip():
+        return f"Waiting: {path.name} has uncommitted edits on the scan machine; commit or discard them first."
+    return None
+
+
+def github_waiting() -> str | None:
+    """Why a fault report cannot be filed yet, or None when it can."""
+    remote = git(REPO_ROOT, "remote", "get-url", "origin")
+    if remote.returncode != 0 or "github.com" not in remote.stdout:
+        return "Waiting: this repo has no GitHub remote yet, so the issue cannot be filed."
+    if shutil.which("gh") is None:
+        return "Waiting: the GitHub command line tool (gh) is not installed on the scan machine."
+    return None
+
+
+def file_issue(title: str, body: str) -> str:
+    """File a GitHub issue in this repo with gh. Returns the issue's URL."""
+    done = subprocess.run(["gh", "issue", "create", "--title", title, "--body", body], cwd=REPO_ROOT,
+                          capture_output=True, text=True, timeout=ISSUE_TIMEOUT_S)
+    if done.returncode != 0:
+        raise RuntimeError(f"gh issue create failed: {(done.stderr or done.stdout).strip()[:200]}")
+    return done.stdout.strip().splitlines()[-1]
+
+
+def _payload(req: dict[str, Any]) -> dict[str, Any]:
+    try:
+        data = json.loads(req.get("payload") or "{}")
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def request_waiting(req: dict[str, Any]) -> str | None:
+    """Why an approved request cannot be carried out yet, or None when it can."""
+    if req["kind"] == "keyword_change":
+        try:
+            portal = registry.get(req["portal"] or "")
+        except KeyError:
+            return None   # carrying it out records the failure
+        return settings_waiting(portal.keywords) if portal.keywords else None
+    if req["kind"] == "fault_report":
+        return github_waiting()
+    return None
+
+
+def apply_keyword_change(req: dict[str, Any]) -> str:
+    """Edit and commit the portal's keywords file, filter its stored calls again, review the newly kept."""
+    from portals.shared.keyword_filter import CHANGE_KEYS, describe_changes, edit_keywords_text
+
+    portal = registry.get(req["portal"] or "")
+    path = portal.keywords
+    if path is None:
+        raise RuntimeError(f"{portal.name} has no keywords file.")
+    asked = _payload(req).get("changes") or {}
+    changes = {key: list(asked.get(key) or []) for key in CHANGE_KEYS}
+    raw = path.read_bytes().decode("utf-8")
+    crlf = "\r\n" in raw
+    before = raw.replace("\r\n", "\n")
+    after = edit_keywords_text(before, changes,
+                               note=f"added {today()} by request #{req['id']}, approved by {req['decided_by']}")
+    if after == before:
+        return f"Nothing to change: {path.name} already matches."
+    path.write_bytes((after.replace("\n", "\r\n") if crlf else after).encode("utf-8"))
+    by = f"(request #{req['id']}, approved by {req['decided_by']})"
+    subject = f"chore({portal.slug}): {describe_changes(changes)} {by}"
+    if len(subject) > 120:
+        subject = f"chore({portal.slug}): keyword changes {by}"
+    done = git(path.parent, "commit", "-q", "-m", subject, "--", path.name)
+    if done.returncode != 0:
+        path.write_bytes(raw.encode("utf-8"))   # leave the file as it was
+        raise RuntimeError(f"git commit failed: {(done.stderr or done.stdout).strip()[:200]}")
+    sha = git(path.parent, "rev-parse", "--short", "HEAD").stdout.strip()
+
+    stored = calls_where(portal=portal.name)
+    was = {r["id"]: r["filter_result"] for r in stored}
+    if stored:
+        portal.filter(stored)
+    now = {r["id"]: r["filter_result"] for r in calls_where(portal=portal.name)}
+    kept = sum(1 for cid, result in now.items() if result == "kept" and was.get(cid) != "kept")
+    dropped = sum(1 for cid, result in now.items() if result != "kept" and was.get(cid) == "kept")
+    reviewed = run_review(portal, None, no_review=False)
+    return (f"Committed {sha} to {SETTINGS_BRANCH}. Filtered {len(stored)} stored calls again: {kept} newly kept, "
+            f"{dropped} newly dropped" + (f"; reviewed {reviewed}." if reviewed else "."))
+
+
+def apply_rereview(req: dict[str, Any]) -> str:
+    """Ask the reviewer again about one call, with the team's context in the prompt."""
+    from review.feedback import build_examples_block
+    from review.reviewer import review_calls
+
+    row = get_call(req["call_id"] or "")
+    if row is None:
+        raise RuntimeError(f"No call with id '{req['call_id']}'.")
+    before = row.get("ai_verdict")
+    passed, dropped = review_calls([row], review_model(), feedback_examples_block=build_examples_block(),
+                                   extra_context=str(_payload(req).get("context") or ""))
+    result = (passed + dropped)[0]
+    if before and before != result.verdict:
+        change = f"changed from {before} to {result.verdict}"
+    elif before:
+        change = f"stayed {result.verdict}"
+    else:
+        change = f"said {result.verdict}"
+    return f"The AI review {change}: {result.reason}"
+
+
+def apply_scan(req: dict[str, Any], log_path: Path) -> tuple[str, bool]:
+    """One pipeline run for the portal, as `run.py --portal <slug>` would do it."""
+    portal = registry.get(req["portal"] or "")
+    feedback_pass(dry_run=False)
+    outcome = run_portal(portal, parse_args(["--portal", portal.slug]), log_path)
+    counts = outcome["counts"]
+    text = (f"Run #{outcome['run_id']} {outcome['status']}: fetched {counts.get('fetched', 0)}, filtered "
+            f"{counts.get('filtered', 0)}, reviewed {counts.get('reviewed', 0)}, {counts.get('new', 0)} new.")
+    run = get_run(outcome["run_id"]) or {}
+    if run.get("error"):
+        text += f" {run['error']}"
+    return text, outcome["status"] == "completed"
+
+
+def apply_fault_report(req: dict[str, Any]) -> str:
+    data = _payload(req)
+    body = f"{str(data.get('body') or '').rstrip()}\n\nApproved by {req['decided_by']} (request #{req['id']})."
+    return f"Filed {file_issue(str(data.get('title') or req['summary']), body)}"
+
+
+def carry_out(req: dict[str, Any], log_path: Path) -> tuple[str, bool]:
+    if req["kind"] == "keyword_change":
+        return apply_keyword_change(req), True
+    if req["kind"] == "rereview":
+        return apply_rereview(req), True
+    if req["kind"] == "scan":
+        return apply_scan(req, log_path)
+    if req["kind"] == "fault_report":
+        return apply_fault_report(req), True
+    raise RuntimeError(f"run.py does not carry out {req['kind']} requests.")
+
+
+def _failure_text(exc: BaseException) -> str:
+    if isinstance(exc, KeyError) and exc.args:
+        return str(exc.args[0])
+    if isinstance(exc, (RuntimeError, ValueError)):
+        return str(exc)
+    return f"{type(exc).__name__}: {exc}"[:500]
+
+
+def report_outcomes(outcomes: list[tuple[dict[str, Any], str, str]]) -> None:
+    if not outcomes:
+        return
+    lines = ["*Approved requests carried out*"]
+    for req, status, text in outcomes:
+        lines.append(f"- #{req['id']} {req['summary']} (approved by {req.get('decided_by') or 'someone'}): "
+                     f"{'done' if status == 'applied' else 'failed'}. {text}")
+    try:
+        from slack.sink import post_text
+
+        post_text("\n".join(lines))
+    except Exception as exc:   # the ledger already holds every outcome
+        log.warning("Slack post of request outcomes failed: %s: %s", type(exc).__name__, str(exc)[:120])
+
+
+def apply_requests(wait_s: float = 0) -> int:
+    """Carry out approved requests, oldest first. 0 when all went well or nothing was ready,
+    1 when one failed, 3 when another run holds the lock (they stay approved for next time)."""
+    approved = [r for r in list_requests("approved", limit=100, oldest_first=True) if r["kind"] in APPLY_KINDS]
+    stuck = list_requests("applying", limit=100, oldest_first=True)
+    ready = []
+    for req in approved:
+        waiting = request_waiting(req)
+        if waiting is None:
+            ready.append(req)
+            continue
+        if waiting != req.get("result"):
+            note_request(req["id"], waiting)
+        print(f"request #{req['id']}: {waiting}")
+    if not ready and not stuck:
+        print("No approved requests to carry out." if not approved else "Nothing to carry out now.")
+        return 0
+    try:
+        acquire_lock(wait_s=wait_s)
+    except LockHeld as exc:
+        print(f"{exc} Approved requests stay approved for the next pass.")
+        return 3
+    try:
+        log_path = setup_logging()
+        outcomes: list[tuple[dict[str, Any], str, str]] = []
+        for req in stuck:   # we hold the lock, so nothing else is carrying these out
+            text = "Interrupted: the job stopped before it finished. Propose it again if it is still needed."
+            if finish_request(req["id"], "failed", text):
+                outcomes.append((req, "failed", text))
+        for req in ready:
+            if not claim_request(req["id"]):
+                continue
+            log.info("REQUEST #%d (%s): %s", req["id"], req["kind"], req["summary"])
+            try:
+                text, ok = carry_out(req, log_path)
+            except Exception as exc:
+                text, ok = _failure_text(exc), False
+                log.debug("%s", traceback.format_exc())
+            status = "applied" if ok else "failed"
+            finish_request(req["id"], status, text)
+            log.info("REQUEST #%d %s: %s", req["id"], status, text)
+            outcomes.append((req, status, text))
+        report_outcomes(outcomes)
+        for req, status, text in outcomes:
+            print(f"request #{req['id']} {status}: {text}")
+        return 0 if all(status == "applied" for _, status, _ in outcomes) else 1
+    finally:
+        release_lock()
+
+
 # ----------------------------------------------------------------------------- portal
 
 def run_portal(portal: Portal, args: argparse.Namespace, log_path: Path) -> dict[str, Any]:
@@ -352,13 +677,25 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--feedback-only", action="store_true", help="only sync Slack: thread notes in, decisions out to the cards")
     parser.add_argument("--debug", action="store_true", help="DEBUG logging (includes the first review prompt)")
     parser.add_argument("--deliver-run", type=int, metavar="N", help="re-post run N's new calls that never reached Slack, then exit")
+    parser.add_argument("--wait-lock", type=int, default=0, metavar="MINUTES",
+                        help="if another run holds the lock, wait up to this many minutes for it")
+    parser.add_argument("--remind", action="store_true", help="post Slack reminders for Pursue calls due soon, then exit")
+    parser.add_argument("--post-summary", action="store_true", help="post the weekly summary to Slack, then exit")
+    parser.add_argument("--apply-requests", action="store_true",
+                        help="carry out change requests approved on the dashboard, then exit")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.remind:
+        return remind()
+    if args.post_summary:
+        return post_summary()
+    if args.apply_requests:
+        return apply_requests(wait_s=args.wait_lock * 60)
     try:
-        acquire_lock()
+        acquire_lock(wait_s=args.wait_lock * 60)
     except LockHeld as exc:
         print(exc)
         return 3

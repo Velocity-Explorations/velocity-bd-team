@@ -266,9 +266,9 @@ def test_tuning_report_finds_patterns(ledger_db: str, portal: Portal) -> None:
 # -------------------------------------------------------------------------- the registry
 
 def test_every_tool_is_described_for_a_model() -> None:
-    names = [t.name for t in tools.TOOLS]
+    names = [t.name for t in tools.all_tools()]
     assert len(names) == len(set(names))
-    for t in tools.TOOLS:
+    for t in tools.all_tools():
         assert t.permission in ("read", "propose") and t.description and callable(t.run)
         assert t.parameters["type"] == "object" and "properties" in t.parameters
     assert {"explain_call", "brief_call", "upcoming_deadlines", "scraper_health", "weekly_summary",

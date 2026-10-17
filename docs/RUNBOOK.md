@@ -107,9 +107,22 @@ repo as usual. To run while logged off, re-register with a password-backed princ
 ## Portal assistant
 
 Try any tool from the command line, for example `python -m assistant explain <call id>` or
-`python -m assistant deadlines`; `python -m assistant tools` lists them all. Two scheduled
-jobs post to Slack: deadline reminders daily at 08:00 and the weekly summary on Mondays at
-09:00. Every scan also alerts when it reads too many pages badly. Details in docs/ASSISTANT.md.
+`python -m assistant deadlines`; `python -m assistant tools` lists them all. Three scheduled
+jobs run from run.py: deadline reminders daily at 08:00 (`--remind`), the weekly summary on
+Mondays at 09:00 (`--post-summary`), and approved change requests every 15 minutes
+(`--apply-requests`). Every scan also alerts when it reads too many pages badly. Details in
+docs/ASSISTANT.md.
+
+Change requests:
+
+- `python -m assistant requests` lists them; the dashboard's Requests page is where they
+  are approved or rejected.
+- An approved keyword change waits while this checkout is on a branch other than main, or
+  while the portal's keywords.yaml has uncommitted edits. Its result on the Requests page
+  says which. Switch back to main (or commit the edit) and the next pass applies it.
+- The commit it makes is local. Push main when convenient once the repo has a remote.
+- To carry out approved requests now instead of waiting for the next pass:
+  `python run.py --apply-requests`.
 
 ## Dashboard
 

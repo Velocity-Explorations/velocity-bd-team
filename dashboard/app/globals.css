@@ -534,3 +534,42 @@ ul.notes li + li {
   border-radius: 8px;
   padding: 0.75rem;
 }
+
+/* ---------------------------------------------------------------- requests */
+
+.nav-count {
+  margin-left: 0.35rem;
+  font-size: 0.72rem;
+}
+
+.request .request-summary {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0.35rem 0;
+}
+
+.request .preview {
+  white-space: pre-wrap;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.request-decide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.6rem;
+}
+
+.request-decide input[type="text"] {
+  flex: 1 1 18rem;
+  font-size: 0.85rem;
+}
+
+main h2 {
+  margin-top: 1.5rem;
+}

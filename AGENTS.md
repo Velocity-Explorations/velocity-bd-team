@@ -14,13 +14,13 @@ that share one SQLite ledger database.
 
 | Path | Purpose |
 |---|---|
-| run.py | Pipeline entry point. Takes a lock file so only one pipeline runs at a time. `run.py --portal <slug> --dry-run` tests one portal. |
+| run.py | Pipeline entry point. Takes a lock file so only one pipeline runs at a time. `run.py --portal <slug> --dry-run` tests one portal. Also runs the portal assistant's jobs (`--remind`, `--post-summary`, `--apply-requests`), because it is the one place that wires components together. |
 | config.py | Settings loader. `require("KEY")` raises a ConfigError naming the key; `python -m config` lists which keys are set, never values. |
 | ledger/ | The shared database: connection helpers, `migrate.py`, and `migrations/` (numbered `NNN_description.sql`, additive only). |
 | portals/<slug>/ | One adapter per portal (first: `portals/vulcan_sof/`). Logs in, lists calls, extracts details, writes `calls` rows. Exposes a `PORTAL` dict that `portals/registry.py` discovers; run.py never names a portal. Keeps only what is specific to that portal, including its `keywords.yaml`. |
 | portals/shared/ | Helpers every adapter reuses: `browser` (headless Chromium), `session` (saved cookies in `data/<slug>/cookies.json`), `otp` (emailed sign-in codes, described per portal as an `OtpSource`), `keyword_filter`. Not a portal. |
 | review/ | Per-call review: regex blocklist, then LLM verdict. Writes verdicts to the ledger. |
-| assistant/ | The portal assistant's toolbox: read tools, scheduled Slack posts, and (with approvals) propose tools. See docs/ASSISTANT.md. |
+| assistant/ | The portal assistant's toolbox: read tools, and propose tools that record change requests for a person to approve. It reads the ledger and the portals' files only. See docs/ASSISTANT.md. |
 | corpus/ | Past-submission corpus: Drive sync, text extraction, chunking, embeddings. |
 | drafting/ | Proposal briefs and response drafts built from reviewed calls and the corpus. |
 | dashboard/ | Next.js triage dashboard reading the ledger directly (docs/DASHBOARD.md). Its own package.json; run npm commands inside dashboard/. |
@@ -39,6 +39,8 @@ disagree, Phase 0 wins and this file gets updated in the same PR.
 1. Components communicate only through the ledger database. No HTTP between components,
    no shared files, no imports across component directories. If component B needs
    something component A produced, A writes it to the ledger and B reads it there.
+   run.py is the orchestrator, not a component: it is the one file that calls several
+   components in turn (portals, review, slack, the assistant's tools).
 2. Never use Playwright's `networkidle` on Vulcan SOF. Its Angular app keeps a connection
    open and `networkidle` never fires (see
    reference/yukon/2026-04-18_vulcan-sof-hanging.md). Use `domcontentloaded` plus fixed
@@ -90,6 +92,12 @@ for review, corpus, drafting, and dashboard. Rules:
    Change a directory you don't own only through a pull request to its owner.
 2. Branches. Never commit to main. Work on `<agent>/<short-task>` (e.g. vulcan-sof/fix-deadline-regex),
    open a PR, and the Coordinator merges. Keep PRs to one concern.
+   One exception, for approved settings only: when a person approves a `keyword_change`
+   request on the dashboard, `run.py --apply-requests` on the scan machine commits that
+   portal's keywords.yaml straight to main. One file per commit, subject
+   `chore(<slug>): <change> (request #N, approved by <name>)`. It commits only when the
+   checkout is on main and the file has no other edits; otherwise the request waits. No
+   agent commits to main by hand under this exception.
 3. Schema. Only the Coordinator changes the ledger schema, via numbered files in
    ledger/migrations/ (NNN_description.sql), additive only: add tables or columns, never
    rename or drop without a deprecation note and a release gap. Every schema PR updates

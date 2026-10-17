@@ -20,12 +20,18 @@ const TONES: Record<string, string> = {
   shortlisted: "info",
   no_award: "grey",
   withdrawn: "grey",
+  proposed: "warn",
+  approved: "info",
+  applying: "info",
+  applied: "good",
+  failed: "bad",
 };
 
 const LABELS: Record<string, string> = {
   not_relevant: "not relevant",
   skipped_timeout: "timeout",
   no_award: "no award",
+  proposed: "waiting",
 };
 
 export function toneOf(value: string | null | undefined): string {

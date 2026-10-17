@@ -60,3 +60,74 @@ def test_malformed_settings_are_a_clear_error(tmp_path: Path) -> None:
     with pytest.raises(ValueError) as exc:
         kf.load_keywords(bad)
     assert "broad_keywords" in str(exc.value)
+
+
+# --------------------------------------------------------------- editing the settings file
+
+FILE_TEXT = r"""# Relevance filter. Edit this file, then re-run the filter.
+# Blocklist entries are regular expressions.
+
+broad_keywords:
+  - software
+  - data
+  # added 2026-10-16 after a live run
+  - zero trust
+
+tight_keywords:
+  - machine learning
+
+blocklist_patterns:
+  - '\brepair\b'
+  - '\bspare parts\b'
+"""
+
+
+def _changes(**given: list[str]) -> dict[str, list[str]]:
+    return {key: given.get(key, []) for key in kf.CHANGE_KEYS}
+
+
+def test_apply_changes_adds_and_removes() -> None:
+    kw = kf.load_keywords_text(FILE_TEXT)
+    after = kf.apply_changes(kw, _changes(add_broad=["Digital Twin"], remove_broad=["data"], add_block=[r"\bturret\b"]))
+    assert after.broad == ["software", "zero trust", "digital twin"]
+    assert [b.pattern for b in after.blocklist] == [r"\brepair\b", r"\bspare parts\b", r"\bturret\b"]
+    with pytest.raises(ValueError, match="'nope' is not in the broad keywords"):
+        kf.apply_changes(kw, _changes(remove_broad=["nope"]))
+    with pytest.raises(ValueError, match="not a valid blocklist pattern"):
+        kf.apply_changes(kw, _changes(add_block=["(unclosed"]))
+
+
+def test_edit_adds_items_under_a_dated_comment_and_keeps_everything_else() -> None:
+    text = kf.edit_keywords_text(FILE_TEXT, _changes(add_broad=["digital twin"], add_block=[r"\bturret\b"]),
+                                 note="added 2026-10-17 by request #3, approved by Dana")
+    assert text.startswith("# Relevance filter. Edit this file, then re-run the filter.\n# Blocklist")
+    assert ("  # added 2026-10-16 after a live run\n  - zero trust\n"
+            "  # added 2026-10-17 by request #3, approved by Dana\n  - digital twin\n\ntight_keywords:") in text
+    assert text.endswith(r"""  - '\bspare parts\b'
+  # added 2026-10-17 by request #3, approved by Dana
+  - '\bturret\b'
+""")
+    kw = kf.load_keywords_text(text)
+    assert kw.broad[-1] == "digital twin" and kw.blocklist[-1].pattern == r"\bturret\b"
+
+
+def test_edit_removes_only_the_named_lines() -> None:
+    text = kf.edit_keywords_text(FILE_TEXT, _changes(remove_broad=["Data"], remove_block=[r"\brepair\b"]))
+    assert text == FILE_TEXT.replace("  - data\n", "").replace(r"  - '\brepair\b'" + "\n", "")
+
+
+def test_edit_quotes_values_yaml_would_misread() -> None:
+    text = kf.edit_keywords_text(FILE_TEXT, _changes(add_broad=["c2: ops", "yes", "5g"]))
+    assert "  - 'c2: ops'\n" in text and "  - 'yes'\n" in text and "  - 5g\n" in text
+    assert kf.load_keywords_text(text).broad[-3:] == ["c2: ops", "yes", "5g"]
+
+
+def test_edit_leaves_a_present_keyword_alone() -> None:
+    assert kf.edit_keywords_text(FILE_TEXT, _changes(add_broad=["software"]), note="added today") == FILE_TEXT
+
+
+def test_edit_refuses_what_it_cannot_do_safely() -> None:
+    with pytest.raises(ValueError, match="'nope' is not in the tight keywords"):
+        kf.edit_keywords_text(FILE_TEXT, _changes(remove_tight=["nope"]))
+    with pytest.raises(ValueError, match="one item per line"):
+        kf.edit_keywords_text(SETTINGS, _changes(add_broad=["digital twin"]))

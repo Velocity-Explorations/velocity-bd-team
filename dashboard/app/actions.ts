@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { decideCall, type DecideResult } from "@/lib/queries";
+import { decideCall, decideRequest, type DecideRequestResult, type DecideResult } from "@/lib/queries";
+import { isRequestChoice } from "@/lib/requests";
 import { safeReturnTo } from "@/lib/text";
 import { isDecision, STATUS_LABELS } from "@/lib/values";
 import { allowlist, currentViewer, VIEWER_COOKIE } from "@/lib/viewer";
@@ -48,6 +49,34 @@ export async function decide(formData: FormData): Promise<void> {
   revalidatePath("/calls");
   if (result.ok) {
     backTo(returnTo, "notice", result.plan === "note" ? `Note added: ${result.title}` : `${STATUS_LABELS[status]}: ${result.title}`);
+  }
+  backTo(returnTo, "error", result.reason);
+}
+
+/**
+ * Approve or reject a change request on /requests. Writes status, decided_by, decided_at
+ * and the optional note, only while the request is still proposed.
+ */
+export async function decideRequestAction(formData: FormData): Promise<void> {
+  const returnTo = "/requests";
+  const id = Number.parseInt(String(formData.get("id") ?? ""), 10);
+  const choice = formData.get("choice");
+  const note = String(formData.get("note") ?? "").slice(0, MAX_NOTE_CHARS);
+  if (!Number.isInteger(id) || id <= 0 || !isRequestChoice(choice)) backTo(returnTo, "error", "Choose Approve or Reject first.");
+
+  const viewer = await currentViewer();
+  if (!viewer) backTo(returnTo, "error", "Choose who you are (top right) before deciding.");
+
+  let result: DecideRequestResult;
+  try {
+    result = await decideRequest({ id, choice, by: viewer, note });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
+    backTo(returnTo, "error", `Could not save the decision: ${detail}`);
+  }
+  revalidatePath("/", "layout");
+  if (result.ok) {
+    backTo(returnTo, "notice", `${choice === "approve" ? "Approved" : "Rejected"} request #${id}: ${result.summary}`);
   }
   backTo(returnTo, "error", result.reason);
 }

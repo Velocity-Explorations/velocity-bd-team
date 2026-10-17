@@ -1,6 +1,8 @@
 """run.py end to end on SQLite with a fake, browser-free portal."""
 from __future__ import annotations
 
+import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -11,6 +13,8 @@ from ledger import queries as lq
 from ledger.db import tx, q, rows
 from portals import registry
 from portals.registry import Portal
+from tests.test_assistant_tools import due
+from tests.test_reviewer import FakeModel
 
 
 def fake_portal(behaviour: str = "ok", timeout: int = 300) -> Portal:
@@ -188,3 +192,244 @@ def test_watch_alerts_when_a_scan_reads_pages_badly(isolated, monkeypatch: pytes
     monkeypatch.setattr(registry, "discover", lambda: [flaky])
     assert pipeline.main(["--no-review"]) == 0
     assert any("read 4 of 4 pages badly" in a and "Page 0" in a for a in isolated)
+
+
+
+# ------------------------------------------------------------------ scheduled Slack posts
+
+@pytest.fixture
+def slack_posts(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    import slack.sink as sink
+    sent: list[str] = []
+    monkeypatch.setattr(sink, "post_text", lambda text, client=None: sent.append(text) or "1.0")
+    return sent
+
+
+def test_remind_posts_only_when_something_is_due(isolated, slack_posts, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setattr(pipeline, "acquire_lock", lambda *a, **k: pytest.fail("a reminder never takes the pipeline lock"))
+    assert pipeline.main(["--remind"]) == 0
+    assert slack_posts == [] and "nothing to post" in capsys.readouterr().out
+    seed = lq.start_run("Fake")
+    lq.upsert_call({"id": "soon", "portal": "Fake", "title": "Soon", "due_date": due(3.5)}, seed)
+    lq.set_human("soon", "pursue", "David Wood")
+    assert pipeline.main(["--remind"]) == 0
+    assert len(slack_posts) == 1 and slack_posts[0].startswith("*Deadline reminder*") and "Soon" in slack_posts[0]
+
+
+def test_post_summary_covers_each_portal_and_the_scraper(isolated, slack_posts, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pipeline, "acquire_lock", lambda *a, **k: pytest.fail("a summary never takes the pipeline lock"))
+    monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
+    seed = lq.start_run("Fake", component="fake")
+    lq.upsert_call({"id": "fake-1", "portal": "Fake", "title": "Analytics software"}, seed)
+    lq.finish_run(seed, "completed", {"fetched": 1})
+    assert pipeline.main(["--post-summary"]) == 0
+    assert len(slack_posts) == 1 and "*Fake, last 7 days*" in slack_posts[0] and "Scraper:" in slack_posts[0]
+
+
+# ------------------------------------------------------------------------ waiting for the lock
+
+def test_wait_for_lock_starts_once_the_other_run_finishes(isolated) -> None:
+    pipeline.acquire_lock()
+    threading.Timer(0.3, pipeline.release_lock).start()
+    pipeline.acquire_lock(wait_s=5, poll_s=0.05)
+    pipeline.release_lock()
+
+
+def test_wait_for_lock_gives_up_in_time(isolated) -> None:
+    pipeline.acquire_lock()
+    try:
+        started = time.time()
+        with pytest.raises(pipeline.LockHeld):
+            pipeline.acquire_lock(wait_s=0.3, poll_s=0.05)
+        assert time.time() - started < 3
+    finally:
+        pipeline.release_lock()
+
+
+def test_wait_lock_flag_is_in_minutes() -> None:
+    assert pipeline.parse_args(["--wait-lock", "30"]).wait_lock == 30
+    assert pipeline.parse_args([]).wait_lock == 0
+
+
+# ------------------------------------------------------------------- approved change requests
+
+SETTINGS = r"""# Test settings.
+
+broad_keywords:
+  - software
+
+tight_keywords:
+  - machine learning
+
+blocklist_patterns:
+  - '\bspare parts\b'
+"""
+
+
+def _git(cwd: Path, *args: str) -> str:
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+
+@pytest.fixture
+def settings_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "settings"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    for key, value in (("user.name", "Test Person"), ("user.email", "test@example.invalid"),
+                       ("core.autocrlf", "false"), ("commit.gpgsign", "false")):
+        _git(repo, "config", key, value)
+    (repo / "keywords.yaml").write_bytes(SETTINGS.encode("utf-8"))
+    _git(repo, "add", "keywords.yaml")
+    _git(repo, "commit", "-q", "-m", "start")
+    return repo
+
+
+def settings_portal(path: Path) -> Portal:
+    def filt(rows_):
+        from portals.shared.keyword_filter import filter_calls
+        return filter_calls(rows_, path)
+    return Portal(slug="fake", name="Fake", fetch=lambda *a, **k: {}, filter=filt, keywords=path, needs_browser=False)
+
+
+def approved(kind: str, summary: str, **fields) -> int:
+    rid = lq.create_request(kind, summary, "Dana", **fields)
+    assert lq.decide_request(rid, True, "David Wood")
+    return rid
+
+
+def test_apply_with_nothing_approved_does_nothing(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setattr(pipeline, "acquire_lock", lambda *a, **k: pytest.fail("took the lock with nothing to do"))
+    lq.create_request("scan", "Scan Fake now", "Dana", portal="fake")       # proposed, not approved
+    assert pipeline.main(["--apply-requests"]) == 0
+    assert "No approved requests to carry out." in capsys.readouterr().out
+    assert not pipeline.LOG_DIR.exists()
+
+
+def test_apply_keyword_change_commits_refilters_and_reviews(isolated, settings_repo: Path, slack_posts,
+                                                             monkeypatch: pytest.MonkeyPatch) -> None:
+    path = settings_repo / "keywords.yaml"
+    portal = settings_portal(path)
+    monkeypatch.setattr(registry, "discover", lambda: [portal])
+    seed = lq.start_run("Fake")
+    lq.upsert_call({"id": "twin", "portal": "Fake", "title": "Digital twin for ships", "description": ""}, seed)
+    lq.upsert_call({"id": "sw", "portal": "Fake", "title": "Software tools", "description": ""}, seed)
+    portal.filter(lq.calls_where(portal="Fake"))
+    assert lq.get_call("twin")["filter_result"] == "rejected"
+    lq.set_review("sw", "yes", "Software.")              # already kept and reviewed; only the twin is new
+    rid = approved("keyword_change", "Fake keywords: add broad keyword 'digital twin'", portal="fake",
+                   payload={"changes": {"add_broad": ["digital twin"]}})
+    model = FakeModel(["VERDICT: yes\nREASON: Digital twin software."])
+    monkeypatch.setattr(pipeline, "review_model", lambda: model)
+
+    assert pipeline.main(["--apply-requests"]) == 0
+    req = lq.get_request(rid)
+    assert req["status"] == "applied", req["result"]
+    assert req["result"].startswith("Committed ") and "1 newly kept, 0 newly dropped" in req["result"]
+    text = path.read_text(encoding="utf-8")
+    assert f"  # added {pipeline.today()} by request #{rid}, approved by David Wood\n  - digital twin\n" in text
+    assert _git(settings_repo, "log", "-1", "--format=%s") == (
+        f"chore(fake): add broad keyword 'digital twin' (request #{rid}, approved by David Wood)")
+    assert _git(settings_repo, "status", "--porcelain") == ""
+    twin = lq.get_call("twin")
+    assert twin["filter_result"] == "kept" and twin["ai_verdict"] == "yes"
+    assert len(slack_posts) == 1 and f"#{rid}" in slack_posts[0] and "Committed" in slack_posts[0]
+
+
+def test_apply_keyword_change_waits_for_a_clean_main(isolated, settings_repo: Path, slack_posts,
+                                                     monkeypatch: pytest.MonkeyPatch) -> None:
+    path = settings_repo / "keywords.yaml"
+    monkeypatch.setattr(registry, "discover", lambda: [settings_portal(path)])
+    rid = approved("keyword_change", "Fake keywords: add broad keyword 'digital twin'", portal="fake",
+                   payload={"changes": {"add_broad": ["digital twin"]}})
+    _git(settings_repo, "checkout", "-q", "-b", "dev")
+    assert pipeline.main(["--apply-requests"]) == 0
+    req = lq.get_request(rid)
+    assert req["status"] == "approved" and req["result"].startswith("Waiting:") and "branch dev" in req["result"]
+    assert path.read_bytes().decode("utf-8") == SETTINGS and slack_posts == []
+    assert not pipeline.LOG_DIR.exists()
+
+    _git(settings_repo, "checkout", "-q", "main")
+    path.write_bytes((SETTINGS + "# a local edit\n").encode("utf-8"))
+    assert pipeline.main(["--apply-requests"]) == 0
+    req = lq.get_request(rid)
+    assert req["status"] == "approved" and "uncommitted" in req["result"]
+
+
+def test_apply_scan_runs_the_portal_now(isolated, slack_posts, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
+    monkeypatch.setattr(pipeline, "review_model", lambda: FakeModel(["VERDICT: yes\nREASON: fits"]))
+    rid = approved("scan", "Scan Fake now", portal="fake", payload={})
+    assert pipeline.main(["--apply-requests"]) == 0
+    req = lq.get_request(rid)
+    run_id = lq.latest_run_id(component="fake")
+    assert req["status"] == "applied" and req["result"].startswith(f"Run #{run_id} completed")
+    assert lq.get_run(run_id)["status"] == "completed" and lq.get_call("fake-0")["ai_verdict"] == "yes"
+    assert pipeline._test_capture["posted"] == ["fake-0"]   # type: ignore[attr-defined]
+
+
+def test_apply_rereview_asks_again_with_the_teams_context(isolated, slack_posts, monkeypatch: pytest.MonkeyPatch) -> None:
+    seed = lq.start_run("Fake")
+    lq.upsert_call({"id": "c2", "portal": "Fake", "title": "C2 data layer", "description": "radios"}, seed)
+    lq.set_filter("c2", "kept", tier="broad", keywords=["data"])
+    lq.set_review("c2", "no", "Hardware.")
+    model = FakeModel(["VERDICT: yes\nREASON: Software over radios."])
+    monkeypatch.setattr(pipeline, "review_model", lambda: model)
+    rid = approved("rereview", "Re-review 'C2 data layer' with the team's context", call_id="c2",
+                   payload={"context": "It is a software layer."})
+    assert pipeline.main(["--apply-requests"]) == 0
+    req = lq.get_request(rid)
+    assert req["status"] == "applied" and req["result"] == "The AI review changed from no to yes: Software over radios."
+    assert "Context from the team: It is a software layer." in model.prompts[0]
+
+
+def test_apply_fault_report_waits_for_github_then_files(isolated, slack_posts, monkeypatch: pytest.MonkeyPatch) -> None:
+    rid = approved("fault_report", "Report a scraper fault in Fake", portal="fake",
+                   payload={"title": "Scraper fault: Fake: logins fail", "body": "Logins fail."})
+    monkeypatch.setattr(pipeline, "github_waiting", lambda: "Waiting: this repo has no GitHub remote yet.")
+    assert pipeline.main(["--apply-requests"]) == 0
+    req = lq.get_request(rid)
+    assert req["status"] == "approved" and "no GitHub remote" in req["result"]
+
+    filed: list[tuple[str, str]] = []
+    monkeypatch.setattr(pipeline, "github_waiting", lambda: None)
+    monkeypatch.setattr(pipeline, "file_issue",
+                        lambda title, body: filed.append((title, body)) or "https://github.com/o/r/issues/1")
+    assert pipeline.main(["--apply-requests"]) == 0
+    req = lq.get_request(rid)
+    assert req["status"] == "applied" and req["result"] == "Filed https://github.com/o/r/issues/1"
+    assert filed[0][0] == "Scraper fault: Fake: logins fail"
+    assert filed[0][1].startswith("Logins fail.") and f"Approved by David Wood (request #{rid})" in filed[0][1]
+
+
+def test_apply_leaves_drafts_for_the_writer(isolated, slack_posts, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pipeline, "acquire_lock", lambda *a, **k: pytest.fail("drafts are not run.py's to carry out"))
+    rid = approved("draft", "Start a response draft for 'Open call'", call_id="x", payload={"notes": ""})
+    assert pipeline.main(["--apply-requests"]) == 0
+    assert lq.get_request(rid)["status"] == "approved" and slack_posts == []
+
+
+def test_apply_records_a_failure(isolated, slack_posts) -> None:
+    rid = approved("rereview", "Re-review a missing call", call_id="missing", payload={"context": "x"})
+    assert pipeline.main(["--apply-requests"]) == 1
+    req = lq.get_request(rid)
+    assert req["status"] == "failed" and "No call with id 'missing'" in req["result"]
+    assert len(slack_posts) == 1 and "failed" in slack_posts[0]
+
+
+def test_apply_waits_while_a_pipeline_runs(isolated, slack_posts, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
+    rid = approved("scan", "Scan Fake now", portal="fake", payload={})
+    pipeline.acquire_lock()
+    try:
+        assert pipeline.main(["--apply-requests"]) == 3
+    finally:
+        pipeline.release_lock()
+    assert lq.get_request(rid)["status"] == "approved"
+
+
+def test_apply_marks_an_interrupted_request_failed(isolated, slack_posts) -> None:
+    rid = approved("scan", "Scan Fake now", portal="fake", payload={})
+    assert lq.claim_request(rid)
+    assert pipeline.main(["--apply-requests"]) == 1
+    req = lq.get_request(rid)
+    assert req["status"] == "failed" and req["result"].startswith("Interrupted")

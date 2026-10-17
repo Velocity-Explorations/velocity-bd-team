@@ -36,6 +36,24 @@ def test_build_prompt_has_context_fields_and_truncates_description() -> None:
     assert "PAST\nFEEDBACK\n" in with_blocks
 
 
+def test_build_prompt_adds_the_team_context_after_the_description() -> None:
+    plain = reviewer.build_prompt(ROW)
+    with_context = reviewer.build_prompt(ROW, extra_context="  They want a C2 software layer,\nnot hardware. ")
+    assert "Context from the team" not in plain
+    assert ("x" * 1500 + "\nContext from the team: They want a C2 software layer, not hardware.\n\nRespond with exactly"
+            in with_context)
+
+
+def test_review_calls_passes_the_team_context_to_every_prompt(ledger_db: str) -> None:
+    run_id = lq.start_run("Vulcan SOF")
+    lq.upsert_call({"id": "vulcan-1", "portal": "Vulcan SOF", "title": "AI Digital Scribe"}, run_id)
+    model = FakeModel(["VERDICT: yes\nREASON: software after all"])
+    passed, _ = reviewer.review_calls([lq.get_call("vulcan-1")], model, extra_context="It is a software call.",
+                                      sleep=lambda s: None)
+    assert passed[0].verdict == "yes" and "Context from the team: It is a software call." in model.prompts[0]
+    assert lq.get_call("vulcan-1")["ai_verdict"] == "yes"
+
+
 @pytest.mark.parametrize(
     "text, expected",
     [

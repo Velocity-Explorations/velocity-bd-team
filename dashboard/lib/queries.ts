@@ -3,6 +3,7 @@
 
 import { sql } from "./db";
 import { isoNow } from "./format";
+import type { RequestChoice } from "./requests";
 import { escapeLike, isClosed, noteLine } from "./text";
 import { planDecision, type Decision } from "./values";
 
@@ -21,7 +22,7 @@ export type QueueRow = {
   extra: string | null;
 };
 
-/** The triage backlog from LEDGER_SCHEMA.md, newest first. */
+/** The triage backlog from LEDGER_SCHEMA.md, newest first. A call a later keyword change dropped leaves it. */
 export async function reviewQueue(f: { portal: string; verdict: string; openOnly: boolean }): Promise<QueueRow[]> {
   const db = sql();
   const rows = await db<QueueRow[]>`
@@ -29,6 +30,7 @@ export async function reviewQueue(f: { portal: string; verdict: string; openOnly
     FROM calls
     WHERE ai_verdict IN ('yes', 'maybe')
       AND human_status IS NULL
+      AND filter_result = 'kept'
       ${f.portal ? db`AND portal = ${f.portal}` : db``}
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
     ORDER BY first_seen_at DESC, id
@@ -132,6 +134,89 @@ export async function decideCall(input: {
     reason: existing.human_status
       ? `It was changed meanwhile to ${existing.human_status} by ${existing.human_by}. Nothing saved; reload and try again.`
       : "Its decision was cleared meanwhile. Nothing saved; reload and try again.",
+  };
+}
+
+// -------------------------------------------------------------------- change requests
+
+export type RequestRow = {
+  id: number;
+  kind: string;
+  portal: string | null;
+  call_id: string | null;
+  summary: string;
+  reason: string | null;
+  preview: string | null;
+  status: string;
+  requested_by: string;
+  requested_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  applied_at: string | null;
+  result: string | null;
+};
+
+const REQUEST_COLUMNS = [
+  "id", "kind", "portal", "call_id", "summary", "reason", "preview", "status", "requested_by", "requested_at",
+  "decided_by", "decided_at", "decision_note", "applied_at", "result",
+];
+
+/** Requests waiting for a person to approve or reject them, oldest first. */
+export async function waitingRequests(): Promise<RequestRow[]> {
+  const db = sql();
+  const rows = await db<RequestRow[]>`
+    SELECT ${db(REQUEST_COLUMNS)} FROM change_requests WHERE status = 'proposed' ORDER BY id`;
+  return [...rows];
+}
+
+/** Requests already decided, newest first. */
+export async function decidedRequests(limit = 50): Promise<RequestRow[]> {
+  const db = sql();
+  const rows = await db<RequestRow[]>`
+    SELECT ${db(REQUEST_COLUMNS)} FROM change_requests WHERE status <> 'proposed' ORDER BY id DESC LIMIT ${limit}`;
+  return [...rows];
+}
+
+/** How many requests wait for a decision; null when the table is not there yet (migration 002 not applied). */
+export async function countWaitingRequests(): Promise<number | null> {
+  try {
+    const [row] = await sql()<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM change_requests WHERE status = 'proposed'`;
+    return row?.n ?? 0;
+  } catch {
+    return null;
+  }
+}
+
+export type DecideRequestResult = { ok: true; summary: string } | { ok: false; reason: string };
+
+/**
+ * Approve or reject a proposed request, the equivalent of decide_request() in Python.
+ * Guarded on status = 'proposed', so a request is decided once; the scan machine carries
+ * out approved requests (run.py --apply-requests).
+ */
+export async function decideRequest(input: {
+  id: number;
+  choice: RequestChoice;
+  by: string;
+  note: string;
+}): Promise<DecideRequestResult> {
+  const db = sql();
+  const now = isoNow();
+  const status = input.choice === "approve" ? "approved" : "rejected";
+  const updated = await db<{ summary: string }[]>`
+    UPDATE change_requests
+    SET status = ${status}, decided_by = ${input.by}, decided_at = ${now},
+        decision_note = ${input.note.trim() || null}, updated_at = ${now}
+    WHERE id = ${input.id} AND status = 'proposed'
+    RETURNING summary`;
+  if (updated.length === 1) return { ok: true, summary: updated[0].summary };
+  const [existing] = await db<{ status: string; decided_by: string | null }[]>`
+    SELECT status, decided_by FROM change_requests WHERE id = ${input.id}`;
+  if (!existing) return { ok: false, reason: `There is no request #${input.id}.` };
+  return {
+    ok: false,
+    reason: `Request #${input.id} was already ${existing.status}${existing.decided_by ? ` by ${existing.decided_by}` : ""}. Nothing saved.`,
   };
 }
 

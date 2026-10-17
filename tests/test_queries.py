@@ -173,3 +173,67 @@ def test_upsert_and_list_proposals(ledger_db: str) -> None:
     assert [p["outcome"] for p in lq.list_proposals(portal="vulcan_sof")] == ["shortlisted"]
     assert lq.list_proposals(outcome="won")[0]["title"] == "Edge AI"
     assert json.loads(lq.list_proposals(outcome="won")[0]["themes"]) == ["edge", "autonomy"]
+
+
+# ------------------------------------------------------------------ change requests
+
+def test_a_request_moves_from_proposed_to_applied(ledger_db: str) -> None:
+    rid = lq.create_request("scan", "Scan Vulcan SOF now", "Dana", portal="vulcan_sof", reason="new calls",
+                            payload={}, preview={"text": "The last scan finished yesterday."})
+    req = lq.get_request(rid)
+    assert req and req["status"] == "proposed" and req["kind"] == "scan" and req["portal"] == "vulcan_sof"
+    assert req["requested_by"] == "Dana" and req["reason"] == "new calls" and req["requested_at"]
+    assert json.loads(req["preview"])["text"] == "The last scan finished yesterday."
+    assert lq.claim_request(rid) is False                      # only approved requests can be claimed
+    assert lq.decide_request(rid, True, "David Wood", note="go ahead") is True
+    assert lq.decide_request(rid, False, "Someone else") is False   # decided once, never twice
+    req = lq.get_request(rid)
+    assert req["status"] == "approved" and req["decided_by"] == "David Wood" and req["decision_note"] == "go ahead"
+    assert lq.claim_request(rid) is True and lq.claim_request(rid) is False
+    assert lq.finish_request(rid, "applied", "Run 7 completed.") is True
+    req = lq.get_request(rid)
+    assert req["status"] == "applied" and req["result"] == "Run 7 completed." and req["applied_at"]
+
+
+def test_a_rejected_request_is_never_applied(ledger_db: str) -> None:
+    rid = lq.create_request("scan", "Scan now", "assistant", portal="vulcan_sof")
+    assert lq.decide_request(rid, False, "David Wood") is True
+    assert lq.get_request(rid)["status"] == "rejected"
+    assert lq.claim_request(rid) is False
+
+
+def test_a_claimed_request_can_go_back_to_waiting(ledger_db: str) -> None:
+    rid = lq.create_request("keyword_change", "Add a keyword", "assistant", portal="vulcan_sof")
+    lq.decide_request(rid, True, "David Wood")
+    assert lq.note_request(rid, "Waiting: the checkout is on branch dev.") is True
+    assert lq.get_request(rid)["result"] == "Waiting: the checkout is on branch dev."
+    assert lq.claim_request(rid) is True
+    assert lq.release_request(rid, "Waiting: another pipeline run is in progress.") is True
+    req = lq.get_request(rid)
+    assert req["status"] == "approved" and req["result"].startswith("Waiting: another pipeline")
+    assert lq.finish_request(rid, "applied", "x") is False     # not claimed any more
+
+
+def test_finish_request_only_accepts_an_outcome(ledger_db: str) -> None:
+    rid = lq.create_request("scan", "Scan now", "assistant", portal="vulcan_sof")
+    try:
+        lq.finish_request(rid, "approved", "no")
+    except ValueError as exc:
+        assert "applied" in str(exc)
+    else:
+        raise AssertionError("finish_request accepted a status that is not an outcome")
+
+
+def test_list_and_find_open_requests(ledger_db: str) -> None:
+    first = lq.create_request("scan", "Scan Vulcan", "assistant", portal="vulcan_sof", payload={})
+    second = lq.create_request("rereview", "Re-review a call", "assistant", call_id="vulcan-1",
+                               payload={"context": "C2 software"})
+    third = lq.create_request("scan", "Scan Vulcan again", "assistant", portal="vulcan_sof", payload={})
+    lq.decide_request(third, False, "David Wood")
+    assert [r["id"] for r in lq.list_requests()] == [third, second, first]          # newest first
+    assert [r["id"] for r in lq.list_requests("proposed", oldest_first=True)] == [first, second]
+    assert [r["id"] for r in lq.list_requests(("rejected", "applied"))] == [third]
+    assert lq.find_open_request("scan", "vulcan_sof", None, {})["id"] == first
+    assert lq.find_open_request("rereview", None, "vulcan-1", {"context": "C2 software"})["id"] == second
+    assert lq.find_open_request("rereview", None, "vulcan-1", {"context": "other"}) is None
+    assert lq.count_requests("proposed") == 2

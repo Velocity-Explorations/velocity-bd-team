@@ -3,7 +3,7 @@
 Triage and history for velocity-bd-team, read straight from the ledger with the same
 DATABASE_URL the pipeline uses. There is no API layer. Pages are server-rendered; the only
 client-side code is the error page's "Try again" button. What each page shows and how the
-write action works is in [docs/DASHBOARD.md](../docs/DASHBOARD.md).
+write actions work is in [docs/DASHBOARD.md](../docs/DASHBOARD.md).
 
 ## Run locally
 

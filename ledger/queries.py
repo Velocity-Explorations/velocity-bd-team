@@ -3,14 +3,14 @@
 Conventions:
 - Every function opens its own transaction; callers never pass connections.
 - Timestamps are ISO-8601 UTC text (see ledger.db.now_iso).
-- JSON columns (stage_counts, matched_keywords, extra, themes) accept a dict/list and are
-  stored as JSON text; they come back as text.
+- JSON columns (stage_counts, matched_keywords, extra, themes, payload, preview) accept a
+  dict/list and are stored as JSON text; they come back as text.
 """
 from __future__ import annotations
 
 import csv
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -304,3 +304,132 @@ def list_proposals(portal: str | None = None, outcome: str | None = None) -> lis
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     with tx() as conn:
         return rows(q(conn, f"SELECT * FROM proposals{where} ORDER BY submitted_date DESC, submission_id", params))
+
+
+# ------------------------------------------------------------------ change requests
+# The assistant's approval queue (docs/ASSISTANT.md). Every status change is guarded by the
+# status it expects, so a request is decided once and carried out once.
+
+REQUEST_KINDS = ("keyword_change", "rereview", "scan", "draft", "fault_report")
+REQUEST_OUTCOMES = ("applied", "failed")
+OPEN_REQUEST_STATUSES = ("proposed", "approved", "applying")
+
+
+def _request_json(value: Any) -> str | None:
+    """Payloads and previews as JSON text with sorted keys, so equal payloads compare equal."""
+    return None if value is None else json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def create_request(
+    kind: str,
+    summary: str,
+    requested_by: str,
+    *,
+    portal: str | None = None,
+    call_id: str | None = None,
+    reason: str | None = None,
+    payload: Any = None,
+    preview: Any = None,
+) -> int:
+    """Record a proposed change request. Returns its id."""
+    if kind not in REQUEST_KINDS:
+        raise ValueError(f"unknown request kind: {kind}")
+    now = now_iso()
+    with tx() as conn:
+        cur = q(
+            conn,
+            "INSERT INTO change_requests (kind, portal, call_id, summary, reason, payload, preview, status, "
+            "requested_by, requested_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'proposed', ?, ?, ?) RETURNING id",
+            (kind, portal, call_id, summary, reason or None, _request_json(payload), _request_json(preview),
+             requested_by, now, now),
+        )
+        return int(cur.fetchone()[0])
+
+
+def get_request(request_id: int) -> dict[str, Any] | None:
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM change_requests WHERE id = ?", (request_id,)))
+
+
+def list_requests(
+    statuses: str | Sequence[str] | None = None,
+    limit: int = 50,
+    oldest_first: bool = False,
+) -> list[dict[str, Any]]:
+    """Requests, newest first (or oldest first), optionally with one of the given statuses."""
+    wanted = (statuses,) if isinstance(statuses, str) else tuple(statuses or ())
+    where = f" WHERE status IN ({_placeholders(len(wanted))})" if wanted else ""
+    order = "ASC" if oldest_first else "DESC"
+    with tx() as conn:
+        return rows(q(conn, f"SELECT * FROM change_requests{where} ORDER BY id {order} LIMIT ?", [*wanted, limit]))
+
+
+def count_requests(status: str) -> int:
+    with tx() as conn:
+        row = one(q(conn, "SELECT COUNT(*) AS n FROM change_requests WHERE status = ?", (status,)))
+        return int(row["n"]) if row else 0
+
+
+def find_open_request(kind: str, portal: str | None, call_id: str | None, payload: Any) -> dict[str, Any] | None:
+    """An open request (proposed, approved or applying) asking for exactly the same thing."""
+    clauses = ["kind = ?", f"status IN ({_placeholders(len(OPEN_REQUEST_STATUSES))})"]
+    params: list[Any] = [kind, *OPEN_REQUEST_STATUSES]
+    for column, value in (("portal", portal), ("call_id", call_id), ("payload", _request_json(payload))):
+        if value is None:
+            clauses.append(f"{column} IS NULL")
+        else:
+            clauses.append(f"{column} = ?")
+            params.append(value)
+    with tx() as conn:
+        return one(q(conn, f"SELECT * FROM change_requests WHERE {' AND '.join(clauses)} ORDER BY id LIMIT 1", params))
+
+
+def decide_request(request_id: int, approve: bool, by: str, note: str | None = None) -> bool:
+    """Approve or reject a proposed request. False when it was not waiting for a decision."""
+    now = now_iso()
+    with tx() as conn:
+        cur = q(
+            conn,
+            "UPDATE change_requests SET status = ?, decided_by = ?, decided_at = ?, decision_note = ?, updated_at = ? "
+            "WHERE id = ? AND status = 'proposed'",
+            ("approved" if approve else "rejected", by, now, note or None, now, request_id),
+        )
+        return cur.rowcount == 1
+
+
+def _move_request(request_id: int, expected: str, status: str, result: str | None) -> bool:
+    now = now_iso()
+    applied_at = now if status == "applied" else None
+    with tx() as conn:
+        cur = q(
+            conn,
+            "UPDATE change_requests SET status = ?, result = COALESCE(?, result), "
+            "applied_at = COALESCE(?, applied_at), updated_at = ? WHERE id = ? AND status = ?",
+            (status, result, applied_at, now, request_id, expected),
+        )
+        return cur.rowcount == 1
+
+
+def claim_request(request_id: int) -> bool:
+    """approved -> applying. False when someone else claimed it first, or it is not approved."""
+    return _move_request(request_id, "approved", "applying", None)
+
+
+def release_request(request_id: int, result: str) -> bool:
+    """applying -> approved, with a note saying what it is waiting for."""
+    return _move_request(request_id, "applying", "approved", result)
+
+
+def finish_request(request_id: int, status: str, result: str) -> bool:
+    """applying -> applied or failed, with what happened."""
+    if status not in REQUEST_OUTCOMES:
+        raise ValueError(f"finish_request takes applied or failed, not {status}")
+    return _move_request(request_id, "applying", status, result)
+
+
+def note_request(request_id: int, result: str) -> bool:
+    """Update an approved request's note (what it is waiting for) without changing its status."""
+    with tx() as conn:
+        cur = q(conn, "UPDATE change_requests SET result = ?, updated_at = ? WHERE id = ? AND status = 'approved'",
+                (result, now_iso(), request_id))
+        return cur.rowcount == 1

@@ -23,6 +23,7 @@ from assistant.dates import days_until, parse_due
 from ledger.queries import calls_where, get_call, recent_runs
 from portals import registry
 from portals.registry import Portal
+from portals.shared import keyword_filter as kf
 from portals.shared.keyword_filter import Keywords, decide, load_keywords
 
 UTC = timezone.utc
@@ -446,17 +447,12 @@ def weekly_summary(portal: str | None = None, days: int = 7, now: datetime | Non
 
 # ------------------------------------------------------------- settings change, previewed
 
-CHANGE_KEYS = ("add_broad", "remove_broad", "add_tight", "remove_tight", "add_block", "remove_block")
+CHANGE_KEYS = kf.CHANGE_KEYS
 
 
 def normalize_changes(**lists: Any) -> dict[str, list[str]]:
     """The six change lists, trimmed and de-duplicated; keywords lower-cased like the filter."""
-    out: dict[str, list[str]] = {}
-    for key in CHANGE_KEYS:
-        values = [str(v).strip() for v in (lists.get(key) or []) if str(v).strip()]
-        if not key.endswith("_block"):
-            values = [v.lower() for v in values]
-        out[key] = list(dict.fromkeys(values))
+    out = {key: kf.change_values(lists, key) for key in CHANGE_KEYS}
     if not any(out.values()):
         raise ToolError("Nothing to change: name at least one keyword or pattern to add or remove.")
     return out
@@ -464,23 +460,10 @@ def normalize_changes(**lists: Any) -> dict[str, list[str]]:
 
 def changed_keywords(p: Portal, changes: dict[str, list[str]]) -> Keywords:
     """The portal's keywords with the changes applied. Raises ToolError on anything invalid."""
-    now = _keywords_for(p)
-    broad, tight, block = list(now.broad), list(now.tight), [b.pattern for b in now.blocklist]
-    for key, current, label in (("broad", broad, "broad keywords"), ("tight", tight, "tight keywords"), ("block", block, "blocklist")):
-        for value in changes[f"remove_{key}"]:
-            if value not in current:
-                raise ToolError(f"'{value}' is not in {p.name}'s {label}.")
-            current.remove(value)
-        for value in changes[f"add_{key}"]:
-            if value not in current:
-                current.append(value)
-    compiled = []
-    for pattern in block:
-        try:
-            compiled.append(re.compile(pattern, re.IGNORECASE))
-        except re.error as exc:
-            raise ToolError(f"'{pattern}' is not a valid blocklist pattern: {exc}.") from exc
-    return Keywords(broad=broad, tight=tight, blocklist=compiled)
+    try:
+        return kf.apply_changes(_keywords_for(p), changes)
+    except ValueError as exc:
+        raise ToolError(f"{p.name}: {exc}") from exc
 
 
 def preview_keyword_change(portal: str, add_broad: list[str] | None = None, remove_broad: list[str] | None = None,
@@ -632,11 +615,15 @@ READ_TOOLS = [
          tuning_report),
 ]
 
-TOOLS: list[Tool] = list(READ_TOOLS)
+def all_tools() -> list[Tool]:
+    """Every tool a model may be given: these read tools, then the request tools in assistant/requests.py."""
+    from assistant.requests import REQUEST_TOOLS   # imported here: requests.py builds on this module
+
+    return [*READ_TOOLS, *REQUEST_TOOLS]
 
 
 def tool(name: str) -> Tool:
-    for t in TOOLS:
+    for t in all_tools():
         if t.name == name:
             return t
     raise ToolError(f"No tool called '{name}'.")

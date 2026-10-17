@@ -24,8 +24,13 @@ def test_doc_queries_run(ledger_db: str) -> None:
     run_id = lq.start_run("vulcan_sof")
     lq.upsert_call({"id": "vulcan-1", "portal": "vulcan_sof", "title": "A", "due_date": "2026-11-01"}, run_id)
     lq.upsert_call({"id": "vulcan-2", "portal": "vulcan_sof", "title": "B", "due_date": "2026-10-20"}, run_id)
+    lq.upsert_call({"id": "vulcan-3", "portal": "vulcan_sof", "title": "C", "due_date": "2026-10-21"}, run_id)
+    for call_id in ("vulcan-1", "vulcan-2"):
+        lq.set_filter(call_id, "kept", tier="broad", keywords=["software"])
+    lq.set_filter("vulcan-3", "rejected", reason=r"blocklist: \bturret\b")   # dropped by a later keyword change
     lq.set_review("vulcan-1", "yes", "r")
     lq.set_review("vulcan-2", "maybe", "r")
+    lq.set_review("vulcan-3", "maybe", "r")
     lq.set_human("vulcan-1", "pursue", "d")
     lq.upsert_proposal({"submission_id": "2025-01-01_sbir_a", "portal": "sbir", "outcome": "won"})
     lq.upsert_proposal({"submission_id": "2025-02-01_sbir_b", "portal": "sbir", "outcome": "lost"})
@@ -38,7 +43,7 @@ def test_doc_queries_run(ledger_db: str) -> None:
         backlog = rows(q(conn, queries["Triage backlog"]))
         win = rows(q(conn, queries["Win rate by portal"]))
 
-    assert [r["id"] for r in new] == ["vulcan-1", "vulcan-2"] or len(new) == 2
+    assert len(new) == 3
     assert [r["id"] for r in backlog] == ["vulcan-2"]
     by_portal = {r["portal"]: r for r in win}
     assert by_portal["sbir"]["won"] == 1 and by_portal["sbir"]["decided"] == 2

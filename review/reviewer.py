@@ -5,7 +5,8 @@
 The fail-safe is always "maybe", never "no": a model outage must not discard leads.
 Each call gets one retry after a second; both failing yields verdict "maybe" with a
 "Review error" reason. Two prompt slots stay empty for now: past_experience_block (the
-corpus component, later) and feedback_examples_block (Phase 8).
+corpus component, later) and feedback_examples_block (Phase 8). A third, extra_context,
+carries the team's note when a person approves a re-review (docs/ASSISTANT.md).
 """
 from __future__ import annotations
 
@@ -54,7 +55,7 @@ Type: {type}
 NAICS: {naics_code}
 Agency: {department}
 Description: {description}
-
+{extra_context_block}
 Respond with exactly this format (no other text):
 VERDICT: yes|no|maybe
 REASON: [one sentence explaining why]
@@ -100,11 +101,18 @@ class Reviewed:
     match_tier: str | None = None
 
 
-def build_prompt(row: Mapping[str, Any], past_experience_block: str = "", feedback_examples_block: str = "") -> str:
+def build_prompt(
+    row: Mapping[str, Any],
+    past_experience_block: str = "",
+    feedback_examples_block: str = "",
+    extra_context: str = "",
+) -> str:
+    context = " ".join((extra_context or "").split())
     return PROMPT_TEMPLATE.format(
         company_context=COMPANY_CONTEXT,
         past_experience_block=past_experience_block or "",
         feedback_examples_block=feedback_examples_block or "",
+        extra_context_block=f"Context from the team: {context}\n" if context else "",
         title=row.get("title") or "",
         portal=row.get("portal") or "",
         type=row.get("type") or "",
@@ -156,13 +164,14 @@ def review_calls(
     past_experience_fn: Callable[[Mapping[str, Any]], str] | None = None,
     feedback_examples_block: str = "",
     sleep: Callable[[float], None] = time.sleep,
+    extra_context: str = "",
 ) -> tuple[list[Reviewed], list[Reviewed]]:
     """Review every row, write verdicts to the ledger, return (passed, dropped)."""
     passed: list[Reviewed] = []
     dropped: list[Reviewed] = []
     for n, row in enumerate(rows):
         past = past_experience_fn(row) if past_experience_fn else ""
-        prompt = build_prompt(row, past, feedback_examples_block)
+        prompt = build_prompt(row, past, feedback_examples_block, extra_context)
         if n == 0:
             log.debug("Rendered prompt for first row:\n%s", prompt)
         verdict, reason = ask_model(prompt, model_client, sleep)

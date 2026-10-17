@@ -1,4 +1,4 @@
-"""Try the assistant's tools from the command line, and run its scheduled Slack jobs.
+"""Try the assistant's tools from the command line.
 
     python -m assistant tools                          # every tool and its permission
     python -m assistant profile vulcan_sof
@@ -10,10 +10,17 @@
     python -m assistant preview vulcan_sof --add-broad "digital twin" [--add-block "\\bturret\\b"]
     python -m assistant tuning vulcan_sof [--min-examples 3]
 
-Scheduled jobs (docs/RUNBOOK.md):
+Change requests (approved on the dashboard, carried out by `python run.py --apply-requests`):
 
-    python -m assistant remind          # daily: post deadline reminders, nothing when none are due
-    python -m assistant post-summary    # weekly: post each portal's summary and scraper health
+    python -m assistant propose keyword vulcan_sof --add-broad "digital twin" --reason "..." --by "David Wood"
+    python -m assistant propose rereview <call id> --context "It is a software layer, not hardware."
+    python -m assistant propose scan vulcan_sof
+    python -m assistant propose draft <call id> [--notes "Lead with Echo C2."]
+    python -m assistant propose fault vulcan_sof --description "Logins have failed twice this week."
+    python -m assistant requests [--status proposed]
+
+The scheduled Slack posts (deadline reminders, the weekly summary) run from run.py:
+`python run.py --remind` and `python run.py --post-summary`.
 """
 from __future__ import annotations
 
@@ -23,12 +30,10 @@ import logging
 import sys
 from typing import Any
 
-from assistant import tools
+from assistant import requests, tools
 from assistant.tools import ToolError
-from portals import registry
-from slack.sink import post_text
 
-REMIND_DAYS = 14
+DEADLINE_DAYS = 14
 
 
 def _print(result: dict[str, Any], as_json: bool) -> None:
@@ -43,7 +48,7 @@ def _change_args(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="python -m assistant", description="The portal assistant's tools and jobs")
+    parser = argparse.ArgumentParser(prog="python -m assistant", description="The portal assistant's tools")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("tools", help="list every tool and its permission")
     for name, needs in (("profile", "portal"), ("explain", "call_id"), ("brief", "call_id")):
@@ -51,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument(needs)
         p.add_argument("--json", action="store_true")
     p = sub.add_parser("deadlines")
-    p.add_argument("--days", type=int, default=REMIND_DAYS)
+    p.add_argument("--days", type=int, default=DEADLINE_DAYS)
     p.add_argument("--portal")
     p.add_argument("--json", action="store_true")
     p = sub.add_parser("health")
@@ -69,33 +74,47 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("portal")
     p.add_argument("--min-examples", type=int, default=3)
     p.add_argument("--json", action="store_true")
-    sub.add_parser("remind", help="post deadline reminders to Slack")
-    sub.add_parser("post-summary", help="post the weekly summary to Slack")
+
+    p = sub.add_parser("requests", help="change requests and where each stands")
+    p.add_argument("--status", choices=requests.STATUSES)
+    p.add_argument("--limit", type=int, default=20)
+    p.add_argument("--json", action="store_true")
+
+    propose = sub.add_parser("propose", help="record a change request for approval on the dashboard")
+    kinds = propose.add_subparsers(dest="kind", required=True)
+    k = kinds.add_parser("keyword", help="change a portal's keywords")
+    k.add_argument("portal")
+    _change_args(k)
+    r = kinds.add_parser("rereview", help="review one call again with the team's context")
+    r.add_argument("call_id")
+    r.add_argument("--context", required=True)
+    s = kinds.add_parser("scan", help="scan one portal now")
+    s.add_argument("portal")
+    d = kinds.add_parser("draft", help="start a response draft for one call")
+    d.add_argument("call_id")
+    d.add_argument("--notes", default="")
+    f = kinds.add_parser("fault", help="report a scraper fault as a GitHub issue")
+    f.add_argument("portal")
+    f.add_argument("--description", required=True)
+    for p in (k, r, s, d, f):
+        if p is not f:
+            p.add_argument("--reason", default="", help="why it is needed")
+        p.add_argument("--by", default="command line", help="who is asking (default: command line)")
+        p.add_argument("--json", action="store_true")
     return parser
 
 
-def remind() -> int:
-    result = tools.upcoming_deadlines(days=REMIND_DAYS)
-    if not result["calls"]:
-        print("No Pursue deadlines in the next 14 days; nothing to post.")
-        return 0
-    ts = post_text("*Deadline reminder*\n" + result["text"])
-    print(f"Posted {len(result['calls'])} reminder(s)" + ("" if ts else " (Slack did not accept the post; see the log)"))
-    return 0 if ts else 1
-
-
-def post_summary() -> int:
-    parts = []
-    for p in registry.discover():
-        summary = tools.weekly_summary(p.slug)
-        health = tools.scraper_health(p.slug)
-        parts.append(f"{summary['text']}\nScraper: {health['text']}")
-    if not parts:
-        print("No portals registered; nothing to post.")
-        return 0
-    ts = post_text("\n\n".join(parts))
-    print("Posted the weekly summary" + ("" if ts else " (Slack did not accept the post; see the log)"))
-    return 0 if ts else 1
+def _propose(args: argparse.Namespace) -> dict[str, Any]:
+    if args.kind == "keyword":
+        return requests.propose_keyword_change(args.portal, reason=args.reason, requested_by=args.by,
+                                               **{key: getattr(args, key) for key in tools.CHANGE_KEYS})
+    if args.kind == "rereview":
+        return requests.propose_rereview(args.call_id, args.context, reason=args.reason, requested_by=args.by)
+    if args.kind == "scan":
+        return requests.propose_scan(args.portal, reason=args.reason, requested_by=args.by)
+    if args.kind == "draft":
+        return requests.propose_draft(args.call_id, notes=args.notes, reason=args.reason, requested_by=args.by)
+    return requests.propose_fault_report(args.portal, args.description, requested_by=args.by)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -103,13 +122,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         if args.command == "tools":
-            for t in tools.TOOLS:
+            for t in tools.all_tools():
                 print(f"{t.name:24s} {t.permission:8s} {t.description}")
             return 0
-        if args.command == "remind":
-            return remind()
-        if args.command == "post-summary":
-            return post_summary()
         if args.command == "profile":
             result = tools.portal_profile(args.portal)
         elif args.command == "explain":
@@ -124,8 +139,12 @@ def main(argv: list[str] | None = None) -> int:
             result = tools.weekly_summary(portal=args.portal, days=args.days)
         elif args.command == "preview":
             result = tools.preview_keyword_change(args.portal, **{k: getattr(args, k) for k in tools.CHANGE_KEYS})
-        else:
+        elif args.command == "tuning":
             result = tools.tuning_report(args.portal, min_examples=args.min_examples)
+        elif args.command == "requests":
+            result = requests.list_change_requests(status=args.status, limit=args.limit)
+        else:
+            result = _propose(args)
     except ToolError as exc:
         print(exc)
         return 2

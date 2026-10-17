@@ -1,11 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { setViewer } from "@/app/actions";
+import { countWaitingRequests } from "@/lib/queries";
 import { allowlist, currentViewer, viewerHeader } from "@/lib/viewer";
 
 const LINKS = [
   { key: "queue", href: "/", label: "Review queue" },
   { key: "calls", href: "/calls", label: "All calls" },
+  { key: "requests", href: "/requests", label: "Requests" },
   { key: "runs", href: "/runs", label: "Runs" },
   { key: "proposals", href: "/proposals", label: "Proposals" },
 ] as const;
@@ -13,6 +15,7 @@ const LINKS = [
 export type NavKey = (typeof LINKS)[number]["key"];
 
 export async function Shell({ current, children }: { current: NavKey; children: ReactNode }) {
+  const waiting = await countWaitingRequests();
   return (
     <>
       <header className="topbar">
@@ -28,6 +31,11 @@ export async function Shell({ current, children }: { current: NavKey; children: 
               aria-current={link.key === current ? "page" : undefined}
             >
               {link.label}
+              {link.key === "requests" && waiting ? (
+                <span className="badge tone-warn nav-count" aria-label={`${waiting} waiting for approval`}>
+                  {waiting}
+                </span>
+              ) : null}
             </Link>
           ))}
         </nav>

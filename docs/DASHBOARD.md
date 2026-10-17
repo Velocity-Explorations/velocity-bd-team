@@ -9,8 +9,9 @@ it is in [dashboard/README.md](../dashboard/README.md).
 
 | Path | What it shows |
 |---|---|
-| `/` | **Review queue.** Calls with ai_verdict yes or maybe and no decision yet, newest first: verdict, title linked to the portal, due date, match tier, the AI's reason, first seen, and four buttons (Pursue, Not relevant, Submitted, Dismiss) with an optional note. Filters: portal, verdict, and "open calls only", which hides calls a portal adapter flagged as closed. Counts at the top: waiting, yes, maybe, and new this week. |
+| `/` | **Review queue.** Calls with ai_verdict yes or maybe, still kept by the keyword filter, and no decision yet, newest first: verdict, title linked to the portal, due date, match tier, the AI's reason, first seen, and four buttons (Pursue, Not relevant, Submitted, Dismiss) with an optional note. Filters: portal, verdict, and "open calls only", which hides calls a portal adapter flagged as closed. Counts at the top: waiting, yes, maybe, and new this week. |
 | `/calls` | **All calls**, newest first, up to 200 at a time. Filters: title text, portal, filter_result, ai_verdict (or not reviewed), human_status (or undecided). Shows the filter tier and filter_reason for rejected rows, the AI's reason behind a toggle, who decided and when, and every note. Each row has a "decide" or "change" control, for example to move a call from Pursue to Submitted, or to add a note to a decided call. |
+| `/requests` | **Change requests** from the portal assistant (docs/ASSISTANT.md, "Approvals"). Requests waiting for approval come first, oldest first, each with who asked, why, and the preview of what approving would do, plus Approve and Reject buttons and an optional note. Below them, the last 50 decided requests with their status, who decided, and the result, or what an approved request is waiting for. The Requests link in the top bar shows how many are waiting. |
 | `/runs` | **Scan history.** The most recent run sits at the top with its status, start time, duration, stage counts, error and log. Below it, the last 100 runs. A run still marked running two hours after it started is flagged as having no finish recorded. |
 | `/proposals` | **Past submissions** from the proposals table, with win rate by portal. Shows an empty state until the Proposal Corpus plan fills the table. |
 
@@ -26,10 +27,18 @@ Log links open `/runs/<id>/log`, which serves the file named in runs.log_path, b
 the pipeline's log directory on the same machine. On any other host it says the log is not
 there.
 
-## The write action
+## The write actions
 
-`decide` in `dashboard/app/actions.ts` is the dashboard's only write, used by the queue's
-buttons and by the control on `/calls`. One UPDATE on `calls`:
+`dashboard/app/actions.ts` has two writes.
+
+`decideRequestAction` approves or rejects a change request on `/requests`: one UPDATE on
+`change_requests` setting `status` (approved or rejected), `decided_by` (the viewer),
+`decided_at`, `decision_note` and `updated_at`, only while the request is still `proposed`.
+A request decided in another tab is not overwritten; the page says who decided it. The scan
+machine carries out approved requests within 15 minutes (`run.py --apply-requests`).
+
+`decide` records triage decisions, used by the queue's buttons and by the control on
+`/calls`. One UPDATE on `calls`:
 
 - `human_status`: pursue, not_relevant, submitted or dismissed
 - `human_by`: the viewer's name (see below)
