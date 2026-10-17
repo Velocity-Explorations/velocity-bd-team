@@ -98,7 +98,9 @@ def test_collect_feedback_reaction_note_and_dismiss(ledger_db: str, monkeypatch:
             {"ok": True, "messages": [
                 {"ts": "vulcan-a.ts", "text": "card"},
                 {"ts": "1700000001.000100", "user": "UDAVID", "text": "Note: hardware-heavy, not us"},
-                {"ts": "1700000002.000100", "user": "UOTHER", "text": "unrelated chatter"},
+                {"ts": "1700000002.000100", "user": "UOTHER", "text": "Just to note, this one seems hardware heavy"},
+                {"ts": "1700000003.000100", "user": "UBOT", "bot_id": "B1", "text": "bot echo, ignored"},
+                {"ts": "1700000004.000100", "user": "USYS", "subtype": "channel_join", "text": "joined"},
             ]},
             {"ok": True, "messages": [{"ts": "vulcan-b.ts", "text": "card"}]},
             {"ok": True, "messages": [{"ts": "vulcan-c.ts", "text": "card"}]},
@@ -110,7 +112,9 @@ def test_collect_feedback_reaction_note_and_dismiss(ledger_db: str, monkeypatch:
 
     a = lq.get_call("vulcan-a")
     assert a and a["human_status"] == "not_relevant" and a["human_by"] == "UDAVID" and a["human_at"]
-    assert a["human_notes"] == "[2023-11-14T22:13:21Z UDAVID] hardware-heavy, not us"
+    assert a["human_notes"] == ("[2023-11-14T22:13:21Z UDAVID] hardware-heavy, not us
+"
+                                "[2023-11-14T22:13:22Z UOTHER] Just to note, this one seems hardware heavy")
     b = lq.get_call("vulcan-b")
     assert b and b["human_status"] == "dismissed"
     assert ("chat.delete", {"channel": "C123", "ts": "vulcan-b.ts"}, True) in client.calls

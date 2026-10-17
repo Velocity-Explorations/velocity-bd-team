@@ -6,8 +6,9 @@
 
 Reactions on a card:  +1 -> pursue, -1 -> not_relevant, white_check_mark -> submitted,
 x -> dismissed (and the card is deleted). Priority when several are present: x, then
-white_check_mark, then -1, then +1. A thread reply starting with "note:" is appended to
-the call's human_notes. Cards already decided are still polled (the last 50): their notes
+white_check_mark, then -1, then +1. Every human reply in a card's thread is appended to
+the call's human_notes (a leading "note:" is stripped); the thread exists only for that
+call, so all of it is context. Cards already decided are still polled (the last 50): their notes
 are collected, and an X placed later still dismisses; other reactions no longer change them.
 
 Every Slack call has a 15 s timeout, honours Retry-After on 429, logs failures and never
@@ -233,10 +234,10 @@ def _collect_one(row: dict[str, Any], client: SlackClient, sleep: Callable[[floa
         for message in replies.get("messages") or []:
             if str(message.get("ts")) == ts:
                 continue   # the card itself
+            if message.get("bot_id") or message.get("subtype"):
+                continue   # the bot's own messages and join/edit system notices
             text = (message.get("text") or "").strip()
-            if not text.lower().startswith(NOTE_PREFIX):
-                continue
-            note = text[len(NOTE_PREFIX):].strip()
+            note = text[len(NOTE_PREFIX):].strip() if text.lower().startswith(NOTE_PREFIX) else text
             if not note or note in existing:
                 continue
             existing = append_note(row["id"], note, by=str(message.get("user") or "?"), at=_slack_ts_to_iso(str(message.get("ts"))))

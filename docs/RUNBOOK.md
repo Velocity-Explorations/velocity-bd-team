@@ -44,7 +44,7 @@ one-line summary. The team answers on the card:
 | white check mark | submitted | a response went in |
 | x | dismissed | the card is deleted |
 
-A thread reply starting with `note:` is stored on the call's human_notes. Several reactions
+Any reply in a card's thread is stored on the call's human_notes (a leading `note:` is dropped). Several reactions
 on one card resolve in the order x, check mark, thumbs down, thumbs up. The pipeline polls
 for all of this at the start of every run and in the daily "velocity-bd-team feedback" task
 (`run.py --feedback-only`). Decisions feed the next review as a RECENT HUMAN DECISIONS block
