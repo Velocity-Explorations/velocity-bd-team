@@ -1,0 +1,270 @@
+<title>Draft-Ready Upgrade</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: runbook, same system as the Playbook, Corpus and Writer plans. Phase rail left, prompts right. */
+  :root {
+    --bg: #f6f5f0; --surface: #fdfcf8; --ink: #1f2219; --ink-2: #4e5346; --ink-3: #7b8072; --line: #d9d8cc;
+    --accent: #5b6a35; --accent-ink: #ffffff; --accent-soft: #e9ecd9;
+    --code-bg: #26291f; --code-ink: #e8e7da; --code-dim: #a7ab97; --warn: #9a5b1f; --warn-soft: #f4e6d3;
+    --display: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #181a14; --surface: #1f2219; --ink: #e8e7da; --ink-2: #bfc1ae; --ink-3: #8a8e7c; --line: #33372b;
+      --accent: #a9bb6a; --accent-ink: #1a1d12; --accent-soft: #2b3121;
+      --code-bg: #101209; --code-ink: #dcdbcc; --code-dim: #858a74; --warn: #d9a05a; --warn-soft: #3a2d1a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #181a14; --surface: #1f2219; --ink: #e8e7da; --ink-2: #bfc1ae; --ink-3: #8a8e7c; --line: #33372b;
+    --accent: #a9bb6a; --accent-ink: #1a1d12; --accent-soft: #2b3121;
+    --code-bg: #101209; --code-ink: #dcdbcc; --code-dim: #858a74; --warn: #d9a05a; --warn-soft: #3a2d1a;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 64px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+  header.top { grid-column: 1 / -1; padding-block: 40px 28px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+  h1 { font-family: var(--display); font-weight: 600; font-size: 40px; line-height: 1.1; margin: 8px 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .lede { max-width: 66ch; color: var(--ink-2); font-size: 16px; margin: 0; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 18px; font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+  .meta b { color: var(--ink-2); font-weight: 500; }
+  .meta a, .howto a { color: var(--accent); }
+  nav.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start; }
+  @media (max-width: 860px) { nav.rail { position: static; } }
+  nav.rail .eyebrow { margin-bottom: 10px; }
+  nav.rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  nav.rail a { display: grid; grid-template-columns: 32px 1fr; gap: 6px; padding: 6px 8px; border-radius: 6px; color: var(--ink-2); text-decoration: none; font-size: 13.5px; line-height: 1.3; }
+  nav.rail a:hover { background: var(--accent-soft); color: var(--ink); }
+  nav.rail a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  nav.rail a .n { font-family: var(--mono); font-size: 12px; color: var(--ink-3); padding-top: 2px; }
+  main { min-width: 0; }
+  .howto { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; margin-block: 28px 8px; max-width: 76ch; scroll-margin-top: 16px; }
+  .howto h2 { font-family: var(--display); font-size: 21px; margin: 0 0 8px; }
+  .howto h3 { font-family: var(--sans); font-weight: 600; font-size: 15px; margin: 16px 0 6px; color: var(--ink); }
+  .howto p { margin: 0 0 10px; color: var(--ink-2); }
+  .howto ul, .howto ol { margin: 0 0 10px; padding-left: 22px; color: var(--ink-2); }
+  .howto li + li { margin-top: 5px; }
+  .howto li b { color: var(--ink); font-weight: 600; }
+  table.reg { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 6px 0 4px; }
+  table.reg th, table.reg td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
+  table.reg th { font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; color: var(--ink-3); font-weight: 500; }
+  table.reg td:first-child { color: var(--ink); font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+  .tablewrap { overflow-x: auto; }
+  section.phase { padding-block: 36px; border-bottom: 1px solid var(--line); scroll-margin-top: 16px; }
+  section.phase:last-of-type { border-bottom: 0; }
+  .phase-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .phase-num { font-family: var(--mono); font-size: 13px; color: var(--accent-ink); background: var(--accent); padding: 3px 8px; border-radius: 4px; letter-spacing: 0.04em; }
+  .owner { font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: 0.04em; text-transform: uppercase; }
+  h2.phase-title { font-family: var(--display); font-weight: 600; font-size: 27px; margin: 0; line-height: 1.2; text-wrap: balance; }
+  .brief { max-width: 68ch; color: var(--ink-2); margin: 12px 0 0; }
+  .brief p { margin: 0 0 8px; }
+  .depends { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); margin-top: 8px; }
+  .prompt { margin-top: 18px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); background: var(--code-bg); }
+  .prompt-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .prompt-bar .label { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--code-dim); }
+  .copy { font-family: var(--sans); font-size: 13px; font-weight: 500; color: var(--code-ink); background: transparent; border: 1px solid rgba(255,255,255,0.22); border-radius: 5px; padding: 5px 11px; cursor: pointer; }
+  .copy:hover { background: rgba(255,255,255,0.08); }
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy.done { border-color: var(--accent); color: var(--accent); }
+  pre.body { margin: 0; padding: 16px 18px 18px; font-family: var(--mono); font-size: 13px; line-height: 1.55; color: var(--code-ink); white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: auto; }
+  .you { margin-top: 16px; max-width: 72ch; border: 1.5px solid var(--warn); border-radius: 8px; background: var(--surface); overflow: hidden; }
+  .you-bar { display: flex; align-items: center; gap: 10px; padding: 7px 14px; background: var(--warn-soft); border-bottom: 1px solid var(--warn); }
+  .you-bar .badge { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); background: var(--warn); padding: 2px 7px; border-radius: 3px; }
+  .you-bar .when { font-size: 13px; color: var(--ink-2); }
+  .you ol { margin: 0; padding: 12px 14px 12px 32px; color: var(--ink-2); font-size: 14px; }
+  .you li + li { margin-top: 5px; }
+  .checklist { margin-top: 36px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px; max-width: 72ch; }
+  .checklist h2 { font-family: var(--display); font-size: 22px; margin: 0 0 10px; }
+  .checklist ol { margin: 0; padding-left: 22px; color: var(--ink-2); }
+  .checklist li + li { margin-top: 6px; }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; }
+  @media (prefers-reduced-motion: no-preference) { .copy { transition: border-color .15s, color .15s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Follow-up plan · velocity-bd-team · after the Playbook, before the Writer Plan</div>
+    <h1>Draft-Ready Upgrade</h1>
+    <p class="lede">Two prompts that get the built system ready for the Writer Plan. The ledger gets the queue that draft requests need, and the shared docs and a check script confirm it. Revised on 18 Oct to match the system as built: the dashboard makes every decision and Slack only informs, so this upgrade no longer touches Slack.</p>
+    <div class="meta">
+      <span><b>Applies to</b> the system as built on 18 Oct 2026</span>
+      <span><b>Next</b> <a href="https://claude.ai/artifact/JxjbVYwQzPUd6VtkRAxcBD" target="_blank" rel="noopener">Writer Plan</a>, whose W0 doesn't need this upgrade</span>
+      <span><b>Written</b> 2026-10-18 · revised 2026-10-18 so the dashboard decides</span>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Sections">
+    <div class="eyebrow">Sections</div>
+    <ol>
+      <li><a href="#why"><span class="n">·</span><span>Why this upgrade</span></a></li>
+      <li><a href="#u1"><span class="n">U1</span><span>Ledger migration</span></a></li>
+      <li><a href="#u2"><span class="n">U2</span><span>Close-out check</span></a></li>
+      <li><a href="#done"><span class="n">✓</span><span>Acceptance checklist</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <div class="howto" id="why">
+      <h2>Why this upgrade</h2>
+      <p>Since 17 Oct the dashboard is the only place decisions are made. Slack posts cards, run summaries and progress, but its reactions are not read. The Writer Plan still needs one thing the system doesn't have:</p>
+      <ul>
+        <li><b>A draft queue.</b> A draft takes 20 to 60 minutes and costs real money, so it needs somewhere to queue, show progress, cancel, retry and wait for approval. Requests arrive three ways: the dashboard's Draft button, the command line, and draft requests from the portal assistant that a person approves on the dashboard's Requests page. Those already exist as <code>change_requests</code> rows of kind <code>draft</code>, built on 17 Oct.</li>
+      </ul>
+      <h3>What changed from the first version of this page</h3>
+      <div class="tablewrap">
+      <table class="reg">
+        <thead><tr><th>First version</th><th>Now</th></tr></thead>
+        <tbody>
+          <tr><td>Slack app changes for reaction events</td><td>Removed. Reactions stay unread. The Slack assistant sets up Socket Mode later, for questions rather than reactions.</td></tr>
+          <tr><td>U1 added <code>slack_events</code> and <code>drafts</code></td><td>U1 adds <code>drafts</code> only, linked to the approved draft request it came from</td></tr>
+          <tr><td>U2 moved the submitted step onto the ledger</td><td>Moved into the <a href="https://claude.ai/artifact/TrkcJ7yDfYnZnFPRFEZvyR" target="_blank" rel="noopener">Corpus Plan</a>'s Phase F. The corpus isn't built yet, so its submitted step reads the ledger from the start.</td></tr>
+          <tr><td>U3 live Slack feedback with a listener and a backstop</td><td>Removed, because decisions are made on the dashboard</td></tr>
+          <tr><td>U4 close-out check</td><td>Kept as U2, without the Slack checks</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <h3>What each step does</h3>
+      <div class="tablewrap">
+      <table class="reg">
+        <thead><tr><th>Step</th><th>Change</th><th>Owner</th></tr></thead>
+        <tbody>
+          <tr><td>U1</td><td>Adds the <code>drafts</code> table, its helpers and <code>proposals.source_call_id</code> to the ledger. Behavior doesn't change yet.</td><td>Coordinator</td></tr>
+          <tr><td>U2</td><td>Updates the shared docs and adds a check script that confirms the upgrade.</td><td>Coordinator</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+
+    <!-- U1 -->
+    <section class="phase" id="u1">
+      <div class="phase-head"><span class="phase-num">UPGRADE U1</span><h2 class="phase-title">Ledger migration</h2><span class="owner">Coordinator</span></div>
+      <div class="brief">
+        <p>Adds the draft queue and its helpers in one additive migration. Nothing that runs today changes: scans, the dashboard and the requests job behave as before.</p>
+        <div class="depends">Depends on: the built ledger, migrations 001 and 002. Produces: one migration, new query helpers, an updated <code>docs/LEDGER_SCHEMA.md</code>.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Upgrade U1</span><button class="copy" type="button" data-copy="cu1">Copy prompt</button></div>
+<pre class="body" id="cu1">You are the Coordinator in the `velocity-bd-team` repository. The ledger was built from the Vulcan SOF Playbook's Phase 0, and migration 002 added `change_requests`, the portal assistant's approval queue, which already records draft requests (kind 'draft') that a person approves on the dashboard's Requests page. This is Upgrade U1: add the draft queue the Writer Plan needs. Read docs/LEDGER_SCHEMA.md, ledger/migrations/ and ledger/queries.py first. If something below already exists or differs from this description, adapt and list what you found in the PR description. Branch `coordinator/u1-drafts`.
+
+## Context
+
+- Decisions are made on the dashboard, and Slack reactions are not read. A draft request arrives from the dashboard's Draft button, from the command line, or as an approved `change_requests` row of kind 'draft', which the Writer's worker turns into a queued draft (Writer Plan W2a).
+- The Writer Plan needs a `drafts` queue: one row per draft request, with progress, cancel, retry and approval.
+- Writer Phase W3 links a proposal to its call through `proposals.source_call_id`, which doesn't exist yet.
+
+## Tasks
+
+1. New migration `ledger/migrations/&lt;next number&gt;_drafts.sql`, additive only and portable between Postgres and SQLite (timestamps ISO-8601 UTC text, JSON stored as TEXT, `@@AUTOINCREMENT@@` on the key):
+
+   drafts(                                -- draft requests and their progress; the Writer's queue
+     id INTEGER PRIMARY KEY @@AUTOINCREMENT@@, call_id TEXT,
+     requested_by TEXT, requested_via TEXT CHECK IN ('dashboard','assistant','cli'), requested_at,
+     request_id INTEGER NULL,             -- the change_requests row an assistant request came from
+     status TEXT CHECK IN ('queued','needs_approval','running','completed','failed','cancelled') DEFAULT 'queued',
+     resume_of INTEGER NULL,              -- the failed or cancelled draft this one continues
+     work_dir TEXT, estimate_usd REAL, approved_by TEXT, approved_at,
+     started_at, finished_at, heartbeat_at, worker_pid INTEGER,
+     current_phase TEXT,
+     phase_log TEXT (JSON array, one entry per phase: id, name, status, started_at, finished_at, seconds, chars_in, chars_out),
+     cancel_requested_by TEXT, cancel_requested_at,
+     status_channel TEXT, status_ts TEXT, -- the Slack message that shows this draft's progress
+     result TEXT (JSON: word_count, page_estimate, page_limit, compliance_open_items, alignment_fit),
+     drive_folder_url TEXT, submission_id TEXT, cost_usd REAL, error TEXT,
+     updated_at )
+
+   Add proposals.source_call_id (ALTER TABLE proposals ADD COLUMN source_call_id TEXT).
+   Indexes: proposals(source_call_id), drafts(status), drafts(call_id), and one active draft per call:
+   CREATE UNIQUE INDEX drafts_one_active ON drafts(call_id) WHERE status IN ('queued','needs_approval','running');
+2. `ledger/queries.py`, each helper returning (draft_id, None) or (None, reason):
+   - `request_draft(call_id, by, via, request_id=None, force=False)`: refuses calls whose human_status is not_relevant, dismissed or submitted (force skips this, for the CLI) and calls that already have a queued, needs_approval or running draft; otherwise sets human_status to 'pursue' if it is empty and inserts a queued draft.
+   - `request_cancel(call_id, by)`: a queued or needs_approval draft becomes 'cancelled' at once; a running one gets cancel_requested_by and cancel_requested_at, and the worker stops it.
+   - `request_retry(call_id, by, via)`: a new queued draft with resume_of set to the call's latest failed or cancelled draft; refused if there is none or a draft is active.
+   - `approve_draft(draft_id, by)`: needs_approval back to queued, with approved_by and approved_at; callers decide who may approve.
+3. `docs/LEDGER_SCHEMA.md`: document the table, the one-active-draft rule and source_call_id, and add a "Requesting a draft from SQL" section with the exact statements the dashboard uses to request, cancel, retry and approve, following the same rules as the Python helpers.
+4. Tests (pytest, SQLite): request_draft refuses a second active draft for a call and refuses a call marked not_relevant; it marks an undecided call pursue; request_cancel on a queued draft cancels it at once; request_retry points resume_of at the failed draft; approve_draft releases a needs_approval draft; upsert_proposal without source_call_id leaves it unchanged.
+
+## Done when
+
+- `python -m ledger.migrate` applies the new migration on Postgres and on SQLite, a second run reports nothing to do, and `python -m ledger.migrate --list` shows drafts.
+- The new tests and every existing test pass.
+- Scans, the dashboard and `run.py --apply-requests` behave exactly as before.
+- The PR description lists anything in the existing ledger that differed from this prompt.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">after U1</span></div>
+        <ol>
+          <li>In Supabase's Table Editor, confirm the <code>drafts</code> table exists, read the PR description's list of differences, then merge.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- U2 -->
+    <section class="phase" id="u2">
+      <div class="phase-head"><span class="phase-num">UPGRADE U2</span><h2 class="phase-title">Close-out check</h2><span class="owner">Coordinator</span></div>
+      <div class="brief">
+        <p>Brings the shared docs up to date, so every agent works from an accurate picture, and adds one script that confirms the upgrade is complete.</p>
+        <div class="depends">Depends on: U1. Produces: updated AGENTS.md, STATUS.md and OWNERS.md; <code>scripts/check-upgrade.ps1</code>.</div>
+      </div>
+      <div class="prompt">
+        <div class="prompt-bar"><span class="label">Prompt · Upgrade U2</span><button class="copy" type="button" data-copy="cu2">Copy prompt</button></div>
+<pre class="body" id="cu2">You are the Coordinator in the `velocity-bd-team` repository. Upgrade U1 added the drafts table, its helpers and proposals.source_call_id. This is Upgrade U2: close out the upgrade so every agent works from accurate docs, and confirm the system is ready for the Writer Plan. Branch `coordinator/u2-closeout`.
+
+## Tasks
+
+1. docs/STATUS.md: under Live, add the drafts queue; under In progress, the Writer Plan and the phase it is on.
+2. docs/OWNERS.md: confirm drafting/ belongs to the Writer, and that the draft status loop in slack/ and the draft buttons in dashboard/ belong to the Dashboard agent.
+3. AGENTS.md, environment block: extend the Scheduler line with "Always-on services (the draft worker and the draft status loop) run as at-logon tasks that restart on failure."
+4. `scripts/check-upgrade.ps1`, printing PASS or FAIL per line: migrations are current; the drafts table and its one-active-draft index exist; proposals.source_call_id exists; change_requests exists; `python -m pytest -q` passes.
+
+## Done when
+
+- `scripts/check-upgrade.ps1` prints PASS on every line; show the output.
+- AGENTS.md, STATUS.md and OWNERS.md are updated in one PR.</pre>
+      </div>
+      <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">after U2</span></div>
+        <ol>
+          <li>Run <code>scripts\check-upgrade.ps1</code> yourself from PowerShell in the project folder. Every line should say PASS.</li>
+          <li>When it does, the Writer Plan can continue past W0 to W1 and the queue in W2a.</li>
+        </ol>
+      </div>
+    </section>
+
+    <div class="checklist" id="done">
+      <h2>Acceptance checklist for the upgrade</h2>
+      <ol>
+        <li>The ledger has the drafts queue the Writer Plan needs, with request, cancel, retry and approve helpers and documented SQL for the dashboard.</li>
+        <li>Approved draft requests from the assistant have a path into the queue: the Writer's worker queues them in W2a.</li>
+        <li>Nothing in Slack changed: reactions stay unread, and decisions stay on the dashboard.</li>
+        <li>The check script passes.</li>
+      </ol>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pre = document.getElementById(btn.dataset.copy);
+      const text = pre.innerText;
+      let ok = false;
+      try { await navigator.clipboard.writeText(text); ok = true; } catch (e) { ok = false; }
+      if (!ok) {
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      const prev = btn.textContent;
+      btn.textContent = ok ? 'Copied' : 'Selected: press ⌘C';
+      btn.classList.add('done');
+      setTimeout(() => { btn.textContent = prev; btn.classList.remove('done'); }, 1800);
+    });
+  });
+</script>

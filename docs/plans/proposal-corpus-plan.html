@@ -104,6 +104,7 @@
       <span><b>Plugs into</b> Vulcan SOF Agent Playbook Phase 0 (the <code>proposals</code> table) and Phase 6 (the <code>past_experience_block</code> slot)</span>
       <span><b>Human work</b> Phase A is yours; everything after it is the bot's</span>
       <span><b>Written</b> 2026-10-15</span>
+      <span><b>Status</b> Not built yet, as of 18 Oct 2026. The <a href="https://claude.ai/artifact/6PDa9shDxczQ3DcNkeMH6M" target="_blank" rel="noopener" style="color: var(--accent)">Draft-Ready Upgrade</a> adds <code>proposals.source_call_id</code>, which Phase F uses.</span>
     </div>
   </header>
 
@@ -435,12 +436,12 @@ A future drafting workflow will take a new call and produce a response. It needs
     <section class="phase" id="pf">
       <div class="phase-head"><span class="phase-num">PHASE F</span><h2 class="phase-title">Keep it current</h2></div>
       <div class="brief">
-        <p>Closes the loop between the scanner and the corpus. A ✅ in Slack (or the dashboard) means a response went out, so the bot starts a Register row and reminds you to record the outcome later. Without this, the Register goes stale the week after you finish it.</p>
-        <div class="depends">Depends on: Phases A–D and Playbook Phase 8. Produces: a ✅ → Register hook, a monthly "outcomes pending" reminder, the daily corpus job.</div>
+        <p>Closes the loop between the scanner and the corpus. Marking a call Submitted on the dashboard means a response went out, so the bot starts a Register row and reminds you to record the outcome later. Without this, the Register goes stale the week after you finish it.</p>
+        <div class="depends">Depends on: Phases A to D, and the dashboard (Playbook Phase 9). Produces: a submitted step that reads the ledger, a monthly "outcomes pending" reminder, the daily corpus job.</div>
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase F</span><button class="copy" type="button" data-copy="cf">Copy prompt</button></div>
-<pre class="body" id="cf">You are working in the `velocity-bd-team` repository. The scanner sets `calls.human_status = 'submitted'` when the team reacts ✅ on a Slack card (or uses the dashboard). The corpus component syncs the "00 Proposal Register" sheet into `proposals` (`corpus/register.py`), mirrors Drive (`corpus/drive_sync.py`), and ingests documents (`corpus/ingest.py`). This is Phase F: keep the register and corpus current automatically.
+<pre class="body" id="cf">You are working in the `velocity-bd-team` repository. A person sets `calls.human_status = 'submitted'` on the dashboard when a response goes out. Since 17 Oct the dashboard is the only place decisions are made, and Slack reactions are not read. The corpus component syncs the "00 Proposal Register" sheet into `proposals` (`corpus/register.py`), mirrors Drive (`corpus/drive_sync.py`), and ingests documents (`corpus/ingest.py`). This is Phase F: keep the register and corpus current automatically.
 
 ## Context
 
@@ -448,21 +449,23 @@ The register was built by hand once; it must not go stale. Two things keep it al
 
 ## Tasks
 
-1. Submitted hook: in the feedback collection step, when a call transitions to human_status 'submitted', create a Register row (and the `proposals` row) with submission_id = `&lt;today&gt;_&lt;portal-slug&gt;_&lt;slugified title, ≤40 chars&gt;`, title, portal, solicitation_id (for Vulcan: the collectionUuid from the call id), due_date, type = 'other', outcome = 'pending', drive_link blank. Post a thread reply on the Slack card: "Added to the Proposal Register as &lt;submission_id&gt;. Create the folder Submissions/&lt;submission_id&gt;/ in the corpus and drop the submitted files in 01_submitted/." Idempotent: never create a second row for the same call id (store the call id in a new `proposals.source_call_id` column; update `docs/LEDGER_SCHEMA.md`).
+1. Submitted step, run first in the daily corpus job and on demand with `python -m corpus.cli --submitted [--dry-run]`: for every call with human_status 'submitted' and no proposals row whose source_call_id is that call, create a Register row (and the `proposals` row) with submission_id = `&lt;today&gt;_&lt;portal-slug&gt;_&lt;slugified title, ≤40 chars&gt;`, title, portal, solicitation_id (for Vulcan: the collectionUuid from the call id), due_date, type = 'other', outcome = 'pending', drive_link blank. Post a thread reply on the Slack card: "Added to the Proposal Register as &lt;submission_id&gt;. Create the folder Submissions/&lt;submission_id&gt;/ in the corpus and drop the submitted files in 01_submitted/." Never create a second row for a call: match on `proposals.source_call_id`, which the Draft-Ready Upgrade U1 adds (add it here if it's missing, and update `docs/LEDGER_SCHEMA.md`). If a row already exists for the call with submitted_date empty, because the Writer created it while drafting, set submitted_date to today and reply "Marked submitted. Put the final as-submitted files in Submissions/&lt;submission_id&gt;/01_submitted/." instead. With --dry-run, print what would happen and change nothing.
 2. Monthly reminder (first Monday): list Register rows with outcome 'pending' and submitted_date older than 60 days, and rows whose folder exists but has an empty 01_submitted/, as one Slack message with direct links to the sheet rows. Skip the message when there is nothing to report.
-3. Daily corpus job: `--sync-register --sync-drive --ingest` (register first, so new metadata is on the chunks). Add to the scheduler from the playbook. Log a one-line summary to the `runs` table with portal = 'corpus'.
+3. Daily corpus job: `--submitted --sync-register --sync-drive --ingest` (the submitted step first so new rows sync, then the register, so new metadata is on the chunks). Add to the scheduler from the playbook. Log a one-line summary to the `runs` table with portal = 'corpus'.
 4. Dashboard: on the `/proposals` page add an "Outcomes pending" tile and, on a call's detail, the "similar past proposals" from `calls.review_context`.
 
 ## Done when
 
-- React ✅ on a test card, run `--feedback-only`: a new Register row and `proposals` row exist with outcome pending and the thread reply appears; a second `--feedback-only` creates nothing new.
+- The first `--submitted --dry-run` lists every call already marked submitted, and David confirms each is a real submission before the real run.
+- Mark a test call Submitted on the dashboard and run `--submitted`: a new Register row and `proposals` row exist with outcome pending and the thread reply appears; a second run creates nothing new.
 - Set one row's submitted_date to 90 days ago and run the reminder: the Slack message lists it; set it back and the reminder is silent.
 - The daily corpus job runs on schedule and shows as a `runs` row with portal 'corpus'.
 - `/proposals` shows the pending tile with the right count.</pre>
       </div>
       <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">during Phase F, and ongoing</span></div>
         <ol>
-          <li>Test: react ✅ on any Slack card, tell the agent to run <code>--feedback-only</code>, and confirm a new row appeared at the bottom of the Register and a thread reply named it.</li>
+          <li>Before the first real run, read the dry-run list: each call on it should be a real submission.</li>
+          <li>Test: mark any call Submitted on the dashboard, tell the agent to run the submitted step, and confirm a new row appeared at the bottom of the Register and a thread reply named it.</li>
           <li>Reminder test: in the Register, set one pending row's <code>submitted_date</code> to 90 days ago, ask the agent to run the reminder, confirm the Slack message, then set the date back.</li>
           <li>Ongoing, every time you submit something: create the <code>Submissions/&lt;submission_id&gt;/</code> folder the thread reply names, drop the files in <code>01_submitted</code>, and fill the row's judgment columns.</li>
           <li>Ongoing, when the reminder arrives: update <code>outcome</code> on the rows it lists. That's the whole maintenance burden.</li>
@@ -478,7 +481,7 @@ The register was built by hand once; it must not go stale. Two things keep it al
         <li>Every proposal has a one-paragraph brief that reads as an accurate summary.</li>
         <li>The reviewer's prompt shows similar past submissions with outcome and strength, plus portal history, and verdict changes are explainable by what was shown.</li>
         <li>Exemplar retrieval honors the <code>use_as_exemplar</code> flag and prefers wins; evaluator feedback from losses is retrievable too.</li>
-        <li>A ✅ creates a Register row; pending outcomes are surfaced monthly; the corpus job runs daily.</li>
+        <li>Marking a call Submitted on the dashboard creates a Register row; pending outcomes are surfaced monthly; the corpus job runs daily.</li>
       </ol>
     </div>
   </main>

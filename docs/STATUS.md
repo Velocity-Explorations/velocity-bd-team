@@ -37,6 +37,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   the dashboard's Requests page approves or rejects them; `run.py --apply-requests` carries
   them out every 15 minutes. Drafts wait for the Writer; fault reports wait for a GitHub
   remote. The reminder and summary jobs moved from `python -m assistant` to run.py.
+- GitHub (2026-10-18): the repo is private at Velocity-Explorations/velocity-bd-team, with main
+  pushed. Approved fault reports now file there as issues.
+- Plans (2026-10-18): the Writer Plan, the Draft-Ready Upgrade and the corpus plan were revised
+  so the dashboard decides. Drafts are requested with the dashboard's Draft button, an approved
+  draft request from the assistant, or the CLI. Offline copies are in docs/plans/.
 - Shared portal helpers (2026-10-17): browser, saved sessions, emailed sign-in codes and the
   keyword filter live in portals/shared/ for every adapter; Vulcan SOF keeps only its own
   login, scraping and keywords.yaml.

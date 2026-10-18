@@ -120,7 +120,7 @@ Change requests:
 - An approved keyword change waits while this checkout is on a branch other than main, or
   while the portal's keywords.yaml has uncommitted edits. Its result on the Requests page
   says which. Switch back to main (or commit the edit) and the next pass applies it.
-- The commit it makes is local. Push main when convenient once the repo has a remote.
+- The commit it makes is local. Push it with `git push origin main`.
 - To carry out approved requests now instead of waiting for the next pass:
   `python run.py --apply-requests`.
 
