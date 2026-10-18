@@ -1,0 +1,16 @@
+# Company facts the drafting prompts and templates fill in ({company_name}, {cage} and so on).
+# Ported from the retired Yukon profile (reference/yukon/profile.yaml, company_meta).
+# Change them here when they change; they appear on every draft's title page.
+company_name: "Velocity Explorations"
+legal_name: "Velocity Explorations, Inc."
+short_name: "Velocity Explorations"
+cage: "9KCQ5"
+uei: "HFEDQFZUJSZ6"
+duns: "11-909-2408"
+business_size: "Small Business (WOSB)"
+poc_name: "Alec Leeseberg"
+poc_title: "President"
+poc_email: "alec@velocityexplorations.com"
+poc_phone: "(888) 780-1888"
+naics_display: "541511, 541512, 541715"
+company_description: "a small defense technology company specializing in AI/ML, command & control (Echo C2), and software modernization"
