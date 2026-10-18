@@ -128,7 +128,7 @@ Change requests:
 
 ```powershell
 cd dashboard
-npm run dev      # http://localhost:3000
+npm run dev      # http://localhost:8000
 ```
 
 It reads `dashboard/.env.local` (DATABASE_URL, DASHBOARD_USERS). Pages, the decision buttons and

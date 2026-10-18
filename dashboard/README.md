@@ -13,14 +13,14 @@ Needs Node 20.9 or newer (built on Node 24). From the repo root, in PowerShell:
 cd dashboard
 npm install
 Copy-Item .env.example .env.local    # then set DATABASE_URL and DASHBOARD_USERS
-npm run dev                          # http://localhost:3000
+npm run dev                          # http://localhost:8000
 ```
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Development server with live reload. |
+| `npm run dev` | Development server with live reload, on port 8000 (3000 is taken by another app on this machine). |
 | `npm run build` | Production build, including the TypeScript check. |
-| `npm start` | Serves the production build. |
+| `npm start` | Serves the production build, also on port 8000. |
 | `npm test` | Unit tests for the helpers in `lib/`, on Node's built-in test runner. |
 
 Next.js sends anonymous usage telemetry by default. `npx next telemetry disable` turns it off
@@ -46,7 +46,8 @@ The app is self-contained in `dashboard/`, with its own `package.json` and lockf
 - **Vercel**: import the repository, set **Root Directory** to `dashboard`, keep the Next.js
   framework preset, and add the variables above under Settings, Environment Variables.
 - **Other hosts**: with `dashboard/` as the working directory, run `npm ci`, `npm run build`,
-  then `npm start` (port 3000, or set `PORT`).
+  then `npx next start`, which listens on the port the host assigns in `PORT`. (`npm start`
+  is pinned to port 8000 for the pipeline machine and ignores `PORT`.)
 
 Three things differ from running it on the pipeline machine:
 
