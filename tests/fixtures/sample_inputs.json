@@ -1,0 +1,19 @@
+{
+  "title": "AI-Enabled Logistics Forecasting for Expeditionary Units (FICTIONAL TEST)",
+  "portal": "SAM.gov",
+  "opp_type": "BAA",
+  "agency": "Naval Expeditionary Logistics Command (fictional)",
+  "due_date": "2026-12-15",
+  "url": "https://example.invalid/fictional-baa-n00000-26-s-b999",
+  "description": "Software that forecasts consumption and recommends resupply windows for expeditionary units, running disconnected on edge hardware.",
+  "listing_text": "BROAD AGENCY ANNOUNCEMENT N00000-26-S-B999 (FICTIONAL TEST NOTICE, NOT A REAL SOLICITATION)\nTitle: AI-Enabled Logistics Forecasting for Expeditionary Units\nAgency: Naval Expeditionary Logistics Command (fictional)\n\nKEYWORDS: predictive logistics; edge inference; disconnected operations; supply forecasting; human-machine teaming\n\n1. Background. Expeditionary units lose time and fuel to resupply requests made too late. The Government seeks software that forecasts consumption of fuel, water and spare parts and recommends resupply windows, running on edge hardware with no reach-back for up to 72 hours.\n\n2. Required functions. The solution shall: (a) Forecast Consumption at the unit level; (b) Recommend Resupply Windows; (c) Explain Forecast Drivers to the logistics officer in plain language; (d) Operate Disconnected for >=72 hours.\n\n3. Performance thresholds. Forecast accuracy of >=90% on a 7-day horizon (MAPE <10%). Inference latency <2 seconds on a single edge node with 16 GB RAM. Model updates applied in <15 minutes when connectivity returns.\n\n4. Phases. Phase I Base (6 months): feasibility study, data model, and a software prototype tested on historical data only. Phase I Option (3 months): user evaluation with one unit's logistics staff. Phase II: field demonstration during an exercise. Phase I proposals shall not include field testing.\n\n5. Submission. White paper not to exceed 5 pages, Times New Roman 12 pt, single-spaced, 1-inch margins, PDF, submitted through the BAA portal. Evaluation: Technical approach 50%, Team capability 30%, Cost realism 20%.\n\n6. Security. Work is unclassified. Offerors shall comply with DFARS 252.204-7012. No foreign nationals without approval under 22 CFR Parts 120-130.\n\nRef 1: NELC Logistics Data Standard v2.1. Ref 2: Expeditionary Edge Compute Profile.\n",
+  "attachments": [
+    {
+      "name": "statement-of-objectives.txt",
+      "text": "STATEMENT OF OBJECTIVES (fictional)\nO1. Demonstrate a forecasting model for fuel, water and repair parts consumption using the historical data set described in Ref 1.\nO2. Show that forecasts and resupply recommendations run on the Ref 2 edge profile without network access.\nO3. Provide an explanation view a logistics officer can read in under one minute.\nDeliverables: monthly status reports, a feasibility report, prototype software with source, and a Phase II plan.\n"
+    }
+  ],
+  "past_experience": "",
+  "company_context": "Velocity Explorations is a small defense technology company focused on software development and AI/ML for DoD and government; legacy system modernization; command and control (C2) systems, with Echo C2 AI as its flagship product; natural language processing, transcription and translation for operational environments; computer vision and autonomous systems software; DevSecOps, cloud migration and data analytics platforms; and SBIR/STTR contracts and OTA agreements.\n\nVelocity does not do hardware development or manufacturing, construction, IT administrative support, medical devices, training services, events, or logistics and parts procurement.\n",
+  "team_notes": ""
+}
