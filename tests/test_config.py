@@ -46,3 +46,7 @@ def test_environment_wins_over_file(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 def test_known_keys_match_env_example() -> None:
     example = config.parse_env_file(config.REPO_ROOT / ".env.example")
     assert set(example) == set(config.KNOWN_KEYS)
+
+
+def test_pipeline_github_token_is_a_known_key() -> None:
+    assert "BD_GITHUB_TOKEN" in config.KNOWN_KEYS

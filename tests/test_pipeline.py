@@ -433,3 +433,38 @@ def test_apply_marks_an_interrupted_request_failed(isolated, slack_posts) -> Non
     assert pipeline.main(["--apply-requests"]) == 1
     req = lq.get_request(rid)
     assert req["status"] == "failed" and req["result"].startswith("Interrupted")
+
+
+def fake_gh(monkeypatch: pytest.MonkeyPatch, token: str | None, returncode: int = 0,
+            stderr: str = "") -> list[dict[str, str] | None]:
+    """Stub gh and the token setting; return the env each gh call received."""
+    envs: list[dict[str, str] | None] = []
+
+    def run(cmd: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        envs.append(kwargs.get("env"))  # type: ignore[arg-type]
+        return subprocess.CompletedProcess(cmd, returncode, stdout="https://github.com/o/r/issues/7\n", stderr=stderr)
+
+    monkeypatch.setattr(pipeline.subprocess, "run", run)
+    monkeypatch.setattr(pipeline.config, "get", lambda key, default=None: token if key == "BD_GITHUB_TOKEN" else default)
+    return envs
+
+
+def test_file_issue_uses_the_pipeline_github_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    envs = fake_gh(monkeypatch, "fake-pipeline-token")
+    assert pipeline.file_issue("Scraper fault", "Logins fail.") == "https://github.com/o/r/issues/7"
+    assert envs[0] is not None and envs[0]["GH_TOKEN"] == "fake-pipeline-token"
+
+
+def test_file_issue_without_a_pipeline_token_uses_the_gh_login(monkeypatch: pytest.MonkeyPatch) -> None:
+    envs = fake_gh(monkeypatch, None)
+    pipeline.file_issue("Scraper fault", "Logins fail.")
+    assert envs == [None]
+
+
+@pytest.mark.parametrize("stderr, hint", [("HTTP 401: Bad credentials", "expired"),
+                                          ("HTTP 403: Resource not accessible by personal access token", "Issues")])
+def test_refused_pipeline_token_names_the_key_and_the_fix(monkeypatch: pytest.MonkeyPatch, stderr: str, hint: str) -> None:
+    fake_gh(monkeypatch, "fake-pipeline-token", returncode=1, stderr=stderr)
+    with pytest.raises(RuntimeError, match="BD_GITHUB_TOKEN") as raised:
+        pipeline.file_issue("Scraper fault", "Logins fail.")
+    assert hint in str(raised.value) and "fake-pipeline-token" not in str(raised.value)

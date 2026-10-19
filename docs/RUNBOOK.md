@@ -124,6 +124,32 @@ Change requests:
 - To carry out approved requests now instead of waiting for the next pass:
   `python run.py --apply-requests`.
 
+## GitHub token
+
+Approved fault reports become GitHub issues through `gh issue create`. With `BD_GITHUB_TOKEN`
+in `.env`, the pipeline files them with its own fine-grained token, which can reach only this
+repo's issues. Without it, gh uses whoever is signed in on the scan machine, whose token
+reaches every repo that person can.
+
+To create the token (about five minutes):
+
+1. On GitHub, click your profile picture, then Settings, Developer settings, Personal access
+   tokens, Fine-grained tokens, and Generate new token.
+2. Name it `velocity-bd-team pipeline`, set Resource owner to Velocity-Explorations, and set
+   an expiration (90 days is a sensible default; GitHub emails a reminder before it lapses).
+3. Under Repository access, choose Only select repositories and pick velocity-bd-team.
+4. Under Permissions, set Issues to Read and write. Leave everything else at No access;
+   Metadata stays Read-only because GitHub requires it.
+5. Click Generate token and copy it. GitHub shows it only once.
+6. Open `.env` in VS Code, add a line `BD_GITHUB_TOKEN=` followed by the token, and save.
+7. If the organization requires approval for fine-grained tokens, approve it in the
+   Velocity-Explorations organization settings under Personal access tokens, Pending requests.
+8. Check it: `python -m config` should show `BD_GITHUB_TOKEN` as `set` instead of `MISSING`.
+
+When the token expires or loses access, the fault report's result on the Requests page names
+`BD_GITHUB_TOKEN` and says what to fix. Create a new token the same way and replace the value
+in `.env`; the next pass files the report.
+
 ## Dashboard
 
 ```powershell

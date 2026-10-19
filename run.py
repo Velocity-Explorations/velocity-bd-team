@@ -41,6 +41,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import config
 from ledger.db import dry_run_session
 from ledger.queries import (
     calls_where,
@@ -74,6 +75,7 @@ APPLY_KINDS = ("keyword_change", "rereview", "scan", "fault_report")   # drafts 
 SETTINGS_BRANCH = "main"
 GIT_TIMEOUT_S = 60
 ISSUE_TIMEOUT_S = 120
+GITHUB_TOKEN_KEY = "BD_GITHUB_TOKEN"   # the pipeline's own fine-grained token: this repo's issues only
 
 log = logging.getLogger("pipeline")
 
@@ -414,12 +416,30 @@ def github_waiting() -> str | None:
     return None
 
 
+def github_env() -> dict[str, str] | None:
+    """Environment for gh: the pipeline's own token when .env has one, else None so gh uses the signed-in login."""
+    token = config.get(GITHUB_TOKEN_KEY)
+    return {**os.environ, "GH_TOKEN": token} if token else None
+
+
 def file_issue(title: str, body: str) -> str:
-    """File a GitHub issue in this repo with gh. Returns the issue's URL."""
+    """File a GitHub issue in this repo with gh. Returns the issue's URL.
+
+    gh files it with the pipeline's own token (BD_GITHUB_TOKEN) when .env has one, and with
+    whoever is signed in to gh otherwise. See "GitHub token" in docs/RUNBOOK.md.
+    """
+    env = github_env()
     done = subprocess.run(["gh", "issue", "create", "--title", title, "--body", body], cwd=REPO_ROOT,
-                          capture_output=True, text=True, timeout=ISSUE_TIMEOUT_S)
+                          capture_output=True, text=True, timeout=ISSUE_TIMEOUT_S, env=env)
     if done.returncode != 0:
-        raise RuntimeError(f"gh issue create failed: {(done.stderr or done.stdout).strip()[:200]}")
+        error = (done.stderr or done.stdout).strip()
+        if env and ("401" in error or "Bad credentials" in error):
+            raise RuntimeError(f"GitHub refused the pipeline token in {GITHUB_TOKEN_KEY}; it has probably expired. "
+                               "Create a new one (see GitHub token in docs/RUNBOOK.md) and replace it in .env.")
+        if env and ("403" in error or "not accessible" in error):
+            raise RuntimeError(f"The pipeline token in {GITHUB_TOKEN_KEY} cannot file issues here. Give it "
+                               "Issues: Read and write on velocity-bd-team (see GitHub token in docs/RUNBOOK.md).")
+        raise RuntimeError(f"gh issue create failed: {error[:200]}")
     return done.stdout.strip().splitlines()[-1]
 
 
