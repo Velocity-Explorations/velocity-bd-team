@@ -3,7 +3,7 @@
 Offline copies of the four build plans (open in a browser). The live, editable versions are claude.ai artifacts owned by David:
 
 - vulcan-sof-agent-playbook.html: Phases 0 to 9. Repo and ledger, Vulcan SOF scraper, review, Slack feedback, dashboard. Start here.
-- proposal-corpus-plan.html: Phases A to F. Drive corpus of past proposals, outcomes register, retrieval. Not built yet.
+- proposal-library-plan.html: Phases A to F. Proposal Library of past proposals on Drive, outcomes register, retrieval. Not built yet.
 - draft-ready-upgrade.html: U1 and U2. The draft queue the Writer Plan needs.
 - writer-plan.html: Phases W0 to W5. Port of the proposal-drafting pipeline, its draft queue and worker, and delivery to Drive.
 

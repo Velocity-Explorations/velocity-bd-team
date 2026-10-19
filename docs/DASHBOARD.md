@@ -13,7 +13,7 @@ it is in [dashboard/README.md](../dashboard/README.md).
 | `/calls` | **All calls**, newest first, up to 200 at a time. Filters: title text, portal, filter_result, ai_verdict (or not reviewed), human_status (or undecided). Shows the filter tier and filter_reason for rejected rows, the AI's reason behind a toggle, who decided and when, and every note. Each row has a "decide" or "change" control, for example to move a call from Pursue to Submitted, or to add a note to a decided call. |
 | `/requests` | **Change requests** from the portal assistant (docs/ASSISTANT.md, "Approvals"). Requests waiting for approval come first, oldest first, each with who asked, why, and the preview of what approving would do, plus Approve and Reject buttons and an optional note. Below them, the last 50 decided requests with their status, who decided, and the result, or what an approved request is waiting for. The Requests link in the top bar shows how many are waiting. |
 | `/runs` | **Scan history.** The most recent run sits at the top with its status, start time, duration, stage counts, error and log. Below it, the last 100 runs. A run still marked running two hours after it started is flagged as having no finish recorded. |
-| `/proposals` | **Past submissions** from the proposals table, with win rate by portal. Shows an empty state until the Proposal Corpus plan fills the table. |
+| `/proposals` | **Past submissions** from the proposals table, with win rate by portal. Shows an empty state until the Proposal Library plan fills the table. |
 
 The queue and the proposals tiles use the "Triage backlog" and "Win rate by portal" queries
 from [LEDGER_SCHEMA.md](LEDGER_SCHEMA.md); the "new this week" count uses its "New calls this

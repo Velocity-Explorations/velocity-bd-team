@@ -32,7 +32,7 @@ One row per execution of a component. Written by the component itself through
 | Column | Type | Values | Written by |
 |---|---|---|---|
 | id | INTEGER, primary key, auto-increment | | database |
-| component | TEXT, not null | `vulcan_sof`, `review`, `corpus`, `pipeline`, or any later component slug | the component, at start |
+| component | TEXT, not null | `vulcan_sof`, `review`, `library`, `pipeline`, or any later component slug | the component, at start |
 | portal | TEXT | portal slug when the run is portal-scoped, else NULL | the component, at start |
 | started_at | TEXT timestamp, not null | | the component, at start |
 | finished_at | TEXT timestamp | NULL while running | the component, at finish |
@@ -94,33 +94,33 @@ stored call of its portal again, so `filter_result` can change on old rows.
 
 ## Table: proposals
 
-One row per past submission, keyed by the Drive folder name. Filled by the corpus sync
-(Proposal Corpus plan, Phase A); `brief` is generated later.
+One row per past submission, keyed by the Drive folder name. Filled by the library sync
+(Proposal Library plan, Phase A); `brief` is generated later.
 
 | Column | Type | Values | Written by |
 |---|---|---|---|
-| submission_id | TEXT, primary key | `YYYY-MM-DD_portal_short-title`, equal to the Drive folder name | corpus sync |
-| title | TEXT | | corpus sync |
-| portal | TEXT | portal or program slug (`sbir`, `vulcan_sof`, `sam`, and so on) | corpus sync |
-| agency | TEXT | | corpus sync |
-| solicitation_id | TEXT | the government's identifier | corpus sync |
-| type | TEXT | response type (SBIR Phase I, white paper, BAA response, and so on) | corpus sync |
-| role | TEXT | `prime`, `sub`, `team member` or similar | corpus sync |
-| partners | TEXT | free text or JSON array | corpus sync |
-| submitted_date | TEXT date | `YYYY-MM-DD` | corpus sync |
-| due_date | TEXT date | `YYYY-MM-DD` | corpus sync |
-| requested_value | TEXT | dollar amount as text | corpus sync |
-| outcome | TEXT | NULL, `won`, `lost`, `no_award`, `pending`, `withdrawn`, `shortlisted` | corpus sync |
-| outcome_date | TEXT date | | corpus sync |
-| award_value | TEXT | dollar amount as text | corpus sync |
-| strength_rating | INTEGER | 1 to 5, or NULL | corpus sync (hand-entered) |
-| strength_reason | TEXT | | corpus sync |
-| why_won_or_lost | TEXT | | corpus sync |
-| use_as_exemplar | INTEGER, not null, default 0 | 1 when the Writer may quote it | corpus sync |
-| themes | TEXT JSON | array of strings | corpus sync |
-| drive_link | TEXT | URL of the Drive folder | corpus sync |
-| brief | TEXT | one-paragraph summary | corpus brief generator |
-| synced_at | TEXT timestamp | last sync from the register | corpus sync |
+| submission_id | TEXT, primary key | `YYYY-MM-DD_portal_short-title`, equal to the Drive folder name | library sync |
+| title | TEXT | | library sync |
+| portal | TEXT | portal or program slug (`sbir`, `vulcan_sof`, `sam`, and so on) | library sync |
+| agency | TEXT | | library sync |
+| solicitation_id | TEXT | the government's identifier | library sync |
+| type | TEXT | response type (SBIR Phase I, white paper, BAA response, and so on) | library sync |
+| role | TEXT | `prime`, `sub`, `team member` or similar | library sync |
+| partners | TEXT | free text or JSON array | library sync |
+| submitted_date | TEXT date | `YYYY-MM-DD` | library sync |
+| due_date | TEXT date | `YYYY-MM-DD` | library sync |
+| requested_value | TEXT | dollar amount as text | library sync |
+| outcome | TEXT | NULL, `won`, `lost`, `no_award`, `pending`, `withdrawn`, `shortlisted` | library sync |
+| outcome_date | TEXT date | | library sync |
+| award_value | TEXT | dollar amount as text | library sync |
+| strength_rating | INTEGER | 1 to 5, or NULL | library sync (hand-entered) |
+| strength_reason | TEXT | | library sync |
+| why_won_or_lost | TEXT | | library sync |
+| use_as_exemplar | INTEGER, not null, default 0 | 1 when the Writer may quote it | library sync |
+| themes | TEXT JSON | array of strings | library sync |
+| drive_link | TEXT | URL of the Drive folder | library sync |
+| brief | TEXT | one-paragraph summary | library brief generator |
+| synced_at | TEXT timestamp | last sync from the register | library sync |
 | updated_at | TEXT timestamp, not null | | every writer |
 
 Index: `(portal, outcome)`.

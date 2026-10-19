@@ -2,7 +2,7 @@
 
 Opportunity pipeline for Velocity Explorations: scan government and prime-contractor
 portals (first: Vulcan SOF), filter and review the open calls for fit, surface them in
-Slack, record the team's decisions, keep a corpus of past proposals, and show it all on a
+Slack, record the team's decisions, keep a Proposal Library of past proposals, and show it all on a
 dashboard.
 
 ## Layout
@@ -16,7 +16,7 @@ dashboard.
 | review/ | Per-call review, regex gate then LLM verdict. |
 | assistant/ | The portal assistant's toolbox: read tools, and propose tools whose requests a person approves on the dashboard. See docs/ASSISTANT.md. |
 | slack/ | Alerts, cards for new calls, thread notes. Decisions are made on the dashboard. |
-| corpus/ | Past-proposal corpus: Drive sync, extraction, embeddings. |
+| library/ | Proposal Library of past proposals: Drive sync, extraction, embeddings. |
 | dashboard/ | Next.js triage dashboard over the ledger: review queue, all calls, requests, runs, proposals. See docs/DASHBOARD.md. |
 | docs/ | LEDGER_SCHEMA.md, DASHBOARD.md, RUNBOOK.md, OWNERS.md, STATUS.md, plans/. |
 | tests/ | pytest suite, runs on SQLite. |

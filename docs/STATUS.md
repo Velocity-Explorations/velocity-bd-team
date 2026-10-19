@@ -44,7 +44,7 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   the gh login when `.env` has none. A token limited to this repo's issues would need
   fine-grained tokens enabled for Velocity-Explorations. Renewal steps are in
   docs/RUNBOOK.md, "GitHub token".
-- Plans (2026-10-18): the Writer Plan, the Draft-Ready Upgrade and the corpus plan were revised
+- Plans (2026-10-18): the Writer Plan, the Draft-Ready Upgrade and the Proposal Library plan were revised
   so the dashboard decides. Drafts are requested with the dashboard's Draft button, an approved
   draft request from the assistant, or the CLI. Offline copies are in docs/plans/.
 - Shared portal helpers (2026-10-17): browser, saved sessions, emailed sign-in codes and the

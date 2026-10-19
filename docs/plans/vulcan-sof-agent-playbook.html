@@ -121,7 +121,7 @@
     <h1>Vulcan SOF Agent Playbook</h1>
     <p class="lede">Ten self-contained prompts that take an agent from an empty repository to a scheduled scanner that logs into Vulcan SOF, scrapes open calls, judges fit, delivers results to Slack, learns from the team's reactions, and shows everything in a dashboard. One repo, one database as the contract between every part. Each prompt restates its own context, so it can be pasted into a fresh session.</p>
     <div class="meta">
-      <span><b>Companion plan</b> Proposal Corpus (training on past submissions) lives on its own page and plugs into Phase 6</span>
+      <span><b>Companion plan</b> Proposal Library (training on past submissions) lives on its own page and plugs into Phase 6</span>
       <span><b>Derived from</b> the retired Yukon scanner, including every fix that cost us a hung scan</span>
       <span><b>Written</b> 2026-10-15</span>
     </div>
@@ -130,7 +130,7 @@
   <nav class="rail" aria-label="Phases">
     <div class="eyebrow">Phases</div>
     <ol>
-      <li><a href="#team"><span class="n">—</span><span>The team of agents</span></a></li>
+      <li><a href="#team"><span class="n">·</span><span>The team of agents</span></a></li>
       <li><a href="#setup"><span class="n">YOU</span><span>Your setup, step by step</span></a></li>
       <li><a href="#p0"><span class="n">00</span><span>Repo &amp; ledger foundation</span></a></li>
       <li><a href="#p1"><span class="n">01</span><span>Browser &amp; reconnaissance</span></a></li>
@@ -161,12 +161,12 @@
 - Shell: PowerShell. Python 3.11+ in a venv at .venv. Use pathlib everywhere; never hard-code / or \.
 - Mail and Drive access: the `gog` CLI (install the Windows release, run `gog auth` as david@velocityexplorations.com).
   OTP mailbox: gog gmail search / gog gmail read --account david@velocityexplorations.com
-  Drive: gog drive (list / download / export) for the corpus folder
+  Drive: gog drive (list / download / export) for the Proposal Library folder
   If gog is unavailable on this machine, implement the same calls with the Gmail and Drive APIs behind the same function signatures.
 - LLM for review and briefs: Anthropic API via ANTHROPIC_API_KEY
   (claude-haiku-5-5 for per-call review, claude-sonnet-5-5 for proposal briefs)
 - Embeddings: Ollama for Windows, nomic-embed-text at http://localhost:11434 (768 dims)
-- Alerts and delivery: Slack — SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
+- Alerts and delivery: Slack: SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
 - Scheduler: Windows Task Scheduler, created by a PowerShell script in scripts/ (Register-ScheduledTask); never overlapping runs.
 - Playwright's Chromium shows up as chrome.exe in Task Manager.
 
@@ -174,14 +174,14 @@
 - Before Phase 0: hosted Postgres (Neon/Supabase), DATABASE_URL, pgvector enabled
 - Before Phase 1: .env with VULCAN_SOF_USERNAME / PASSWORD / VULCAN_OTP_MAILBOX
 - Before Phase 8: a Slack app (chat:write, reactions:read, channels:history), bot token, channel ID
-- Before Corpus A: the Drive folder built, its folder ID in CORPUS_DRIVE_FOLDER_ID</div>
+- Before Library phase A: the Drive folder built, its folder ID in LIBRARY_DRIVE_FOLDER_ID</div>
       <div class="tree">velocity-bd-team/
   ledger/              schema.sql · migrate.py · db.py · queries.py        Phase 0
-  portals/vulcan_sof/  browser · recon · otp · auth · session · scrape    Phases 1–5
+  portals/vulcan_sof/  browser · recon · otp · auth · session · scrape    Phases 1 to 5
                        keywords.yaml · filter.py
   review/              reviewer.py · feedback.py                          Phases 6, 8
   slack/               sink.py                                            Phase 8
-  corpus/              (Proposal Corpus plan)
+  library/              (Proposal Library plan)
   dashboard/           Next.js app reading the same database              Phase 9
   run.py               orchestration                                      Phase 7
   docs/                LEDGER_SCHEMA.md · RUNBOOK.md
@@ -196,22 +196,22 @@
         <thead><tr><th>Agent</th><th>Owns</th><th>Job</th><th>Builds</th></tr></thead>
         <tbody>
           <tr><td><b>Coordinator</b></td><td><code>run.py</code>, <code>ledger/</code>, <code>AGENTS.md</code>, <code>docs/</code>, the scheduler</td><td>Runs the pipeline, watches the <code>runs</code> table, alerts on failures, merges PRs, is the only one who changes the schema, keeps <code>docs/STATUS.md</code> current</td><td>Phases 0, 7</td></tr>
-          <tr><td><b>Portal agents</b> (one each: Vulcan SOF first, then SAM.gov, NSTXL, DIU, AFWERX…)</td><td><code>portals/&lt;slug&gt;/</code></td><td>Log in, scrape, filter for that portal; produce <code>calls</code> rows in the shared record shape; fix the scraper when the site changes</td><td>Phases 1–5 per portal</td></tr>
+          <tr><td><b>Portal agents</b> (one each: Vulcan SOF first, then SAM.gov, NSTXL, DIU, AFWERX…)</td><td><code>portals/&lt;slug&gt;/</code></td><td>Log in, scrape, filter for that portal; produce <code>calls</code> rows in the shared record shape; fix the scraper when the site changes</td><td>Phases 1 to 5 per portal</td></tr>
           <tr><td><b>Reviewer</b></td><td><code>review/</code></td><td>The fit judgment every portal's calls pass through: the review prompt, few-shot feedback, calibration against <code>human_status</code>; reports precision/recall monthly</td><td>Phases 6, 8 (feedback half)</td></tr>
-          <tr><td><b>Librarian</b></td><td><code>corpus/</code></td><td>Drive sync, register sync, extraction, embeddings, exemplar retrieval; keeps the past-proposal memory accurate</td><td>Proposal Corpus plan A–F</td></tr>
-          <tr><td><b>Writer</b></td><td><code>drafting/</code></td><td>Turns a pursued call plus exemplars into a draft response (the old RFP pipeline: requirements → alignment → outline → draft → review → compliance); never touches the scanner</td><td>Writer Plan W0–W4 (its own page)</td></tr>
+          <tr><td><b>Librarian</b></td><td><code>library/</code></td><td>Drive sync, register sync, extraction, embeddings, exemplar retrieval; keeps the past-proposal memory accurate</td><td>Proposal Library plan A to F</td></tr>
+          <tr><td><b>Writer</b></td><td><code>drafting/</code></td><td>Turns a pursued call plus exemplars into a draft response (the old RFP pipeline: requirements → alignment → outline → draft → review → compliance); never touches the scanner</td><td>Writer Plan W0 to W4 (its own page)</td></tr>
           <tr><td><b>Dashboard</b></td><td><code>dashboard/</code>, <code>slack/</code></td><td>Everything the humans see: Slack cards, the web app, the triage action</td><td>Phases 8 (delivery half), 9</td></tr>
         </tbody>
       </table>
       </div>
       <h3>Two cautions</h3>
       <ol>
-        <li><b>Don't start with six agents.</b> Every agent adds coordination cost. Start with the Coordinator and the Vulcan portal agent (that's this playbook, Phases 0–7), add the Reviewer at Phase 6 if you want it separated, and bring in the Librarian, Dashboard, and Writer as their plans begin. Add the second portal agent only after Vulcan runs unattended for a few weeks.</li>
-        <li><b>Specialize by what changes independently, not by what sounds tidy.</b> Portals change on their own schedule, so one agent each is right. The review prompt, the corpus, and the dashboard each change for their own reasons too. Splitting further (a "QA agent", a "schema agent") adds overhead without a boundary that earns it; those are the Coordinator's job.</li>
+        <li><b>Don't start with six agents.</b> Every agent adds coordination cost. Start with the Coordinator and the Vulcan portal agent (that's this playbook, Phases 0 to 7), add the Reviewer at Phase 6 if you want it separated, and bring in the Librarian, Dashboard, and Writer as their plans begin. Add the second portal agent only after Vulcan runs unattended for a few weeks.</li>
+        <li><b>Specialize by what changes independently, not by what sounds tidy.</b> Portals change on their own schedule, so one agent each is right. The review prompt, the Proposal Library, and the dashboard each change for their own reasons too. Splitting further (a "QA agent", a "schema agent") adds overhead without a boundary that earns it; those are the Coordinator's job.</li>
       </ol>
       <h3>Who's missing on purpose</h3>
       <ol>
-        <li>A <b>Capture agent</b> (go/no-go recommendation with pricing, teaming, and bid-strategy) is a plausible seventh role once the Writer exists and the corpus has outcomes to learn from. Not before.</li>
+        <li>A <b>Capture agent</b> (go/no-go recommendation with pricing, teaming, and bid-strategy) is a plausible seventh role once the Writer exists and the Proposal Library has outcomes to learn from. Not before.</li>
         <li>A <b>Compliance agent</b> (checks a draft against every "shall" in the solicitation) is already a phase inside the Writer's pipeline; it only becomes its own agent if the Writer gets too large.</li>
       </ol>
     </section>
@@ -230,7 +230,7 @@
         <div class="prompt-bar"><span class="label">Kickoff prompt · paste before Phase 0</span><button class="copy" type="button" data-copy="ck">Copy prompt</button></div>
 <pre class="body" id="ck">Create a new repository `velocity-bd-team` in this directory. I will paste a "Phase 0" prompt next that defines the layout and the database schema; follow it exactly. Before that, do two things:
 
-(a) The directory `reference/yukon/` already exists in this folder: read-only prior art from the retired Yukon scanner (11 source files, a templates/ folder, a knowledge-base/ folder, and INDEX.md describing each). Nothing in the repo may import from it. Read INDEX.md, confirm it lists every file present (it should: 24 files in all), and grep the directory for anything secret-looking (xoxb-, sk-ant-, AKIA, a literal password=) — expect none; report if you find any and stop.
+(a) The directory `reference/yukon/` already exists in this folder: read-only prior art from the retired Yukon scanner (11 source files, a templates/ folder, a knowledge-base/ folder, and INDEX.md describing each). Nothing in the repo may import from it. Read INDEX.md, confirm it lists every file present (it should: 24 files in all), and grep the directory for anything secret-looking (xoxb-, sk-ant-, AKIA, a literal password=): expect none; report if you find any and stop.
 
 (b) Write `AGENTS.md` at the repo root for the agent that will build the remaining phases. Include:
     - the repo layout and what each directory is for;
@@ -244,7 +244,7 @@
 
       ## Working alongside other agents
       Several agents work in this repo: a Coordinator, one agent per portal, and specialists
-      for review, corpus, drafting, and dashboard. Rules:
+      for review, the Proposal Library, drafting, and dashboard. Rules:
       1. Ownership. Each top-level directory has one owning agent, listed in docs/OWNERS.md.
          Change a directory you don't own only through a pull request to its owner.
       2. Branches. Never commit to main. Work on `&lt;agent&gt;/&lt;short-task&gt;` (e.g. vulcan-sof/fix-deadline-regex),
@@ -274,16 +274,16 @@
       - Shell: PowerShell. Python 3.11+ in a venv at .venv. Use pathlib everywhere; never hard-code / or \.
       - Mail and Drive access: the `gog` CLI (install the Windows release, run `gog auth` as david@velocityexplorations.com).
         OTP mailbox: gog gmail search / gog gmail read --account david@velocityexplorations.com
-        Drive: gog drive (list / download / export) for the corpus folder
+        Drive: gog drive (list / download / export) for the Proposal Library folder
         If gog is unavailable on this machine, implement the same calls with the Gmail and Drive APIs behind the same function signatures.
       - LLM for review and briefs: Anthropic API via ANTHROPIC_API_KEY
         (claude-haiku-5-5 for per-call review, claude-sonnet-5-5 for proposal briefs)
       - Embeddings: Ollama for Windows, nomic-embed-text at http://localhost:11434 (768 dims)
-      - Alerts and delivery: Slack — SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
+      - Alerts and delivery: Slack: SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
       - Scheduler: Windows Task Scheduler, created by a PowerShell script in scripts/ (Register-ScheduledTask); never overlapping runs.
       - Playwright's Chromium shows up as chrome.exe in Task Manager.
 
-(c) Write `docs/OWNERS.md` mapping directories to owning agents: run.py, ledger/, docs/, scheduler → Coordinator; portals/vulcan_sof/ → Vulcan SOF agent (one entry per portal as they're added); review/ → Reviewer; corpus/ → Librarian; drafting/ → Writer; dashboard/ and slack/ → Dashboard agent. And an empty `docs/STATUS.md` with headings Live / In progress / Known breakages.
+(c) Write `docs/OWNERS.md` mapping directories to owning agents: run.py, ledger/, docs/, scheduler → Coordinator; portals/vulcan_sof/ → Vulcan SOF agent (one entry per portal as they're added); review/ → Reviewer; library/ → Librarian; drafting/ → Writer; dashboard/ and slack/ → Dashboard agent. And an empty `docs/STATUS.md` with headings Live / In progress / Known breakages.
 
 Confirm all three are done, then wait for the Phase 0 prompt.</pre>
       </div>
@@ -318,7 +318,7 @@ Confirm all three are done, then wait for the Phase 0 prompt.</pre>
         <li>Push the repo to GitHub (private). Claude Code can do this if you ask: "create a private GitHub repo and push".</li>
         <li>Give the Grok bot access to the repo.</li>
         <li>Do not send it any secret in a message. The bot reads secrets from the environment it runs in. If it runs on your PC, they are already in <code>.env</code> there (or in 1Password via <code>op run --env-file .env -- …</code>, with <code>.env</code> holding only <code>op://</code> references). If it runs on a hosted platform, enter the values in that platform's secrets settings yourself. If the platform has no secret store, don't run it there.</li>
-        <li>Use dedicated credentials where possible so each can be revoked alone: a separate Anthropic key named <code>bd-team</code>, a Postgres role scoped to the ledger, the bot-specific Slack token, and Drive sharing limited to the corpus folder. Vulcan is the exception; the bot acts as you there.</li>
+        <li>Use dedicated credentials where possible so each can be revoked alone: a separate Anthropic key named <code>bd-team</code>, a Postgres role scoped to the ledger, the bot-specific Slack token, and Drive sharing limited to the Proposal Library folder. Vulcan is the exception; the bot acts as you there.</li>
         <li>Tell it which phase to start at and paste that phase's prompt. Nothing else from this page is needed.</li>
       </ol>
     </section>
@@ -327,13 +327,13 @@ Confirm all three are done, then wait for the Phase 0 prompt.</pre>
     <section class="phase" id="p0">
       <div class="phase-head"><span class="phase-num">PHASE 00</span><h2 class="phase-title">Repo and ledger foundation</h2></div>
       <div class="brief">
-        <p>Everything else writes into the database this phase creates, and the dashboard reads from it, so the schema is the one contract in the system. It's designed wider than "scraped calls" on purpose: it already has a <code>proposals</code> table for the Proposal Corpus plan, so that work slots in without a migration later.</p>
+        <p>Everything else writes into the database this phase creates, and the dashboard reads from it, so the schema is the one contract in the system. It's designed wider than "scraped calls" on purpose: it already has a <code>proposals</code> table for the Proposal Library plan, so that work slots in without a migration later.</p>
         <p>Postgres is specified because the dashboard needs to reach the database from wherever it's hosted. A free Neon or Supabase instance is enough. SQLite remains available for local development only.</p>
         <div class="depends">Depends on: nothing. Produces: the repository, <code>DATABASE_URL</code>, the schema, a migration runner, query helpers, and <code>docs/LEDGER_SCHEMA.md</code>.</div>
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase 00</span><button class="copy" type="button" data-copy="c0">Copy prompt</button></div>
-<pre class="body" id="c0">You are building `velocity-bd-team`, a single repository that will hold a government-opportunity scanner, an LLM reviewer, a Slack delivery/feedback loop, a past-proposal corpus, and a dashboard. This is Phase 0 of 9: create the repository and the shared database ("the ledger") that every later phase reads and writes. No scraping happens in this phase.
+<pre class="body" id="c0">You are building `velocity-bd-team`, a single repository that will hold a government-opportunity scanner, an LLM reviewer, a Slack delivery/feedback loop, a Proposal Library of past proposals, and a dashboard. This is Phase 0 of 9: create the repository and the shared database ("the ledger") that every later phase reads and writes. No scraping happens in this phase.
 
 ## Context
 
@@ -344,11 +344,11 @@ Database: PostgreSQL, reached via a `DATABASE_URL` in `.env` (a hosted free-tier
 ## Tasks
 
 1. Initialize the repo with this layout (create empty packages where noted):
-   ledger/ (schema.sql, migrate.py, db.py, queries.py), portals/vulcan_sof/, review/, slack/, corpus/, dashboard/ (empty for now), docs/, data/ (git-ignored), run.py (stub), README.md, .env.example, .gitignore (data/, .env, __pycache__, node_modules), pyproject.toml or requirements.txt (Python 3.11+).
-2. `ledger/schema.sql` — three tables, every timestamp ISO-8601 UTC text:
+   ledger/ (schema.sql, migrate.py, db.py, queries.py), portals/vulcan_sof/, review/, slack/, library/, dashboard/ (empty for now), docs/, data/ (git-ignored), run.py (stub), README.md, .env.example, .gitignore (data/, .env, __pycache__, node_modules), pyproject.toml or requirements.txt (Python 3.11+).
+2. `ledger/schema.sql`: three tables, every timestamp ISO-8601 UTC text:
 
    runs(
-     id INTEGER PRIMARY KEY (autoincrement/serial), component TEXT (e.g. 'vulcan_sof','review','corpus','pipeline'),
+     id INTEGER PRIMARY KEY (autoincrement/serial), component TEXT (e.g. 'vulcan_sof','review','library','pipeline'),
      portal TEXT, started_at, finished_at,
      status TEXT CHECK IN ('running','completed','skipped_timeout','error'),
      stage_counts TEXT (JSON: {"fetched":N,"filtered":N,"reviewed":N,"new":N}),
@@ -368,19 +368,19 @@ Database: PostgreSQL, reached via a `DATABASE_URL` in `.env` (a hosted free-tier
      extra TEXT (JSON; portal-specific fields with a key prefix such as "vulcan_"; never add portal-specific columns),
      updated_at )
 
-   proposals(                             -- past submissions; filled by the Proposal Corpus plan
+   proposals(                             -- past submissions; filled by the Proposal Library plan
      submission_id TEXT PRIMARY KEY,      -- "YYYY-MM-DD_portal_short-title", matches a Drive folder name
      title, portal, agency, solicitation_id, type, role, partners, submitted_date, due_date,
      requested_value TEXT, outcome TEXT CHECK IN ('won','lost','no_award','pending','withdrawn','shortlisted') NULL,
-     outcome_date, award_value TEXT, strength_rating INTEGER (1–5), strength_reason TEXT,
+     outcome_date, award_value TEXT, strength_rating INTEGER (1 to 5), strength_reason TEXT,
      why_won_or_lost TEXT, use_as_exemplar INTEGER DEFAULT 0, themes TEXT, drive_link TEXT,
      brief TEXT,                          -- one-paragraph summary generated later
      synced_at, updated_at )
 
    Add indexes on calls(portal, first_seen_at), calls(human_status), calls(ai_verdict), proposals(portal, outcome).
 3. `ledger/migrations/001_initial.sql` holds the schema above; `ledger/migrate.py` applies every `NNN_*.sql` in order that isn't yet recorded in a `schema_migrations` table. Running it twice is a no-op. Works against both Postgres and SQLite. Later schema changes are new numbered files, additive only (see AGENTS.md).
-4. `ledger/db.py` — `connect()` returning a DB-API connection from DATABASE_URL (psycopg for postgres://, sqlite3 for sqlite://), a `tx()` context manager that commits/rolls back, and a tiny `q(sql, params)` helper that normalizes the `?` vs `%s` placeholder difference so queries.py is written once.
-5. `ledger/queries.py` — the functions later phases will call. Implement and unit-test each:
+4. `ledger/db.py`: `connect()` returning a DB-API connection from DATABASE_URL (psycopg for postgres://, sqlite3 for sqlite://), a `tx()` context manager that commits/rolls back, and a tiny `q(sql, params)` helper that normalizes the `?` vs `%s` placeholder difference so queries.py is written once.
+5. `ledger/queries.py`: the functions later phases will call. Implement and unit-test each:
    runs:  `start_run(portal, dry_run) -> id`, `finish_run(id, status, stage_counts, error=None, log_path=None)`
    calls: `upsert_call(record, run_id) -> bool is_new` (insert if absent and set first_seen/first_run; otherwise update scraped fields and last_seen/last_run, NEVER touching filter_*, ai_*, slack_*, human_* columns),
           `set_filter(id, result, reason=None, tier=None, keywords=None)`, `set_review(id, verdict, reasoning)`,
@@ -389,8 +389,8 @@ Database: PostgreSQL, reached via a `DATABASE_URL` in `.env` (a hosted free-tier
           `pending_feedback()` (slack_ts set, human_status null), `recent_decisions(limit=20)`,
           `export_csv(path)`.
    proposals: `upsert_proposal(row)`, `list_proposals(portal=None, outcome=None)`.
-6. `docs/LEDGER_SCHEMA.md` — every table, every column, allowed values, which component writes it, and a short "how to build a dashboard against this" section with three example queries (new calls this week, triage backlog, win rate by portal).
-7. `README.md` — purpose, layout, setup (.env, migrate), and the rule that components communicate only through the ledger.
+6. `docs/LEDGER_SCHEMA.md`: every table, every column, allowed values, which component writes it, and a short "how to build a dashboard against this" section with three example queries (new calls this week, triage backlog, win rate by portal).
+7. `README.md`: purpose, layout, setup (.env, migrate), and the rule that components communicate only through the ledger.
 
 ## Done when
 
@@ -406,7 +406,7 @@ Database: PostgreSQL, reached via a `DATABASE_URL` in `.env` (a hosted free-tier
           <li>During: approve package installs and file creation when asked.</li>
           <li>After: open your Postgres dashboard's table view and confirm <code>runs</code>, <code>calls</code>, <code>proposals</code>, <code>schema_migrations</code> exist.</li>
           <li>After: skim <code>docs/LEDGER_SCHEMA.md</code>. If a column name reads wrong to you, say so now; renaming is cheap before Phase 4 and expensive after.</li>
-          <li>If the final schema differs from this plan, paste <code>ledger/migrations/001_initial.sql</code> into a Claude conversation along with the playbook link and ask for Phases 4–9 and the companion plans to be reconciled. Any Claude session can do this from the artifact links; it doesn't need the old Yukon folder.</li>
+          <li>If the final schema differs from this plan, paste <code>ledger/migrations/001_initial.sql</code> into a Claude conversation along with the playbook link and ask for Phases 4 to 9 and the companion plans to be reconciled. Any Claude session can do this from the artifact links; it doesn't need the old Yukon folder.</li>
         </ol>
       </div>
     </section>
@@ -420,7 +420,7 @@ Database: PostgreSQL, reached via a `DATABASE_URL` in `.env` (a hosted free-tier
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase 01</span><button class="copy" type="button" data-copy="c1">Copy prompt</button></div>
-<pre class="body" id="c1">You are working in the `velocity-bd-team` repository. Phase 0 created the layout (ledger/, portals/vulcan_sof/, review/, slack/, corpus/, dashboard/, docs/, data/) and a config pattern where settings come from `.env`. This is Phase 1 of 9: install browser automation and confirm headless access to the Vulcan SOF portal. Do not attempt to log in yet.
+<pre class="body" id="c1">You are working in the `velocity-bd-team` repository. Phase 0 created the layout (ledger/, portals/vulcan_sof/, review/, slack/, library/, dashboard/, docs/, data/) and a config pattern where settings come from `.env`. This is Phase 1 of 9: install browser automation and confirm headless access to the Vulcan SOF portal. Do not attempt to log in yet.
 
 ## Context
 
@@ -433,13 +433,13 @@ Vulcan SOF (https://vulcan-sof.com) is USSOCOM's industry engagement portal wher
 Authentication is username + password followed by a 6-digit one-time code emailed to the account owner (Phase 2). The reference implementation used Python 3.11 with Playwright and headless Chromium; use the same unless the runtime forbids it.
 
 Two rules that apply to every phase, learned from a scan that hung for three days:
-1. NEVER wait for Playwright's "networkidle" state on this site. The Angular app keeps background XHR/WebSocket traffic alive, so networkidle never fires. Use wait_for_load_state("domcontentloaded") followed by a fixed wait_for_timeout() of 1.5–3 seconds.
+1. NEVER wait for Playwright's "networkidle" state on this site. The Angular app keeps background XHR/WebSocket traffic alive, so networkidle never fires. Use wait_for_load_state("domcontentloaded") followed by a fixed wait_for_timeout() of 1.5 to 3 seconds.
 2. Every navigation and every wait gets an explicit timeout. Nothing may block indefinitely.
 
 ## Tasks
 
 1. Add to `.env.example` and the config loader: VULCAN_SOF_USERNAME, VULCAN_SOF_PASSWORD, VULCAN_OTP_MAILBOX (the address the OTP is sent to). Parse `.env` line by line; a missing key must produce a clear error naming the key, never a stack trace.
-2. `portals/vulcan_sof/browser.py` — `launch()` returning (playwright, browser, context, page) with chromium, headless=True, 15-second launch timeout; `close_all()` that closes everything without raising; and a module-level `_active_browser` reference plus `force_close()` that closes it from another thread without raising (Phase 7 relies on this).
+2. `portals/vulcan_sof/browser.py`: `launch()` returning (playwright, browser, context, page) with chromium, headless=True, 15-second launch timeout; `close_all()` that closes everything without raising; and a module-level `_active_browser` reference plus `force_close()` that closes it from another thread without raising (Phase 7 relies on this).
 3. Install Playwright and the Chromium binary. Verify with a one-line launch/close script.
 4. `portals/vulcan_sof/recon.py`:
    - Navigate to the login URL (30s), wait domcontentloaded (15s), then 2s.
@@ -480,7 +480,7 @@ Vulcan SOF (https://vulcan-sof.com) is an Angular SPA under /login/ng2/.
 - Login page:    https://vulcan-sof.com/login/ng2/auth/login
 - Calls listing: https://vulcan-sof.com/login/ng2/search/calls  (only reachable when logged in)
 
-Auth flow: enter username and password, press Enter. The account requires 2FA, so the page then shows a one-time-code screen. The code is emailed to the account's address from notifications@vulcan-sof.com with subject "Vulcan - OTP Code". The body contains the line "YOUR AUTHENTICATION CODE: 123456" (six digits). It usually arrives within 10–30 seconds.
+Auth flow: enter username and password, press Enter. The account requires 2FA, so the page then shows a one-time-code screen. The code is emailed to the account's address from notifications@vulcan-sof.com with subject "Vulcan - OTP Code". The body contains the line "YOUR AUTHENTICATION CODE: 123456" (six digits). It usually arrives within 10 to 30 seconds.
 
 Rules for every phase: never use wait_for_load_state("networkidle") on this site; use "domcontentloaded" plus a fixed wait_for_timeout(). Every navigation and wait has an explicit timeout.
 
@@ -507,10 +507,10 @@ OTP entry (Angular quirks):
 
 ## Tasks
 
-1. `portals/vulcan_sof/otp.py` — `get_otp(sent_after: float, max_wait: int = 90) -> str | None`. Poll every 5 seconds until max_wait: search the mailbox (VULCAN_OTP_MAILBOX) for messages from notifications@vulcan-sof.com with subject "Vulcan - OTP Code" received in the last 5 minutes, newest first. Reject any message received before `sent_after`. Extract with regex `YOUR AUTHENTICATION CODE:\s*(\d{6})`, return the last match. Every mailbox call has its own 15s timeout; every failure (tool missing, timeout, non-zero exit, no match) logs and continues polling. Return None on overall timeout.
+1. `portals/vulcan_sof/otp.py`: `get_otp(sent_after: float, max_wait: int = 90) -> str | None`. Poll every 5 seconds until max_wait: search the mailbox (VULCAN_OTP_MAILBOX) for messages from notifications@vulcan-sof.com with subject "Vulcan - OTP Code" received in the last 5 minutes, newest first. Reject any message received before `sent_after`. Extract with regex `YOUR AUTHENTICATION CODE:\s*(\d{6})`, return the last match. Every mailbox call has its own 15s timeout; every failure (tool missing, timeout, non-zero exit, no match) logs and continues polling. Return None on overall timeout.
    Implement against whatever mail access this environment has (Gmail API, IMAP, or a CLI). The reference used: `gog gmail search "from:notifications@vulcan-sof.com subject:'Vulcan - OTP Code' newer_than:5m" --max 1 --account &lt;mailbox&gt;` then `gog gmail read &lt;thread_id&gt; --account &lt;mailbox&gt;`.
-2. `portals/vulcan_sof/auth.py` — `login(page, context, username, password) -> bool` implementing everything above, with INFO logging at each step (page URL, which selector matched, OTP required yes/no, post-OTP URL). On failure log the URL and first 150 characters of body text, return False. Never log the password; logging the OTP code is acceptable.
-3. `portals/vulcan_sof/test_login.py` — launches, calls login(), on success navigates to the calls listing, waits domcontentloaded + 3s, saves `data/after_login.png`, prints the URL and the count of anchors whose href contains "collectionUuid".
+2. `portals/vulcan_sof/auth.py`: `login(page, context, username, password) -> bool` implementing everything above, with INFO logging at each step (page URL, which selector matched, OTP required yes/no, post-OTP URL). On failure log the URL and first 150 characters of body text, return False. Never log the password; logging the OTP code is acceptable.
+3. `portals/vulcan_sof/test_login.py`: launches, calls login(), on success navigates to the calls listing, waits domcontentloaded + 3s, saves `data/after_login.png`, prints the URL and the count of anchors whose href contains "collectionUuid".
 
 ## Done when
 
@@ -538,7 +538,7 @@ OTP entry (Angular quirks):
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase 03</span><button class="copy" type="button" data-copy="c3">Copy prompt</button></div>
-<pre class="body" id="c3">You are working in the `velocity-bd-team` repository. Phases 1–2 produced `portals/vulcan_sof/` with `browser.py`, `otp.py`, and `auth.py` whose `login(page, context, username, password) -> bool` performs username/password + OTP login, plus an `is_logged_in(page)` helper. This is Phase 3 of 9: persist the browser session so repeat runs skip the emailed one-time code.
+<pre class="body" id="c3">You are working in the `velocity-bd-team` repository. Phases 1 to 2 produced `portals/vulcan_sof/` with `browser.py`, `otp.py`, and `auth.py` whose `login(page, context, username, password) -> bool` performs username/password + OTP login, plus an `is_logged_in(page)` helper. This is Phase 3 of 9: persist the browser session so repeat runs skip the emailed one-time code.
 
 ## Context
 
@@ -551,10 +551,10 @@ Rules for every phase: never use "networkidle"; use "domcontentloaded" plus a fi
 ## Tasks
 
 1. `portals/vulcan_sof/session.py`:
-   - `save_cookies(context)` — writes `context.cookies()` as JSON to `data/vulcan_cookies.json`, creating the directory if needed. Never raises; logs on failure.
-   - `load_cookies(context) -> bool` — if the file exists with a non-empty list, `context.add_cookies(...)` and return True; else False. Never raises.
+   - `save_cookies(context)`: writes `context.cookies()` as JSON to `data/vulcan_cookies.json`, creating the directory if needed. Never raises; logs on failure.
+   - `load_cookies(context) -> bool`: if the file exists with a non-empty list, `context.add_cookies(...)` and return True; else False. Never raises.
 2. Make `auth.login()` cookie-first:
-   a. If `load_cookies(context)` is True, go to the calls listing (20s), wait 3s, call `is_logged_in(page)`. If True, log "Session restored from cookies — no OTP needed" and return True.
+   a. If `load_cookies(context)` is True, go to the calls listing (20s), wait 3s, call `is_logged_in(page)`. If True, log "Session restored from cookies: no OTP needed" and return True.
    b. If restore fails for any reason, log that the saved cookies expired and fall through to the password + OTP path.
    c. After a successful password/OTP login, `save_cookies(context)` before returning True.
 3. Add `--fresh` to `test_login.py` that deletes the cookie file first.
@@ -562,7 +562,7 @@ Rules for every phase: never use "networkidle"; use "domcontentloaded" plus a fi
 ## Done when
 
 - Run 1 (`--fresh`): log shows the password path, an OTP retrieved, login success; `data/vulcan_cookies.json` now exists.
-- Run 2 (no flag, immediately after): log shows "Session restored from cookies — no OTP needed", no mailbox query occurs, collectionUuid anchor count &gt; 0.
+- Run 2 (no flag, immediately after): log shows "Session restored from cookies: no OTP needed", no mailbox query occurs, collectionUuid anchor count &gt; 0.
 - Run 3: write `[]` into the cookie file and run again; log shows the fallback to password + OTP and the file is rewritten with a non-empty list.
 - Report wall-clock time of Run 1 versus Run 2.</pre>
       </div>
@@ -583,12 +583,12 @@ Rules for every phase: never use "networkidle"; use "domcontentloaded" plus a fi
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase 04</span><button class="copy" type="button" data-copy="c4">Copy prompt</button></div>
-<pre class="body" id="c4">You are working in the `velocity-bd-team` repository. Phases 0–3 produced the ledger (`ledger/queries.py` with `start_run`, `finish_run`, `upsert_call(record, run_id) -> is_new`) and `portals/vulcan_sof/` with a cookie-first `auth.login()`, `browser.launch()/close_all()`, and `session.save_cookies()`. This is Phase 4 of 9: enumerate every open call and scrape each detail page into the ledger.
+<pre class="body" id="c4">You are working in the `velocity-bd-team` repository. Phases 0 to 3 produced the ledger (`ledger/queries.py` with `start_run`, `finish_run`, `upsert_call(record, run_id) -> is_new`) and `portals/vulcan_sof/` with a cookie-first `auth.login()`, `browser.launch()/close_all()`, and `session.save_cookies()`. This is Phase 4 of 9: enumerate every open call and scrape each detail page into the ledger.
 
 ## Context
 
 Vulcan SOF (https://vulcan-sof.com) is an Angular SPA. After login:
-- Calls listing: https://vulcan-sof.com/login/ng2/search/calls — every open call is an &lt;a&gt; whose href contains `collectionUuid=`; the anchor's trimmed innerText is the title.
+- Calls listing: https://vulcan-sof.com/login/ng2/search/calls: every open call is an &lt;a&gt; whose href contains `collectionUuid=`; the anchor's trimmed innerText is the title.
 - Call detail pages render content as plain text sections. Fields are extracted from `document.body.innerText` with regexes; there are no reliable CSS hooks.
 
 Rules for every phase: never use "networkidle"; use "domcontentloaded" plus a fixed wait. Every navigation has a timeout. The whole run (login + listing + all detail pages) must finish in under 300 seconds, so keep per-page waits short.
@@ -622,7 +622,7 @@ Extraction regexes (Python `re`) against body innerText:
    - `list_calls(page) -> list[{"title","href"}]`: goto listing (20s), domcontentloaded (10s) + 3s, evaluate `document.querySelectorAll('a[href*="collectionUuid"]')` into {text: innerText.trim(), href: a.href}, drop empties, log the count.
    - `scrape_call(page, href, title) -> dict | None`: goto (15s), domcontentloaded (10s), wait 1.5s, read body innerText, apply the rules, return the record. Any exception: WARNING with the title's first 40 chars and the error, return None. One bad page never aborts the run.
    - `scrape_all(page, run_id) -> dict`: list, scrape sequentially with 0.3s between pages, log progress every 10, call `upsert_call(record, run_id)` for each, and return {"found": N, "scraped": N, "new": N, "failed": N}.
-2. `portals/vulcan_sof/run_scrape.py` — launches, logs in cookie-first, `start_run("Vulcan SOF")`, scrape_all, save cookies, `finish_run` with stage counts, then prints: found/scraped/new/failed, elapsed seconds, and the fill rate for due_date, posted_date, type, description (percentage of this run's rows where the field is non-empty and not the fallback).
+2. `portals/vulcan_sof/run_scrape.py`: launches, logs in cookie-first, `start_run("Vulcan SOF")`, scrape_all, save cookies, `finish_run` with stage counts, then prints: found/scraped/new/failed, elapsed seconds, and the fill rate for due_date, posted_date, type, description (percentage of this run's rows where the field is non-empty and not the fallback).
 3. For the first three calls only, save full body innerText to `data/samples/call_&lt;n&gt;.txt` so the regexes can be verified against real page text.
 
 ## Done when
@@ -662,12 +662,12 @@ Calls are screened for Velocity Explorations: a small defense software company d
    `broad_keywords` (loose; keeps anything plausibly in-lane): ai, artificial intelligence, machine learning, software, data, cyber, cloud, modernization, command and control, c2, nlp, autonomous, autonomy, digital, information, analytics, agentic, esof, engage sof, warfighter, joint, experimentation, computing, algorithm, automation, intelligence, help desk, privacy, opsec, c5isr, isr, sensor, network, communications, pcte, training system, simulation.
    `tight_keywords` (strong match): artificial intelligence, machine learning, autonomous systems, command and control, computer vision, natural language processing, cobol modernization, legacy modernization, transcription, translation, sensor fusion, c5isr, software defined, ai hardware, edge ai, autonomous vehicle, multi-agent.
    `blocklist_patterns` (regex, case-insensitive; any match rejects): `\brepair\b`, `\bspare parts\b`, `\bparts kit\b`, `\bnsn\s+\d`, `\b\d{4}-\d{2,}-\d{2,}-\d{2,}\b`, `\bhose assembly\b`, `\bcircuit card\b`, `\bconstruction\b.*\b(facility|building|pavement|airfield|runway)\b`, `\bindustry day\b`, `\breverse industry day\b`, `\bconference\b.*\bregistration\b`, `\bdocument destruction\b`, `\bmedical cart\b`, `\bboiler replacement\b`, `\bfuel supplier\b`, `\bdredging\b`, `\bappraisal service\b`, `\bplc training\b`.
-2. `portals/vulcan_sof/filter.py` — `filter_calls(rows, keywords_path) -> (kept, rejected)` where search_text = (title + " " + description).lower():
+2. `portals/vulcan_sof/filter.py`: `filter_calls(rows, keywords_path) -> (kept, rejected)` where search_text = (title + " " + description).lower():
    - Reject with reason "blocklist: &lt;pattern&gt;" if any blocklist pattern matches.
    - Else reject with reason "no keyword match" if no broad_keyword is a substring.
    - Else keep, with match_tier "tight" if any tight_keyword matches else "broad", and matched_keywords listing every hit.
    - Write each outcome with `set_filter(...)`. Substring matching on lowercased text is intentional; note the known weakness that "ai" matches "maintain"; the tight tier and the LLM phase handle that.
-3. `portals/vulcan_sof/run_filter.py` — filters every row with filter_result = 'pending' (or `--all` to re-filter everything, e.g. after a keywords change) and prints: total, kept-tight, kept-broad, rejected-blocklist, rejected-no-keyword, and a table of every rejected title with its reason.
+3. `portals/vulcan_sof/run_filter.py`: filters every row with filter_result = 'pending' (or `--all` to re-filter everything, e.g. after a keywords change) and prints: total, kept-tight, kept-broad, rejected-blocklist, rejected-no-keyword, and a table of every rejected title with its reason.
 
 ## Done when
 
@@ -689,7 +689,7 @@ Calls are screened for Velocity Explorations: a small defense software company d
     <section class="phase" id="p6">
       <div class="phase-head"><span class="phase-num">PHASE 06</span><h2 class="phase-title">LLM fit review</h2></div>
       <div class="brief">
-        <p>The "review listings" step. Strict <code>VERDICT</code>/<code>REASON</code> contract, fail-safe default to <code>maybe</code> so a model hiccup never silently discards a lead. Two slots are left open on purpose: <code>past_experience_block</code> gets filled by the Proposal Corpus plan, and <code>feedback_examples_block</code> by Phase 8.</p>
+        <p>The "review listings" step. Strict <code>VERDICT</code>/<code>REASON</code> contract, fail-safe default to <code>maybe</code> so a model hiccup never silently discards a lead. Two slots are left open on purpose: <code>past_experience_block</code> gets filled by the Proposal Library plan, and <code>feedback_examples_block</code> by Phase 8.</p>
         <div class="depends">Depends on: Phase 5. Produces: review/reviewer.py, populated ai_verdict / ai_reasoning columns.</div>
       </div>
       <div class="prompt">
@@ -704,7 +704,7 @@ Use this company profile verbatim as the context block of every review prompt:
 Velocity Explorations is a small defense technology company focused on:
 - Software development and AI/ML development for DoD and government
 - Legacy system modernization (COBOL, AS/400, mainframe → modern web/cloud)
-- Command and control (C2) systems — Echo C2 AI is their flagship product
+- Command and control (C2) systems: Echo C2 AI is their flagship product
 - Natural language processing, transcription, translation for operational environments
 - Computer vision, autonomous systems software
 - DevSecOps, cloud migration, data analytics platforms
@@ -717,7 +717,7 @@ Velocity does NOT do: hardware development or manufacturing; physical constructi
 A good opportunity for Velocity involves: building software, developing AI/ML models, modernizing legacy systems, creating C2 tools, or conducting R&amp;D in AI/autonomy/NLP.
 ---
 
-Two optional slots exist in the prompt. Leave them as empty strings for now but keep them as parameters: `past_experience_block` (similar past proposals with outcomes, supplied later by the corpus component) and `feedback_examples_block` (recent human decisions, supplied by Phase 8).
+Two optional slots exist in the prompt. Leave them as empty strings for now but keep them as parameters: `past_experience_block` (similar past proposals with outcomes, supplied later by the library component) and `feedback_examples_block` (recent human decisions, supplied by Phase 8).
 
 ## Review prompt template (fill the braces)
 
@@ -741,11 +741,11 @@ If past experience shows similar work has been pursued or won, weight that posit
 
 ## Tasks
 
-1. `review/reviewer.py` — `review_calls(rows, model_client, past_experience_fn=None, feedback_examples_block="") -> (passed, dropped)`:
+1. `review/reviewer.py`: `review_calls(rows, model_client, past_experience_fn=None, feedback_examples_block="") -> (passed, dropped)`:
    - For each row build the prompt (call `past_experience_fn(row)` for the block if provided), call the model with a 35-second timeout, retry once after 1 second on any error or empty response.
    - Parse line by line: "VERDICT:" sets the verdict if yes/no/maybe; "REASON:" sets the reason. Unparseable → verdict "maybe", reason "Could not parse LLM response". Both attempts failed → "maybe", "Review error: &lt;first 80 chars&gt;". The fail-safe is always "maybe", never "no": a model outage must not discard leads.
    - `set_review(id, verdict, reason)` for every row. "no" → dropped; "yes"/"maybe" → passed. Sleep 0.5s between calls. Log "AI review [verdict]: &lt;title&gt;" per row and "→ Dropped: &lt;reason&gt;" per no.
-2. `review/run_review.py` — reviews `calls_for_review(run_id)` for the latest run (or `--run-id`), with `--limit N`, and prints title | match_tier | verdict | reason for each, totals per verdict, elapsed time. Log the full rendered prompt at DEBUG for the first row.
+2. `review/run_review.py`: reviews `calls_for_review(run_id)` for the latest run (or `--run-id`), with `--limit N`, and prints title | match_tier | verdict | reason for each, totals per verdict, elapsed time. Log the full rendered prompt at DEBUG for the first row.
 
 ## Done when
 
@@ -768,11 +768,11 @@ If past experience shows similar work has been pursued or won, weight that posit
       <div class="phase-head"><span class="phase-num">PHASE 07</span><h2 class="phase-title">Orchestration, resilience, and schedule</h2></div>
       <div class="brief">
         <p>Ties the pieces into one command that runs unattended weekly. The hard timeout with a forced browser kill is the single most important safeguard; it's what turned a three-day hang into a logged five-minute skip. Run state lives in the <code>runs</code> table, so the dashboard can show scan history without reading log files.</p>
-        <div class="depends">Depends on: Phases 0–6. Produces: run.py, scheduled job, failure alert, docs/RUNBOOK.md.</div>
+        <div class="depends">Depends on: Phases 0 to 6. Produces: run.py, scheduled job, failure alert, docs/RUNBOOK.md.</div>
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase 07</span><button class="copy" type="button" data-copy="c7">Copy prompt</button></div>
-<pre class="body" id="c7">You are working in the `velocity-bd-team` repository. Phases 0–6 produced: the ledger (`ledger/queries.py`: start_run, finish_run, upsert_call, set_filter, set_review, calls_for_review, new_calls), `portals/vulcan_sof/` (browser with force_close, cookie-first auth, scrape_all(page, run_id), filter_calls), and `review/reviewer.py` (review_calls). Each stage currently has its own run_*.py. This is Phase 7 of 9: wire them into one resilient, schedulable command.
+<pre class="body" id="c7">You are working in the `velocity-bd-team` repository. Phases 0 to 6 produced: the ledger (`ledger/queries.py`: start_run, finish_run, upsert_call, set_filter, set_review, calls_for_review, new_calls), `portals/vulcan_sof/` (browser with force_close, cookie-first auth, scrape_all(page, run_id), filter_calls), and `review/reviewer.py` (review_calls). Each stage currently has its own run_*.py. This is Phase 7 of 9: wire them into one resilient, schedulable command.
 
 ## Context
 
@@ -784,7 +784,7 @@ In production this runs weekly, unattended. The reference implementation learned
    Portals are discovered through `portals/registry.py`: each portal package exposes `PORTAL = {"slug": "vulcan_sof", "name": "Vulcan SOF", "fetch": fn(page, run_id), "filter": fn(rows), "fetch_timeout": 300, "needs_browser": True}` and the registry imports every package under `portals/`. Adding a portal must not require editing `run.py`; a future portal agent only adds a package.
 2. Fetch stage with a hard timeout:
    - Run login + scrape_all in a worker thread; wait with a 300-second timeout.
-   - On timeout: ERROR "FETCH TIMEOUT: Vulcan SOF exceeded 300s — skipping", call `browser.force_close()`, finish_run with status 'skipped_timeout', continue to later stages with whatever rows were upserted before the timeout.
+   - On timeout: ERROR "FETCH TIMEOUT: Vulcan SOF exceeded 300s: skipping", call `browser.force_close()`, finish_run with status 'skipped_timeout', continue to later stages with whatever rows were upserted before the timeout.
    - On any other exception: log the first 200 characters, finish_run with status 'error', continue likewise.
    - On success: save cookies.
 3. Pipeline: start_run → fetch → filter (pending rows) → review (kept, unreviewed rows) → collect new calls (`new_calls(run_id)`: first seen this run, verdict yes/maybe) → digest → finish_run with stage_counts {"fetched","filtered","reviewed","new"} and log_path. Each stage logs one line: `STAGE: N rows (12.3s)`.
@@ -792,7 +792,7 @@ In production this runs weekly, unattended. The reference implementation learned
 5. Logging: every run writes `data/logs/run_YYYY-MM-DD_HHMM.log` in addition to stdout; store its path in runs.log_path.
 6. Scheduling: a PowerShell script `scripts/install-schedule.ps1` that registers a Windows Task Scheduler task (Register-ScheduledTask) running `run.py` inside the venv weekly, with "do not start a new instance" set so runs never overlap, plus the lock file as a second guard. Include an uninstall script.
 7. Failure notification: if fetch times out or errors, or login returns False, send a short alert through whatever channel this agent already uses to reach people. Include the stage, the error, and the log path.
-8. `docs/RUNBOOK.md` — how to run manually, flags, how to re-trigger an OTP login, where logs are, what each runs.status means.
+8. `docs/RUNBOOK.md`: how to run manually, flags, how to re-trigger an OTP login, where logs are, what each runs.status means.
 
 ## Done when
 
@@ -842,11 +842,11 @@ No public webhook: the bot polls Slack for reactions and thread replies at the s
    - `post_run_summary(run)`: calls scanned, new, yes/maybe counts, elapsed, and "react 👍 👎 ✅ ❌ on any card; reply 'note: …' in its thread to explain".
    - `collect_feedback()`: for every `pending_feedback()` row, `reactions.get` on its message; map the first matching reaction (priority ❌ &gt; ✅ &gt; 👎 &gt; 👍) via `set_human(id, status, user_id, ts)`. Then `conversations.replies` on the thread; store replies beginning with "note:" (case-insensitive) via `append_note`. For ❌, also `chat.delete` the bot message. Sleep 0.3s between API calls; honor Retry-After on 429.
    - Every Slack call has a 15s timeout, logs failures (status + first 200 chars), and never raises into run.py.
-2. `review/feedback.py` — `build_examples_block(limit=20) -> str` from `recent_decisions()`:
+2. `review/feedback.py`: `build_examples_block(limit=20) -> str` from `recent_decisions()`:
 
    --- RECENT HUMAN DECISIONS (examples of what the team considers relevant) ---
-   - [PURSUE] &lt;title&gt; — &lt;human_notes or ai_reasoning&gt;
-   - [NOT RELEVANT] &lt;title&gt; — &lt;human_notes or ai_reasoning&gt;
+   - [PURSUE] &lt;title&gt;: &lt;human_notes or ai_reasoning&gt;
+   - [NOT RELEVANT] &lt;title&gt;: &lt;human_notes or ai_reasoning&gt;
    ---
 
    pursue/submitted → PURSUE; not_relevant/dismissed → NOT RELEVANT. Return "" when there are no decisions.
@@ -887,15 +887,15 @@ Internal BD tool for a small team. No API layer: the app queries the database di
 
 ## Tasks
 
-1. `dashboard/` — Next.js app with its own package.json, reading DATABASE_URL from `dashboard/.env.local` (git-ignored). Add a `dashboard/README.md` with run and deploy-from-subdirectory notes (Vercel "Root Directory" or equivalent).
+1. `dashboard/`: Next.js app with its own package.json, reading DATABASE_URL from `dashboard/.env.local` (git-ignored). Add a `dashboard/README.md` with run and deploy-from-subdirectory notes (Vercel "Root Directory" or equivalent).
 2. Pages:
-   - `/` Review queue — calls with ai_verdict in (yes, maybe) and human_status null, newest first. Columns: verdict badge, title (links to url), due date, match tier, AI reason, first seen. Filter by portal and verdict. Row action buttons: Pursue / Not relevant / Submitted / Dismiss.
-   - `/calls` — all calls with filters (portal, filter_result, ai_verdict, human_status) and text search on title; shows filter_reason for rejected rows and human_notes.
-   - `/runs` — scan history: started/finished, portal, status, stage counts, link to log path; the most recent run's status prominently at the top.
-   - `/proposals` — the past-submission register from the `proposals` table: title, portal, type, submitted date, outcome, strength rating, exemplar flag; summary tiles for win rate by portal. Shows an empty state until the Proposal Corpus plan fills it.
+   - `/` Review queue: calls with ai_verdict in (yes, maybe) and human_status null, newest first. Columns: verdict badge, title (links to url), due date, match tier, AI reason, first seen. Filter by portal and verdict. Row action buttons: Pursue / Not relevant / Submitted / Dismiss.
+   - `/calls`: all calls with filters (portal, filter_result, ai_verdict, human_status) and text search on title; shows filter_reason for rejected rows and human_notes.
+   - `/runs`: scan history: started/finished, portal, status, stage counts, link to log path; the most recent run's status prominently at the top.
+   - `/proposals`: the past-submission register from the `proposals` table: title, portal, type, submitted date, outcome, strength rating, exemplar flag; summary tiles for win rate by portal. Shows an empty state until the Proposal Library plan fills it.
 3. One write action: a server action that sets human_status, human_by (the viewer's name from a simple env-configured allowlist or a header; no auth system yet), human_at, and optionally appends a note. It writes the same columns Slack reactions write, so either surface can be used.
 4. Theme: readable in light and dark; tabular numerals for dates and counts; nothing fancy.
-5. `docs/DASHBOARD.md` — pages, the write action, and a note that moving triage off Slack means removing the Slack reaction mapping in `slack/sink.py` or leaving both active (they are compatible).
+5. `docs/DASHBOARD.md`: pages, the write action, and a note that moving triage off Slack means removing the Slack reaction mapping in `slack/sink.py` or leaving both active (they are compatible).
 
 ## Done when
 
@@ -945,7 +945,7 @@ Internal BD tool for a small team. No API layer: the app queries the database di
         sel.addRange(range);
       }
       const prev = btn.textContent;
-      btn.textContent = ok ? 'Copied' : 'Selected — press ⌘C';
+      btn.textContent = ok ? 'Copied' : 'Selected: press ⌘C';
       btn.classList.add('done');
       setTimeout(() => { btn.textContent = prev; btn.classList.remove('done'); }, 1800);
     });

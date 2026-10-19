@@ -5,7 +5,7 @@
 The fail-safe is always "maybe", never "no": a model outage must not discard leads.
 Each call gets one retry after a second; both failing yields verdict "maybe" with a
 "Review error" reason. Two prompt slots stay empty for now: past_experience_block (the
-corpus component, later) and feedback_examples_block (Phase 8). A third, extra_context,
+library component, later) and feedback_examples_block (Phase 8). A third, extra_context,
 carries the team's note when a person approves a re-review (docs/ASSISTANT.md).
 """
 from __future__ import annotations

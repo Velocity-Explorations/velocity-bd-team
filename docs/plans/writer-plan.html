@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-  /* Layout: runbook, same system as the Vulcan SOF Agent Playbook and Proposal Corpus Plan. */
+  /* Layout: runbook, same system as the Vulcan SOF Agent Playbook and Proposal Library Plan. */
   :root {
     --bg: #f6f5f0; --surface: #fdfcf8; --ink: #1f2219; --ink-2: #4e5346; --ink-3: #7b8072; --line: #d9d8cc;
     --accent: #5b6a35; --accent-ink: #ffffff; --accent-soft: #e9ecd9;
@@ -91,9 +91,9 @@
   <header class="top">
     <div class="eyebrow">Companion plan · velocity-bd-team repo · drafting/ · Writer agent</div>
     <h1>Writer Plan</h1>
-    <p class="lede">Seven prompts that port the proven RFP response pipeline into the new repo with its prompts intact, let anyone on the team ask for a draft from the dashboard, through the assistant in Slack, or from the command line, and deliver the result to the corpus Drive folder. The first milestone is a real end-to-end run on a real pursued call, which the old pipeline never had.</p>
+    <p class="lede">Seven prompts that port the proven RFP response pipeline into the new repo with its prompts intact, let anyone on the team ask for a draft from the dashboard, through the assistant in Slack, or from the command line, and deliver the result to the Proposal Library Drive folder. The first milestone is a real end-to-end run on a real pursued call, which the old pipeline never had.</p>
     <div class="meta">
-      <span><b>Depends on</b> the <a href="https://claude.ai/artifact/6PDa9shDxczQ3DcNkeMH6M" target="_blank" rel="noopener" style="color: var(--accent)">Draft-Ready Upgrade</a> U1, the drafts queue (run it first), Corpus Phase E (<code>drafting_context</code>)</span>
+      <span><b>Depends on</b> the <a href="https://claude.ai/artifact/6PDa9shDxczQ3DcNkeMH6M" target="_blank" rel="noopener" style="color: var(--accent)">Draft-Ready Upgrade</a> U1, the drafts queue (run it first), Proposal Library Phase E (<code>drafting_context</code>)</span>
       <span><b>Source</b> reference/yukon/rfp_response_agent.py, templates/, slack_events_server.py</span>
       <span><b>Written</b> 2026-10-15 · request flow added 2026-10-18 · revised 2026-10-18 so the dashboard decides</span>
     </div>
@@ -102,10 +102,10 @@
   <nav class="rail" aria-label="Phases">
     <div class="eyebrow">Sections</div>
     <ol>
-      <li><a href="#ask"><span class="n">—</span><span>When someone asks for a draft</span></a></li>
-      <li><a href="#keep"><span class="n">—</span><span>Keep vs. replace</span></a></li>
+      <li><a href="#ask"><span class="n">·</span><span>When someone asks for a draft</span></a></li>
+      <li><a href="#keep"><span class="n">·</span><span>Keep vs. replace</span></a></li>
       <li><a href="#w0"><span class="n">W0</span><span>Port the pipeline</span></a></li>
-      <li><a href="#w1"><span class="n">W1</span><span>Inputs from ledger &amp; corpus</span></a></li>
+      <li><a href="#w1"><span class="n">W1</span><span>Inputs from ledger &amp; Proposal Library</span></a></li>
       <li><a href="#w2a"><span class="n">W2a</span><span>Draft queue &amp; worker</span></a></li>
       <li><a href="#w2b"><span class="n">W2b</span><span>Dashboard controls &amp; Slack status</span></a></li>
       <li><a href="#w3"><span class="n">W3</span><span>Delivery to Drive</span></a></li>
@@ -135,7 +135,7 @@
         <tbody>
           <tr><td><code>drafts</code> table; request, cancel, retry and approve helpers</td><td>Draft-Ready Upgrade U1</td><td>Coordinator</td></tr>
           <tr><td>Draft requests from the assistant, approved on the dashboard's Requests page (<code>change_requests</code>, kind <code>draft</code>)</td><td>Built 17 Oct</td><td>Coordinator</td></tr>
-          <tr><td>The pipeline and its inputs</td><td>W0–W1</td><td>Writer</td></tr>
+          <tr><td>The pipeline and its inputs</td><td>W0 to W1</td><td>Writer</td></tr>
           <tr><td>Queue worker, cost gate, cancel and resume, manual requests, approved draft requests into the queue</td><td>W2a</td><td>Writer</td></tr>
           <tr><td>The Draft, Cancel, Retry and Approve buttons, <code>/drafts</code>, and the Slack status message</td><td>W2b</td><td>Dashboard agent</td></tr>
           <tr><td>Drive folder, six documents, Register row</td><td>W3</td><td>Writer</td></tr>
@@ -152,7 +152,7 @@
         <li>Phase order: 1 listing · 2 attachments · 3 retrieval · 4 requirements · 4.5 alignment · 5 outline · 6 draft · 6.5 review ×4 · 6.75 compliance · 7 checklist · 7.5 polish · 8 deliver</li>
         <li>Every phase prompt, verbatim, including the <code>---CORRECTED DRAFT---</code> separator convention</li>
         <li>The <code>templates/*.md</code> files and <code>TEMPLATE_MAP</code> (opportunity type → template)</li>
-        <li>Company-context injection, now reading the corpus reference material</li>
+        <li>Company-context injection, now reading the Proposal Library reference material</li>
         <li>SAM.gov attachment download (Vulcan's attachments are on the call page)</li>
       </ul>
       <h3>Replace</h3>
@@ -164,8 +164,8 @@
           <tr><td>"⏳ Still drafting…" Slack replies every minute</td><td>One status message per draft, edited in place</td></tr>
           <tr><td><code>claude -p</code> subprocess with a Popen keepalive loop</td><td>Anthropic API with streaming and a per-phase timeout</td></tr>
           <tr><td><code>--opp-json</code> argument</td><td>The call, read from the ledger by id</td></tr>
-          <tr><td>ChromaDB via <code>_query_chroma</code></td><td>The Librarian's <code>corpus.exemplars.drafting_context()</code></td></tr>
-          <tr><td>An ad-hoc Drive folder</td><td><code>Submissions/&lt;submission_id&gt;/02_working/</code> in the corpus, plus a <code>proposals</code> row</td></tr>
+          <tr><td>ChromaDB via <code>_query_chroma</code></td><td>The Librarian's <code>library.exemplars.drafting_context()</code></td></tr>
+          <tr><td>An ad-hoc Drive folder</td><td><code>Submissions/&lt;submission_id&gt;/02_working/</code> in the Proposal Library, plus a <code>proposals</code> row</td></tr>
           <tr><td>Progress posted to the Prospector API</td><td>Progress written to the draft's ledger row</td></tr>
           <tr><td><code>unmapped_types.log</code></td><td>A warning in the draft's phase log when no template matches</td></tr>
         </tbody>
@@ -177,7 +177,7 @@
     <section class="phase" id="w0">
       <div class="phase-head"><span class="phase-num">PHASE W0</span><h2 class="phase-title">Port the pipeline</h2><span class="owner">Writer</span></div>
       <div class="brief">
-        <p>A mechanical port. Every phase becomes a pure function (text in, text out) that calls one shared LLM client, and the old prompts are copied verbatim. There's no ledger, corpus or Drive yet: the pipeline runs from a JSON file to a local folder, so it can be tested without touching anything live.</p>
+        <p>A mechanical port. Every phase becomes a pure function (text in, text out) that calls one shared LLM client, and the old prompts are copied verbatim. There's no ledger, Proposal Library or Drive yet: the pipeline runs from a JSON file to a local folder, so it can be tested without touching anything live.</p>
         <div class="depends">Depends on: the repo (Playbook Phase 0) and <code>reference/yukon/</code>. Produces: <code>drafting/pipeline.py</code>, <code>drafting/llm.py</code>, <code>drafting/phases.py</code>, <code>drafting/templates/</code>, <code>drafting.cli dev</code>.</div>
       </div>
       <div class="prompt">
@@ -186,18 +186,18 @@
 
 ## Context
 
-The reference script generates a complete proposal response in phases: 1 scrape the listing page, 2 download attachments (SAM.gov only), 3 retrieve similar past submissions, 4 extract requirements (including a "SOLICITATION TERMINOLOGY &amp; KEYWORDS — SOURCE OF TRUTH" section), 4.5 alignment assessment, 5 outline with page budget, 6 draft with evidence-first rules, 6.5 four sequential review passes (government evaluator, second evaluator, company leadership, capability verification), 6.75 mechanical compliance check (outputs a report and a corrected draft split on `---CORRECTED DRAFT---`), 7 submission checklist, 7.5 format polish, 8 deliver. Templates per opportunity type live in `reference/yukon/templates/` and are chosen by `TEMPLATE_MAP`.
+The reference script generates a complete proposal response in phases: 1 scrape the listing page, 2 download attachments (SAM.gov only), 3 retrieve similar past submissions, 4 extract requirements (including a "SOLICITATION TERMINOLOGY &amp; KEYWORDS: SOURCE OF TRUTH" section), 4.5 alignment assessment, 5 outline with page budget, 6 draft with evidence-first rules, 6.5 four sequential review passes (government evaluator, second evaluator, company leadership, capability verification), 6.75 mechanical compliance check (outputs a report and a corrected draft split on `---CORRECTED DRAFT---`), 7 submission checklist, 7.5 format polish, 8 deliver. Templates per opportunity type live in `reference/yukon/templates/` and are chosen by `TEMPLATE_MAP`.
 
 The phase prompts are trusted; copy them verbatim. The plumbing is not: it shells out to `claude -p` with a Popen keepalive loop, takes the opportunity as a JSON argument, queries ChromaDB directly, and reports progress to a web API that no longer exists. Replace all of that. The pipeline has never been run end-to-end live, so expect to find bugs in phase hand-offs; fix plumbing bugs, do not rewrite prompts.
 
 ## Tasks
 
-1. `drafting/llm.py` — `generate(prompt, system="", model=None, max_tokens=8000, timeout=600, phase_label="") -> str` using the Anthropic API (ANTHROPIC_API_KEY) with streaming so long phases don't idle a connection; model default claude-sonnet-5-5, overridable per call; retries once on transient errors; logs prompt length, output length, token usage and seconds per call; raises a `PhaseError` with the phase label on failure. Never log prompt contents above DEBUG. Make an in-flight stream abortable from another thread, because later phases cancel drafts mid-call.
-2. `drafting/phases.py` — the ordered phase list with ids and display names: 1 Listing, 2 Attachments, 3 Past experience, 4 Requirements, 4.5 Alignment, 5 Outline, 6 Draft, 6.5 Review ×4, 6.75 Compliance, 7 Checklist, 7.5 Polish, 8 Deliver. Everything that reports progress uses these names.
-3. `drafting/templates/` — copy every `.md` from `reference/yukon/templates/` and port `TEMPLATE_MAP` into `drafting/templates/__init__.py` as `select_template(opp_type) -> (name, text, is_fallback)`.
-4. `drafting/prompts.py` — every phase prompt from the reference, verbatim, as functions that take their inputs and return the prompt string. Keep the phase numbers in the function names (`p4_requirements`, `p45_alignment`, `p5_outline`, `p6_draft`, `p65_review_pass(n)`, `p675_compliance`, `p7_checklist`, `p75_polish`).
-5. `drafting/pipeline.py` — `run_pipeline(inputs: DraftInputs, out_dir: Path, hooks: Hooks, from_phase=None) -> DraftOutputs` where DraftInputs holds: title, portal, opp_type, agency, due_date, url, description, listing_text, attachments (list of {name, text}), past_experience, company_context, team_notes, template (name, text). Each phase is a function `phase_xx(inputs, state, out_dir, hooks) -> state`; the pipeline runs them in order, writes each phase's output to `out_dir` with the reference's filenames (`requirements.md`, `alignment.md`, `outline.md`, `draft.md`, `draft_review_pass{1-4}.md`, `draft_v2.md`, `compliance_report.md`, `draft_v3.md`, `checklist.md`, `draft_final.md`), and calls `hooks.phase_started(phase)` and `hooks.phase_finished(phase, status, stats)` around each. A phase failure is recorded and the pipeline continues with the previous best draft (the reference's fallback chain `draft_final → draft_v3 → draft_v2 → draft`). With from_phase set, earlier phases load their saved files instead of running.
-6. `drafting/cli.py` — a subcommand CLI. This phase adds `dev`: `python -m drafting.cli dev --inputs inputs.json --out data/drafting/&lt;slug&gt;/ [--from-phase 5] [--model ...]`. Hooks print to stdout. No ledger, corpus, Drive or Slack in this phase.
+1. `drafting/llm.py`: `generate(prompt, system="", model=None, max_tokens=8000, timeout=600, phase_label="") -> str` using the Anthropic API (ANTHROPIC_API_KEY) with streaming so long phases don't idle a connection; model default claude-sonnet-5-5, overridable per call; retries once on transient errors; logs prompt length, output length, token usage and seconds per call; raises a `PhaseError` with the phase label on failure. Never log prompt contents above DEBUG. Make an in-flight stream abortable from another thread, because later phases cancel drafts mid-call.
+2. `drafting/phases.py`: the ordered phase list with ids and display names: 1 Listing, 2 Attachments, 3 Past experience, 4 Requirements, 4.5 Alignment, 5 Outline, 6 Draft, 6.5 Review ×4, 6.75 Compliance, 7 Checklist, 7.5 Polish, 8 Deliver. Everything that reports progress uses these names.
+3. `drafting/templates/`: copy every `.md` from `reference/yukon/templates/` and port `TEMPLATE_MAP` into `drafting/templates/__init__.py` as `select_template(opp_type) -> (name, text, is_fallback)`.
+4. `drafting/prompts.py`: every phase prompt from the reference, verbatim, as functions that take their inputs and return the prompt string. Keep the phase numbers in the function names (`p4_requirements`, `p45_alignment`, `p5_outline`, `p6_draft`, `p65_review_pass(n)`, `p675_compliance`, `p7_checklist`, `p75_polish`).
+5. `drafting/pipeline.py`: `run_pipeline(inputs: DraftInputs, out_dir: Path, hooks: Hooks, from_phase=None) -> DraftOutputs` where DraftInputs holds: title, portal, opp_type, agency, due_date, url, description, listing_text, attachments (list of {name, text}), past_experience, company_context, team_notes, template (name, text). Each phase is a function `phase_xx(inputs, state, out_dir, hooks) -> state`; the pipeline runs them in order, writes each phase's output to `out_dir` with the reference's filenames (`requirements.md`, `alignment.md`, `outline.md`, `draft.md`, `draft_review_pass{1-4}.md`, `draft_v2.md`, `compliance_report.md`, `draft_v3.md`, `checklist.md`, `draft_final.md`), and calls `hooks.phase_started(phase)` and `hooks.phase_finished(phase, status, stats)` around each. A phase failure is recorded and the pipeline continues with the previous best draft (the reference's fallback chain `draft_final → draft_v3 → draft_v2 → draft`). With from_phase set, earlier phases load their saved files instead of running.
+6. `drafting/cli.py`: a subcommand CLI. This phase adds `dev`: `python -m drafting.cli dev --inputs inputs.json --out data/drafting/&lt;slug&gt;/ [--from-phase 5] [--model ...]`. Hooks print to stdout. No ledger, Proposal Library, Drive or Slack in this phase.
 7. Tests: one unit test per phase using a fake `generate` that returns canned text, asserting the right files are written and the fallback chain works when a phase raises; one test that `select_template` maps every TEMPLATE_MAP key and falls back to `full_proposal`.
 
 ## Done when
@@ -217,24 +217,24 @@ The phase prompts are trusted; copy them verbatim. The plumbing is not: it shell
 
     <!-- ───────────────────────── W1 ───────────────────────── -->
     <section class="phase" id="w1">
-      <div class="phase-head"><span class="phase-num">PHASE W1</span><h2 class="phase-title">Inputs from the ledger and the corpus</h2><span class="owner">Writer</span></div>
+      <div class="phase-head"><span class="phase-num">PHASE W1</span><h2 class="phase-title">Inputs from the ledger and the Proposal Library</h2><span class="owner">Writer</span></div>
       <div class="brief">
         <p>Replaces the JSON file with a call id. The Writer reads the call from <code>calls</code> and pulls the full listing text through the portal's own login session. It gets its past-experience block from the Librarian's <code>drafting_context()</code> instead of querying a vector store directly.</p>
-        <div class="depends">Depends on: W0, Corpus Phase E. Produces: <code>drafting/inputs.py</code>, <code>drafting.cli dev --call-id</code>, issues to the portal agents.</div>
+        <div class="depends">Depends on: W0, Proposal Library Phase E. Produces: <code>drafting/inputs.py</code>, <code>drafting.cli dev --call-id</code>, issues to the portal agents.</div>
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase W1</span><button class="copy" type="button" data-copy="c1">Copy prompt</button></div>
-<pre class="body" id="c1">You are working in the `velocity-bd-team` repository as the Writer agent. Phase W0 produced `drafting/pipeline.py` with `run_pipeline(inputs: DraftInputs, out_dir, hooks)` and `drafting.cli dev --inputs`, which takes an inputs JSON file. This is Writer Phase W1: build the inputs from the ledger and the corpus instead. Branch `writer/w1-inputs`.
+<pre class="body" id="c1">You are working in the `velocity-bd-team` repository as the Writer agent. Phase W0 produced `drafting/pipeline.py` with `run_pipeline(inputs: DraftInputs, out_dir, hooks)` and `drafting.cli dev --inputs`, which takes an inputs JSON file. This is Writer Phase W1: build the inputs from the ledger and the Proposal Library instead. Branch `writer/w1-inputs`.
 
 ## Context
 
-The ledger's `calls` table holds every scraped opportunity (id like `vulcan-&lt;uuid&gt;`, portal, title, type, department, due_date, url, description, extra JSON, human_status, human_notes). The Librarian's `corpus/exemplars.py` provides `drafting_context(query, portal=None, budget_chars=12000) -> str` (exemplar passages, the solicitations they answered, evaluator feedback, company reference material). The corpus's `_reference/` text (capabilities, boilerplate, bios, win themes) replaces the old knowledge-base injection. Whether a call may be drafted is decided when a draft is requested (W2a), not here.
+The ledger's `calls` table holds every scraped opportunity (id like `vulcan-&lt;uuid&gt;`, portal, title, type, department, due_date, url, description, extra JSON, human_status, human_notes). The Librarian's `library/exemplars.py` provides `drafting_context(query, portal=None, budget_chars=12000) -> str` (exemplar passages, the solicitations they answered, evaluator feedback, company reference material). The Proposal Library's `_reference/` text (capabilities, boilerplate, bios, win themes) replaces the old knowledge-base injection. Whether a call may be drafted is decided when a draft is requested (W2a), not here.
 
 Listing text: the Vulcan SOF call page requires login. Use the portal's own session through two functions the portal agent exposes in its `PORTAL` dict: `fetch_full_text(page, url) -> {"text": str, "attachments": [{"name", "url"}]}` and `session_lock()`, a file lock the scanner also takes during its fetch. Hold the lock while you fetch, so a draft and a scheduled scan never log in to the same portal at the same time; two logins can trigger two OTP emails and invalidate each other's cookies. If a portal doesn't expose fetch_full_text, fall back to `description`. For SAM.gov, port the attachment download from the reference (`phase_download_attachments`) behind the same interface, to be wired when that portal agent exists.
 
 ## Tasks
 
-1. `drafting/inputs.py` — `build_inputs(call_id) -> DraftInputs`: load the call; map `calls.type` to `opp_type` with the reference's `_resolve_opp_type` logic; fetch the full listing and attachment text through the portal (120-second cap, under the session lock), caching under `data/drafting/&lt;call_id&gt;/source/`; build `past_experience` from `drafting_context(title + description, portal=slug)`; build `company_context` from the corpus reference material (fall back to `reference/yukon/knowledge-base/*.md` until the corpus is ingested); set `team_notes` from the call's human_notes; select the template.
+1. `drafting/inputs.py` (`build_inputs(call_id) -> DraftInputs`): load the call; map `calls.type` to `opp_type` with the reference's `_resolve_opp_type` logic; fetch the full listing and attachment text through the portal (120-second cap, under the session lock), caching under `data/drafting/&lt;call_id&gt;/source/`; build `past_experience` from `drafting_context(title + description, portal=slug)`; build `company_context` from the Proposal Library reference material (fall back to `reference/yukon/knowledge-base/*.md` until the Proposal Library is ingested); set `team_notes` from the call's human_notes; select the template.
 2. Ask each portal agent, in a GitHub issue, to expose `fetch_full_text` and `session_lock` in its `PORTAL` dict and to take the same lock in its own fetch. Implement the Vulcan one in this PR only if the Vulcan agent agrees in the issue; otherwise fall back to description and note it.
 3. CLI: `python -m drafting.cli dev --call-id vulcan-… --out data/drafting/&lt;call_id&gt;/`, alongside `dev --inputs` for fixtures. Write the resolved DraftInputs to `source/inputs.json` so a run is reproducible.
 4. Pass `team_notes` into the alignment prompt as "Team notes on this pursuit:", because the person who marked a call pursue usually said why.
@@ -258,7 +258,7 @@ Listing text: the Vulcan SOF call page requires login. Use the portal's own sess
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase W2a</span><button class="copy" type="button" data-copy="c2a">Copy prompt</button></div>
-<pre class="body" id="c2a">You are working in the `velocity-bd-team` repository as the Writer agent. You own `drafting/`. Phases W0–W1 produced `drafting/pipeline.py` (`run_pipeline(inputs, out_dir, hooks, from_phase)`), `drafting/phases.py` (the ordered phase list), `drafting/inputs.py` (`build_inputs(call_id)`) and `drafting.cli dev`. This is Writer Phase W2a: turn a draft request into a queued, visible, cancellable job. Branch `writer/w2a-queue`. The dashboard buttons that create requests come in W2b, built by the Dashboard agent; everything here is driven from the CLI and the ledger.
+<pre class="body" id="c2a">You are working in the `velocity-bd-team` repository as the Writer agent. You own `drafting/`. Phases W0 to W1 produced `drafting/pipeline.py` (`run_pipeline(inputs, out_dir, hooks, from_phase)`), `drafting/phases.py` (the ordered phase list), `drafting/inputs.py` (`build_inputs(call_id)`) and `drafting.cli dev`. This is Writer Phase W2a: turn a draft request into a queued, visible, cancellable job. Branch `writer/w2a-queue`. The dashboard buttons that create requests come in W2b, built by the Dashboard agent; everything here is driven from the CLI and the ledger.
 
 ## Context
 
@@ -268,17 +268,17 @@ The request contract lives in the ledger (see docs/LEDGER_SCHEMA.md):
 - Draft requests from the assistant: the portal assistant's `propose_draft` records a `change_requests` row of kind 'draft'. A person approves it on the dashboard's Requests page, and it then waits with status 'approved' for you; `run.py --apply-requests` leaves drafts alone. Turning those into queued drafts is your job (task 1e).
 - You, the worker, are the only thing that moves a draft from queued to running, completed or failed, or a running draft to cancelled. Progress goes into the row: current_phase, phase_log, heartbeat_at, estimate_usd, cost_usd, result, error. Slack and the dashboard render that row; you never call Slack.
 
-A draft runs 20–60 minutes and makes many long model calls. So: one at a time by default, cost checked before starting, a cancel must stop spending within about a minute, and a crash must leave enough on disk to resume.
+A draft runs 20 to 60 minutes and makes many long model calls. So: one at a time by default, cost checked before starting, a cancel must stop spending within about a minute, and a crash must leave enough on disk to resume.
 
 ## Tasks
 
-1. `drafting/worker.py` — `python -m drafting.worker`, a long-running loop with a 20-second tick:
+1. `drafting/worker.py`: `python -m drafting.worker`, a long-running loop with a 20-second tick:
    a. Reap: a running draft whose heartbeat_at (or started_at, if it has no heartbeat yet) is more than 10 minutes old, or whose worker_pid is no longer alive, becomes 'failed' with error "draft process stopped unexpectedly".
    b. Enforce cancels: a running draft with cancel_requested_at set should exit by itself within 60 seconds (task 2d). If its process is still alive 2 minutes after the request, kill the whole process tree (on Windows `taskkill /PID &lt;pid&gt; /T /F`, which also ends Playwright's Chromium) and mark it 'cancelled'.
    c. Claim: while fewer than DRAFT_MAX_CONCURRENT (default 1) drafts are running, claim the oldest queued draft atomically (`UPDATE drafts SET status='running', started_at=… WHERE id=? AND status='queued'`, then check the row count) and start `python -m drafting.cli run --draft-id N` as a child process logging to `data/drafting/&lt;call_id&gt;/draft_&lt;N&gt;.log`. Store its pid.
    d. Drafts never run inside the worker process. Log one line per state change to `data/drafting/worker.log`.
    e. Approved draft requests: for each `change_requests` row with kind 'draft' and status 'approved', claim it with `ledger.queries.claim_request(id)`, call `request_draft(call_id, by=&lt;its requested_by&gt;, via='assistant')`, and finish it with `finish_request(id, 'applied', 'Queued as draft N')`, or `finish_request(id, 'failed', &lt;the refusal reason&gt;)` when request_draft refuses.
-2. `python -m drafting.cli run --draft-id N` — the child process:
+2. `python -m drafting.cli run --draft-id N`: the child process:
    a. Load the draft and its call. work_dir = `data/drafting/&lt;call_id&gt;/`, shared by retries of the same call. Call `build_inputs(call_id)`.
    b. Initialize phase_log with every phase from drafting/phases.py in order (id, name, status 'pending'). For a retry (resume_of set), mark the phases that completed in that earlier draft as 'resumed' and start at the first one that didn't.
    c. Cost gate: before the first model call, estimate the run's cost from the source text sizes and the phase structure, using per-model prices kept in `drafting/config.py` (look them up and record where and when). If the estimate exceeds DRAFT_BUDGET_USD (default 10; revisit after W4's measured run) and approved_by is empty, store estimate_usd, set status 'needs_approval', and exit cleanly. After `approve_draft`, the worker claims it again and the gate passes.
@@ -364,8 +364,8 @@ Slack informs. A draft's progress shows in its call card's thread, but nothing i
     <section class="phase" id="w3">
       <div class="phase-head"><span class="phase-num">PHASE W3</span><h2 class="phase-title">Delivery to Drive</h2><span class="owner">Writer</span></div>
       <div class="brief">
-        <p>Where the drafts go. The six working documents land in the submission's <code>02_working/</code> folder in the corpus, so the Librarian's conventions hold from the first draft. One Register row is created per pursuit, and the draft row gets the Drive link that Slack and the dashboard show. A re-draft updates the same documents in place, so Drive's version history keeps the earlier ones.</p>
-        <div class="depends">Depends on: W2a–W2b, Corpus Phase A (the Register). Produces: <code>drafting/deliver.py</code> as the Deliver phase.</div>
+        <p>Where the drafts go. The six working documents land in the submission's <code>02_working/</code> folder in the Proposal Library, so the Librarian's conventions hold from the first draft. One Register row is created per pursuit, and the draft row gets the Drive link that Slack and the dashboard show. A re-draft updates the same documents in place, so Drive's version history keeps the earlier ones.</p>
+        <div class="depends">Depends on: W2a to W2b, Proposal Library Phase A (the Register). Produces: <code>drafting/deliver.py</code> as the Deliver phase.</div>
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase W3</span><button class="copy" type="button" data-copy="c3">Copy prompt</button></div>
@@ -373,7 +373,7 @@ Slack informs. A draft's progress shows in its call card's thread, but nothing i
 
 ## Context
 
-Corpus conventions: each submission has a Drive folder `Submissions/&lt;submission_id&gt;/{00_solicitation,01_submitted,02_working,03_outcome}/` where submission_id = `YYYY-MM-DD_portal_short-title`, plus a row in the Register sheet and the ledger's `proposals` table. The Writer's drafts are working documents, so they go in 02_working/. The Librarian's `corpus/register.py` can create a Register row (`create_register_row(fields)`), `ledger.queries.upsert_proposal` writes the table, and `proposals.source_call_id` links a proposal to its call. Only documents generated for this call go on Drive; nothing from the retired Yukon project does.
+Proposal Library conventions: each submission has a Drive folder `Submissions/&lt;submission_id&gt;/{00_solicitation,01_submitted,02_working,03_outcome}/` where submission_id = `YYYY-MM-DD_portal_short-title`, plus a row in the Register sheet and the ledger's `proposals` table. The Writer's drafts are working documents, so they go in 02_working/. The Librarian's `library/register.py` can create a Register row (`create_register_row(fields)`), `ledger.queries.upsert_proposal` writes the table, and `proposals.source_call_id` links a proposal to its call. Only documents generated for this call go on Drive; nothing from the retired Yukon project does.
 
 ## Tasks
 
@@ -387,7 +387,7 @@ Corpus conventions: each submission has a Drive folder `Submissions/&lt;submissi
 
 ## Done when
 
-- A real draft requested from the dashboard ends with a corpus Drive folder holding six readable Google Docs in 02_working/, one Register row and one proposals row (outcome pending, source_call_id set), and a completion reply whose link opens that folder.
+- A real draft requested from the dashboard ends with a Proposal Library Drive folder holding six readable Google Docs in 02_working/, one Register row and one proposals row (outcome pending, source_call_id set), and a completion reply whose link opens that folder.
 - Re-drafting the same call updates the six Docs in place (their version history shows both drafts) and creates no new rows; show the counts before and after.
 - With Drive access deliberately broken, the draft fails at Deliver; after access is restored, Retry completes the delivery without re-running the earlier phases.</pre>
       </div>
@@ -407,7 +407,7 @@ Corpus conventions: each submission has a Drive folder `Submissions/&lt;submissi
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase W4</span><button class="copy" type="button" data-copy="c4">Copy prompt</button></div>
-<pre class="body" id="c4">You are working in the `velocity-bd-team` repository as the Writer agent. Phases W0–W3 produced a complete path from a draft request to six delivered documents. This is Writer Phase W4: the first full run on a real opportunity, and the fixes it reveals. Branch `writer/w4-live-fixes`.
+<pre class="body" id="c4">You are working in the `velocity-bd-team` repository as the Writer agent. Phases W0 to W3 produced a complete path from a draft request to six delivered documents. This is Writer Phase W4: the first full run on a real opportunity, and the fixes it reveals. Branch `writer/w4-live-fixes`.
 
 ## Context
 
@@ -440,22 +440,22 @@ The pipeline's prompts were tuned over many sessions, but the full sequence has 
     <section class="phase" id="w5">
       <div class="phase-head"><span class="phase-num">PHASE W5</span><h2 class="phase-title">Exemplar-driven drafting</h2><span class="owner">Writer</span></div>
       <div class="brief">
-        <p>The first genuinely new capability, and the reason the corpus exists. The draft phase writes in the voice of your strongest winning submissions, the alignment phase cites real past performance with outcomes, and the review passes check the draft against evaluator feedback you actually received. This is only worth doing once W4's fix list is closed and the Register has a few rated rows with known outcomes.</p>
-        <div class="depends">Depends on: W4, Corpus Phases C–E with exemplars flagged. Produces: exemplar injection in phases 4.5, 6 and 6.5; a before/after comparison.</div>
+        <p>The first genuinely new capability, and the reason the Proposal Library exists. The draft phase writes in the voice of your strongest winning submissions, the alignment phase cites real past performance with outcomes, and the review passes check the draft against evaluator feedback you actually received. This is only worth doing once W4's fix list is closed and the Register has a few rated rows with known outcomes.</p>
+        <div class="depends">Depends on: W4, Proposal Library Phases C to E with exemplars flagged. Produces: exemplar injection in phases 4.5, 6 and 6.5; a before/after comparison.</div>
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase W5</span><button class="copy" type="button" data-copy="c5">Copy prompt</button></div>
-<pre class="body" id="c5">You are working in the `velocity-bd-team` repository as the Writer agent. Phases W0–W4 produced a pipeline that runs end-to-end on live calls from a draft request, with a findings document and approved prompt changes. This is Writer Phase W5: make the corpus shape the writing. Branch `writer/w5-exemplars`.
+<pre class="body" id="c5">You are working in the `velocity-bd-team` repository as the Writer agent. Phases W0 to W4 produced a pipeline that runs end-to-end on live calls from a draft request, with a findings document and approved prompt changes. This is Writer Phase W5: make the Proposal Library shape the writing. Branch `writer/w5-exemplars`.
 
 ## Context
 
-The Librarian's `corpus/exemplars.py` provides `find_exemplars(query, portal, k, require_exemplar=True, prefer_won=True)` (passages from submissions the team flagged as exemplars, each paired with the solicitation excerpt it answered), `find_feedback(query, portal, k)` (evaluator feedback and debriefs from `03_outcome/`, wins and losses), and `find_reference(query, k)` (company material). The Register carries outcome and strength_rating per submission. Until now the Writer used only the combined `drafting_context()` block in the retrieval phase. This phase threads targeted retrieval into the phases where it changes the writing.
+The Librarian's `library/exemplars.py` provides `find_exemplars(query, portal, k, require_exemplar=True, prefer_won=True)` (passages from submissions the team flagged as exemplars, each paired with the solicitation excerpt it answered), `find_feedback(query, portal, k)` (evaluator feedback and debriefs from `03_outcome/`, wins and losses), and `find_reference(query, k)` (company material). The Register carries outcome and strength_rating per submission. Until now the Writer used only the combined `drafting_context()` block in the retrieval phase. This phase threads targeted retrieval into the phases where it changes the writing.
 
 ## Tasks
 
 1. Phase 4.5 alignment: replace the generic past-experience block with `find_exemplars` results filtered to won and shortlisted submissions, plus `find_reference` past-performance write-ups, and instruct the prompt to cite them by submission title with outcome ("as demonstrated in &lt;title&gt; (won, 2026)"). Never cite a lost submission as past performance; losses may inform gaps only.
-2. Phase 6 draft: for each major outline section, retrieve up to two exemplar passages on that section's topic and pass them under "WRITE IN THIS VOICE — passages from our strongest submissions (do not copy; match tone, structure, and specificity)". Keep exemplar text under 8K characters per section call; if the draft is generated in one call, cap it at 12K in total, and prefer section-level generation when the outline has more than six sections.
-3. Phase 6.5 review pass 1 (government evaluator): add `find_feedback` results under "EVALUATOR FEEDBACK WE HAVE RECEIVED BEFORE — check the draft against each point", so the review catches the mistakes that cost points last time.
+2. Phase 6 draft: for each major outline section, retrieve up to two exemplar passages on that section's topic and pass them under "WRITE IN THIS VOICE: passages from our strongest submissions (do not copy; match tone, structure, and specificity)". Keep exemplar text under 8K characters per section call; if the draft is generated in one call, cap it at 12K in total, and prefer section-level generation when the outline has more than six sections.
+3. Phase 6.5 review pass 1 (government evaluator): add `find_feedback` results under "EVALUATOR FEEDBACK WE HAVE RECEIVED BEFORE: check the draft against each point", so the review catches the mistakes that cost points last time.
 4. Record which submission_ids each phase used in that phase's phase_log entry, and write them into the Alignment Assessment's footer so a human can see the lineage.
 5. Comparison: re-run the W4 call from phase 4.5 with `drafting.cli dev --call-id … --from-phase 4.5`, once with `--no-exemplars` and once without. Produce `docs/WRITER_EXEMPLAR_COMPARISON.md` with side-by-side excerpts of the alignment and two draft sections, and the metrics for both runs.
 
@@ -463,7 +463,7 @@ The Librarian's `corpus/exemplars.py` provides `find_exemplars(query, portal, k,
 
 - The Alignment Assessment cites at least one real won submission by title, and no lost one as past performance.
 - Two draft sections visibly follow exemplar structure and specificity in the comparison document; David judges which run reads better and says so in the document.
-- Review pass 1 output references at least one item from real evaluator feedback when such feedback exists in the corpus.
+- Review pass 1 output references at least one item from real evaluator feedback when such feedback exists in the Proposal Library.
 - Prompt sizes stay under the W4 threshold; metrics for both runs are recorded.</pre>
       </div>
       <div class="you"><div class="you-bar"><span class="badge">Your part</span><span class="when">before and after W5</span></div>
@@ -480,7 +480,7 @@ The Librarian's `corpus/exemplars.py` provides `find_exemplars(query, portal, k,
         <li>Every phase prompt from the reference pipeline survives the port with no wording change; the plumbing is API-based, resumable, and tested.</li>
         <li>Anyone can request a draft with the dashboard's Draft button, through the assistant with an approved draft request, or with the CLI, including for a solicitation no scanner found. Duplicates and calls marked not relevant are refused with a reason.</li>
         <li>One status message per draft shows progress in place, and completion, failure and cancellation each post one reply that notifies people. Cancel stops spending within about two minutes, Retry resumes from the failed phase, and drafts over budget wait for an approver on the dashboard.</li>
-        <li>A draft reads the full listing, takes its memory from the corpus, and delivers six Google Docs to the submission's <code>02_working/</code> folder, with exactly one Register row per pursuit.</li>
+        <li>A draft reads the full listing, takes its memory from the Proposal Library, and delivers six Google Docs to the submission's <code>02_working/</code> folder, with exactly one Register row per pursuit.</li>
         <li>One real pursued call has been drafted end to end, measured, read by David, and the findings closed.</li>
         <li>Exemplars, real past performance with outcomes, and real evaluator feedback shape the alignment, the draft, and the first review pass, with lineage recorded.</li>
       </ol>
@@ -503,7 +503,7 @@ The Librarian's `corpus/exemplars.py` provides `find_exemplars(query, portal, k,
         sel.addRange(range);
       }
       const prev = btn.textContent;
-      btn.textContent = ok ? 'Copied' : 'Selected — press ⌘C';
+      btn.textContent = ok ? 'Copied' : 'Selected: press ⌘C';
       btn.classList.add('done');
       setTimeout(() => { btn.textContent = prev; btn.classList.remove('done'); }, 1800);
     });

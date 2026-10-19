@@ -15,7 +15,7 @@ pull request to its owner (see AGENTS.md, "Working alongside other agents").
 | assistant/ | Coordinator |
 | portals/vulcan_sof/ | Vulcan SOF agent |
 | review/ | Reviewer |
-| corpus/ | Librarian |
+| library/ | Librarian |
 | drafting/ | Writer |
 | dashboard/ | Dashboard agent |
 | slack/ | Dashboard agent |

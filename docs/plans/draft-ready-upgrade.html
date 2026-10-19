@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-  /* Layout: runbook, same system as the Playbook, Corpus and Writer plans. Phase rail left, prompts right. */
+  /* Layout: runbook, same system as the Playbook, Library and Writer plans. Phase rail left, prompts right. */
   :root {
     --bg: #f6f5f0; --surface: #fdfcf8; --ink: #1f2219; --ink-2: #4e5346; --ink-3: #7b8072; --line: #d9d8cc;
     --accent: #5b6a35; --accent-ink: #ffffff; --accent-soft: #e9ecd9;
@@ -124,7 +124,7 @@
         <tbody>
           <tr><td>Slack app changes for reaction events</td><td>Removed. Reactions stay unread. The Slack assistant sets up Socket Mode later, for questions rather than reactions.</td></tr>
           <tr><td>U1 added <code>slack_events</code> and <code>drafts</code></td><td>U1 adds <code>drafts</code> only, linked to the approved draft request it came from</td></tr>
-          <tr><td>U2 moved the submitted step onto the ledger</td><td>Moved into the <a href="https://claude.ai/artifact/TrkcJ7yDfYnZnFPRFEZvyR" target="_blank" rel="noopener">Corpus Plan</a>'s Phase F. The corpus isn't built yet, so its submitted step reads the ledger from the start.</td></tr>
+          <tr><td>U2 moved the submitted step onto the ledger</td><td>Moved into the <a href="https://claude.ai/artifact/TrkcJ7yDfYnZnFPRFEZvyR" target="_blank" rel="noopener">Proposal Library Plan</a>'s Phase F. The Proposal Library isn't built yet, so its submitted step reads the ledger from the start.</td></tr>
           <tr><td>U3 live Slack feedback with a listener and a backstop</td><td>Removed, because decisions are made on the dashboard</td></tr>
           <tr><td>U4 close-out check</td><td>Kept as U2, without the Slack checks</td></tr>
         </tbody>

@@ -6,7 +6,7 @@ docs/STATUS.md, then the phase prompt you were given.
 ## What this repo is
 
 velocity-bd-team scans government and prime-contractor portals for opportunities that fit
-Velocity Explorations, reviews them, keeps a corpus of past submissions, drafts proposal
+Velocity Explorations, reviews them, keeps a Proposal Library of past submissions, drafts proposal
 material, and reports through Slack and a dashboard. Components are independent programs
 that share one SQLite ledger database.
 
@@ -21,8 +21,8 @@ that share one SQLite ledger database.
 | portals/shared/ | Helpers every adapter reuses: `browser` (headless Chromium), `session` (saved cookies in `data/<slug>/cookies.json`), `otp` (emailed sign-in codes, described per portal as an `OtpSource`), `keyword_filter`. Not a portal. |
 | review/ | Per-call review: regex blocklist, then LLM verdict. Writes verdicts to the ledger. |
 | assistant/ | The portal assistant's toolbox: read tools, and propose tools that record change requests for a person to approve. It reads the ledger and the portals' files only. See docs/ASSISTANT.md. |
-| corpus/ | Past-submission corpus: Drive sync, text extraction, chunking, embeddings. |
-| drafting/ | Proposal briefs and response drafts built from reviewed calls and the corpus. |
+| library/ | Proposal Library of past submissions: Drive sync, text extraction, chunking, embeddings. |
+| drafting/ | Proposal briefs and response drafts built from reviewed calls and the Proposal Library. |
 | dashboard/ | Next.js triage dashboard reading the ledger directly (docs/DASHBOARD.md). Its own package.json; run npm commands inside dashboard/. |
 | slack/ | `alerts.py` (failure alerts), `sink.py` (cards, run summary, thread notes, and editing cards to show decisions made on the dashboard). |
 | scripts/ | PowerShell helpers, including the Task Scheduler registration script. |
@@ -87,7 +87,7 @@ python run.py --portal vulcan_sof --dry-run
 
 ## Working alongside other agents
 Several agents work in this repo: a Coordinator, one agent per portal, and specialists
-for review, corpus, drafting, and dashboard. Rules:
+for review, the Proposal Library, drafting, and dashboard. Rules:
 1. Ownership. Each top-level directory has one owning agent, listed in docs/OWNERS.md.
    Change a directory you don't own only through a pull request to its owner.
 2. Branches. Never commit to main. Work on `<agent>/<short-task>` (e.g. vulcan-sof/fix-deadline-regex),
@@ -121,7 +121,7 @@ for review, corpus, drafting, and dashboard. Rules:
 - Shell: PowerShell. Python 3.11+ in a venv at .venv. Use pathlib everywhere; never hard-code / or \.
 - Mail and Drive access: the `gog` CLI (install the Windows release, run `gog auth` as david@velocityexplorations.com).
   OTP mailbox: gog gmail search / gog gmail read --account david@velocityexplorations.com
-  Drive: gog drive (list / download / export) for the corpus folder
+  Drive: gog drive (list / download / export) for the Proposal Library folder
   If gog is unavailable on this machine, implement the same calls with the Gmail and Drive APIs behind the same function signatures.
   Current state (2026-10-16): gog is not installed. OTP mail is read over Gmail IMAP with a Google app password
   (VELOCITY_GMAIL_APP_USERNAME, VELOCITY_GMAIL_APP_PASSWORD in .env); portals/vulcan_sof/otp.py switches to gog automatically once it is on PATH.

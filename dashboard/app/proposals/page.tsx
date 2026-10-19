@@ -24,7 +24,7 @@ export default async function ProposalsPage() {
         <div className="empty">
           <p className="title">No past submissions in the register yet.</p>
           <p className="muted">
-            The Proposal Corpus plan fills the proposals table from the hand-built register and the Drive folders. Once
+            The Proposal Library plan fills the proposals table from the hand-built register and the Drive folders. Once
             it runs, this page lists every submission with its outcome, strength rating and exemplar flag, plus win
             rates by portal.
           </p>
