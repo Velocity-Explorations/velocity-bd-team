@@ -39,9 +39,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   remote. The reminder and summary jobs moved from `python -m assistant` to run.py.
 - GitHub (2026-10-18): the repo is private at Velocity-Explorations/velocity-bd-team, with main
   pushed. Approved fault reports now file there as issues.
-- GitHub token (2026-10-19): fault reports file with the pipeline's own fine-grained token
-  (`BD_GITHUB_TOKEN`, this repo's issues only) when `.env` has one, and with the gh login
-  otherwise. Creating it is in docs/RUNBOOK.md, "GitHub token".
+- GitHub token (2026-10-19): fault reports file with the pipeline's own token
+  (`BD_GITHUB_TOKEN`), a classic token with the repo scope that expires 2027-01-17, and with
+  the gh login when `.env` has none. A token limited to this repo's issues would need
+  fine-grained tokens enabled for Velocity-Explorations. Renewal steps are in
+  docs/RUNBOOK.md, "GitHub token".
 - Plans (2026-10-18): the Writer Plan, the Draft-Ready Upgrade and the corpus plan were revised
   so the dashboard decides. Drafts are requested with the dashboard's Draft button, an approved
   draft request from the assistant, or the CLI. Offline copies are in docs/plans/.

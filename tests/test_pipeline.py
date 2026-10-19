@@ -462,7 +462,7 @@ def test_file_issue_without_a_pipeline_token_uses_the_gh_login(monkeypatch: pyte
 
 
 @pytest.mark.parametrize("stderr, hint", [("HTTP 401: Bad credentials", "expired"),
-                                          ("HTTP 403: Resource not accessible by personal access token", "Issues")])
+                                          ("HTTP 403: Resource not accessible by personal access token", "repo scope")])
 def test_refused_pipeline_token_names_the_key_and_the_fix(monkeypatch: pytest.MonkeyPatch, stderr: str, hint: str) -> None:
     fake_gh(monkeypatch, "fake-pipeline-token", returncode=1, stderr=stderr)
     with pytest.raises(RuntimeError, match="BD_GITHUB_TOKEN") as raised:

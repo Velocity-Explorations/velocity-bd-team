@@ -75,7 +75,7 @@ APPLY_KINDS = ("keyword_change", "rereview", "scan", "fault_report")   # drafts 
 SETTINGS_BRANCH = "main"
 GIT_TIMEOUT_S = 60
 ISSUE_TIMEOUT_S = 120
-GITHUB_TOKEN_KEY = "BD_GITHUB_TOKEN"   # the pipeline's own fine-grained token: this repo's issues only
+GITHUB_TOKEN_KEY = "BD_GITHUB_TOKEN"   # the pipeline's own GitHub token; see "GitHub token" in docs/RUNBOOK.md
 
 log = logging.getLogger("pipeline")
 
@@ -437,8 +437,9 @@ def file_issue(title: str, body: str) -> str:
             raise RuntimeError(f"GitHub refused the pipeline token in {GITHUB_TOKEN_KEY}; it has probably expired. "
                                "Create a new one (see GitHub token in docs/RUNBOOK.md) and replace it in .env.")
         if env and ("403" in error or "not accessible" in error):
-            raise RuntimeError(f"The pipeline token in {GITHUB_TOKEN_KEY} cannot file issues here. Give it "
-                               "Issues: Read and write on velocity-bd-team (see GitHub token in docs/RUNBOOK.md).")
+            raise RuntimeError(f"The pipeline token in {GITHUB_TOKEN_KEY} cannot file issues here. A classic token "
+                               "needs the repo scope; a fine-grained one needs Issues: Read and write on "
+                               "velocity-bd-team (see GitHub token in docs/RUNBOOK.md).")
         raise RuntimeError(f"gh issue create failed: {error[:200]}")
     return done.stdout.strip().splitlines()[-1]
 

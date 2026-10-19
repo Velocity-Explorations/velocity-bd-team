@@ -127,28 +127,35 @@ Change requests:
 ## GitHub token
 
 Approved fault reports become GitHub issues through `gh issue create`. With `BD_GITHUB_TOKEN`
-in `.env`, the pipeline files them with its own fine-grained token, which can reach only this
-repo's issues. Without it, gh uses whoever is signed in on the scan machine, whose token
-reaches every repo that person can.
+in `.env`, the pipeline files them with its own token, which has its own name and expiry and
+can be revoked without signing anyone out of gh. Without it, gh uses whoever is signed in on
+the scan machine.
+
+The token is a classic token with the `repo` scope, so like the gh login it reaches every
+repo its owner can. A token limited to this repo's issues is a fine-grained token with
+Velocity-Explorations as its resource owner, which the org's settings did not offer when the
+token was set up (2026-10-19).
 
 To create the token (about five minutes):
 
-1. On GitHub, click your profile picture, then Settings, Developer settings, Personal access
-   tokens, Fine-grained tokens, and Generate new token.
-2. Name it `velocity-bd-team pipeline`, set Resource owner to Velocity-Explorations, and set
-   an expiration (90 days is a sensible default; GitHub emails a reminder before it lapses).
-3. Under Repository access, choose Only select repositories and pick velocity-bd-team.
-4. Under Permissions, set Issues to Read and write. Leave everything else at No access;
-   Metadata stays Read-only because GitHub requires it.
-5. Click Generate token and copy it. GitHub shows it only once.
-6. Open `.env` in VS Code, add a line `BD_GITHUB_TOKEN=` followed by the token, and save.
-7. If the organization requires approval for fine-grained tokens, approve it in the
-   Velocity-Explorations organization settings under Personal access tokens, Pending requests.
-8. Check it: `python -m config` should show `BD_GITHUB_TOKEN` as `set` instead of `MISSING`.
+1. Go to https://github.com/settings/tokens/new (profile picture, Settings, Developer
+   settings, Personal access tokens, Tokens (classic), Generate new token (classic)).
+2. Set Note to `velocity-bd-team pipeline` and Expiration to 90 days, and tick the `repo`
+   scope only. Creating issues in a private repo needs it.
+3. Click Generate token and copy it. It starts with `ghp_`, and GitHub shows it only once.
+4. If the token list shows Configure SSO next to the new token, authorize Velocity-Explorations.
+5. Open `.env` in VS Code, set `BD_GITHUB_TOKEN=` followed by the token, and save.
+6. Check it: `python -m config` should show `BD_GITHUB_TOKEN` as `set` instead of `MISSING`.
+
+To renew it, open the token on the Tokens (classic) page, choose Regenerate token, and
+replace the value in `.env`. GitHub emails a reminder before it expires.
+
+If Velocity-Explorations later allows fine-grained tokens, switch to one: resource owner
+Velocity-Explorations, only velocity-bd-team, and Issues set to Read and write.
 
 When the token expires or loses access, the fault report's result on the Requests page names
-`BD_GITHUB_TOKEN` and says what to fix. Create a new token the same way and replace the value
-in `.env`; the next pass files the report.
+`BD_GITHUB_TOKEN` and says what to fix. Replace the value in `.env`; the next pass files the
+report.
 
 ## Dashboard
 
