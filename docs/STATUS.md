@@ -35,9 +35,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Portal assistant, step 2 (2026-10-17): approvals. Propose tools (keyword change, re-review,
   scan now, start a draft, fault report) record requests in change_requests (migration 002);
   the dashboard's Requests page approves or rejects them; `run.py --apply-requests` carries
-  them out every 15 minutes. Drafts wait for the Writer; fault reports wait for a GitHub
+  them out twice a day, at 12:07 and 17:07. Drafts wait for the Writer; fault reports wait for a GitHub
   remote. The reminder and summary jobs moved from `python -m assistant` to run.py.
-- GitHub (2026-10-18): the repo is private at Velocity-Explorations/velocity-bd-team, with main
+- GitHub (2026-10-18): the repo is at Velocity-Explorations/velocity-bd-team, public since
+  2026-10-19 (a scan of every commit found no credentials first), with main
   pushed. Approved fault reports now file there as issues.
 - GitHub token (2026-10-19): fault reports file with the pipeline's own token
   (`BD_GITHUB_TOKEN`), a classic token with the repo scope that expires 2027-01-17, and with

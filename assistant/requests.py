@@ -37,7 +37,7 @@ from portals.shared.keyword_filter import describe_changes
 
 STATUSES = ("proposed", "approved", "rejected", "applying", "applied", "failed")
 TITLE_CHARS = 80
-APPLY_EVERY = "15 minutes"   # how often the scan machine looks for approved requests (scripts/install-schedule.ps1)
+APPLY_WHEN = "at the scan machine's next pass (12:07 or 17:07)"   # scripts/install-schedule.ps1, -RequestsAt
 
 
 def dashboard_link() -> str:
@@ -77,7 +77,7 @@ def _status_phrase(req: dict[str, Any]) -> str:
             return phrase + ", waiting for the Writer"
         if req.get("result"):
             return f"{phrase}. {req['result']}"
-        return f"{phrase}, to be carried out within {APPLY_EVERY}"
+        return f"{phrase}, to be carried out {APPLY_WHEN}"
     if status == "applying":
         return "being carried out now"
     if status == "applied":
@@ -181,7 +181,7 @@ def propose_scan(portal: str, reason: str = "", requested_by: str = "assistant")
         parts.append(f"{p.name} has no completed scan yet.")
     if runs and runs[0]["status"] == "running":
         parts.append("A run is in progress now; an approved scan waits for it to finish.")
-    parts.append(f"Approving runs one scan of {p.name} within {APPLY_EVERY}: it fetches the calls, filters and "
+    parts.append(f"Approving runs one scan of {p.name} {APPLY_WHEN}: it fetches the calls, filters and "
                  "reviews new ones, and posts them to Slack.")
     return _record("scan", f"Scan {p.name} now", requested_by, {"text": " ".join(parts)},
                    portal=p.slug, reason=reason, payload={})

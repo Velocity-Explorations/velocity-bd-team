@@ -23,7 +23,7 @@ test("previewText reads the preview's text and survives bad JSON", () => {
 });
 
 test("nextStep says what happens to an approved request", () => {
-  assert.equal(nextStep("scan", "approved", null), "Approved. The scan machine carries it out within 15 minutes.");
+  assert.equal(nextStep("scan", "approved", null), "Approved. The scan machine carries it out at its next pass (12:07 or 17:07).");
   assert.equal(nextStep("keyword_change", "approved", "Waiting: the scan machine is on branch dev."),
     "Waiting: the scan machine is on branch dev.");
   assert.equal(nextStep("draft", "approved", null), "Approved. The Writer starts the draft once it is built.");

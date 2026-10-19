@@ -35,7 +35,7 @@ there.
 `change_requests` setting `status` (approved or rejected), `decided_by` (the viewer),
 `decided_at`, `decision_note` and `updated_at`, only while the request is still `proposed`.
 A request decided in another tab is not overwritten; the page says who decided it. The scan
-machine carries out approved requests within 15 minutes (`run.py --apply-requests`).
+machine carries out approved requests twice a day, at 12:07 and 17:07 (`run.py --apply-requests`).
 
 `decide` records triage decisions, used by the queue's buttons and by the control on
 `/calls`. One UPDATE on `calls`:

@@ -4,7 +4,7 @@ import { Shell } from "@/components/Shell";
 import { Badge, Flash } from "@/components/bits";
 import { formatTime } from "@/lib/format";
 import { decidedRequests, waitingRequests, type RequestRow } from "@/lib/queries";
-import { APPLY_EVERY, kindLabel, nextStep, previewText } from "@/lib/requests";
+import { APPLY_WHEN, kindLabel, nextStep, previewText } from "@/lib/requests";
 import { displayTimeZone } from "@/lib/settings";
 import { firstParam } from "@/lib/text";
 
@@ -55,7 +55,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Sea
           <h1>Requests</h1>
           <p className="muted">
             Changes the portal assistant was asked to make. Nothing changes until someone approves a request here; the
-            scan machine then carries it out within {APPLY_EVERY}.
+            scan machine then carries it out {APPLY_WHEN}.
           </p>
         </div>
         <dl className="stats">

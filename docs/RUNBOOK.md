@@ -96,7 +96,7 @@ The task's MultipleInstances policy is IgnoreNew, and the lock file is a second 
 ```powershell
 .\scripts\install-schedule.ps1                 # install or replace
 Start-ScheduledTask -TaskName "velocity-bd-team pipeline"   # run now
-Get-ScheduledTaskInfo -TaskName "velocity-bd-team pipeline" # last run time and result
+Get-ScheduledTaskInfo -TaskName "velocity-bd-team pipeline" # last run time
 .\scripts\uninstall-schedule.ps1               # remove
 ```
 
@@ -104,12 +104,16 @@ The task runs as the current user with an interactive logon, so it fires only wh
 user is logged on (locked screen is fine). `.env` and the cookie file are read from this
 repo as usual. To run while logged off, re-register with a password-backed principal.
 
+Each task starts python through `conhost.exe --headless`, so no console window opens, for
+python or for anything it starts. Task Scheduler's Last Run Result therefore reads 0 even
+when a run fails: look for failures in data\logs and the Slack alerts.
+
 ## Portal assistant
 
 Try any tool from the command line, for example `python -m assistant explain <call id>` or
 `python -m assistant deadlines`; `python -m assistant tools` lists them all. Three scheduled
 jobs run from run.py: deadline reminders daily at 08:00 (`--remind`), the weekly summary on
-Mondays at 09:00 (`--post-summary`), and approved change requests every 15 minutes
+Mondays at 09:00 (`--post-summary`), and approved change requests daily at 12:07 and 17:07
 (`--apply-requests`). Every scan also alerts when it reads too many pages badly. Details in
 docs/ASSISTANT.md.
 

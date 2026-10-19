@@ -53,7 +53,7 @@ Add `--json` to any of them for the full result.
 |---|---|---|
 | `python run.py --remind` | Daily 08:00 | Posts the calls marked Pursue and due within 14 days, nearest first. Posts nothing when none are due. |
 | `python run.py --post-summary` | Mondays 09:00 | Posts each portal's week: new calls, closing soon, decisions, scraper health. |
-| `python run.py --apply-requests` | Every 15 minutes | Carries out the change requests approved on the dashboard (see "Approvals"). |
+| `python run.py --apply-requests` | Daily at 12:07 and 17:07 | Carries out the change requests approved on the dashboard (see "Approvals"). |
 | Scraper watch, inside `run.py` | After every scan | Alerts when at least 3 pages, and at least a tenth of the scan, were read badly. |
 
 These run from `run.py`, not from `assistant/`, because the assistant may only read the
@@ -82,7 +82,7 @@ How a request moves:
    the open request instead of a second one.
 2. **Approved or rejected** on the dashboard's Requests page (`/requests`), by whoever is
    deciding there, with an optional note. A request is decided once.
-3. **Carried out** by `python run.py --apply-requests`, every 15 minutes. It takes the
+3. **Carried out** by `python run.py --apply-requests`, twice a day at 12:07 and 17:07. It takes the
    pipeline lock only when an approved request is ready, so it never runs alongside a scan.
    Each request ends `applied` or `failed`, with a `result` in words, and one Slack message
    lists what was carried out.

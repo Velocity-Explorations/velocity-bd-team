@@ -15,8 +15,8 @@ export const KIND_LABELS: Record<RequestKind, string> = {
   fault_report: "Fault report",
 };
 
-/** How often the scan machine looks for approved requests (scripts/install-schedule.ps1). */
-export const APPLY_EVERY = "15 minutes";
+/** When the scan machine carries out approved requests (scripts/install-schedule.ps1, -RequestsAt). */
+export const APPLY_WHEN = "at its next pass (12:07 or 17:07)";
 
 export function isRequestChoice(value: unknown): value is RequestChoice {
   return value === "approve" || value === "reject";
@@ -45,7 +45,7 @@ export function nextStep(kind: string, status: string, result: string | null): s
   if (status === "approved") {
     if (kind === "draft") return "Approved. The Writer starts the draft once it is built.";
     if (result) return result;
-    return `Approved. The scan machine carries it out within ${APPLY_EVERY}.`;
+    return `Approved. The scan machine carries it out ${APPLY_WHEN}.`;
   }
   if (status === "applying") return "Being carried out now.";
   return result ?? "";
