@@ -52,7 +52,7 @@ Add `--json` to any of them for the full result.
 | Job | When | What it does |
 |---|---|---|
 | `python run.py --remind` | Daily 08:00 | Posts the calls marked Pursue and due within 14 days, nearest first. Posts nothing when none are due. |
-| `python run.py --post-summary` | Mondays 09:00 | Posts each portal's week: new calls, closing soon, decisions, scraper health. |
+| `python run.py --post-summary` | Mondays 09:00 | Posts the Monday summary to Slack: for each portal, new calls, open calls waiting for a decision, the top picks (yes before maybe, then nearest deadline) with links and reasons, pursued calls closing within 14 days, the week's decisions by name, and scraper health. |
 | `python run.py --apply-requests` | Daily at 12:07 and 17:07 | Carries out the change requests approved on the dashboard (see "Approvals"). |
 | Scraper watch, inside `run.py` | After every scan | Alerts when at least 3 pages, and at least a tenth of the scan, were read badly. |
 

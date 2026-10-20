@@ -201,7 +201,16 @@ def test_watch_alerts_when_a_scan_reads_pages_badly(isolated, monkeypatch: pytes
 def slack_posts(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     import slack.sink as sink
     sent: list[str] = []
-    monkeypatch.setattr(sink, "post_text", lambda text, client=None: sent.append(text) or "1.0")
+
+    def fake_post(text: str, client=None, blocks: list[dict] | None = None) -> str:
+        parts = [text]
+        for block in blocks or []:
+            parts += [block["text"]["text"]] if "text" in block else []
+            parts += [element.get("text", "") for element in block.get("elements", [])]
+        sent.append("\n".join(parts))
+        return "1.0"
+
+    monkeypatch.setattr(sink, "post_text", fake_post)
     return sent
 
 
@@ -223,7 +232,8 @@ def test_post_summary_covers_each_portal_and_the_scraper(isolated, slack_posts, 
     lq.upsert_call({"id": "fake-1", "portal": "Fake", "title": "Analytics software"}, seed)
     lq.finish_run(seed, "completed", {"fetched": 1})
     assert pipeline.main(["--post-summary"]) == 0
-    assert len(slack_posts) == 1 and "*Fake, last 7 days*" in slack_posts[0] and "Scraper:" in slack_posts[0]
+    assert len(slack_posts) == 1 and slack_posts[0].startswith("Weekly BD summary, week of")
+    assert "*Fake*: 1 new this week" in slack_posts[0] and "Scraper: Fake" in slack_posts[0]
 
 
 # ------------------------------------------------------------------------ waiting for the lock

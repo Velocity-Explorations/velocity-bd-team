@@ -212,6 +212,23 @@ def test_weekly_summary(ledger_db: str, portal: Portal) -> None:
         assert words in s["text"], words
 
 
+def test_weekly_summary_ranks_open_undecided_calls(ledger_db: str, portal: Portal) -> None:
+    run = lq.start_run("Example")
+    calls = {"ex-yes-later": ("yes", 20.5), "ex-maybe-soon": ("maybe", 3.5), "ex-yes-soon": ("yes", 10.5),
+             "ex-closed": ("yes", 5.5), "ex-past": ("yes", -2), "ex-decided": ("yes", 8.5)}
+    for call_id, (verdict, days) in calls.items():
+        add_call(call_id, call_id, run, due_date=due(days), extra={"example_closed": True} if call_id == "ex-closed" else None)
+        lq.set_filter(call_id, "kept", tier="broad", keywords=["software"])
+        lq.set_review(call_id, verdict, "Builds C2 software. More detail follows.")
+    lq.set_human("ex-decided", "pursue", "David Wood")
+    s = tools.weekly_summary("example", days=7, now=NOW)
+    assert [c["id"] for c in s["top_picks"]] == ["ex-yes-soon", "ex-yes-later", "ex-maybe-soon"]
+    assert s["waiting"] == 3
+    first = s["top_picks"][0]
+    assert first["verdict"] == "yes" and first["days_left"] == 10 and first["reason"] == "Builds C2 software."
+    assert first["url"] == "https://example.invalid/ex-yes-soon" and first["deadline"] == due(10.5)
+
+
 # ----------------------------------------------------------------- settings change preview
 
 def test_preview_shows_what_a_keyword_change_would_keep_and_drop(ledger_db: str, portal: Portal) -> None:

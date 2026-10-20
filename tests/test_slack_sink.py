@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -102,6 +103,49 @@ def test_summary_points_to_the_dashboard(monkeypatch: pytest.MonkeyPatch) -> Non
     assert "Decide on the dashboard" in text and "thread" in text and "React" not in text
     monkeypatch.setattr(sink, "dashboard_url", lambda: "https://bd.example.invalid")
     assert "<https://bd.example.invalid|the dashboard>" in sink.summary_text(summary)
+
+
+def block_texts(blocks: list[dict]) -> str:
+    out = []
+    for block in blocks:
+        if "text" in block:
+            out.append(block["text"]["text"])
+        out += [element.get("text", "") for element in block.get("elements", [])]
+    return "\n".join(out)
+
+
+def test_weekly_summary_message_reads_as_a_brief(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sink, "dashboard_url", lambda: "https://bd.example.invalid")
+    pick = {"id": "v-1", "title": "IT & Cyber <Ops>", "url": "https://portal.invalid/1", "verdict": "yes",
+            "deadline": "27 OCT 2026 : 21:59 MDT", "days_left": 7, "reason": "Builds C2 software."}
+    summary = {
+        "portal": "Vulcan SOF", "days": 7, "waiting": 13,
+        "new": {"total": 3, "by_verdict": {"yes": 1, "maybe": 2}, "calls": []},
+        "top_picks": [pick],
+        "closing_soon": [
+            {"id": "v-2", "title": "Picked call", "url": None, "deadline": "22 OCT 2026 : 10:00 MDT", "days_left": 2,
+             "status": "pursue"},
+            {**pick, "status": None},
+        ],
+        "decided": [
+            {"id": "v-3", "title": "Old call", "url": None, "status": "dismissed", "by": "U08V7ULPH1N", "at": "x"},
+            {"id": "v-4", "title": "New call", "url": None, "status": "pursue", "by": "David Wood", "at": "y"},
+        ],
+    }
+    health = [{"name": "Vulcan SOF", "text": "Vulcan SOF: the last scan completed at 19 Oct 06:03."}]
+    text, blocks = sink.weekly_summary_message([summary], health, now=datetime(2026, 10, 21, tzinfo=timezone.utc))
+    body = block_texts(blocks)
+    assert blocks[0]["type"] == "header" and blocks[0]["text"]["text"] == "Weekly BD summary, week of 19 Oct"
+    assert "*Vulcan SOF*: 3 new this week, 13 open calls waiting for a decision" in body
+    assert "<https://bd.example.invalid/?state=open|Open the review queue>" in body
+    assert "1. <https://portal.invalid/1|IT &amp; Cyber &lt;Ops&gt;>: yes, closes Tue 27 Oct (7 days)" in body
+    assert "Builds C2 software." in body
+    assert "Picked call, closes Thu 22 Oct (2 days)" in body and body.count("IT &amp; Cyber") == 1
+    assert "Dismissed: Old call (decided in Slack)" in body and "Pursue: New call (David Wood)" in body
+    assert "U08V7ULPH1N" not in json.dumps(blocks)
+    assert "Scraper: Vulcan SOF: the last scan completed at 19 Oct 06:03." in body
+    assert text == "Weekly BD summary, week of 19 Oct. Vulcan SOF: 3 new, 13 waiting for a decision."
+    assert sink._closes("15 APR 2028 : 22:59 MDT", 543) == "closes Sat 15 Apr 2028 (543 days)"
 
 
 # ---------------------------------------------------------------------- feedback

@@ -363,16 +363,19 @@ def remind() -> int:
 
 
 def post_summary() -> int:
-    """Post each portal's weekly summary and scraper health as one message."""
+    """Post the Monday summary, every portal's week and scraper health, as one Slack message."""
     from assistant.tools import scraper_health, weekly_summary
-    from slack.sink import post_text
+    from slack.sink import post_text, weekly_summary_message
 
     _console_logging()
-    parts = [f"{weekly_summary(p.slug)['text']}\nScraper: {scraper_health(p.slug)['text']}" for p in registry.discover()]
-    if not parts:
+    portals = registry.discover()
+    if not portals:
         print("No portals registered; nothing to post.")
         return 0
-    ts = post_text("\n\n".join(parts))
+    summaries = [weekly_summary(p.slug) for p in portals]
+    health = [entry for p in portals for entry in scraper_health(p.slug)["portals"]]
+    text, blocks = weekly_summary_message(summaries, health)
+    ts = post_text(text, blocks=blocks)
     print("Posted the weekly summary" + ("" if ts else " (Slack did not accept the post; see the log)"))
     return 0 if ts else 1
 
