@@ -7,7 +7,7 @@ reference's prompts (drafting/prompts.py), truncation limits and file names. A p
 fails is recorded and the run carries on with the best draft so far, as the reference did
 (draft_final, then draft_v3, draft_v2, draft). DraftCancelled is never caught: it ends the
 run. With from_phase, earlier phases load their saved files instead of running; with
-to_phase, later phases do not run. No ledger, corpus, Drive or Slack in this phase.
+to_phase, later phases do not run. No ledger, Proposal Library, Drive or Slack in this phase.
 """
 from __future__ import annotations
 
@@ -179,7 +179,7 @@ def phase_2_attachments(inputs: DraftInputs, state: State, out_dir: Path, hooks:
 
 
 def phase_3_past_experience(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hooks) -> State:
-    """Past submissions for context. W1 takes them from the corpus; here from the inputs."""
+    """Past submissions for context. W1 takes them from the Proposal Library; here from the inputs."""
     state.rag_context = inputs.past_experience
     state.stats["chars_out"] = len(state.rag_context)
     return state
