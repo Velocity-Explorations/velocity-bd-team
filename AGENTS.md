@@ -56,6 +56,9 @@ disagree, Phase 0 wins and this file gets updated in the same PR.
    ahead of the phase you are on.
 7. Use pathlib for every path. Never hard-code `/` or `\`.
 8. Tests first. Write the failing test, then the code.
+9. The repo is public (since 2026-10-19). Commits, pull requests and issues, approved fault
+   reports included, are world-readable: keep login-gated portal content, CUI and
+   export-controlled material out of them, as well as credentials (rule 4).
 
 ## Running things
 
@@ -130,4 +133,5 @@ for review, the Proposal Library, drafting, and dashboard. Rules:
 - Embeddings: Ollama for Windows, nomic-embed-text at http://localhost:11434 (768 dims)
 - Alerts and delivery: Slack: BD_SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
 - Scheduler: Windows Task Scheduler, created by a PowerShell script in scripts/ (Register-ScheduledTask); never overlapping runs.
+  Each task starts python through `conhost.exe --headless`, so no window opens; Last Run Result always reads 0 (docs/RUNBOOK.md).
 - Playwright's Chromium shows up as chrome.exe in Task Manager.
