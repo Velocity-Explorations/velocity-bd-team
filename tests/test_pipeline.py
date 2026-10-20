@@ -478,3 +478,55 @@ def test_refused_pipeline_token_names_the_key_and_the_fix(monkeypatch: pytest.Mo
     with pytest.raises(RuntimeError, match="BD_GITHUB_TOKEN") as raised:
         pipeline.file_issue("Scraper fault", "Logins fail.")
     assert hint in str(raised.value) and "fake-pipeline-token" not in str(raised.value)
+
+
+# ------------------------------------------------------------------------- the second judge
+
+def test_the_review_step_asks_grok_too_when_its_key_is_set(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
+    monkeypatch.setattr(pipeline, "review_model", lambda: FakeModel(["VERDICT: yes\nREASON: fits"]))
+    monkeypatch.setattr(pipeline, "grok_enabled", lambda: True)
+    monkeypatch.setattr(pipeline, "grok_model", lambda: FakeModel(["VERDICT: maybe\nREASON: partly hardware"]))
+    assert pipeline.main([]) == 0
+    judged = lq.latest_judgments("fake-0")
+    assert judged["claude"]["verdict"] == "yes" and judged["grok"]["verdict"] == "maybe"
+    assert lq.get_call("fake-0")["ai_verdict"] == "yes"   # Claude's verdict still decides what is posted
+
+
+def test_without_the_key_only_claude_judges(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
+    monkeypatch.setattr(pipeline, "review_model", lambda: FakeModel(["VERDICT: yes\nREASON: fits"]))
+    monkeypatch.setattr(pipeline, "grok_enabled", lambda: False)
+    monkeypatch.setattr(pipeline, "grok_model", lambda: pytest.fail("no key, so Grok is never asked"))
+    assert pipeline.main([]) == 0
+    assert set(lq.latest_judgments("fake-0")) == {"claude"}
+
+
+def test_a_grok_failure_never_stops_the_run(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
+    monkeypatch.setattr(pipeline, "review_model", lambda: FakeModel(["VERDICT: yes\nREASON: fits"]))
+    monkeypatch.setattr(pipeline, "grok_enabled", lambda: True)
+
+    def broken() -> object:
+        raise RuntimeError("xAI is down")
+
+    monkeypatch.setattr(pipeline, "grok_model", broken)
+    assert pipeline.main([]) == 0
+    assert lq.get_call("fake-0")["ai_verdict"] == "yes" and set(lq.latest_judgments("fake-0")) == {"claude"}
+
+
+def test_backfill_copies_claude_and_asks_grok_once(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
+    seed = lq.start_run("Fake")
+    for call_id in ("ok", "err"):
+        lq.upsert_call({"id": call_id, "portal": "Fake", "title": call_id, "description": "software"}, seed)
+        lq.set_filter(call_id, "kept", tier="broad", keywords=["software"])
+    lq.set_review("ok", "yes", "Builds C2 software.")
+    lq.set_review("err", "maybe", "Review error: TimeoutError")
+    grok = FakeModel(["VERDICT: maybe\nREASON: a", "VERDICT: no\nREASON: b"])
+    monkeypatch.setattr(pipeline, "grok_enabled", lambda: True)
+    monkeypatch.setattr(pipeline, "grok_model", lambda: grok)
+    assert pipeline.main(["--backfill-judgments"]) == 0
+    assert lq.latest_judgments("ok")["claude"]["verdict"] == "yes" and "claude" not in lq.latest_judgments("err")
+    assert {lq.latest_judgments(c)["grok"]["verdict"] for c in ("ok", "err")} == {"maybe", "no"}
+    assert pipeline.main(["--backfill-judgments"]) == 0   # a second pass finds nothing to do
+    assert grok.script == [] and len(grok.prompts) == 2

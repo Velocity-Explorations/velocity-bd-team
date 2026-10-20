@@ -164,6 +164,27 @@ says what it waits for. A row left `applying` by a job that stopped is marked `f
 the next pass. Drafts stay `approved` for the Writer, which claims and finishes them the
 same way.
 
+## Table: judgments
+
+How each judge rated each call, so the judges can be compared (docs/DASHBOARD.md shows both).
+The Claude review still writes `calls.ai_verdict`, the verdict that decides what is posted; it
+also writes a row here, and Grok, the second judge, writes its own when `BD_XAI_API_KEY` is set.
+Added by `003_judgments.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| call_id | TEXT, not null | `calls.id` | the review (`review_calls`), the second judge (`judge_calls`), `run.py --backfill-judgments` |
+| judge | TEXT, not null | `claude` or `grok` | same |
+| model | TEXT, not null | the model that answered, for example `claude-haiku-5-5` or `grok-4.7` | same |
+| verdict | TEXT, not null | `yes`, `maybe`, `no` | same |
+| reasoning | TEXT | the judge's one-sentence reason | same |
+| rated_at | TEXT timestamp, not null | when it judged; for backfilled Claude rows, the call's `reviewed_at` | same |
+
+Index: `(call_id, judge, id)`. A newer row for the same call and judge supersedes the older
+one (a re-review writes a new row); older rows stay as history. A review error is not a
+judgment and writes no row.
+
 ## Table: schema_migrations
 
 Bookkeeping for `ledger/migrate.py`. `version` is the migration filename, `applied_at`
@@ -226,4 +247,18 @@ SELECT portal,
 FROM proposals
 GROUP BY portal
 ORDER BY decided DESC, portal;
+```
+
+### Judge agreement
+
+Of the calls both judges rated, how many verdicts match, using each judge's newest verdict.
+
+```sql
+SELECT COUNT(*) AS both_judged,
+       SUM(CASE WHEN c.verdict = g.verdict THEN 1 ELSE 0 END) AS agree
+FROM judgments AS c
+JOIN judgments AS g ON g.call_id = c.call_id AND g.judge = 'grok'
+WHERE c.judge = 'claude'
+  AND c.id = (SELECT MAX(id) FROM judgments WHERE call_id = c.call_id AND judge = 'claude')
+  AND g.id = (SELECT MAX(id) FROM judgments WHERE call_id = g.call_id AND judge = 'grok');
 ```

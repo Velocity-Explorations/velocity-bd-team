@@ -241,6 +241,7 @@ def run_review(portal: Portal, limit: int | None, no_review: bool) -> int:
     examples = build_examples_block()
     log.info("REVIEW: feedback examples block is %d chars", len(examples))
     review_calls(rows, review_model(), feedback_examples_block=examples)
+    second_judge(rows, examples)
     return len(rows)
 
 
@@ -249,6 +250,60 @@ def review_model() -> Any:
     from review.reviewer import AnthropicModel
 
     return AnthropicModel()
+
+
+GROK_KEY = "BD_XAI_API_KEY"   # the second judge's key; without it only Claude judges
+
+
+def grok_enabled() -> bool:
+    return bool((config.get(GROK_KEY) or "").strip())
+
+
+def grok_model() -> Any:
+    """The second judge's model client. Tests replace this with a scripted one."""
+    from review.reviewer import GrokModel
+
+    return GrokModel()
+
+
+def second_judge(rows: list[dict[str, Any]], examples: str, extra_context: str = "") -> int:
+    """Grok judges the same calls with the review's own prompt (judgments table). It never changes
+    what is posted, and a failure only logs a warning: the run carries on."""
+    if not rows or not grok_enabled():
+        return 0
+    from review.reviewer import judge_calls
+
+    try:
+        judged = judge_calls(rows, grok_model(), "grok", feedback_examples_block=examples, extra_context=extra_context)
+    except Exception as exc:
+        log.warning("SECOND JUDGE: skipped (%s)", type(exc).__name__)
+        return 0
+    log.info("SECOND JUDGE: Grok judged %d of %d call(s)", len(judged), len(rows))
+    return len(judged)
+
+
+def backfill_judgments() -> int:
+    """Copy the Claude review's existing verdicts into judgments, then have Grok judge every kept,
+    reviewed call it has not judged yet. Safe to rerun: each pass only fills what is missing."""
+    from ledger.queries import add_judgment, calls_without_judgment
+    from review.feedback import build_examples_block
+    from review.reviewer import MODEL_ID, is_judgment
+
+    _console_logging()
+    copied = 0
+    for row in calls_without_judgment("claude"):
+        reason = row.get("ai_reasoning") or ""
+        if is_judgment(reason) and reason != NO_REVIEW_REASON:
+            add_judgment(row["id"], "claude", MODEL_ID, row["ai_verdict"], reason, rated_at=row.get("reviewed_at"))
+            copied += 1
+    print(f"Copied {copied} Claude verdict(s) into judgments.")
+    pending = calls_without_judgment("grok")
+    if not grok_enabled():
+        print(f"{GROK_KEY} is not set, so Grok did not judge the {len(pending)} call(s) waiting for it.")
+        return 0
+    judged = second_judge(pending, build_examples_block())
+    print(f"Grok judged {judged} of {len(pending)} call(s).")
+    return 0
 
 
 def deliver(portal: Portal, fresh: list[dict[str, Any]], counts: dict[str, int], elapsed: float, dry_run: bool) -> int:
@@ -517,8 +572,10 @@ def apply_rereview(req: dict[str, Any]) -> str:
     if row is None:
         raise RuntimeError(f"No call with id '{req['call_id']}'.")
     before = row.get("ai_verdict")
-    passed, dropped = review_calls([row], review_model(), feedback_examples_block=build_examples_block(),
-                                   extra_context=str(_payload(req).get("context") or ""))
+    examples = build_examples_block()
+    context = str(_payload(req).get("context") or "")
+    passed, dropped = review_calls([row], review_model(), feedback_examples_block=examples, extra_context=context)
+    second_judge([row], examples, extra_context=context)
     result = (passed + dropped)[0]
     if before and before != result.verdict:
         change = f"changed from {before} to {result.verdict}"
@@ -707,6 +764,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--post-summary", action="store_true", help="post the weekly summary to Slack, then exit")
     parser.add_argument("--apply-requests", action="store_true",
                         help="carry out change requests approved on the dashboard, then exit")
+    parser.add_argument("--backfill-judgments", action="store_true",
+                        help="record Claude's past verdicts as judgments and have Grok judge the backlog, then exit")
     return parser.parse_args(argv)
 
 
@@ -718,6 +777,8 @@ def main(argv: list[str] | None = None) -> int:
         return post_summary()
     if args.apply_requests:
         return apply_requests(wait_s=args.wait_lock * 60)
+    if args.backfill_judgments:
+        return backfill_judgments()
     try:
         acquire_lock(wait_s=args.wait_lock * 60)
     except LockHeld as exc:

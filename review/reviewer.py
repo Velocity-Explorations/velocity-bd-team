@@ -10,13 +10,15 @@ carries the team's note when a person approves a re-review (docs/ASSISTANT.md).
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
+import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from ledger.queries import set_review
+from ledger.queries import add_judgment, set_review
 
 log = logging.getLogger("review")
 
@@ -26,6 +28,9 @@ RETRY_DELAY_S = 1.0
 BETWEEN_CALLS_S = 0.5
 VERDICTS = ("yes", "no", "maybe")
 UNPARSEABLE_REASON = "Could not parse LLM response"
+GROK_MODEL_ID = "grok-4.7"   # the second judge; its key is limited to this model
+GROK_URL = "https://api.x.ai/v1/responses"
+GROK_TIMEOUT_S = 120.0       # Grok reasons before it answers; the 20 Oct trial averaged about 20 s a call
 DESCRIPTION_CHARS = 1500   # the spec said 500; the ledger now stores 1,500 and the model asked for more
 
 # Company profile, used verbatim in every review prompt.
@@ -92,6 +97,31 @@ class AnthropicModel:
         return "".join(block.text for block in response.content if block.type == "text")
 
 
+class GrokModel:
+    """Grok through xAI's Responses API, the second judge. Raises on any failure; the caller retries.
+
+    Uses BD_XAI_API_KEY, never XAI_API_KEY: on David's PC that name holds another project's key
+    and the process environment overrides .env.
+    """
+
+    def __init__(self, model: str = GROK_MODEL_ID, api_key: str | None = None) -> None:
+        from config import require
+
+        self.model = model
+        self._key = api_key or require("BD_XAI_API_KEY")
+
+    def complete(self, prompt: str, timeout: float) -> str:
+        body = json.dumps({"model": self.model, "input": prompt}).encode("utf-8")
+        request = urllib.request.Request(GROK_URL, data=body, method="POST", headers={
+            "Authorization": f"Bearer {self._key}", "Content-Type": "application/json"})
+        with urllib.request.urlopen(request, timeout=max(timeout, GROK_TIMEOUT_S)) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if isinstance(payload.get("output_text"), str):
+            return payload["output_text"]
+        return "\n".join(part["text"] for item in payload.get("output") or [] for part in item.get("content") or []
+                         if part.get("type") in ("output_text", "text") and part.get("text"))
+
+
 @dataclass
 class Reviewed:
     id: str
@@ -140,6 +170,11 @@ def parse_response(text: str) -> tuple[str, str]:
     return verdict, reason or ""
 
 
+def is_judgment(reason: str) -> bool:
+    """False for the fail-safe answers ask_model gives when the model failed or could not be read."""
+    return not (reason.startswith("Review error") or reason == UNPARSEABLE_REASON)
+
+
 def ask_model(prompt: str, model: ModelClient, sleep: Callable[[float], None] = time.sleep) -> tuple[str, str]:
     """One call plus one retry. Any failure on both -> ("maybe", "Review error: ...")."""
     first_error = ""
@@ -176,6 +211,8 @@ def review_calls(
             log.debug("Rendered prompt for first row:\n%s", prompt)
         verdict, reason = ask_model(prompt, model_client, sleep)
         set_review(row["id"], verdict, reason)
+        if is_judgment(reason):
+            add_judgment(row["id"], "claude", getattr(model_client, "model", MODEL_ID), verdict, reason)
         reviewed = Reviewed(row["id"], str(row.get("title") or ""), verdict, reason, row.get("match_tier"))
         log.info("AI review [%s]: %s", verdict, reviewed.title[:80])
         if verdict == "no":
@@ -186,3 +223,33 @@ def review_calls(
         if n < len(rows) - 1:
             sleep(BETWEEN_CALLS_S)
     return passed, dropped
+
+
+def judge_calls(
+    rows: list[Mapping[str, Any]],
+    model_client: ModelClient,
+    judge: str,
+    feedback_examples_block: str = "",
+    sleep: Callable[[float], None] = time.sleep,
+    extra_context: str = "",
+) -> list[Reviewed]:
+    """A second judge: rate each row with the review's own prompt and record only its judgment.
+
+    calls.ai_verdict, which decides what is posted, stays the Claude review's. A call the judge
+    could not rate (a model error, an unreadable answer) gets no judgment.
+    """
+    judged: list[Reviewed] = []
+    name = getattr(model_client, "model", judge)
+    for n, row in enumerate(rows):
+        prompt = build_prompt(row, "", feedback_examples_block, extra_context)
+        verdict, reason = ask_model(prompt, model_client, sleep)
+        title = str(row.get("title") or "")
+        if is_judgment(reason):
+            add_judgment(row["id"], judge, name, verdict, reason)
+            judged.append(Reviewed(row["id"], title, verdict, reason, row.get("match_tier")))
+            log.info("%s judged [%s]: %s", judge, verdict, title[:80])
+        else:
+            log.warning("%s could not judge %s: %s", judge, row["id"], reason[:120])
+        if n < len(rows) - 1:
+            sleep(BETWEEN_CALLS_S)
+    return judged

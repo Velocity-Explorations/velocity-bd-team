@@ -1,11 +1,18 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { CallState, Sort } from "@/lib/filters";
+import type { JudgeFilter } from "@/lib/judges";
 
 const STATES: { value: CallState; label: string }[] = [
   { value: "", label: "Open and closed" },
   { value: "open", label: "Open" },
   { value: "closed", label: "Closed" },
+];
+
+const JUDGE_CHOICES: { value: JudgeFilter; label: string }[] = [
+  { value: "", label: "Any" },
+  { value: "disagree", label: "Claude and Grok disagree" },
+  { value: "agree", label: "Claude and Grok agree" },
 ];
 
 /**
@@ -19,6 +26,7 @@ export function FilterPanel(props: {
   selected: string[];
   state: CallState;
   sort: Sort;
+  judges: JudgeFilter;
   filtered: boolean;
   children?: ReactNode;
 }) {
@@ -40,6 +48,14 @@ export function FilterPanel(props: {
           {STATES.map((s) => (
             <label key={s.value || "both"} className="check">
               <input type="radio" name="state" value={s.value} defaultChecked={props.state === s.value} /> {s.label}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset>
+          <legend>Judges</legend>
+          {JUDGE_CHOICES.map((j) => (
+            <label key={j.value || "any"} className="check">
+              <input type="radio" name="judges" value={j.value} defaultChecked={props.judges === j.value} /> {j.label}
             </label>
           ))}
         </fieldset>

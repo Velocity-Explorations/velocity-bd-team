@@ -217,6 +217,27 @@ button:hover {
   border-color: var(--muted);
 }
 
+/* ---------------------------------------------------------------------- judges */
+
+.judges {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: start;
+}
+
+.judge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.judge .who {
+  min-width: 3.2rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 /* ---------------------------------------------------------------- filter panel */
 
 .with-panel {
