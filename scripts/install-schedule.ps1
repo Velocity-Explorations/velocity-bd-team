@@ -1,6 +1,6 @@
 # Registers the pipeline and the portal assistant's jobs in Windows Task Scheduler.
 #
-#   .\scripts\install-schedule.ps1                       # Mondays 06:00, current user
+#   .\scripts\install-schedule.ps1                       # Sundays 22:00, current user
 #   .\scripts\install-schedule.ps1 -Day Tuesday -At 07:30
 #   .\scripts\install-schedule.ps1 -RequestsAt "09:07"   # approved requests once a day
 #
@@ -15,8 +15,8 @@
 # Slack alerts instead.
 param(
     [string]$TaskName = "velocity-bd-team pipeline",
-    [string]$Day = "Monday",
-    [string]$At = "06:00",
+    [string]$Day = "Sunday",
+    [string]$At = "22:00",
     [string]$FeedbackTaskName = "velocity-bd-team feedback",
     [string]$FeedbackAt = "18:00",
     [string]$RemindAt = "08:00",
@@ -48,8 +48,11 @@ function Register-Job([string]$Name, [string]$Arguments, $Trigger, [int]$LimitMi
 
 $action = New-ScheduledTaskAction -Execute $conhost -Argument (Headless "run.py --wait-lock $WaitLockMinutes") -WorkingDirectory $repo
 $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Day -At $At
+# Sunday night, so the results are in before the Monday meeting. WakeToRun wakes the PC if
+# someone put it to sleep; on mains power it is set never to sleep.
 $settings = New-ScheduledTaskSettingsSet `
     -MultipleInstances IgnoreNew `
+    -WakeToRun `
     -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
     -StartWhenAvailable `
     -RunOnlyIfNetworkAvailable `
