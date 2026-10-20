@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { aliasesFor } from "@/lib/people";
 import { decideCall, decideRequest, type DecideRequestResult, type DecideResult } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
 import { safeReturnTo } from "@/lib/text";
@@ -21,9 +22,10 @@ function backTo(returnTo: string, key: "notice" | "error", message: string): nev
 
 /**
  * Record or change a decision (the review queue's buttons, and the change control on
- * /calls). Writes human_status, human_by and human_at and appends the optional note. The
- * form carries the decision the page showed ("expected", empty for undecided); if the call
- * changed since, nothing is written.
+ * /calls). Writes human_status, human_by and human_at, appends the optional note, and keeps
+ * the person's decision in `decisions`. Choosing the decision a call already has, when it is
+ * someone else's, adds the viewer's own. The form carries the decision the page showed
+ * ("expected", empty for undecided); if the call changed since, nothing is written.
  */
 export async function decide(formData: FormData): Promise<void> {
   const returnTo = safeReturnTo(formData.get("return_to"));
@@ -40,7 +42,7 @@ export async function decide(formData: FormData): Promise<void> {
 
   let result: DecideResult;
   try {
-    result = await decideCall({ id, status, expected, by: viewer, note });
+    result = await decideCall({ id, status, expected, by: viewer, aliases: aliasesFor(viewer, allowlist()), note });
   } catch (err) {
     const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
     backTo(returnTo, "error", `Could not save the decision: ${detail}`);
@@ -48,7 +50,12 @@ export async function decide(formData: FormData): Promise<void> {
   revalidatePath("/");
   revalidatePath("/calls");
   if (result.ok) {
-    backTo(returnTo, "notice", result.plan === "note" ? `Note added: ${result.title}` : `${STATUS_LABELS[status]}: ${result.title}`);
+    const done = {
+      decide: `${STATUS_LABELS[status]}: ${result.title}`,
+      agree: `Added your decision, ${STATUS_LABELS[status]}: ${result.title}`,
+      note: `Note added: ${result.title}`,
+    };
+    backTo(returnTo, "notice", done[result.plan]);
   }
   backTo(returnTo, "error", result.reason);
 }

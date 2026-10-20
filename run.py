@@ -50,6 +50,7 @@ from ledger.queries import (
     finish_run,
     get_call,
     get_run,
+    judge_records,
     list_requests,
     new_calls,
     note_request,
@@ -429,7 +430,7 @@ def post_summary() -> int:
         return 0
     summaries = [weekly_summary(p.slug) for p in portals]
     health = [entry for p in portals for entry in scraper_health(p.slug)["portals"]]
-    text, blocks = weekly_summary_message(summaries, health)
+    text, blocks = weekly_summary_message(summaries, health, judges=judge_records())
     ts = post_text(text, blocks=blocks)
     print("Posted the weekly summary" + ("" if ts else " (Slack did not accept the post; see the log)"))
     return 0 if ts else 1

@@ -6,6 +6,7 @@ import { CLOSED_PATTERN, type CallState, type Sort } from "./filters";
 import type { JudgeFilter, Judgment } from "./judges";
 import { isoNow } from "./format";
 import type { RequestChoice } from "./requests";
+import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine } from "./text";
 import { planDecision, type Decision } from "./values";
 
@@ -53,10 +54,22 @@ function dueDate(db: Db) {
     END`;
 }
 
-/** Newest first, or closing soonest: upcoming deadlines first, then undated calls, then past ones. */
-function panelOrder(db: Db, sort: Sort) {
-  if (sort !== "due") return db`ORDER BY first_seen_at DESC, id`;
-  return db`ORDER BY (${dueDate(db)} < CURRENT_DATE) IS TRUE, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id`;
+/**
+ * Newest first, or closing soonest: upcoming deadlines first, then undated calls, then past ones.
+ * Under the disagree filter, calls where one judge said yes and the other no come first.
+ */
+function panelOrder(db: Db, f: { sort: Sort; judges: JudgeFilter }) {
+  const conflictsFirst = f.judges === "disagree"
+    ? db`(${newestVerdict(db, "claude")} IN ('yes', 'no') AND ${newestVerdict(db, "grok")} IN ('yes', 'no')) IS NOT TRUE,`
+    : db``;
+  if (f.sort !== "due") return db`ORDER BY ${conflictsFirst} first_seen_at DESC, id`;
+  return db`ORDER BY ${conflictsFirst} (${dueDate(db)} < CURRENT_DATE) IS TRUE, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id`;
+}
+
+/** True when a ledger table exists; a migration may not be applied to this database yet. */
+async function hasTable(db: Db, name: string): Promise<boolean> {
+  const [row] = await db<{ present: boolean }[]>`SELECT to_regclass(${name}::text) IS NOT NULL AS present`;
+  return Boolean(row?.present);
 }
 
 /** The triage backlog from LEDGER_SCHEMA.md, newest first unless sorted otherwise. A call a later keyword change dropped leaves it. */
@@ -70,7 +83,7 @@ export async function reviewQueue(f: PanelFilters & { verdict: string }): Promis
       AND filter_result = 'kept'
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
       ${panelWhere(db, f)}
-    ${panelOrder(db, f.sort)}
+    ${panelOrder(db, f)}
     LIMIT 500`;
   return [...rows];
 }
@@ -164,44 +177,65 @@ export async function listCalls(f: CallFilters, limit = 200): Promise<{ rows: Ca
       SELECT id, portal, title, url, type, due_date, filter_result, filter_reason, match_tier,
              ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra
       FROM calls ${where()}
-      ${panelOrder(db, f.sort)}
+      ${panelOrder(db, f)}
       LIMIT ${limit}`,
   ]);
   return { rows: [...rows], total: count[0]?.n ?? 0 };
 }
 
-export type DecideResult = { ok: true; title: string; plan: "decide" | "note" } | { ok: false; reason: string };
+export type DecideResult = { ok: true; title: string; plan: "decide" | "agree" | "note" } | { ok: false; reason: string };
+
+/** The newest decision recorded under any of these names on a call, or null. */
+async function latestDecisionBy(db: Db, callId: string, aliases: string[]): Promise<string | null> {
+  if (aliases.length === 0) return null;
+  const [row] = await db<{ status: string }[]>`
+    SELECT status FROM decisions WHERE call_id = ${callId} AND decided_by IN ${db(aliases)} ORDER BY id DESC LIMIT 1`;
+  return row?.status ?? null;
+}
 
 /**
  * The dashboard's one write, and since 2026-10-17 the only place decisions are made:
  * human_status, human_by, human_at, plus an optional note appended in append_note()'s
- * format. `expected` is the decision the page showed; if the call changed since (another
- * tab, another person), nothing is written and the reason says what it is now.
+ * format, and a row in `decisions` (migration 004) so every person's decision is kept.
+ * Choosing the decision a call already has, when it is someone else's, adds yours without
+ * changing the call. `expected` is the decision the page showed; if the call changed since
+ * (another tab, another person), nothing is written and the reason says what it is now.
+ * `aliases` are the names the person's earlier decisions are recorded under.
  */
 export async function decideCall(input: {
   id: string;
   status: Decision;
   expected: Decision | null;
   by: string;
+  aliases: string[];
   note: string;
 }): Promise<DecideResult> {
-  const plan = planDecision(input.expected, input.status, input.note);
-  if (plan === "noop") return { ok: false, reason: "Nothing to save: choose a different decision or add a note." };
   const db = sql();
+  const history = await hasTable(db, "decisions");
+  const mine = history ? await latestDecisionBy(db, input.id, input.aliases) : input.expected;
+  const plan = planDecision(input.expected, input.status, input.note, mine);
+  if (plan === "noop") return { ok: false, reason: "Nothing to save: choose a different decision or add a note." };
   const now = isoNow();
   const line = noteLine(now, input.by, input.note) || null;
-  const appendNote = db`human_notes = CASE
-      WHEN ${line}::text IS NULL THEN human_notes
-      ELSE COALESCE(NULLIF(human_notes, '') || chr(10), '') || ${line}::text
-    END`;
-  const updated = await db<{ title: string | null }[]>`
-    UPDATE calls
-    SET ${plan === "decide" ? db`human_status = ${input.status}, human_by = ${input.by}, human_at = ${now},` : db``}
-        updated_at = ${now},
-        ${appendNote}
-    WHERE id = ${input.id}
-      AND human_status IS NOT DISTINCT FROM ${input.expected}::text
-    RETURNING title`;
+  const updated = await db.begin(async (tx) => {
+    const rows = await tx<{ title: string | null }[]>`
+      UPDATE calls
+      SET ${plan === "decide" ? tx`human_status = ${input.status}, human_by = ${input.by}, human_at = ${now},` : tx``}
+          updated_at = ${now},
+          human_notes = CASE
+            WHEN ${line}::text IS NULL THEN human_notes
+            ELSE COALESCE(NULLIF(human_notes, '') || chr(10), '') || ${line}::text
+          END
+      WHERE id = ${input.id}
+        AND human_status IS NOT DISTINCT FROM ${input.expected}::text
+      RETURNING title`;
+    if (rows.length === 1 && history && plan !== "note") {
+      await tx`
+        INSERT INTO decisions (call_id, decided_by, status, note, decided_at)
+        VALUES (${input.id}, ${input.by}, ${input.status}, ${input.note.trim() || null}, ${now})`;
+    }
+    return rows.map((r) => ({ title: r.title }));
+  });
   if (updated.length === 1) return { ok: true, title: updated[0].title ?? input.id, plan };
   const [existing] = await db<{ human_status: string | null; human_by: string | null }[]>`
     SELECT human_status, human_by FROM calls WHERE id = ${input.id}`;
@@ -212,6 +246,80 @@ export async function decideCall(input: {
       ? `It was changed meanwhile to ${existing.human_status} by ${existing.human_by}. Nothing saved; reload and try again.`
       : "Its decision was cleared meanwhile. Nothing saved; reload and try again.",
   };
+}
+
+// ------------------------------------------------------------------ decisions, judges
+
+/** Every decision on these calls, oldest first (migration 004); empty before that table exists. */
+export async function decisionsOn(callIds: string[]): Promise<DecisionRow[]> {
+  if (callIds.length === 0) return [];
+  try {
+    const db = sql();
+    const rows = await db<DecisionRow[]>`
+      SELECT call_id, decided_by, status, decided_at FROM decisions WHERE call_id IN ${db(callIds)} ORDER BY id`;
+    return [...rows];
+  } catch {
+    return [];   // decisions table missing (migration 004)
+  }
+}
+
+export type JudgeRecord = { judge: string; decided: number; matches: number; misses: number; false_alarms: number };
+
+/** "Judge scoreboard" from LEDGER_SCHEMA.md, unchanged, wrapped only to cast its numbers. Null before migration 004. */
+export async function judgeRecords(): Promise<JudgeRecord[] | null> {
+  try {
+    const rows = await sql()<JudgeRecord[]>`
+      SELECT judge, decided::int AS decided, matches::int AS matches, misses::int AS misses,
+             false_alarms::int AS false_alarms
+      FROM (
+        SELECT j.judge,
+               COUNT(*) AS decided,
+               SUM(CASE WHEN (j.verdict = 'yes' AND c.human_status IN ('pursue', 'submitted'))
+                          OR (j.verdict = 'no' AND c.human_status IN ('not_relevant', 'dismissed')) THEN 1 ELSE 0 END) AS matches,
+               SUM(CASE WHEN j.verdict = 'no' AND c.human_status IN ('pursue', 'submitted') THEN 1 ELSE 0 END) AS misses,
+               SUM(CASE WHEN j.verdict = 'yes' AND c.human_status IN ('not_relevant', 'dismissed') THEN 1 ELSE 0 END) AS false_alarms
+        FROM calls AS c
+        JOIN judgments AS j ON j.call_id = c.id
+        WHERE c.human_status IS NOT NULL
+          AND j.id = (SELECT MAX(e.id) FROM judgments AS e
+                      WHERE e.call_id = c.id AND e.judge = j.judge
+                        AND e.rated_at < COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id),
+                                                  c.human_at))
+        GROUP BY j.judge
+        ORDER BY j.judge
+      ) AS records
+      ORDER BY judge`;
+    return [...rows];
+  } catch {
+    return null;   // decisions table missing (migration 004)
+  }
+}
+
+/**
+ * What the judges page scores per person: every decision, the judgments on decided calls, and
+ * each decided call with the time it was first decided. Null before migration 004.
+ */
+export async function scoreboardRows(): Promise<{ decisions: DecisionRow[]; judgments: JudgmentRow[]; calls: DecidedCall[] } | null> {
+  try {
+    const db = sql();
+    const [decisions, judgments, calls] = await Promise.all([
+      db<DecisionRow[]>`SELECT call_id, decided_by, status, decided_at FROM decisions ORDER BY id`,
+      db<JudgmentRow[]>`
+        SELECT j.call_id, j.judge, j.verdict, j.rated_at
+        FROM judgments AS j
+        WHERE EXISTS (SELECT 1 FROM decisions AS d WHERE d.call_id = j.call_id)
+        ORDER BY j.id`,
+      db<DecidedCall[]>`
+        SELECT c.id, c.title, c.url, c.human_status AS status,
+               COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id), c.human_at) AS decided_at
+        FROM calls AS c
+        WHERE c.human_status IS NOT NULL
+        ORDER BY 5 DESC, c.id`,
+    ]);
+    return { decisions: [...decisions], judgments: [...judgments], calls: [...calls] };
+  } catch {
+    return null;   // decisions table missing (migration 004)
+  }
 }
 
 // -------------------------------------------------------------------- change requests

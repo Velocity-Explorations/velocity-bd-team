@@ -167,12 +167,18 @@ def set_slack(call_id: str, channel: str, ts: str) -> None:
 
 
 def set_human(call_id: str, status: str, by: str, at: str | None = None) -> None:
+    """Record a person's decision. It becomes the call's current decision (calls.human_*) and is
+    added to the call's history in `decisions`, so an earlier decision by someone else is kept."""
+    at = at or now_iso()
     with tx() as conn:
-        q(
+        cur = q(
             conn,
             "UPDATE calls SET human_status = ?, human_by = ?, human_at = ?, updated_at = ? WHERE id = ?",
-            (status, by, at or now_iso(), now_iso(), call_id),
+            (status, by, at, now_iso(), call_id),
         )
+        if cur.rowcount == 1:
+            q(conn, "INSERT INTO decisions (call_id, decided_by, status, decided_at) VALUES (?, ?, ?, ?)",
+              (call_id, by, status, at))
 
 
 def append_note(call_id: str, text: str, by: str, at: str | None = None) -> str:
@@ -455,9 +461,50 @@ def latest_judgments(call_id: str) -> dict[str, dict[str, Any]]:
     return {row["judge"]: row for row in found}
 
 
+# The judge scoreboard, also in docs/LEDGER_SCHEMA.md ("Judge scoreboard"). The team's decision is
+# calls.human_status; pursue and submitted mean yes, not_relevant and dismissed mean no. A judge's
+# verdict counts only if it was given before the call's first decision, because decided calls are
+# among the examples in the judges' prompt.
+JUDGE_RECORDS_SQL = """
+SELECT j.judge,
+       COUNT(*) AS decided,
+       SUM(CASE WHEN (j.verdict = 'yes' AND c.human_status IN ('pursue', 'submitted'))
+                  OR (j.verdict = 'no' AND c.human_status IN ('not_relevant', 'dismissed')) THEN 1 ELSE 0 END) AS matches,
+       SUM(CASE WHEN j.verdict = 'no' AND c.human_status IN ('pursue', 'submitted') THEN 1 ELSE 0 END) AS misses,
+       SUM(CASE WHEN j.verdict = 'yes' AND c.human_status IN ('not_relevant', 'dismissed') THEN 1 ELSE 0 END) AS false_alarms
+FROM calls AS c
+JOIN judgments AS j ON j.call_id = c.id
+WHERE c.human_status IS NOT NULL
+  AND j.id = (SELECT MAX(e.id) FROM judgments AS e
+              WHERE e.call_id = c.id AND e.judge = j.judge
+                AND e.rated_at < COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id),
+                                          c.human_at))
+GROUP BY j.judge
+ORDER BY j.judge
+"""
+
+
 def calls_without_judgment(judge: str) -> list[dict[str, Any]]:
     """Kept, reviewed calls this judge has not rated yet, oldest first."""
     with tx() as conn:
         return rows(q(conn, "SELECT * FROM calls WHERE filter_result = 'kept' AND ai_verdict IS NOT NULL "
                             "AND NOT EXISTS (SELECT 1 FROM judgments AS j WHERE j.call_id = calls.id AND j.judge = ?) "
                             "ORDER BY first_seen_at, id", (judge,)))
+
+
+def judge_records() -> list[dict[str, Any]]:
+    """Each judge against the team's decisions: calls it judged before they were decided, matches,
+    misses (it said no, the team pursued) and false alarms (it said yes, the team passed)."""
+    with tx() as conn:
+        return rows(q(conn, JUDGE_RECORDS_SQL))
+
+
+# --------------------------------------------------------------------------------- decisions
+# Every decision on every call, kept per person (migration 004). calls.human_status is the
+# latest of them, the team's current decision.
+
+def decision_history(call_id: str) -> list[dict[str, Any]]:
+    """Every decision on one call, oldest first: who decided, what, when, and any note."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT decided_by, status, note, decided_at FROM decisions WHERE call_id = ? ORDER BY id",
+                      (call_id,)))

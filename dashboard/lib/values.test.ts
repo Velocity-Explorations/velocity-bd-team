@@ -19,8 +19,14 @@ test("pickAllowed keeps a filter value only when it is allowed", () => {
 });
 
 test("planDecision: a different status decides, the same status with a note only adds the note", () => {
-  assert.equal(planDecision(null, "pursue", ""), "decide");
-  assert.equal(planDecision("pursue", "submitted", ""), "decide");
-  assert.equal(planDecision("pursue", "pursue", "called the PM"), "note");
-  assert.equal(planDecision("pursue", "pursue", "   "), "noop");
+  assert.equal(planDecision(null, "pursue", "", null), "decide");
+  assert.equal(planDecision("pursue", "submitted", "", "pursue"), "decide");
+  assert.equal(planDecision("pursue", "pursue", "called the PM", "pursue"), "note");
+  assert.equal(planDecision("pursue", "pursue", "   ", "pursue"), "noop");
+});
+
+test("planDecision: choosing the current decision when it is someone else's records yours", () => {
+  assert.equal(planDecision("pursue", "pursue", "", null), "agree");
+  assert.equal(planDecision("pursue", "pursue", "worth a call", "dismissed"), "agree");
+  assert.equal(planDecision("pursue", "dismissed", "", null), "decide");
 });

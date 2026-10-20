@@ -5,9 +5,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 ## Live
 
 - Ledger (Phase 0), migration 001_initial applied to the hosted Supabase Postgres on
-  2026-10-16, and 002_change_requests on 2026-10-17. Tables: calls, change_requests,
-  proposals, runs, schema_migrations. `python -m ledger.migrate` is a no-op until a new
-  migration lands. Connect through the Session pooler URL (the
+  2026-10-16, 002_change_requests on 2026-10-17, 003_judgments on 2026-10-20.
+  004_decisions (every decision kept per person) is applied with `python -m ledger.migrate`
+  after it merges. Tables: calls, change_requests, decisions, judgments, proposals, runs,
+  schema_migrations. Connect through the Session pooler URL (the
   direct URL is IPv6-only and unreachable from David's network).
 
 ## In progress
@@ -20,7 +21,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   notes and cards edited to show decisions (`run.py --feedback-only`, daily task). Live on
   2026-10-16. Since 2026-10-17 reactions are not read: decisions are made on the dashboard.
 - Phase 9 (dashboard): Next.js 16.4 app in dashboard/, run locally with `npm run dev`. The only
-  place decisions are made: review queue buttons, plus a change control on all calls. Runs and
+  place decisions are made: review queue buttons, plus a change control on all calls. Several
+  people can decide (DASHBOARD_USERS lists David and Shaun since 2026-10-20); each person's
+  decisions are kept and a judges page scores Claude and Grok against them. Runs and
   proposals pages too. Not deployed anywhere yet; hosting is undecided, so for now only David
   can decide.
 

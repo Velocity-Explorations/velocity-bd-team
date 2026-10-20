@@ -8,11 +8,12 @@ import { displayPerson } from "@/lib/people";
 import { filterHref, pickMany, pickSort, pickState } from "@/lib/filters";
 import { formatTime } from "@/lib/format";
 import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
-import { judgeAgreement, latestJudgments, listCalls, portals, type CallFilters } from "@/lib/queries";
+import { decisionsOn, judgeAgreement, latestJudgments, listCalls, portals, type CallFilters } from "@/lib/queries";
+import { peopleSplit, votesByCall } from "@/lib/scoreboard";
 import { displayTimeZone } from "@/lib/settings";
 import { firstParam, isClosed, parseNoteLine } from "@/lib/text";
 import { DECISIONS, FILTER_RESULTS, HUMAN_STATUSES, isDecision, pickAllowed, STATUS_LABELS, VERDICTS } from "@/lib/values";
-import { allowlist } from "@/lib/viewer";
+import { allowlist, currentViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "All calls" };
@@ -35,9 +36,11 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
     q: firstParam(sp.q, 120),
   };
   const [{ rows, total }, agreement] = await Promise.all([listCalls(filters, LIMIT), judgeAgreement()]);
-  const judged = await latestJudgments(rows.map((r) => r.id));
+  const ids = rows.map((r) => r.id);
+  const [judged, decisions, viewer] = await Promise.all([latestJudgments(ids), decisionsOn(ids), currentViewer()]);
   const tz = displayTimeZone();
   const users = allowlist();
+  const votes = votesByCall(decisions, (by) => displayPerson(by, users));
   const filtered = Boolean(
     filters.portals.length || filters.state || filters.sort === "due" || filters.judges || filters.filterResult ||
       filters.verdict || filters.status || filters.q,
@@ -145,6 +148,10 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                 <tbody>
                   {rows.map((r) => {
                     const notes = (r.human_notes ?? "").split("\n").filter(Boolean).map(parseNoteLine);
+                    const callVotes = votes.get(r.id) ?? [];
+                    const decidedByViewer = callVotes.length
+                      ? callVotes.some((v) => v.person === viewer)
+                      : displayPerson(r.human_by, users) === viewer;
                     return (
                       <tr key={r.id}>
                         <td className="call">
@@ -165,14 +172,24 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                         </td>
                         <td>
                           <Badge value={r.human_status} empty="undecided" />
-                          {r.human_status ? (
+                          {peopleSplit(callVotes) ? <span className="badge tone-warn">people disagree</span> : null}
+                          {callVotes.length > 1 ? (
+                            <ul className="notes votes">
+                              {callVotes.map((v) => (
+                                <li key={v.person}>
+                                  {v.person}: {isDecision(v.status) ? STATUS_LABELS[v.status] : v.status}{" "}
+                                  <span className="when">{formatTime(v.decided_at, tz)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : r.human_status ? (
                             <div className="meta">
                               <span>{displayPerson(r.human_by, users)}</span>
                               <span className="when">{formatTime(r.human_at, tz)}</span>
                             </div>
                           ) : null}
                           <details className="change">
-                            <summary>{r.human_status ? "change" : "decide"}</summary>
+                            <summary>{!r.human_status ? "decide" : decidedByViewer ? "change" : "add yours"}</summary>
                             <form action={decide}>
                               <input type="hidden" name="id" value={r.id} />
                               <input type="hidden" name="expected" value={isDecision(r.human_status) ? r.human_status : ""} />

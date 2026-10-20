@@ -146,6 +146,11 @@ def test_weekly_summary_message_reads_as_a_brief(monkeypatch: pytest.MonkeyPatch
     assert "Scraper: Vulcan SOF: the last scan completed at 19 Oct 06:03." in body
     assert text == "Weekly BD summary, week of 19 Oct. Vulcan SOF: 3 new, 13 waiting for a decision."
     assert sink._closes("15 APR 2028 : 22:59 MDT", 543) == "closes Sat 15 Apr 2028 (543 days)"
+    judges = [{"judge": "claude", "decided": 3, "matches": 2, "misses": 0, "false_alarms": 1},
+              {"judge": "grok", "decided": 1, "matches": 0, "misses": 1, "false_alarms": 0}]
+    _, with_judges = sink.weekly_summary_message([summary], health, now=datetime(2026, 10, 21, tzinfo=timezone.utc), judges=judges)
+    assert ("Judges against your decisions, counting only verdicts given before you decided: "
+            "Claude matched 2 of 3 (0 misses, 1 false alarm); Grok matched 0 of 1 (1 miss, 0 false alarms).") in block_texts(with_judges)
 
 
 # ---------------------------------------------------------------------- feedback
