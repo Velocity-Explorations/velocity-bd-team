@@ -217,37 +217,93 @@ button:hover {
   border-color: var(--muted);
 }
 
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 0.6rem 1rem;
-  padding: 0.75rem;
-  margin-bottom: 1rem;
+/* ---------------------------------------------------------------- filter panel */
+
+.with-panel {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.panel {
+  position: sticky;
+  top: 1rem;
+  padding: 0.85rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-.filters label {
+.panel form {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 1rem;
+}
+
+.panel fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.panel legend,
+.panel label.field {
   font-size: 0.8rem;
   color: var(--muted);
 }
 
-.filters label.check {
-  flex-direction: row;
-  align-items: center;
-  font-size: 0.9rem;
-  color: var(--fg);
-  padding-bottom: 0.35rem;
+.panel legend {
+  margin-bottom: 0.3rem;
+  padding: 0;
 }
 
-.filters .reset {
-  padding-bottom: 0.35rem;
+.panel label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   font-size: 0.9rem;
+  color: var(--fg);
+}
+
+.panel label.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.panel select,
+.panel input[type="search"] {
+  width: 100%;
+}
+
+.panel .hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.panel-actions .reset {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .with-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .panel {
+    position: static;
+  }
 }
 
 .flash {

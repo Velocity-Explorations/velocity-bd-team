@@ -2,9 +2,10 @@
 // int and rates to float8 because Postgres returns bigint and numeric, which arrive as strings.
 
 import { sql } from "./db";
+import { CLOSED_PATTERN, type CallState, type Sort } from "./filters";
 import { isoNow } from "./format";
 import type { RequestChoice } from "./requests";
-import { escapeLike, isClosed, noteLine } from "./text";
+import { escapeLike, noteLine } from "./text";
 import { planDecision, type Decision } from "./values";
 
 // ------------------------------------------------------------------------------ calls
@@ -22,8 +23,36 @@ export type QueueRow = {
   extra: string | null;
 };
 
-/** The triage backlog from LEDGER_SCHEMA.md, newest first. A call a later keyword change dropped leaves it. */
-export async function reviewQueue(f: { portal: string; verdict: string; openOnly: boolean }): Promise<QueueRow[]> {
+/** The filter panel's choices (lib/filters.ts). No portals ticked means every portal. */
+export type PanelFilters = { portals: string[]; state: CallState; sort: Sort };
+
+type Db = ReturnType<typeof sql>;
+
+/** The panel's portal and open-or-closed conditions, appended after a WHERE. */
+function panelWhere(db: Db, f: PanelFilters) {
+  return db`
+    ${f.portals.length ? db`AND portal IN ${db(f.portals)}` : db``}
+    ${f.state === "open" ? db`AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})` : db``}
+    ${f.state === "closed" ? db`AND extra ~ ${CLOSED_PATTERN}` : db``}`;
+}
+
+/** due_date as a date, from either shape the portals write: "27 OCT 2026 : 21:59 MDT" or "2026-10-27". */
+function dueDate(db: Db) {
+  return db`CASE
+      WHEN due_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN to_date(substring(due_date from 1 for 10), 'YYYY-MM-DD')
+      WHEN due_date ~ '^[0-9]{1,2} [A-Za-z]{3} [0-9]{4}'
+        THEN to_date(substring(due_date from '^[0-9]{1,2} [A-Za-z]{3} [0-9]{4}'), 'DD Mon YYYY')
+    END`;
+}
+
+/** Newest first, or closing soonest: upcoming deadlines first, then undated calls, then past ones. */
+function panelOrder(db: Db, sort: Sort) {
+  if (sort !== "due") return db`ORDER BY first_seen_at DESC, id`;
+  return db`ORDER BY (${dueDate(db)} < CURRENT_DATE) IS TRUE, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id`;
+}
+
+/** The triage backlog from LEDGER_SCHEMA.md, newest first unless sorted otherwise. A call a later keyword change dropped leaves it. */
+export async function reviewQueue(f: PanelFilters & { verdict: string }): Promise<QueueRow[]> {
   const db = sql();
   const rows = await db<QueueRow[]>`
     SELECT id, portal, title, url, ai_verdict, ai_reasoning, due_date, match_tier, first_seen_at, extra
@@ -31,11 +60,11 @@ export async function reviewQueue(f: { portal: string; verdict: string; openOnly
     WHERE ai_verdict IN ('yes', 'maybe')
       AND human_status IS NULL
       AND filter_result = 'kept'
-      ${f.portal ? db`AND portal = ${f.portal}` : db``}
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
-    ORDER BY first_seen_at DESC, id
+      ${panelWhere(db, f)}
+    ${panelOrder(db, f.sort)}
     LIMIT 500`;
-  return f.openOnly ? rows.filter((r) => !isClosed(r.extra)) : [...rows];
+  return [...rows];
 }
 
 /** "New calls this week" from LEDGER_SCHEMA.md, as a count. */
@@ -50,7 +79,7 @@ export async function portals(): Promise<string[]> {
   return rows.map((r) => r.portal);
 }
 
-export type CallFilters = { portal: string; filterResult: string; verdict: string; status: string; q: string };
+export type CallFilters = PanelFilters & { filterResult: string; verdict: string; status: string; q: string };
 
 export type CallRow = {
   id: string;
@@ -76,18 +105,18 @@ export async function listCalls(f: CallFilters, limit = 200): Promise<{ rows: Ca
   const db = sql();
   const where = () => db`
     WHERE TRUE
-      ${f.portal ? db`AND portal = ${f.portal}` : db``}
       ${f.filterResult ? db`AND filter_result = ${f.filterResult}` : db``}
       ${f.verdict === "none" ? db`AND ai_verdict IS NULL` : f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
       ${f.status === "none" ? db`AND human_status IS NULL` : f.status ? db`AND human_status = ${f.status}` : db``}
-      ${f.q ? db`AND title ILIKE ${`%${escapeLike(f.q)}%`}` : db``}`;
+      ${f.q ? db`AND title ILIKE ${`%${escapeLike(f.q)}%`}` : db``}
+      ${panelWhere(db, f)}`;
   const [count, rows] = await Promise.all([
     db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${where()}`,
     db<CallRow[]>`
       SELECT id, portal, title, url, type, due_date, filter_result, filter_reason, match_tier,
              ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra
       FROM calls ${where()}
-      ORDER BY first_seen_at DESC, id
+      ${panelOrder(db, f.sort)}
       LIMIT ${limit}`,
   ]);
   return { rows: [...rows], total: count[0]?.n ?? 0 };
