@@ -90,7 +90,9 @@ its own in `data/<slug>/cookies.json`.
 ## Scheduled runs
 
 `scripts\install-schedule.ps1` registers a Windows Task Scheduler task named
-"velocity-bd-team pipeline" that runs `run.py` from the venv weekly (default Monday 06:00).
+"velocity-bd-team pipeline" that runs `run.py` from the venv weekly (default Sunday 22:00, so the
+results are in before the Monday meeting). The scan PC is a desktop set never to sleep or hibernate
+on mains power, and the scan task may wake it if it was put to sleep by hand.
 The task's MultipleInstances policy is IgnoreNew, and the lock file is a second guard.
 
 ```powershell

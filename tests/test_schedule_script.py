@@ -39,3 +39,9 @@ def test_people_are_told_the_same_request_times() -> None:
 def test_docs_no_longer_promise_fifteen_minutes() -> None:
     for name in ("ASSISTANT.md", "DASHBOARD.md", "RUNBOOK.md", "STATUS.md"):
         assert "15 minutes" not in (REPO / "docs" / name).read_text(encoding="utf-8"), name
+
+
+def test_weekly_scan_runs_sunday_night_and_may_wake_the_pc() -> None:
+    assert '[string]$Day = "Sunday"' in SCRIPT and '[string]$At = "22:00"' in SCRIPT
+    pipeline_settings = SCRIPT.split("$settings = New-ScheduledTaskSettingsSet `", 1)[1].split("Register-ScheduledTask", 1)[0]
+    assert "-WakeToRun" in pipeline_settings

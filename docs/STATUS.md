@@ -13,7 +13,7 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 ## In progress
 
 - Phase 7 (pipeline): `python run.py` runs every registered portal (fetch under a hard timeout,
-  filter, review, digest) and writes data/logs/run_*.log. Scheduled weekly (Monday 06:00) via
+  filter, review, digest) and writes data/logs/run_*.log. Scheduled weekly (Sunday 22:00 since 2026-10-20) via
   scripts/install-schedule.ps1 as of 2026-10-16. Failure alerts go to Slack once SLACK_CHANNEL_ID
   is set; until then they are log warnings.
 - Phase 8 (Slack delivery and feedback): cards and a summary per run; thread replies polled into
