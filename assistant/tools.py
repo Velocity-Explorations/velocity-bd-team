@@ -33,6 +33,7 @@ NEGATIVE = {"not_relevant", "dismissed"}
 VERDICTS = ("yes", "maybe", "no")
 OVERDUE_DAYS = 8          # scans run weekly; more than this without a completed one is worth saying
 CLOSING_WINDOW_DAYS = 14
+TOP_PICKS = 5   # open, undecided calls the weekly summary ranks
 NOTE_LINE = re.compile(r"^\[(\S+) ([^\]]+)\] ?(.*)$")
 STOPWORDS = {
     "with", "from", "into", "that", "this", "their", "they", "have", "will", "your", "call", "calls",
@@ -105,6 +106,14 @@ def _sentence(text: str) -> str:
 
 def _plural(n: int, word: str) -> str:
     return f"{n} {word}" if n == 1 else f"{n} {word}s"
+
+
+def _first_sentence(text: str | None, limit: int = 160) -> str:
+    """The first sentence of a review reason, cut to `limit` characters."""
+    clean = " ".join((text or "").split())
+    match = re.match(r"(.+?[.!?])(\s|$)", clean)
+    sentence = match.group(1) if match else clean
+    return sentence if len(sentence) <= limit else sentence[: limit - 1].rstrip() + "\u2026"
 
 
 def _days_phrase(days: int) -> str:
@@ -420,6 +429,21 @@ def weekly_summary(portal: str | None = None, days: int = 7, now: datetime | Non
             closing.append((due, _call_ref(row, deadline=row.get("due_date"), days_left=days_until(due, moment),
                                            status=row.get("human_status"))))
     closing_soon = [item for _, item in sorted(closing, key=lambda pair: pair[0])]
+    # Open, undecided calls the review kept and rated yes or maybe, best first: yes before maybe,
+    # then the nearest deadline, then the newest. The fit score will replace this order (PRO-487).
+    waiting = []
+    for row in rows:
+        if row.get("human_status") or row.get("filter_result") != "kept" or row.get("ai_verdict") not in ("yes", "maybe"):
+            continue
+        due = parse_due(row.get("due_date"))
+        if _flag(_extra(row), "_closed") or (due is not None and due < moment):
+            continue
+        waiting.append((row, due))
+    waiting.sort(key=lambda pair: pair[0].get("first_seen_at") or "", reverse=True)
+    waiting.sort(key=lambda pair: (pair[0]["ai_verdict"] != "yes", pair[1] is None, pair[1] or moment))
+    top_picks = [_call_ref(r, verdict=r["ai_verdict"], deadline=r.get("due_date"),
+                           days_left=days_until(d, moment) if d else None, reason=_first_sentence(r.get("ai_reasoning")))
+                 for r, d in waiting[:TOP_PICKS]]
     decided = sorted((r for r in rows if r.get("human_status") and (r.get("human_at") or "") >= cutoff),
                      key=lambda r: r.get("human_at") or "", reverse=True)
     decided_refs = [_call_ref(r, status=r["human_status"], by=r.get("human_by"), at=r.get("human_at")) for r in decided]
@@ -442,7 +466,8 @@ def weekly_summary(portal: str | None = None, days: int = 7, now: datetime | Non
         lines += [f"- {STATUS_LABELS.get(d['status'], d['status'])}: {d['title']} ({d['by']})" for d in decided_refs]
     return {"portal": name, "days": days,
             "new": {"total": len(new), "by_verdict": by_verdict, "calls": [_call_ref(r, verdict=r.get("ai_verdict")) for r in new]},
-            "closing_soon": closing_soon, "decided": decided_refs, "text": "\n".join(lines)}
+            "closing_soon": closing_soon, "decided": decided_refs, "waiting": len(waiting), "top_picks": top_picks,
+            "text": "\n".join(lines)}
 
 
 # ------------------------------------------------------------- settings change, previewed

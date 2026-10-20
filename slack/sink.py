@@ -24,7 +24,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from config import get
@@ -50,6 +50,9 @@ DECISION_LABELS = {
 }
 DECISION_BLOCK_PREFIX = "decision:"
 SLACK_USER_ID = re.compile(r"^[UW][A-Z0-9]{6,}$")
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+DECIDED_SHOWN = 10   # decisions listed in the weekly summary; the rest are on the dashboard
 
 
 class SlackClient:
@@ -212,15 +215,115 @@ def summary_text(summary: dict[str, Any]) -> str:
     )
 
 
-def post_text(text: str, client: SlackClient | None = None) -> str | None:
-    """Post a plain message to the team channel. Returns its ts, or None when it was not sent."""
+def post_text(text: str, client: SlackClient | None = None, blocks: list[dict[str, Any]] | None = None) -> str | None:
+    """Post a message to the team channel; with `blocks`, `text` is the notification fallback.
+    Returns its ts, or None when it was not sent."""
     client = client or SlackClient()
     channel = channel_id()
     if not channel:
         log.warning("post_text skipped: SLACK_CHANNEL_ID missing")
         return None
-    payload = client.call("chat.postMessage", {"channel": channel, "text": text, "unfurl_links": False})
+    params: dict[str, Any] = {"channel": channel, "text": text, "unfurl_links": False}
+    if blocks:
+        params["blocks"] = blocks
+    payload = client.call("chat.postMessage", params)
     return str(payload.get("ts")) if payload else None
+
+
+def _esc(text: str) -> str:
+    """Escape the three characters Slack's mrkdwn reads as markup."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _linked(title: str, url: str | None) -> str:
+    return f"<{url}|{_esc(title)}>" if url else _esc(title)
+
+
+def _section(text: str) -> dict[str, Any]:
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text[:3000]}}
+
+
+def _deadline_day(deadline: str | None) -> date | None:
+    """The calendar day of a deadline as the portal wrote it: "27 OCT 2026 : 21:59 MDT" or "2026-10-27"."""
+    text = (deadline or "").strip()
+    match = re.match(r"(\d{1,2}) ([A-Za-z]{3}) (\d{4})", text)
+    try:
+        if match:
+            day, month, year = match.groups()
+            return date(int(year), MONTHS.index(month.title()) + 1, int(day))
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return None
+
+
+def _closes(deadline: str | None, days_left: int | None) -> str:
+    """'closes Tue 27 Oct (7 days)', or the deadline as written when it cannot be read."""
+    day = _deadline_day(deadline)
+    if day is None:
+        return f"closes {_esc(deadline)}" if deadline else ""
+    year = f" {day.year}" if day.year != date.today().year else ""
+    when = f"closes {WEEKDAYS[day.weekday()]} {day.day} {MONTHS[day.month - 1]}{year}"
+    if days_left is None:
+        return when
+    left = "today" if days_left == 0 else f"{days_left} day{'' if days_left == 1 else 's'}"
+    return f"{when} ({left})"
+
+
+def _decider(by: str | None) -> str:
+    """A person's name; decisions made with Slack reactions before 2026-10-17 hold a user id instead."""
+    if not by:
+        return "unknown"
+    return "decided in Slack" if SLACK_USER_ID.match(by) else _esc(by)
+
+
+def weekly_summary_message(summaries: list[dict[str, Any]], health: list[dict[str, Any]],
+                           now: datetime | None = None) -> tuple[str, list[dict[str, Any]]]:
+    """The Monday summary as Slack blocks, plus a one-line fallback for notifications.
+
+    `summaries` are assistant weekly_summary() results, one per portal; `health` are the
+    entries of scraper_health()["portals"].
+    """
+    today = (now or datetime.now(timezone.utc)).date()
+    monday = today - timedelta(days=today.weekday())
+    title = f"Weekly BD summary, week of {monday.day} {MONTHS[monday.month - 1]}"
+    base = dashboard_url()
+    queue = f"<{base}/?state=open|Open the review queue>" if base else "Decide on the dashboard's review queue."
+    scraper = {entry.get("name"): entry.get("text", "") for entry in health}
+    blocks: list[dict[str, Any]] = [{"type": "header", "text": {"type": "plain_text", "text": title}}]
+    fallback: list[str] = []
+    for i, s in enumerate(summaries):
+        if i:
+            blocks.append({"type": "divider"})
+        name, new, waiting = s.get("portal") or "Portal", s["new"]["total"], s.get("waiting", 0)
+        fallback.append(f"{name}: {new} new, {waiting} waiting for a decision")
+        calls = "call" if waiting == 1 else "calls"
+        blocks.append(_section(f"*{_esc(name)}*: {new} new this week, {waiting} open {calls} waiting for a decision. {queue}"))
+        picks = s.get("top_picks") or []
+        if picks:
+            lines = ["*Top picks*, open and undecided, ranked by verdict, then deadline:"]
+            for n, c in enumerate(picks, 1):
+                closes = _closes(c.get("deadline"), c.get("days_left"))
+                lines.append(f"{n}. {_linked(c['title'], c.get('url'))}: {c.get('verdict')}" + (f", {closes}" if closes else ""))
+                if c.get("reason"):
+                    lines.append(f"      _{_esc(c['reason'])}_")
+            blocks.append(_section("\n".join(lines)))
+        pursued = [c for c in s.get("closing_soon") or [] if c.get("status") == "pursue"]
+        if pursued:
+            lines = ["*Pursued, closing within 14 days*"]
+            lines += [f"\u2022 {_linked(c['title'], c.get('url'))}, {_closes(c.get('deadline'), c.get('days_left'))}" for c in pursued]
+            blocks.append(_section("\n".join(lines)))
+        decided = s.get("decided") or []
+        if decided:
+            lines = ["*Decided this week*"]
+            for d in decided[:DECIDED_SHOWN]:
+                label = DECISION_LABELS.get(d.get("status") or "", ("", d.get("status") or ""))[1]
+                lines.append(f"\u2022 {label}: {_linked(d['title'], d.get('url'))} ({_decider(d.get('by'))})")
+            if len(decided) > DECIDED_SHOWN:
+                lines.append(f"and {len(decided) - DECIDED_SHOWN} more on the dashboard")
+            blocks.append(_section("\n".join(lines)))
+        if scraper.get(name):
+            blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": f"Scraper: {_esc(scraper[name])}"}]})
+    return f"{title}. " + "; ".join(fallback) + ".", blocks
 
 
 def post_run_summary(summary: dict[str, Any], client: SlackClient | None = None) -> str | None:
