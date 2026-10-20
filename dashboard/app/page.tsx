@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { decide } from "./actions";
 import { FilterPanel } from "@/components/FilterPanel";
+import { JudgeVerdicts } from "@/components/Judges";
 import { Shell } from "@/components/Shell";
 import { Badge, Flash, TitleLink } from "@/components/bits";
 import { filterHref, pickMany, pickSort, pickState } from "@/lib/filters";
 import { formatTime } from "@/lib/format";
-import { newThisWeek, portals, reviewQueue } from "@/lib/queries";
+import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
+import { judgeAgreement, latestJudgments, newThisWeek, portals, reviewQueue } from "@/lib/queries";
 import { displayTimeZone } from "@/lib/settings";
 import { firstParam, isClosed } from "@/lib/text";
 import { DECISIONS, pickAllowed } from "@/lib/values";
@@ -23,19 +25,24 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
     portals: pickMany(sp.portal, portalList),
     state: pickState(sp.state, sp.open),
     sort: pickSort(sp.sort),
+    judges: pickJudgeFilter(sp.judges),
     verdict: pickAllowed(sp.verdict, ["yes", "maybe"] as const),
   };
 
-  const [rows, weekCount] = await Promise.all([reviewQueue(filters), newThisWeek()]);
+  const [rows, weekCount, agreement] = await Promise.all([reviewQueue(filters), newThisWeek(), judgeAgreement()]);
+  const judged = await latestJudgments(rows.map((r) => r.id));
   const tz = displayTimeZone();
   const returnTo = filterHref("/", {
     portal: filters.portals,
     state: filters.state,
     sort: filters.sort === "due" ? "due" : "",
+    judges: filters.judges,
     verdict: filters.verdict,
   });
   const yesCount = rows.filter((r) => r.ai_verdict === "yes").length;
-  const filtered = Boolean(filters.portals.length || filters.state || filters.sort === "due" || filters.verdict);
+  const filtered = Boolean(
+    filters.portals.length || filters.state || filters.sort === "due" || filters.judges || filters.verdict,
+  );
 
   return (
     <Shell current="queue">
@@ -61,6 +68,12 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
             <dt>New this week</dt>
             <dd>{weekCount}</dd>
           </div>
+          {agreement && agreement.both ? (
+            <div title={agreementText(agreement.both, agreement.agree)}>
+              <dt>Judges agree</dt>
+              <dd>{Math.round((100 * agreement.agree) / agreement.both)}%</dd>
+            </div>
+          ) : null}
         </dl>
       </div>
 
@@ -73,6 +86,7 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
           selected={filters.portals}
           state={filters.state}
           sort={filters.sort}
+          judges={filters.judges}
           filtered={filtered}
         >
           <label className="field">
@@ -99,7 +113,7 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
               <table>
                 <thead>
                   <tr>
-                    <th>Verdict</th>
+                    <th>Claude / Grok</th>
                     <th>Call</th>
                     <th>Due</th>
                     <th>Tier</th>
@@ -114,7 +128,7 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
                     return (
                       <tr key={r.id} data-call-id={r.id}>
                         <td>
-                          <Badge value={r.ai_verdict} />
+                          <JudgeVerdicts verdicts={verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning)} reasonsFor={["grok"]} />
                         </td>
                         <td className="call">
                           <TitleLink title={r.title} url={r.url} fallback={r.id} />

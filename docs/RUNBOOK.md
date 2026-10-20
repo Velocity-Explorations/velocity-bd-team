@@ -163,6 +163,18 @@ When the token expires or loses access, the fault report's result on the Request
 `BD_GITHUB_TOKEN` and says what to fix. Replace the value in `.env`; the next pass files the
 report.
 
+## Second judge (Grok)
+
+Every call the Claude review rates is also judged by Grok (`grok-4.7`) with the same prompt,
+and both verdicts are kept in the `judgments` table for the dashboard. Claude's verdict still
+decides what is posted. Grok runs only when `.env` has `BD_XAI_API_KEY` (the key named
+velocity-bd-team on Velocity's xAI team, limited to grok-4.7, expiring 2027-01-17); remove
+the line to turn it off. A Grok failure logs a warning and the run carries on.
+
+To fill the history once, after migration 003: `python run.py --backfill-judgments` copies
+Claude's past verdicts and has Grok judge every kept call it has not judged yet. It is safe
+to rerun.
+
 ## Dashboard
 
 ```powershell

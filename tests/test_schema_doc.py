@@ -17,7 +17,7 @@ def _doc_queries() -> dict[str, str]:
 
 
 def test_doc_has_three_example_queries() -> None:
-    assert set(_doc_queries()) == {"New calls this week", "Triage backlog", "Win rate by portal"}
+    assert set(_doc_queries()) == {"New calls this week", "Triage backlog", "Win rate by portal", "Judge agreement"}
 
 
 def test_doc_queries_run(ledger_db: str) -> None:
@@ -49,3 +49,18 @@ def test_doc_queries_run(ledger_db: str) -> None:
     assert by_portal["sbir"]["won"] == 1 and by_portal["sbir"]["decided"] == 2
     assert float(by_portal["sbir"]["win_rate_pct"]) == 50.0
     assert by_portal["sam"]["decided"] == 0 and by_portal["sam"]["win_rate_pct"] is None
+
+
+def test_judge_agreement_query_counts_the_newest_verdicts(ledger_db: str) -> None:
+    run_id = lq.start_run("vulcan_sof")
+    for call_id in ("v-1", "v-2", "v-3"):
+        lq.upsert_call({"id": call_id, "portal": "vulcan_sof", "title": call_id}, run_id)
+    lq.add_judgment("v-1", "claude", "m", "yes", "r")
+    lq.add_judgment("v-1", "grok", "m", "maybe", "r")
+    lq.add_judgment("v-1", "grok", "m", "yes", "r")      # the newer Grok verdict now agrees
+    lq.add_judgment("v-2", "claude", "m", "maybe", "r")
+    lq.add_judgment("v-2", "grok", "m", "no", "r")
+    lq.add_judgment("v-3", "claude", "m", "no", "r")     # Grok has not judged v-3: not counted
+    with tx() as conn:
+        result = rows(q(conn, _doc_queries()["Judge agreement"]))[0]
+    assert result["both_judged"] == 2 and result["agree"] == 1

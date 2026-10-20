@@ -433,3 +433,31 @@ def note_request(request_id: int, result: str) -> bool:
         cur = q(conn, "UPDATE change_requests SET result = ?, updated_at = ? WHERE id = ? AND status = 'approved'",
                 (result, now_iso(), request_id))
         return cur.rowcount == 1
+
+
+# --------------------------------------------------------------------------------- judgments
+# Each judge's verdict on each call (migration 003). calls.ai_verdict stays the Claude review's
+# and decides what is posted; these rows let the judges be compared.
+
+def add_judgment(call_id: str, judge: str, model: str, verdict: str, reasoning: str | None,
+                 rated_at: str | None = None) -> None:
+    """Record one judge's verdict on a call. A newer row for the same call and judge supersedes older ones."""
+    with tx() as conn:
+        q(conn, "INSERT INTO judgments (call_id, judge, model, verdict, reasoning, rated_at) VALUES (?, ?, ?, ?, ?, ?)",
+          (call_id, judge, model, verdict, reasoning, rated_at or now_iso()))
+
+
+def latest_judgments(call_id: str) -> dict[str, dict[str, Any]]:
+    """The newest judgment from each judge on one call, keyed by judge."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT judge, model, verdict, reasoning, rated_at FROM judgments "
+                             "WHERE call_id = ? ORDER BY id", (call_id,)))
+    return {row["judge"]: row for row in found}
+
+
+def calls_without_judgment(judge: str) -> list[dict[str, Any]]:
+    """Kept, reviewed calls this judge has not rated yet, oldest first."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM calls WHERE filter_result = 'kept' AND ai_verdict IS NOT NULL "
+                            "AND NOT EXISTS (SELECT 1 FROM judgments AS j WHERE j.call_id = calls.id AND j.judge = ?) "
+                            "ORDER BY first_seen_at, id", (judge,)))

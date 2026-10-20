@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { decide } from "../actions";
 import { FilterPanel } from "@/components/FilterPanel";
+import { JudgeVerdicts } from "@/components/Judges";
 import { Shell } from "@/components/Shell";
 import { Badge, Flash, TitleLink } from "@/components/bits";
 import { displayPerson } from "@/lib/people";
 import { filterHref, pickMany, pickSort, pickState } from "@/lib/filters";
 import { formatTime } from "@/lib/format";
-import { listCalls, portals, type CallFilters } from "@/lib/queries";
+import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
+import { judgeAgreement, latestJudgments, listCalls, portals, type CallFilters } from "@/lib/queries";
 import { displayTimeZone } from "@/lib/settings";
 import { firstParam, isClosed, parseNoteLine } from "@/lib/text";
 import { DECISIONS, FILTER_RESULTS, HUMAN_STATUSES, isDecision, pickAllowed, STATUS_LABELS, VERDICTS } from "@/lib/values";
@@ -26,22 +28,26 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
     portals: pickMany(sp.portal, portalList),
     state: pickState(sp.state, sp.open),
     sort: pickSort(sp.sort),
+    judges: pickJudgeFilter(sp.judges),
     filterResult: pickAllowed(sp.filter_result, FILTER_RESULTS),
     verdict: pickAllowed(sp.verdict, [...VERDICTS, "none"] as const),
     status: pickAllowed(sp.status, [...HUMAN_STATUSES, "none"] as const),
     q: firstParam(sp.q, 120),
   };
-  const { rows, total } = await listCalls(filters, LIMIT);
+  const [{ rows, total }, agreement] = await Promise.all([listCalls(filters, LIMIT), judgeAgreement()]);
+  const judged = await latestJudgments(rows.map((r) => r.id));
   const tz = displayTimeZone();
   const users = allowlist();
   const filtered = Boolean(
-    filters.portals.length || filters.state || filters.sort === "due" || filters.filterResult || filters.verdict || filters.status || filters.q,
+    filters.portals.length || filters.state || filters.sort === "due" || filters.judges || filters.filterResult ||
+      filters.verdict || filters.status || filters.q,
   );
   const returnTo = filterHref("/calls", {
     q: filters.q,
     portal: filters.portals,
     state: filters.state,
     sort: filters.sort === "due" ? "due" : "",
+    judges: filters.judges,
     filter_result: filters.filterResult,
     verdict: filters.verdict,
     status: filters.status,
@@ -58,6 +64,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
               Showing {rows.length} of {total}
             </span>
             {total > rows.length ? ". Narrow the filters to see the rest." : "."}
+            {agreement && agreement.both ? ` ${agreementText(agreement.both, agreement.agree)}` : ""}
           </p>
         </div>
       </div>
@@ -71,6 +78,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
           selected={filters.portals}
           state={filters.state}
           sort={filters.sort}
+          judges={filters.judges}
           filtered={filtered}
         >
           <label className="field">
@@ -127,7 +135,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                   <tr>
                     <th>Call</th>
                     <th>Filter</th>
-                    <th>AI verdict</th>
+                    <th>Claude / Grok</th>
                     <th>Decision</th>
                     <th>Notes</th>
                     <th>Due</th>
@@ -153,13 +161,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                           {r.filter_result === "rejected" && r.filter_reason ? <div className="meta">{r.filter_reason}</div> : null}
                         </td>
                         <td>
-                          <Badge value={r.ai_verdict} empty="not reviewed" />
-                          {r.ai_reasoning ? (
-                            <details>
-                              <summary>reason</summary>
-                              <p>{r.ai_reasoning}</p>
-                            </details>
-                          ) : null}
+                          <JudgeVerdicts verdicts={verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning)} reasonsFor={["claude", "grok"]} />
                         </td>
                         <td>
                           <Badge value={r.human_status} empty="undecided" />

@@ -3,6 +3,7 @@
 
 import { sql } from "./db";
 import { CLOSED_PATTERN, type CallState, type Sort } from "./filters";
+import type { JudgeFilter, Judgment } from "./judges";
 import { isoNow } from "./format";
 import type { RequestChoice } from "./requests";
 import { escapeLike, noteLine } from "./text";
@@ -24,7 +25,7 @@ export type QueueRow = {
 };
 
 /** The filter panel's choices (lib/filters.ts). No portals ticked means every portal. */
-export type PanelFilters = { portals: string[]; state: CallState; sort: Sort };
+export type PanelFilters = { portals: string[]; state: CallState; sort: Sort; judges: JudgeFilter };
 
 type Db = ReturnType<typeof sql>;
 
@@ -33,7 +34,14 @@ function panelWhere(db: Db, f: PanelFilters) {
   return db`
     ${f.portals.length ? db`AND portal IN ${db(f.portals)}` : db``}
     ${f.state === "open" ? db`AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})` : db``}
-    ${f.state === "closed" ? db`AND extra ~ ${CLOSED_PATTERN}` : db``}`;
+    ${f.state === "closed" ? db`AND extra ~ ${CLOSED_PATTERN}` : db``}
+    ${f.judges === "disagree" ? db`AND ${newestVerdict(db, "claude")} <> ${newestVerdict(db, "grok")}` : db``}
+    ${f.judges === "agree" ? db`AND ${newestVerdict(db, "claude")} = ${newestVerdict(db, "grok")}` : db``}`;
+}
+
+/** One judge's newest verdict on the outer query's call (judgments table); NULL when it has not judged. */
+function newestVerdict(db: Db, judge: string) {
+  return db`(SELECT j.verdict FROM judgments AS j WHERE j.call_id = calls.id AND j.judge = ${judge} ORDER BY j.id DESC LIMIT 1)`;
 }
 
 /** due_date as a date, from either shape the portals write: "27 OCT 2026 : 21:59 MDT" or "2026-10-27". */
@@ -77,6 +85,46 @@ export async function newThisWeek(): Promise<number> {
 export async function portals(): Promise<string[]> {
   const rows = await sql()<{ portal: string }[]>`SELECT DISTINCT portal FROM calls WHERE portal IS NOT NULL ORDER BY portal`;
   return rows.map((r) => r.portal);
+}
+
+/**
+ * Each judge's newest judgment on these calls, by call id. Empty when the judgments table is not
+ * there yet (migration 003): the pages then show the review's verdict alone.
+ */
+export async function latestJudgments(callIds: string[]): Promise<Map<string, Judgment[]>> {
+  const byCall = new Map<string, Judgment[]>();
+  if (callIds.length === 0) return byCall;
+  try {
+    const db = sql();
+    const found = await db<(Judgment & { call_id: string })[]>`
+      SELECT DISTINCT ON (call_id, judge) call_id, judge, model, verdict, reasoning, rated_at
+      FROM judgments
+      WHERE call_id IN ${db(callIds)}
+      ORDER BY call_id, judge, id DESC`;
+    for (const { call_id, ...judgment } of found) {
+      byCall.set(call_id, [...(byCall.get(call_id) ?? []), judgment]);
+    }
+  } catch {
+    // judgments table missing: nothing to add
+  }
+  return byCall;
+}
+
+/** "Judge agreement" from LEDGER_SCHEMA.md: calls both judges rated, and how many verdicts match. */
+export async function judgeAgreement(): Promise<{ both: number; agree: number } | null> {
+  try {
+    const [row] = await sql()<{ both_judged: number; agree: number }[]>`
+      SELECT COUNT(*)::int AS both_judged,
+             COALESCE(SUM(CASE WHEN c.verdict = g.verdict THEN 1 ELSE 0 END), 0)::int AS agree
+      FROM judgments AS c
+      JOIN judgments AS g ON g.call_id = c.call_id AND g.judge = 'grok'
+      WHERE c.judge = 'claude'
+        AND c.id = (SELECT MAX(id) FROM judgments WHERE call_id = c.call_id AND judge = 'claude')
+        AND g.id = (SELECT MAX(id) FROM judgments WHERE call_id = g.call_id AND judge = 'grok')`;
+    return { both: row?.both_judged ?? 0, agree: row?.agree ?? 0 };
+  } catch {
+    return null;   // judgments table missing (migration 003)
+  }
 }
 
 export type CallFilters = PanelFilters & { filterResult: string; verdict: string; status: string; q: string };

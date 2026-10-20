@@ -14,3 +14,12 @@ def ledger_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     monkeypatch.setenv("DATABASE_URL", url)
     migrate.apply(url)
     return url
+
+
+@pytest.fixture(autouse=True)
+def no_real_grok(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never reach xAI, even with BD_XAI_API_KEY in the real .env: the second judge is
+    off unless a test turns it on with a scripted model."""
+    import run
+
+    monkeypatch.setattr(run, "grok_enabled", lambda: False)
