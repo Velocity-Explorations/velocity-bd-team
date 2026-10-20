@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { displayPerson, parseUsers, pickViewer } from "./people.ts";
+import { aliasesFor, displayPerson, parseUsers, pickViewer } from "./people.ts";
 
 const USERS = parseUsers("David Wood=U08V7ULPH1N, Aisha");
 
@@ -40,4 +40,10 @@ test("displayPerson turns a known Slack id into a name", () => {
   assert.equal(displayPerson("Aisha", USERS), "Aisha");
   assert.equal(displayPerson("U0UNKNOWN", USERS), "U0UNKNOWN");
   assert.equal(displayPerson(null, USERS), "");
+});
+
+test("aliasesFor lists every name a person's decisions are recorded under", () => {
+  assert.deepEqual(aliasesFor("David Wood", USERS), ["David Wood", "U08V7ULPH1N"]);
+  assert.deepEqual(aliasesFor("Aisha", USERS), ["Aisha"]);
+  assert.deepEqual(aliasesFor("Someone From A Header", USERS), ["Someone From A Header"]);
 });

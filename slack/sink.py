@@ -53,6 +53,7 @@ SLACK_USER_ID = re.compile(r"^[UW][A-Z0-9]{6,}$")
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 DECIDED_SHOWN = 10   # decisions listed in the weekly summary; the rest are on the dashboard
+JUDGE_NAMES = {"claude": "Claude", "grok": "Grok"}
 
 
 class SlackClient:
@@ -276,12 +277,27 @@ def _decider(by: str | None) -> str:
     return "decided in Slack" if SLACK_USER_ID.match(by) else _esc(by)
 
 
+def _count(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
+
+
+def judges_line(judges: list[dict[str, Any]]) -> str:
+    """One sentence scoring each judge against the team's decisions (ledger judge_records()), or ""."""
+    parts = [f"{JUDGE_NAMES.get(j['judge'], j['judge'])} matched {j['matches']} of {j['decided']} "
+             f"({_count(j['misses'], 'miss', 'misses')}, {_count(j['false_alarms'], 'false alarm', 'false alarms')})"
+             for j in judges if j.get("decided")]
+    if not parts:
+        return ""
+    return "Judges against your decisions, counting only verdicts given before you decided: " + "; ".join(parts) + "."
+
+
 def weekly_summary_message(summaries: list[dict[str, Any]], health: list[dict[str, Any]],
-                           now: datetime | None = None) -> tuple[str, list[dict[str, Any]]]:
+                           now: datetime | None = None,
+                           judges: list[dict[str, Any]] | None = None) -> tuple[str, list[dict[str, Any]]]:
     """The Monday summary as Slack blocks, plus a one-line fallback for notifications.
 
     `summaries` are assistant weekly_summary() results, one per portal; `health` are the
-    entries of scraper_health()["portals"].
+    entries of scraper_health()["portals"]; `judges` is the ledger's judge_records().
     """
     today = (now or datetime.now(timezone.utc)).date()
     monday = today - timedelta(days=today.weekday())
@@ -323,6 +339,10 @@ def weekly_summary_message(summaries: list[dict[str, Any]], health: list[dict[st
             blocks.append(_section("\n".join(lines)))
         if scraper.get(name):
             blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": f"Scraper: {_esc(scraper[name])}"}]})
+    scored = judges_line(judges or [])
+    if scored:
+        link = f" <{base}/judges|See the judges page.>" if base else ""
+        blocks += [{"type": "divider"}, {"type": "context", "elements": [{"type": "mrkdwn", "text": _esc(scored) + link}]}]
     return f"{title}. " + "; ".join(fallback) + ".", blocks
 
 

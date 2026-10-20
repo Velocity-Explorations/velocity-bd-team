@@ -17,7 +17,7 @@ def _doc_queries() -> dict[str, str]:
 
 
 def test_doc_has_three_example_queries() -> None:
-    assert set(_doc_queries()) == {"New calls this week", "Triage backlog", "Win rate by portal", "Judge agreement"}
+    assert set(_doc_queries()) == {"New calls this week", "Triage backlog", "Win rate by portal", "Judge agreement", "Judge scoreboard"}
 
 
 def test_doc_queries_run(ledger_db: str) -> None:
@@ -64,3 +64,14 @@ def test_judge_agreement_query_counts_the_newest_verdicts(ledger_db: str) -> Non
     with tx() as conn:
         result = rows(q(conn, _doc_queries()["Judge agreement"]))[0]
     assert result["both_judged"] == 2 and result["agree"] == 1
+
+
+def test_judge_scoreboard_query_matches_judge_records(ledger_db: str) -> None:
+    run_id = lq.start_run("vulcan_sof")
+    lq.upsert_call({"id": "v-1", "portal": "vulcan_sof", "title": "A"}, run_id)
+    lq.add_judgment("v-1", "claude", "m", "yes", "r", rated_at="2026-10-16T10:00:00Z")
+    lq.add_judgment("v-1", "grok", "m", "no", "r", rated_at="2026-10-16T10:00:00Z")
+    lq.set_human("v-1", "pursue", "David Wood", at="2026-10-17T10:00:00Z")
+    with tx() as conn:
+        doc = rows(q(conn, _doc_queries()["Judge scoreboard"]))
+    assert doc == lq.judge_records()

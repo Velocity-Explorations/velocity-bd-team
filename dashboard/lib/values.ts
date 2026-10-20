@@ -25,14 +25,17 @@ export function isDecision(value: unknown): value is Decision {
   return typeof value === "string" && (HUMAN_STATUSES as readonly string[]).includes(value);
 }
 
-export type DecisionPlan = "decide" | "note" | "noop";
+export type DecisionPlan = "decide" | "agree" | "note" | "noop";
 
 /**
- * What saving a decision form does, given the decision the page showed (`expected`):
- * a different decision is recorded; the same decision with a note only appends the note.
+ * What saving a decision form does, given the decision the page showed (`expected`) and the
+ * person's own latest decision on the call (`mine`, null if they have not decided it):
+ * a different decision changes the call's decision; the same decision, when it is someone
+ * else's, adds theirs beside it; otherwise a note is only appended.
  */
-export function planDecision(expected: Decision | null, chosen: Decision, note: string): DecisionPlan {
+export function planDecision(expected: Decision | null, chosen: Decision, note: string, mine: string | null): DecisionPlan {
   if (chosen !== expected) return "decide";
+  if (chosen !== mine) return "agree";
   return note.trim() ? "note" : "noop";
 }
 

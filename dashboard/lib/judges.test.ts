@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { agreementText, judgesDisagree, pickJudgeFilter, verdictsFor, type Judgment } from "./judges.ts";
+import { agreementText, judgesConflict, judgesDisagree, pickJudgeFilter, verdictsFor, type Judgment } from "./judges.ts";
 
 const claude: Judgment = { judge: "claude", model: "claude-haiku-5-5", verdict: "yes", reasoning: "Fits.", rated_at: "t1" };
 const grok: Judgment = { judge: "grok", model: "grok-4.7", verdict: "no", reasoning: "Hardware.", rated_at: "t2" };
@@ -21,6 +21,12 @@ test("judgesDisagree only when both judged and their verdicts differ", () => {
   assert.equal(judgesDisagree(verdictsFor([claude, grok], "yes", "")), true);
   assert.equal(judgesDisagree(verdictsFor([claude, { ...grok, verdict: "yes" }], "yes", "")), false);
   assert.equal(judgesDisagree(verdictsFor([claude], "yes", "")), false);
+});
+
+test("judgesConflict only when one judge says yes and the other no", () => {
+  assert.equal(judgesConflict(verdictsFor([claude, grok], "yes", "")), true);
+  assert.equal(judgesConflict(verdictsFor([claude, { ...grok, verdict: "maybe" }], "yes", "")), false);
+  assert.equal(judgesConflict(verdictsFor([claude], "yes", "")), false);
 });
 
 test("agreementText states the rate, or nothing before both have judged", () => {

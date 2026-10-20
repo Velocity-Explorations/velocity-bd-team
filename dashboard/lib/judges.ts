@@ -27,6 +27,12 @@ export function judgesDisagree(v: Verdicts): boolean {
   return Boolean(v.claude && v.grok && v.claude.verdict !== v.grok.verdict);
 }
 
+/** True when one judge said yes and the other no, the disagreement that matters most. */
+export function judgesConflict(v: Verdicts): boolean {
+  const pair = [v.claude?.verdict, v.grok?.verdict].sort().join(" ");
+  return pair === "no yes";
+}
+
 /** "Claude and Grok agree on 45 of 60 calls (75%).", or "" before both have judged a call. */
 export function agreementText(both: number, agree: number): string {
   if (!both) return "";

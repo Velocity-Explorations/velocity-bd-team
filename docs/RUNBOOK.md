@@ -185,6 +185,11 @@ npm run dev      # http://localhost:8000
 It reads `dashboard/.env.local` (DATABASE_URL, DASHBOARD_USERS). Pages, the decision buttons and
 how they coexist with Slack are in docs/DASHBOARD.md.
 
+To add a person, append `, Name=<Slack id>` to DASHBOARD_USERS in `dashboard/.env.local` and
+restart the dashboard. With more than one name, each person picks who they are in the top bar.
+Everyone's decisions are kept in the `decisions` table (migration 004) and scored on `/judges`;
+the Monday summary ends with one line scoring each judge against the team's decisions.
+
 ## Running the stages separately
 
 The stage commands from earlier phases still work and share the same ledger:

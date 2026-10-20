@@ -48,3 +48,9 @@ export function displayPerson(by: string | null | undefined, users: Person[]): s
   if (!by) return "";
   return users.find((u) => u.slackId === by)?.name ?? by;
 }
+
+/** The names a person's decisions are recorded under: their name, and their Slack id for decisions made in Slack. */
+export function aliasesFor(name: string, users: Person[]): string[] {
+  const slackId = users.find((u) => u.name === name)?.slackId;
+  return slackId ? [name, slackId] : [name];
+}

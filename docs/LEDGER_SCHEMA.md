@@ -185,6 +185,27 @@ Index: `(call_id, judge, id)`. A newer row for the same call and judge supersede
 one (a re-review writes a new row); older rows stay as history. A review error is not a
 judgment and writes no row.
 
+## Table: decisions
+
+Every triage decision, kept per person, so several people can decide on the same call and the
+judges can be scored against each of them. `calls.human_status`, `human_by` and `human_at` stay
+the team's current decision: the newest decision that changed it. Added by `004_decisions.sql`,
+which also copied in every decision made before it (one row per decided call, with `human_by`
+and `human_at`).
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| call_id | TEXT, not null | `calls.id` | the dashboard's decide action, `set_human` |
+| decided_by | TEXT, not null | the person's name from `DASHBOARD_USERS`; a Slack user id for decisions made in Slack before 2026-10-17 | same |
+| status | TEXT, not null | `pursue`, `not_relevant`, `submitted`, `dismissed` | same |
+| note | TEXT | the note given with the decision, also appended to `calls.human_notes` | same |
+| decided_at | TEXT timestamp, not null | when the person decided | same |
+
+Index: `(call_id, id)`. Rows are only added. A person who changes their mind adds a row; their
+newest row is their decision. A person who agrees with the call's current decision adds a row
+without changing `calls`.
+
 ## Table: schema_migrations
 
 Bookkeeping for `ledger/migrate.py`. `version` is the migration filename, `applied_at`
@@ -195,8 +216,8 @@ the timestamp. Nothing else reads it.
 `dashboard/` is the working example (see DASHBOARD.md). Connect with DATABASE_URL and read the
 tables directly; no API exists or is planned.
 Treat the ledger as read-only from the dashboard except for the `human_*` columns on
-`calls`, which the dashboard sets with its decide action (the equivalent of `set_human`
-and `append_note`), and the decision columns of `change_requests` (`status` from
+`calls` and new rows in `decisions`, which the dashboard writes with its decide action (the
+equivalent of `set_human` and `append_note`), and the decision columns of `change_requests` (`status` from
 `proposed` to `approved` or `rejected`, `decided_by`, `decided_at`, `decision_note`), which
 its Requests page sets (the equivalent of `decide_request`). Since 2026-10-17 the dashboard is the only place decisions are made;
 Slack reactions are no longer read. Use the `runs` table for health: the latest row per component tells you
@@ -261,4 +282,29 @@ JOIN judgments AS g ON g.call_id = c.call_id AND g.judge = 'grok'
 WHERE c.judge = 'claude'
   AND c.id = (SELECT MAX(id) FROM judgments WHERE call_id = c.call_id AND judge = 'claude')
   AND g.id = (SELECT MAX(id) FROM judgments WHERE call_id = g.call_id AND judge = 'grok');
+```
+
+### Judge scoreboard
+
+Each judge against the team's decisions, the same as `judge_records()`. Pursue and submitted
+count as yes, not relevant and dismissed as no. A verdict counts only if it was given before
+the call's first decision, because decided calls are among the examples in the judges'
+prompt. A miss is a no on a call the team pursued; a false alarm is a yes on one it passed on.
+
+```sql
+SELECT j.judge,
+       COUNT(*) AS decided,
+       SUM(CASE WHEN (j.verdict = 'yes' AND c.human_status IN ('pursue', 'submitted'))
+                  OR (j.verdict = 'no' AND c.human_status IN ('not_relevant', 'dismissed')) THEN 1 ELSE 0 END) AS matches,
+       SUM(CASE WHEN j.verdict = 'no' AND c.human_status IN ('pursue', 'submitted') THEN 1 ELSE 0 END) AS misses,
+       SUM(CASE WHEN j.verdict = 'yes' AND c.human_status IN ('not_relevant', 'dismissed') THEN 1 ELSE 0 END) AS false_alarms
+FROM calls AS c
+JOIN judgments AS j ON j.call_id = c.id
+WHERE c.human_status IS NOT NULL
+  AND j.id = (SELECT MAX(e.id) FROM judgments AS e
+              WHERE e.call_id = c.id AND e.judge = j.judge
+                AND e.rated_at < COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id),
+                                          c.human_at))
+GROUP BY j.judge
+ORDER BY j.judge;
 ```

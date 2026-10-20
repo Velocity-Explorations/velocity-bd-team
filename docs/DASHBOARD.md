@@ -9,15 +9,16 @@ it is in [dashboard/README.md](../dashboard/README.md).
 
 | Path | What it shows |
 |---|---|
-| `/` | **Review queue.** Calls with ai_verdict yes or maybe, still kept by the keyword filter, and no decision yet, newest first: how Claude and Grok each judged it (flagged when they disagree, Grok's reason behind a toggle), title linked to the portal, due date, match tier, Claude's reason, first seen, and four buttons (Pursue, Not relevant, Submitted, Dismiss) with an optional note. Filters, in a panel on the left: portals (tick any; none ticked shows every portal), open or closed (closed means a portal adapter flagged the call as closed), sort (newest first, or closing soonest, which puts upcoming deadlines first and past ones last), judges (Claude and Grok agree or disagree), and verdict. Counts at the top: waiting, yes, maybe, new this week, and how often Claude and Grok agree. |
-| `/calls` | **All calls**, newest first, up to 200 at a time. Filters, in the same left panel: portals, open or closed, sort, judges, title text, filter_result, ai_verdict (or not reviewed), human_status (or undecided). Shows the filter tier and filter_reason for rejected rows, how Claude and Grok each judged it, each reason behind a toggle and a flag when they disagree, who decided and when, and every note. Each row has a "decide" or "change" control, for example to move a call from Pursue to Submitted, or to add a note to a decided call. |
+| `/` | **Review queue.** Calls with ai_verdict yes or maybe, still kept by the keyword filter, and no decision yet, newest first: how Claude and Grok each judged it (flagged when they disagree, in red when one said yes and the other no, Grok's reason behind a toggle), title linked to the portal, due date, match tier, Claude's reason, first seen, and four buttons (Pursue, Not relevant, Submitted, Dismiss) with an optional note. Filters, in a panel on the left: portals (tick any; none ticked shows every portal), open or closed (closed means a portal adapter flagged the call as closed), sort (newest first, or closing soonest, which puts upcoming deadlines first and past ones last), judges (Claude and Grok agree or disagree; under disagree, calls where one said yes and the other no come first), and verdict. Counts at the top: waiting, yes, maybe, new this week, and how often Claude and Grok agree. |
+| `/calls` | **All calls**, newest first, up to 200 at a time. Filters, in the same left panel: portals, open or closed, sort, judges, title text, filter_result, ai_verdict (or not reviewed), human_status (or undecided). Shows the filter tier and filter_reason for rejected rows, how Claude and Grok each judged it, each reason behind a toggle and a flag when they disagree, who decided and when, and every note. When more than one person has decided a call, each person's own decision is listed, flagged "people disagree" when one said yes and another no. Each row has a "decide", "change" or "add yours" control: "change" moves your decision, for example from Pursue to Submitted, or adds a note; "add yours" appears on a call someone else decided, so your decision is kept beside theirs. |
+| `/judges` | **Judge scoreboard.** How Claude and Grok compare with your decisions, counting only verdicts given before anyone decided the call, because decided calls become examples in the judges' prompt. Pursue and submitted count as yes, not relevant and dismissed as no. Per judge: how many it matched, its misses (a no on a call the team pursued), false alarms (a yes on a call the team passed on) and maybes. Per person: calls decided and how often each judge matched them. Between people: how often two people agree on the calls both decided. Last, the pursued calls a judge said no to. Before migration 004 it says to apply it. |
 | `/requests` | **Change requests** from the portal assistant (docs/ASSISTANT.md, "Approvals"). Requests waiting for approval come first, oldest first, each with who asked, why, and the preview of what approving would do, plus Approve and Reject buttons and an optional note. Below them, the last 50 decided requests with their status, who decided, and the result, or what an approved request is waiting for. The Requests link in the top bar shows how many are waiting. |
 | `/runs` | **Scan history.** The most recent run sits at the top with its status, start time, duration, stage counts, error and log. Below it, the last 100 runs. A run still marked running two hours after it started is flagged as having no finish recorded. |
 | `/proposals` | **Past submissions** from the proposals table, with win rate by portal. Shows an empty state until the Proposal Library plan fills the table. |
 
 The queue and the proposals tiles use the "Triage backlog" and "Win rate by portal" queries
 from [LEDGER_SCHEMA.md](LEDGER_SCHEMA.md); the "new this week" count uses its "New calls this
-week" predicate.
+week" predicate; the judges page uses its "Judge scoreboard" query.
 
 "Closed" comes from calls.extra: any key ending in `_closed` set to true (Vulcan SOF writes
 `vulcan_closed`). A future portal adapter gets the badge and the filter by following the same
@@ -38,7 +39,8 @@ A request decided in another tab is not overwritten; the page says who decided i
 machine carries out approved requests twice a day, at 12:07 and 17:07 (`run.py --apply-requests`).
 
 `decide` records triage decisions, used by the queue's buttons and by the control on
-`/calls`. One UPDATE on `calls`:
+`/calls`. One transaction: an UPDATE on `calls`, and a row in `decisions` (migration 004) with
+who decided, what, when and the note, so every person's decision is kept. On `calls`:
 
 - `human_status`: pursue, not_relevant, submitted or dismissed
 - `human_by`: the viewer's name (see below)
@@ -46,8 +48,11 @@ machine carries out approved requests twice a day, at 12:07 and 17:07 (`run.py -
 - `human_notes`: when a note is typed, one line appended in the pipeline's `[at by] text`
   format, the same as `append_note()` and Slack thread replies
 
-Saving the same decision with a note appends the note and leaves the decision, its author and
-its time alone. Saving the same decision with no note changes nothing.
+Choosing the decision a call already has, when someone else made it, adds your row in
+`decisions` and leaves the call's decision, its author and its time alone (a note is still
+appended). Saving your own current decision again with a note only appends the note; with no
+note it changes nothing. Choosing a different decision changes the call's decision: the
+newest change wins on `calls`, and both people's decisions stay in `decisions`.
 
 Every form carries the decision the page showed. If the call was decided or changed by
 someone else after the page loaded, nothing is written and the page says what the call is
@@ -67,9 +72,14 @@ There is no login yet. Decisions are attributed by one of two means:
 2. **Header**. With DASHBOARD_USER_HEADER set, the viewer is taken from that request header
    only, as set by an access proxy, and must be on the allowlist when there is one.
 
-`human_by` holds the person's name. Calls decided with Slack reactions before 2026-10-17 hold
-a Slack user id instead; writing `Name=<Slack id>` in DASHBOARD_USERS shows those under the
-name too.
+`human_by` and `decisions.decided_by` hold the person's name. Calls decided with Slack
+reactions before 2026-10-17 hold a Slack user id instead; writing `Name=<Slack id>` in
+DASHBOARD_USERS shows those under the name too, and counts them as that person's on the judges
+page.
+
+Several people can decide. Each person's decisions are kept separately, so adding someone is
+one more `Name=<Slack id>` entry in DASHBOARD_USERS (comma separated) and a restart of the
+dashboard.
 
 ## Slack's role
 
