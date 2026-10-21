@@ -23,6 +23,7 @@ ENV_FILE = REPO_ROOT / ".env"
 # Every key any component reads. Keep in step with .env.example.
 KNOWN_KEYS = [
     "DATABASE_URL",
+    "AI_SLOP_SCAN",
     "VULCAN_SOF_USERNAME",
     "VULCAN_SOF_PASSWORD",
     "VULCAN_OTP_MAILBOX",

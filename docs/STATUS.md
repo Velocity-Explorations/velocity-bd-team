@@ -52,6 +52,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Drafts (2026-10-21): drafting phase 7.6 leaves each draft's opening paragraph, and its abstract's
   first three sentences, for a person to write: a [PERSON WRITES: ...] placeholder with points to
   land under it, and a checklist item (PRO-494).
+  Phase 7.7 then runs the AI slop detection skill's scanner and ends with a verdict, such as
+  "Not ready: 1 PERSON WRITES, 34 NEEDS INPUT; band clean (provisional)"; `python -m drafting.cli check
+  --draft <file>` reruns it after edits (PRO-510). The scanner must be installed wherever drafts run
+  (AI_SLOP_SCAN); its bands stay provisional until calibrated on past Velocity proposals.
 - Plans (2026-10-18): the Writer Plan, the Draft-Ready Upgrade and the Proposal Library plan were revised
   so the dashboard decides. Drafts are requested with the dashboard's Draft button, an approved
   draft request from the assistant, or the CLI. Offline copies are in docs/plans/.
