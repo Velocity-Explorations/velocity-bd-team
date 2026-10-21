@@ -49,6 +49,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   the gh login when `.env` has none. A token limited to this repo's issues would need
   fine-grained tokens enabled for Velocity-Explorations. Renewal steps are in
   docs/RUNBOOK.md, "GitHub token".
+- Drafts (2026-10-21): drafting phase 7.6 leaves each draft's opening paragraph, and its abstract's
+  first three sentences, for a person to write: a [PERSON WRITES: ...] placeholder with points to
+  land under it, and a checklist item (PRO-494).
 - Plans (2026-10-18): the Writer Plan, the Draft-Ready Upgrade and the Proposal Library plan were revised
   so the dashboard decides. Drafts are requested with the dashboard's Draft button, an approved
   draft request from the assistant, or the CLI. Offline copies are in docs/plans/.

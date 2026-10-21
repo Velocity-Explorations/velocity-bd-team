@@ -5,7 +5,8 @@
     python -m drafting.cli dev --inputs ... --out ... --model claude-haiku-5-5
 
 `dev` runs the pipeline from an inputs JSON file into a local folder, with progress on
-stdout and a per-phase timing table at the end. It writes the inputs it used to
+stdout and a per-phase timing table at the end. Phase 7.6 leaves the draft's opening for a
+person to write (PRO-494); the last line says how many places are marked PERSON WRITES. It writes the inputs it used to
 <out>/source/inputs.json so a run can be repeated. Later phases add subcommands that work
 from the ledger (W1 `dev --call-id`, W2a `request`, `run`, `status`).
 """
@@ -68,6 +69,9 @@ def main(argv: list[str] | None = None) -> int:
     for line in _table(outputs):
         print(line)
     print(f"\nFinal draft: {outputs.final_draft or 'none'}")
+    held = outputs.phases.get("7.6", {}).get("person_writes")
+    if held:
+        print(f"{held} place{'s' if held > 1 else ''} for a person to write, marked PERSON WRITES in the draft")
     return 1 if any(s["status"] == "failed" for s in outputs.phases.values()) else 0
 
 
