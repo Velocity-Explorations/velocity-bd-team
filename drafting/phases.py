@@ -24,6 +24,7 @@ PHASES: list[Phase] = [
     Phase("7", "Checklist", "building checklist"),
     Phase("7.5", "Polish", "formatting document"),
     Phase("7.6", "Opening", "framing the opening"),   # Velocity's addition (PRO-494): a person writes the opening
+    Phase("7.7", "Slop check"),                        # Velocity's addition (PRO-510): ready or not ready
     Phase("8", "Deliver"),
 ]
 

@@ -58,3 +58,15 @@ def test_an_unknown_phase_is_a_clean_error(tmp_path: Path, fake_model: list[dict
                                            capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main(["dev", "--inputs", str(FIXTURE), "--out", str(tmp_path), "--from-phase", "9"]) == 2
     assert "No phase 9" in capsys.readouterr().out
+
+
+def test_check_reruns_the_slop_check_on_an_edited_draft(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    draft = tmp_path / "draft_final.md"
+    draft.write_text("# Draft\n\n[PERSON WRITES: the opening paragraph.]\n\nBody.\n", encoding="utf-8")
+    assert cli.main(["check", "--draft", str(draft)]) == 1
+    assert capsys.readouterr().out.strip().startswith("Not ready: 1 PERSON WRITES")
+    assert (tmp_path / "slop_report.md").read_text(encoding="utf-8").startswith("# Slop check")
+    draft.write_text("# Draft\n\nWe wrote this opening ourselves.\n\nBody.\n", encoding="utf-8")
+    assert cli.main(["check", "--draft", str(draft)]) == 0
+    assert capsys.readouterr().out.strip() == "Ready: band clean (provisional)"
+    assert cli.main(["check", "--draft", str(tmp_path / "missing.md")]) == 2

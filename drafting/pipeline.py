@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Protocol
 
-from drafting import llm, opening, prompts
+from drafting import llm, opening, prompts, slop_gate
 from drafting.company import profile
 from drafting.phases import PHASES, Phase, index
 from drafting.templates import select_template
@@ -31,7 +31,8 @@ MAX_TOKENS = {"4": 32_000, "4.5": 16_000, "5": 24_000, "6": 48_000, "6.5": 48_00
               "7": 16_000, "7.5": 48_000, "7.6": 2_000}
 OUTPUTS = {"4": ["requirements.md"], "4.5": ["alignment.md"], "5": ["outline.md"], "6": ["draft.md"],
            "6.5": [f"draft_review_pass{n}.md" for n in range(1, 5)] + ["draft_v2.md"],
-           "6.75": ["compliance_report.md", "draft_v3.md"], "7": ["checklist.md"], "7.5": ["draft_final.md"]}
+           "6.75": ["compliance_report.md", "draft_v3.md"], "7": ["checklist.md"], "7.5": ["draft_final.md"],
+           "7.7": ["slop_report.md", "slop_scan.json"]}
 FINAL_CHAIN = ["draft_final.md", "draft_v3.md", "draft_v2.md", "draft.md"]
 DOCUMENTS = {"requirements": "requirements.md", "alignment": "alignment.md", "outline": "outline.md",
              "compliance": "compliance_report.md", "checklist": "checklist.md"}
@@ -347,6 +348,30 @@ def phase_76_opening(inputs: DraftInputs, state: State, out_dir: Path, hooks: Ho
     return state
 
 
+def phase_77_slop(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hooks) -> State:
+    """Velocity's addition (PRO-510): the slop skill's scanner on the final draft, with the solicitation's
+    own words exempt; a report beside the draft and a ready or not-ready verdict in the stats."""
+    final = final_draft(out_dir)
+    if final is None:
+        return _skip(state, "Slop check: no draft to check")
+    solicitation = None
+    text = slop_gate.solicitation_text(inputs)
+    if text:
+        solicitation = out_dir / "source" / "solicitation.txt"
+        solicitation.parent.mkdir(parents=True, exist_ok=True)
+        solicitation.write_text(text, encoding="utf-8")
+    try:
+        report = slop_gate.run_scan(final, solicitation)
+    except slop_gate.ScanError as exc:
+        return _skip(state, f"Slop check: {exc}")
+    gate = slop_gate.summarize(report)
+    _write(out_dir, "slop_scan.json", json.dumps(report, indent=2, ensure_ascii=False))
+    _write(out_dir, "slop_report.md", slop_gate.render_report(gate, final))
+    state.stats.update(band=gate.band, ready=gate.ready, open_placeholders=gate.placeholders,
+                       verdict=slop_gate.verdict(gate))
+    return state
+
+
 def phase_8_deliver(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hooks) -> State:
     """Picks the final draft by the reference's fallback chain. W3 uploads to Drive; here it stays local."""
     final = final_draft(out_dir)
@@ -358,7 +383,7 @@ PHASE_FUNCTIONS: dict[str, Callable[[DraftInputs, State, Path, Hooks], State]] =
     "1": phase_1_listing, "2": phase_2_attachments, "3": phase_3_past_experience, "4": phase_4_requirements,
     "4.5": phase_45_alignment, "5": phase_5_outline, "6": phase_6_draft, "6.5": phase_65_review,
     "6.75": phase_675_compliance, "7": phase_7_checklist, "7.5": phase_75_polish, "7.6": phase_76_opening,
-    "8": phase_8_deliver,
+    "7.7": phase_77_slop, "8": phase_8_deliver,
 }
 
 

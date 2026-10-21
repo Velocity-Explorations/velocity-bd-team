@@ -6,12 +6,13 @@ from typing import Any
 
 import pytest
 
-from drafting import llm, opening, pipeline
+from drafting import llm, opening, pipeline, slop_gate
 from drafting.phases import PHASES, phase
 
 ALL_FILES = ["requirements.md", "alignment.md", "outline.md", "draft.md", "draft_review_pass1.md",
              "draft_review_pass2.md", "draft_review_pass3.md", "draft_review_pass4.md", "draft_v2.md",
-             "compliance_report.md", "draft_v3.md", "checklist.md", "draft_final.md"]
+             "compliance_report.md", "draft_v3.md", "checklist.md", "draft_final.md", "slop_report.md",
+             "slop_scan.json"]
 
 
 def canned(label: str) -> str:
@@ -89,7 +90,7 @@ def test_phase_list_is_the_reference_order_plus_the_opening() -> None:
     assert [(p.id, p.name) for p in PHASES] == [
         ("1", "Listing"), ("2", "Attachments"), ("3", "Past experience"), ("4", "Requirements"),
         ("4.5", "Alignment"), ("5", "Outline"), ("6", "Draft"), ("6.5", "Review ×4"), ("6.75", "Compliance"),
-        ("7", "Checklist"), ("7.5", "Polish"), ("7.6", "Opening"), ("8", "Deliver")]
+        ("7", "Checklist"), ("7.5", "Polish"), ("7.6", "Opening"), ("7.7", "Slop check"), ("8", "Deliver")]
     assert phase("6.5").name == "Review ×4"
     with pytest.raises(KeyError):
         phase("9")
@@ -253,3 +254,26 @@ def test_running_the_opening_again_changes_nothing(tmp_path: Path) -> None:
     out, _ = run(tmp_path, again, from_phase="7.6")
     assert (tmp_path / "draft_final.md").read_text(encoding="utf-8") == first
     assert again.labels() == [] and out.phases["7.6"]["person_writes"] == 1
+
+
+# --------------------------------------------------------------- the slop check (PRO-510)
+
+def test_every_run_ends_with_a_slop_check_and_a_verdict(tmp_path: Path) -> None:
+    model = FakeModel(outputs={"formatting document": PROSE_FINAL, "framing the opening": "PLACE 1:\n- a point"})
+    out, hooks = run(tmp_path, model)
+    stats = out.phases["7.7"]
+    assert hooks.status("7.7") == "completed" and stats["ready"] is False
+    assert stats["open_placeholders"]["PERSON WRITES"] == 1
+    assert stats["verdict"].startswith("Not ready: 1 PERSON WRITES")
+    assert (tmp_path / "slop_report.md").read_text(encoding="utf-8").startswith("# Slop check")
+    assert "LISTING TEXT" in (tmp_path / "source" / "solicitation.txt").read_text(encoding="utf-8")
+
+
+def test_a_missing_scanner_skips_the_check_and_the_run_completes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def missing(*args: Any, **kwargs: Any) -> dict:
+        raise slop_gate.ScanError("slop scanner not found; install the ai-slop-detection skill or set AI_SLOP_SCAN")
+
+    monkeypatch.setattr(slop_gate, "run_scan", missing)
+    out, hooks = run(tmp_path, FakeModel())
+    assert hooks.status("7.7") == "skipped" and "AI_SLOP_SCAN" in out.phases["7.7"]["note"]
+    assert hooks.status("8") == "completed" and out.final_draft == tmp_path / "draft_final.md"
