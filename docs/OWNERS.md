@@ -14,6 +14,7 @@ pull request to its owner (see AGENTS.md, "Working alongside other agents").
 | portals/shared/ | Coordinator |
 | assistant/ | Coordinator |
 | portals/vulcan_sof/ | Vulcan SOF agent |
+| portals/ssc_front_door/ | SSC Front Door agent |
 | review/ | Reviewer |
 | library/ | Librarian |
 | drafting/ | Writer |

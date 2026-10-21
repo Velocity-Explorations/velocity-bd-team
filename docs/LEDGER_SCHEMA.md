@@ -53,12 +53,12 @@ the component that owns them. A component never writes another group's columns.
 | id | TEXT, primary key | `<portal-prefix>-<stable id>`, for example `vulcan-<collectionUuid>` | portal adapter (insert only) |
 | portal | TEXT, not null | portal slug, for example `vulcan_sof` | portal adapter |
 | title | TEXT | | portal adapter |
-| type | TEXT | the portal's opportunity type as shown (RFI, BAA, CSO, and so on) | portal adapter |
+| type | TEXT | the portal's opportunity type as shown (RFI, BAA, CSO, and so on). SSC Front Door reads it from the title; the review rates `Industry day`, `Webinar`, `Conference` and `Event` listings as events, on their topic | portal adapter |
 | department | TEXT | issuing office or command | portal adapter |
 | naics_code | TEXT | NAICS code if the portal lists one | portal adapter |
 | set_aside | TEXT | set-aside designation if listed | portal adapter |
 | posted_date | TEXT | when the call opened, as the portal writes it: `YYYY-MM-DD`, or Vulcan's `04 Oct 2026 : 22:00 MDT` | portal adapter |
-| due_date | TEXT | the deadline as the portal writes it: `YYYY-MM-DD`, or Vulcan's `30 OCT 2026 : 21:59 MDT`; `assistant/dates.py` reads both | portal adapter |
+| due_date | TEXT | the deadline as the portal writes it: `YYYY-MM-DD`, or Vulcan's `30 OCT 2026 : 21:59 MDT`; `assistant/dates.py` reads both. SSC Front Door writes the event's end in that form, in the event's own zone, for example `28 OCT 2026 : 15:00 GMT` | portal adapter |
 | description | TEXT | full text as scraped | portal adapter |
 | url | TEXT | link back to the portal detail page | portal adapter |
 | source_type | TEXT | how it was obtained, for example `scrape`, `rss`, `manual` | portal adapter |
@@ -80,7 +80,7 @@ the component that owns them. A component never writes another group's columns.
 | human_by | TEXT | the deciding person's name; a Slack user id on calls decided by reaction before 2026-10-17 | same |
 | human_at | TEXT timestamp | when they decided | same |
 | human_notes | TEXT | newline-separated lines `[<timestamp> <by>] <text>` | `append_note`, Slack thread replies, the dashboard's decide action |
-| extra | TEXT JSON | object of portal-specific fields, keys prefixed by portal. Vulcan SOF writes `vulcan_closed` (bool, the page says the call has closed) and `vulcan_description_fallback` (bool, no Problem Statement text was found). Page fields any portal may store, found by suffix: `<prefix>_objectives`, `_documents`, `_files_required`, `_tags` (lists) and `_instructions` (text); Vulcan SOF writes all five | portal adapter |
+| extra | TEXT JSON | object of portal-specific fields, keys prefixed by portal. Vulcan SOF writes `vulcan_closed` (bool, the page says the call has closed) and `vulcan_description_fallback` (bool, no Problem Statement text was found). SSC Front Door writes `sscfd_closed` (bool, the end date has passed), `sscfd_content_key`, `sscfd_start` and `sscfd_end` (UTC), `sscfd_time_zone`, `sscfd_location`, `sscfd_event_url`, `sscfd_registration`, `sscfd_audience`, and for notices reposted from SAM.gov `sscfd_sam_notice_id` and `sscfd_sam_url`. Page fields any portal may store, found by suffix: `<prefix>_objectives`, `_documents`, `_files_required`, `_tags` (lists) and `_instructions` (text); Vulcan SOF writes all five | portal adapter |
 | updated_at | TEXT timestamp, not null | touched by every write | every writer |
 
 Indexes: `(portal, first_seen_at)`, `(human_status)`, `(ai_verdict)`.

@@ -14,6 +14,13 @@ def test_portal_format_converts_the_zone_to_utc() -> None:
     assert parse_due("04 Oct 2026 : 22:00 UTC") == datetime(2026, 10, 4, 22, 0, tzinfo=UTC)
 
 
+def test_european_event_zones_convert_to_utc() -> None:
+    assert parse_due("15 JUL 2026 : 15:00 BST") == datetime(2026, 7, 15, 14, 0, tzinfo=UTC)
+    assert parse_due("28 OCT 2026 : 15:00 GMT") == datetime(2026, 10, 28, 15, 0, tzinfo=UTC)
+    assert parse_due("10 JUN 2026 : 09:00 CEST") == datetime(2026, 6, 10, 7, 0, tzinfo=UTC)
+    assert parse_due("10 DEC 2026 : 09:00 CET") == datetime(2026, 12, 10, 8, 0, tzinfo=UTC)
+
+
 def test_missing_or_unknown_zone_is_read_as_utc() -> None:
     assert parse_due("30 OCT 2026 : 21:59") == datetime(2026, 10, 30, 21, 59, tzinfo=UTC)
     assert parse_due("30 OCT 2026 : 21:59 XYZ") == datetime(2026, 10, 30, 21, 59, tzinfo=UTC)

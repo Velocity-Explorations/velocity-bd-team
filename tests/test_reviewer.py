@@ -36,6 +36,13 @@ def test_build_prompt_has_context_fields_and_truncates_description() -> None:
     assert "PAST\nFEEDBACK\n" in with_blocks
 
 
+def test_events_are_judged_on_topic_and_other_calls_are_unchanged() -> None:
+    event = reviewer.build_prompt({"title": "Space Industry Days 2026", "type": "Industry day", "portal": "SSC Front Door"})
+    call = reviewer.build_prompt({"title": "Edge AI", "type": "OTA Prototype", "portal": "Vulcan SOF"})
+    assert reviewer.EVENT_GUIDANCE in event and reviewer.EVENT_GUIDANCE not in call
+    assert all(reviewer.EVENT_GUIDANCE in reviewer.build_prompt({"type": t}) for t in reviewer.EVENT_TYPES)
+
+
 def test_build_prompt_adds_the_team_context_after_the_description() -> None:
     plain = reviewer.build_prompt(ROW)
     with_context = reviewer.build_prompt(ROW, extra_context="  They want a C2 software layer,\nnot hardware. ")

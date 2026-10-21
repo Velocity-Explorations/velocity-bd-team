@@ -15,11 +15,13 @@ from datetime import datetime, timedelta, timezone
 UTC = timezone.utc
 MONTHS = {m: i for i, m in enumerate(
     ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"], start=1)}
-# US zone abbreviations portals use, as hours from UTC. Anything else is read as UTC.
+# Zone abbreviations portals use, as hours from UTC: US zones, plus the UK and central Europe for
+# SSC Front Door events held there. Anything else is read as UTC.
 ZONES = {
     "UTC": 0, "GMT": 0, "Z": 0,
     "EST": -5, "EDT": -4, "CST": -6, "CDT": -5, "MST": -7, "MDT": -6,
     "PST": -8, "PDT": -7, "AKST": -9, "AKDT": -8, "HST": -10,
+    "BST": 1, "CET": 1, "CEST": 2,
 }
 PORTAL_FORMAT = re.compile(
     r"^(\d{1,2})\s+([A-Za-z]{3})[A-Za-z]*\.?\s+(\d{4})(?:\s*:?\s*(\d{1,2}):(\d{2}))?\s*([A-Za-z]{1,5})?$"

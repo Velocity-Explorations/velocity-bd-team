@@ -1,0 +1,386 @@
+{
+ "actions": [
+  {
+   "id": "1;a",
+   "state": "SUCCESS",
+   "returnValue": {
+    "returnValue": [
+     {
+      "contentKey": "MCRMZYBYDC7ZCZBECOKP7CZIMPQQ",
+      "contentNodes": {
+       "eventEndDate": {
+        "dateTimeValue": "2026-09-11T22:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/Los_Angeles"
+       },
+       "eventGraphic": {
+        "nodeType": "Media",
+        "fileName": "SAM.gov__Event_USSF_Front_Door_2025.png"
+       },
+       "eventLocation": {
+        "nodeType": "Text",
+        "value": "SAM.GOV"
+       },
+       "eventURL": {
+        "nodeType": "Url",
+        "value": "https://sam.gov/workspace/contract/opp/df6f48b65a7d43cf92c7402317ccaaf4/view"
+       },
+       "eventDescription": {
+        "nodeType": "MultilineText",
+        "value": "Space Systems Command (SSC) S6, Cyber and Data, is issuing an RFI to support mission system programs in identifying and selecting commercial Zero Trust (ZT) solutions that align with the U.S. Department of Defense/Department of War’s (DoD/DoW) Zero Trust Framework and National Institute of Standards and Technology (NIST) Zero Trust guidelines. Currently, Zero Trust solutions vary significantly acr"
+       },
+       "Title": {
+        "nodeType": "NameField",
+        "value": "RFI - Zero Trust Architecture (ZTA) Vendor Framework"
+       },
+       "eventAudience": {
+        "nodeType": "Text",
+        "value": "Civ; Industry"
+       },
+       "eventRegistrationDetails": {
+        "nodeType": "Text",
+        "value": "https://sam.gov/workspace/contract/opp/df6f48b65a7d43cf92c7402317ccaaf4/view"
+       },
+       "eventStartDate": {
+        "dateTimeValue": "2026-07-30T17:50:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/Los_Angeles"
+       }
+      },
+      "contentUrlName": "rfi-zero-trust-architecture-zta-vendor-framework",
+      "language": "en_US",
+      "managedContentId": "20YRw00000OU5NqMAL",
+      "publishedDate": "2026-08-03T21:29:52.000Z",
+      "title": "RFI - Zero Trust Architecture (ZTA) Vendor Framework",
+      "type": "Events",
+      "typeLabel": "Events - Front Door",
+      "unauthenticatedUrl": "/cms/delivery/v52.0/0DB8300000000HNGAY/contents/20YRw00000OU5NqMAL?oid=00D830000008cdBEAQ"
+     },
+     {
+      "associations": {
+       "topics": [
+        {
+         "id": "0TO8300000002J2GAI",
+         "name": "Featured"
+        }
+       ]
+      },
+      "contentKey": "MC3Z3PADFN6BHZHEA7L5MQH6JIHE",
+      "contentNodes": {
+       "eventEndDate": {
+        "dateTimeValue": "2026-10-23T00:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/Los_Angeles"
+       },
+       "eventGraphic": {
+        "nodeType": "Media",
+        "fileName": "Space Industry Days 2026.png"
+       },
+       "eventLocation": {
+        "nodeType": "Text",
+        "value": "Los Angeles Airport Marriott - 5855 W. Century Blvd., Los Angeles, California, 90045"
+       },
+       "eventURL": {
+        "nodeType": "Url",
+        "value": "https://afcea-la.org/events/space-industry-days-2026/"
+       },
+       "eventDescription": {
+        "nodeType": "MultilineText",
+        "value": "Space Industry Days provides industry an opportunity to receive presentations from US Air Force, US Space Force, and Space Systems Command (SSC) senior leadership on current and emerging opportunities. USAF/USSF Senior Leaders and SSC program offices will share their plans for the next five years and panels of industry representatives will provide their perspective on challenges they are facing as"
+       },
+       "Title": {
+        "nodeType": "NameField",
+        "value": "Space Industry Days 2026"
+       },
+       "eventAudience": {
+        "nodeType": "Text",
+        "value": "Mil; Civ; Industry; Academia"
+       },
+       "eventRegistrationDetails": {
+        "nodeType": "Text",
+        "value": "https://afcea-la.org/events/space-industry-days-2026/"
+       },
+       "eventStartDate": {
+        "dateTimeValue": "2026-10-21T15:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/Los_Angeles"
+       }
+      },
+      "contentUrlName": "space-industry-days-2026",
+      "language": "en_US",
+      "managedContentId": "20YRw00000OYNR1MAP",
+      "publishedDate": "2026-08-31T16:49:35.000Z",
+      "title": "Space Industry Days 2026",
+      "type": "Events",
+      "typeLabel": "Events - Front Door",
+      "unauthenticatedUrl": "/cms/delivery/v52.0/0DB8300000000HNGAY/contents/20YRw00000OYNR1MAP?oid=00D830000008cdBEAQ"
+     },
+     {
+      "contentKey": "MCGRCMXTQ5VRBL7BEDCTBF5UAKCQ",
+      "contentNodes": {
+       "eventEndDate": {
+        "dateTimeValue": "2026-10-28T15:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "Europe/London"
+       },
+       "eventGraphic": {
+        "nodeType": "Media",
+        "fileName": "Defence in Space.jpg"
+       },
+       "eventLocation": {
+        "nodeType": "Text",
+        "value": "London, England"
+       },
+       "eventURL": {
+        "nodeType": "Url",
+        "value": "https://www.eventbrite.com/e/disc-26-tickets-1979851448980?aff=oddtdtcreator"
+       },
+       "governmentOrganizations": {
+        "nodeType": "Text",
+        "value": "SSC/SYD88, SSC/IA"
+       },
+       "eventDescription": {
+        "nodeType": "MultilineText",
+        "value": "A Free Event By the Space &amp; Defence Community for the Government, Industry, Institutions &amp; Academia.​ Over 20 talks covering MilSatcom, Space Based ISR &amp; Earth Observation, Space Based Navigation, Space Domain Awareness, National programmes and Space Security &amp; Cyber Strategies. The following Government Organizations will be in attendance*: SSC/SYD88, SSC/IA *subject to change"
+       },
+       "Title": {
+        "nodeType": "NameField",
+        "value": "Defence in Space Conference 2026"
+       },
+       "eventAudience": {
+        "nodeType": "Text",
+        "value": "Civ, Industry, Academia"
+       },
+       "eventRegistrationDetails": {
+        "nodeType": "Text",
+        "value": "https://defenceinspace.com/"
+       },
+       "eventStartDate": {
+        "dateTimeValue": "2026-10-27T08:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "Europe/London"
+       }
+      },
+      "contentUrlName": "defence-in-space-conference-2026",
+      "language": "en_US",
+      "managedContentId": "20YRw00000R8TF1MAN",
+      "publishedDate": "2026-09-29T16:00:47.000Z",
+      "title": "Defence in Space Conference 2026",
+      "type": "Events",
+      "typeLabel": "Events - Front Door",
+      "unauthenticatedUrl": "/cms/delivery/v52.0/0DB8300000000HNGAY/contents/20YRw00000R8TF1MAN?oid=00D830000008cdBEAQ"
+     },
+     {
+      "contentKey": "MCHUADDDWURVCP3PZXC7ORXPDZSU",
+      "contentNodes": {
+       "eventEndDate": {
+        "dateTimeValue": "2026-04-22T18:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/New_York"
+       },
+       "eventGraphic": {
+        "nodeType": "Media",
+        "fileName": "SBIR STTR Webinar.jpg"
+       },
+       "eventLocation": {
+        "nodeType": "Text",
+        "value": "WEBINAR"
+       },
+       "eventURL": {
+        "nodeType": "Url",
+        "value": "https://spacewerx.us/events/afwerx-spacewerx-sbir-sttr-reauthorization-webinar/"
+       },
+       "eventDescription": {
+        "nodeType": "MultilineText",
+        "value": "Our team invites you to register for the upcoming “AFWERX &amp; SpaceWERX SBIR/STTR Reauthorization Webinar” next week! This session is designed to help you navigate the reauthorization with clarity and confidence-from understanding key changes to preparing for upcoming United States Air Force (USAF) and United States Space Force (USSF) opportunities. Be sure to submit your questions for the AFWER"
+       },
+       "Title": {
+        "nodeType": "NameField",
+        "value": "AFWERX and SpaceWERX SBIR, STTR Reauthorization Webinar"
+       },
+       "eventAudience": {
+        "nodeType": "Text",
+        "value": "DoW Mil/Civ, Industry"
+       },
+       "eventRegistrationDetails": {
+        "nodeType": "Text",
+        "value": "https://spacewerx.us/events/afwerx-spacewerx-sbir-sttr-reauthorization-webinar/"
+       },
+       "eventStartDate": {
+        "dateTimeValue": "2026-04-22T17:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/New_York"
+       }
+      },
+      "contentUrlName": "afwerx-and-spacewerx-sbir-sttr-reauthorization-webinar",
+      "language": "en_US",
+      "managedContentId": "20YRw00000JtlbHMAR",
+      "publishedDate": "2026-04-20T14:55:49.000Z",
+      "title": "AFWERX and SpaceWERX SBIR, STTR Reauthorization Webinar",
+      "type": "Events",
+      "typeLabel": "Events - Front Door",
+      "unauthenticatedUrl": "/cms/delivery/v52.0/0DB8300000000HNGAY/contents/20YRw00000JtlbHMAR?oid=00D830000008cdBEAQ"
+     },
+     {
+      "contentKey": "MC3L3H44ALMRBS3KSJNVH5BDFCCM",
+      "contentNodes": {
+       "eventEndDate": {
+        "dateTimeValue": "2026-05-11T18:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/Denver"
+       },
+       "eventGraphic": {
+        "nodeType": "Media",
+        "fileName": "SAM.gov__Event_USSF_Front_Door_2025.png"
+       },
+       "eventLocation": {
+        "nodeType": "Text",
+        "value": "SAM.GOV"
+       },
+       "eventURL": {
+        "nodeType": "Url",
+        "value": "https://sam.gov/workspace/contract/opp/8f1cec2c41424a39bc2e6769f13af669/view"
+       },
+       "eventDescription": {
+        "nodeType": "MultilineText",
+        "value": "Thank you for your interest in and submissions to the First Call for the Kronos Family of Systems (FoS) Commercial Solutions Opening (CSO) FA8806-26-S-0001. The Kronos Program Office and Space Systems Command greatly appreciate the time, effort, and innovation reflected across the submissions received."
+       },
+       "Title": {
+        "nodeType": "NameField",
+        "value": "Kronos FoS Commercial Solutions Opening"
+       },
+       "eventAudience": {
+        "nodeType": "Text",
+        "value": "Dow Military and Civilian, Industry"
+       },
+       "eventRegistrationDetails": {
+        "nodeType": "Text",
+        "value": "https://sam.gov/workspace/contract/opp/8f1cec2c41424a39bc2e6769f13af669/view"
+       },
+       "eventStartDate": {
+        "dateTimeValue": "2025-12-15T19:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/Denver"
+       }
+      },
+      "contentUrlName": "kronos-fos-commercial-solutions-opening",
+      "language": "en_US",
+      "managedContentId": "20YRw00000FU3W7MAL",
+      "publishedDate": "2026-01-02T16:50:04.000Z",
+      "title": "Kronos FoS Commercial Solutions Opening",
+      "type": "Events",
+      "typeLabel": "Events - Front Door",
+      "unauthenticatedUrl": "/cms/delivery/v52.0/0DB8300000000HNGAY/contents/20YRw00000FU3W7MAL?oid=00D830000008cdBEAQ"
+     },
+     {
+      "contentKey": "MC6IZKBLUPOJHU7KWVPV5YXVIOAQ",
+      "contentNodes": {
+       "eventEndDate": {
+        "dateTimeValue": "2026-01-24T01:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/Los_Angeles"
+       },
+       "eventGraphic": {
+        "nodeType": "Media",
+        "fileName": "Space_ Industry_Days__News_Event_USSF_Front_Door_2025.png"
+       },
+       "eventLocation": {
+        "nodeType": "Text",
+        "value": "LAX Marriott, Los Angeles, California, USA"
+       },
+       "eventURL": {
+        "nodeType": "Url",
+        "value": "https://afcea-la.org/events/space-industry-days-2025/"
+       },
+       "eventDescription": {
+        "nodeType": "MultilineText",
+        "value": "Space Industry Days provides industry an opportunity to receive presentations from US Air Force, US Space Force, and Space Systems Command (SSC) senior leadership on current and emerging opportunities. The conference will focus on the future of military space in the new DoD Service. USAF/USSF Senior Leaders and SSC program offices will share their plans for the next five years and panels of indust"
+       },
+       "Summary": {
+        "nodeType": "MultilineText",
+        "value": "Mission Area All - DoD Gov, Industry, Academia"
+       },
+       "Title": {
+        "nodeType": "NameField",
+        "value": "Space Industry Days"
+       },
+       "eventAudience": {
+        "nodeType": "Text",
+        "value": "Mission Area All - DoD Gov, Industry, Academia"
+       },
+       "eventRegistrationDetails": {
+        "nodeType": "Text",
+        "value": "https://afcea-la.org/events/space-industry-days-2025/"
+       },
+       "eventStartDate": {
+        "dateTimeValue": "2026-01-22T16:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/Los_Angeles"
+       }
+      },
+      "contentUrlName": "save-the-date-space-industry-days-2025",
+      "language": "en_US",
+      "managedContentId": "20YRw000007Gt9QMAS",
+      "publishedDate": "2025-12-04T03:52:35.000Z",
+      "title": "Space Industry Days",
+      "type": "Events",
+      "typeLabel": "Events - Front Door",
+      "unauthenticatedUrl": "/cms/delivery/v52.0/0DB8300000000HNGAY/contents/20YRw000007Gt9QMAS?oid=00D830000008cdBEAQ"
+     },
+     {
+      "contentKey": "MCB3S2G4PAZVFQBGBS36GPYITRVE",
+      "contentNodes": {
+       "eventEndDate": {
+        "dateTimeValue": "2026-07-30T00:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/Los_Angeles"
+       },
+       "eventGraphic": {
+        "nodeType": "Media",
+        "fileName": "On-Orbit Space Logistics Challenge.png"
+       },
+       "eventLocation": {
+        "nodeType": "Text",
+        "value": "The BR-DGE, 777 S Aviation BLVD #210 | El Segundo, CA 90245"
+       },
+       "eventURL": {
+        "nodeType": "Url",
+        "value": "https://luma.com/the-okf7"
+       },
+       "eventDescription": {
+        "nodeType": "MultilineText",
+        "value": "This effort will kick off with a two-day, in-person Challenge Definition Workshop led by experts in design thinking and collaborative facilitation. It will bring together USSF representatives, industry experts, academia, and acquisition professionals to help define the capabilities needed to build a resilient in-space logistics enterprise and enable sustained operations in orbit. During this Chall"
+       },
+       "Title": {
+        "nodeType": "NameField",
+        "value": "On-Orbit Space Logistics Challenge"
+       },
+       "eventAudience": {
+        "nodeType": "Text",
+        "value": "Mil, Civ, Industry, Academia"
+       },
+       "eventRegistrationDetails": {
+        "nodeType": "Text",
+        "value": "https://afwerxchallenge.com/on-orbit"
+       },
+       "eventStartDate": {
+        "dateTimeValue": "2026-07-28T16:00:00.000Z",
+        "nodeType": "DateTime",
+        "timeZone": "America/Los_Angeles"
+       }
+      },
+      "contentUrlName": "on-orbit-space-logistics-challenge",
+      "language": "en_US",
+      "managedContentId": "20YRw00000N0OulMAF",
+      "publishedDate": "2026-07-13T18:08:42.000Z",
+      "title": "On-Orbit Space Logistics Challenge",
+      "type": "Events",
+      "typeLabel": "Events - Front Door",
+      "unauthenticatedUrl": "/cms/delivery/v52.0/0DB8300000000HNGAY/contents/20YRw00000N0OulMAF?oid=00D830000008cdBEAQ"
+     }
+    ],
+    "cacheable": true
+   }
+  }
+ ]
+}
