@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any, Protocol
 
-from drafting import llm, prompts
+from drafting import llm, opening, prompts
 from drafting.company import profile
 from drafting.phases import PHASES, Phase, index
 from drafting.templates import select_template
@@ -28,7 +28,7 @@ log = logging.getLogger("drafting.pipeline")
 
 PHASE_TIMEOUT_S = 1800          # the reference's safety net per model call
 MAX_TOKENS = {"4": 32_000, "4.5": 16_000, "5": 24_000, "6": 48_000, "6.5": 48_000, "6.75": 64_000,
-              "7": 16_000, "7.5": 48_000}
+              "7": 16_000, "7.5": 48_000, "7.6": 2_000}
 OUTPUTS = {"4": ["requirements.md"], "4.5": ["alignment.md"], "5": ["outline.md"], "6": ["draft.md"],
            "6.5": [f"draft_review_pass{n}.md" for n in range(1, 5)] + ["draft_v2.md"],
            "6.75": ["compliance_report.md", "draft_v3.md"], "7": ["checklist.md"], "7.5": ["draft_final.md"]}
@@ -309,6 +309,44 @@ def phase_75_polish(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hoo
     return state
 
 
+CHECKLIST_OPENING = ("- [ ] Write the opening: the places marked PERSON WRITES in the draft. A person writes these, "
+                     "not the model; the points under each say what to land.")
+
+
+def phase_76_opening(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hooks) -> State:
+    """Velocity's addition (PRO-494): the final draft's opening paragraph, and its abstract's first three
+    sentences, become marked placeholders with points to land, edited in place so the fallback chain holds."""
+    final = final_draft(out_dir)
+    if final is None:
+        state.stats["note"] = "Opening: no draft to hold"
+        return state
+    text = final.read_text(encoding="utf-8")
+    places = opening.find_places(text)
+    if not places:
+        state.stats["person_writes"] = text.count(opening.MARK)
+        state.stats["note"] = "Opening: already held" if opening.MARK in text else "Opening: no prose paragraph found"
+        return state
+    points = [list(opening.GENERIC_POINTS) for _ in places]
+    try:
+        requirements = state.requirements or _read(out_dir, "requirements.md")
+        alignment = state.alignment or _read(out_dir, "alignment.md")
+        prompt = opening.frame_prompt(state.run.company, inputs.title, inputs.agency, requirements, alignment, places)
+        points = opening.parse_points(_ask(state, "7.6", prompt, "framing the opening"), len(places))
+    except llm.DraftCancelled:
+        raise
+    except Exception as exc:   # noqa: BLE001 (the opening is held whatever happens to the points)
+        state.stats["note"] = f"Opening: points failed, generic note used ({str(exc)[:200]})"
+        log.warning("Opening points failed, using the generic note: %s", exc)
+    held = opening.render(text, places, points)
+    _write(out_dir, final.name, held)
+    state.draft = held
+    state.stats["person_writes"] = len(places)
+    checklist = out_dir / "checklist.md"
+    if checklist.exists():
+        _write(out_dir, "checklist.md", checklist.read_text(encoding="utf-8").rstrip("\n") + "\n" + CHECKLIST_OPENING + "\n")
+    return state
+
+
 def phase_8_deliver(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hooks) -> State:
     """Picks the final draft by the reference's fallback chain. W3 uploads to Drive; here it stays local."""
     final = final_draft(out_dir)
@@ -319,7 +357,8 @@ def phase_8_deliver(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hoo
 PHASE_FUNCTIONS: dict[str, Callable[[DraftInputs, State, Path, Hooks], State]] = {
     "1": phase_1_listing, "2": phase_2_attachments, "3": phase_3_past_experience, "4": phase_4_requirements,
     "4.5": phase_45_alignment, "5": phase_5_outline, "6": phase_6_draft, "6.5": phase_65_review,
-    "6.75": phase_675_compliance, "7": phase_7_checklist, "7.5": phase_75_polish, "8": phase_8_deliver,
+    "6.75": phase_675_compliance, "7": phase_7_checklist, "7.5": phase_75_polish, "7.6": phase_76_opening,
+    "8": phase_8_deliver,
 }
 
 

@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from drafting import llm, pipeline
+from drafting import llm, opening, pipeline
 from drafting.phases import PHASES, phase
 
 ALL_FILES = ["requirements.md", "alignment.md", "outline.md", "draft.md", "draft_review_pass1.md",
@@ -31,6 +31,8 @@ def canned(label: str) -> str:
         return "# Checklist\n- [ ] rates"
     if label == "formatting document":
         return "# Final Draft"
+    if label == "framing the opening":
+        return "PLACE 1:" + chr(10) + "- the customer's problem" + chr(10) + "- our discriminator"
     raise AssertionError(f"unexpected phase label {label}")
 
 
@@ -83,11 +85,11 @@ def run(tmp_path: Path, model: FakeModel, **kwargs: Any) -> tuple[pipeline.Draft
     return out, hooks
 
 
-def test_phase_list_is_the_reference_order() -> None:
+def test_phase_list_is_the_reference_order_plus_the_opening() -> None:
     assert [(p.id, p.name) for p in PHASES] == [
         ("1", "Listing"), ("2", "Attachments"), ("3", "Past experience"), ("4", "Requirements"),
         ("4.5", "Alignment"), ("5", "Outline"), ("6", "Draft"), ("6.5", "Review ×4"), ("6.75", "Compliance"),
-        ("7", "Checklist"), ("7.5", "Polish"), ("8", "Deliver")]
+        ("7", "Checklist"), ("7.5", "Polish"), ("7.6", "Opening"), ("8", "Deliver")]
     assert phase("6.5").name == "Review ×4"
     with pytest.raises(KeyError):
         phase("9")
@@ -212,3 +214,42 @@ def test_inputs_round_trip_through_json(tmp_path: Path) -> None:
     path = tmp_path / "inputs.json"
     original.save(path)
     assert pipeline.DraftInputs.load(path) == original
+
+
+# ------------------------------------------------------------------ the opening (PRO-494)
+
+PROSE_FINAL = ("# Edge AI Logistics\n\n## 1. Executive Summary\n\nVelocity proposes Echo C2 for NAVSEA sustainment. "
+               "It fuses four data systems in the field. It ships in six months.\n\n## 2. Approach\n\nDetails here.")
+
+
+def test_the_opening_is_left_for_a_person_with_points_to_land(tmp_path: Path) -> None:
+    model = FakeModel(outputs={"formatting document": PROSE_FINAL,
+                               "framing the opening": "PLACE 1:\n- NAVSEA's data is split\n- Echo C2 already fuses it"})
+    out, hooks = run(tmp_path, model)
+    final = (tmp_path / "draft_final.md").read_text(encoding="utf-8")
+    assert "[PERSON WRITES: the opening paragraph and the first three sentences of the executive summary." in final
+    assert "> - NAVSEA's data is split" in final and "Velocity proposes Echo C2" not in final
+    assert final.endswith("## 2. Approach\n\nDetails here.")
+    assert out.phases["7.6"]["person_writes"] == 1 and hooks.status("7.6") == "completed"
+    assert "PERSON WRITES" in (tmp_path / "checklist.md").read_text(encoding="utf-8")
+    call = next(c for c in model.calls if c["label"] == "framing the opening")
+    assert "Edge AI Logistics" in call["prompt"] and "# Requirements" in call["prompt"]
+
+
+def test_a_failed_framing_call_still_holds_the_opening(tmp_path: Path) -> None:
+    model = FakeModel(fail={"framing the opening"}, outputs={"formatting document": PROSE_FINAL})
+    out, hooks = run(tmp_path, model)
+    final = (tmp_path / "draft_final.md").read_text(encoding="utf-8")
+    assert "[PERSON WRITES:" in final and "Velocity proposes Echo C2" not in final
+    assert opening.GENERIC_POINTS[0] in final
+    assert hooks.status("7.6") == "completed" and "generic" in out.phases["7.6"]["note"]
+
+
+def test_running_the_opening_again_changes_nothing(tmp_path: Path) -> None:
+    model = FakeModel(outputs={"formatting document": PROSE_FINAL, "framing the opening": "PLACE 1:\n- a point"})
+    run(tmp_path, model)
+    first = (tmp_path / "draft_final.md").read_text(encoding="utf-8")
+    again = FakeModel()
+    out, _ = run(tmp_path, again, from_phase="7.6")
+    assert (tmp_path / "draft_final.md").read_text(encoding="utf-8") == first
+    assert again.labels() == [] and out.phases["7.6"]["person_writes"] == 1
