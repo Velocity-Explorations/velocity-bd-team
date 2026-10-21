@@ -3,14 +3,17 @@ import { decide } from "./actions";
 import { FilterPanel } from "@/components/FilterPanel";
 import { JudgeVerdicts } from "@/components/Judges";
 import { Shell } from "@/components/Shell";
-import { Badge, Flash, TitleLink } from "@/components/bits";
+import { Flash, TitleLink } from "@/components/bits";
 import { filterHref, pickMany, pickSort, pickState } from "@/lib/filters";
 import { formatTime } from "@/lib/format";
 import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
-import { judgeAgreement, latestJudgments, newThisWeek, portals, reviewQueue } from "@/lib/queries";
-import { displayTimeZone } from "@/lib/settings";
+import { aliasesFor, displayPerson } from "@/lib/people";
+import { decisionsOn, judgeAgreement, latestJudgments, newThisWeek, portals, reviewQueue } from "@/lib/queries";
+import { peopleSplit, votesByCall } from "@/lib/scoreboard";
+import { displayTimeZone, queueMode } from "@/lib/settings";
 import { firstParam, isClosed } from "@/lib/text";
-import { DECISIONS, pickAllowed } from "@/lib/values";
+import { DECISIONS, isDecision, pickAllowed, STATUS_LABELS } from "@/lib/values";
+import { allowlist, currentViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 // The title template in layout.tsx only applies below the root segment, so this one is spelled out.
@@ -29,8 +32,18 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
     verdict: pickAllowed(sp.verdict, ["yes", "maybe"] as const),
   };
 
-  const [rows, weekCount, agreement] = await Promise.all([reviewQueue(filters), newThisWeek(), judgeAgreement()]);
-  const judged = await latestJudgments(rows.map((r) => r.id));
+  // While everyone decides every call, the queue is the viewer's own: the calls they have not decided.
+  const users = allowlist();
+  const viewer = await currentViewer();
+  const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
+  const [{ rows, perPerson }, weekCount, agreement] = await Promise.all([
+    reviewQueue(filters, waitingFor),
+    newThisWeek(),
+    judgeAgreement(),
+  ]);
+  const ids = rows.map((r) => r.id);
+  const [judged, decisions] = await Promise.all([latestJudgments(ids), decisionsOn(perPerson ? ids : [])]);
+  const votes = votesByCall(decisions, (by) => displayPerson(by, users));
   const tz = displayTimeZone();
   const returnTo = filterHref("/", {
     portal: filters.portals,
@@ -49,11 +62,15 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
       <div className="page-head">
         <div>
           <h1>Review queue</h1>
-          <p className="muted">Calls the reviewer rated yes or maybe that nobody has decided on yet.</p>
+          <p className="muted">
+            {perPerson
+              ? "Calls the reviewer rated yes or maybe that you have not decided yet. While the judges are being trained, everyone decides every call: the first decision becomes the call's decision, and later ones are kept beside it."
+              : "Calls the reviewer rated yes or maybe that nobody has decided on yet."}
+          </p>
         </div>
         <dl className="stats">
           <div>
-            <dt>Waiting</dt>
+            <dt>{perPerson ? "Waiting for you" : "Waiting"}</dt>
             <dd>{rows.length}</dd>
           </div>
           <div>
@@ -102,10 +119,15 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
         <section className="panel-body">
           {rows.length === 0 ? (
             <div className="empty">
-              <p className="title">{filtered ? "No calls match these filters." : "Nothing waiting for a decision."}</p>
+              <p className="title">
+                {filtered ? "No calls match these filters." : perPerson ? "Nothing waiting for you." : "Nothing waiting for a decision."}
+              </p>
               <p className="muted">
-                New yes and maybe calls land here after each scan. Deciding takes a call off this list; change a
-                decision later on All calls.
+                New yes and maybe calls land here after each scan.{" "}
+                {perPerson
+                  ? "A call leaves your list when you decide it and stays on everyone else's until they do."
+                  : "Deciding takes a call off this list."}{" "}
+                Change a call&apos;s decision on All calls.
               </p>
             </div>
           ) : (
@@ -119,12 +141,14 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
                     <th>Tier</th>
                     <th>AI reason</th>
                     <th>First seen</th>
+                    {perPerson ? <th>Decided so far</th> : null}
                     <th>Decide</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => {
                     const label = r.title || r.id;
+                    const callVotes = votes.get(r.id) ?? [];
                     return (
                       <tr key={r.id} data-call-id={r.id}>
                         <td>
@@ -141,10 +165,27 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
                         <td>{r.match_tier ?? ""}</td>
                         <td className="reason">{r.ai_reasoning ?? ""}</td>
                         <td className="when">{formatTime(r.first_seen_at, tz)}</td>
+                        {perPerson ? (
+                          <td>
+                            {callVotes.length ? (
+                              <ul className="notes votes">
+                                {callVotes.map((v) => (
+                                  <li key={v.person}>
+                                    {v.person}: {isDecision(v.status) ? STATUS_LABELS[v.status] : v.status}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="muted">nobody yet</span>
+                            )}
+                            {peopleSplit(callVotes) ? <span className="badge tone-warn">people disagree</span> : null}
+                          </td>
+                        ) : null}
                         <td className="decide">
                           <form action={decide}>
                             <input type="hidden" name="id" value={r.id} />
-                            <input type="hidden" name="expected" value="" />
+                            <input type="hidden" name="expected" value={isDecision(r.human_status) ? r.human_status : ""} />
+                            {perPerson ? <input type="hidden" name="keep" value="1" /> : null}
                             <input type="hidden" name="return_to" value={returnTo} />
                             <input type="text" name="note" maxLength={2000} placeholder="Note (optional)" aria-label={`Note on ${label}`} />
                             <div className="buttons">

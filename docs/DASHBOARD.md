@@ -9,7 +9,7 @@ it is in [dashboard/README.md](../dashboard/README.md).
 
 | Path | What it shows |
 |---|---|
-| `/` | **Review queue.** Calls with ai_verdict yes or maybe, still kept by the keyword filter, and no decision yet, newest first: how Claude and Grok each judged it (flagged when they disagree, in red when one said yes and the other no, Grok's reason behind a toggle), title linked to the portal, due date, match tier, Claude's reason, first seen, and four buttons (Pursue, Not relevant, Submitted, Dismiss) with an optional note. Filters, in a panel on the left: portals (tick any; none ticked shows every portal), open or closed (closed means a portal adapter flagged the call as closed), sort (newest first, or closing soonest, which puts upcoming deadlines first and past ones last), judges (Claude and Grok agree or disagree; under disagree, calls where one said yes and the other no come first), and verdict. Counts at the top: waiting, yes, maybe, new this week, and how often Claude and Grok agree. |
+| `/` | **Review queue.** Calls with ai_verdict yes or maybe, still kept by the keyword filter, that you have not decided yet (with DASHBOARD_QUEUE=shared, that nobody has decided), newest first: how Claude and Grok each judged it (flagged when they disagree, in red when one said yes and the other no, Grok's reason behind a toggle), title linked to the portal, due date, match tier, Claude's reason, first seen, and four buttons (Pursue, Not relevant, Submitted, Dismiss) with an optional note. While everyone decides every call, each row also shows the decisions others have made on it. Filters, in a panel on the left: portals (tick any; none ticked shows every portal), open or closed (closed means a portal adapter flagged the call as closed), sort (newest first, or closing soonest, which puts upcoming deadlines first and past ones last), judges (Claude and Grok agree or disagree; under disagree, calls where one said yes and the other no come first), and verdict. Counts at the top: waiting, yes, maybe, new this week, and how often Claude and Grok agree. |
 | `/calls` | **All calls**, newest first, up to 200 at a time. Filters, in the same left panel: portals, open or closed, sort, judges, title text, filter_result, ai_verdict (or not reviewed), human_status (or undecided). Shows the filter tier and filter_reason for rejected rows, how Claude and Grok each judged it, each reason behind a toggle and a flag when they disagree, who decided and when, and every note. When more than one person has decided a call, each person's own decision is listed, flagged "people disagree" when one said yes and another no. Each row has a "decide", "change" or "add yours" control: "change" moves your decision, for example from Pursue to Submitted, or adds a note; "add yours" appears on a call someone else decided, so your decision is kept beside theirs. |
 | `/judges` | **Judge scoreboard.** How Claude and Grok compare with your decisions, counting only verdicts given before anyone decided the call, because decided calls become examples in the judges' prompt. Pursue and submitted count as yes, not relevant and dismissed as no. Per judge: how many it matched, its misses (a no on a call the team pursued), false alarms (a yes on a call the team passed on) and maybes. Per person: calls decided and how often each judge matched them. Between people: how often two people agree on the calls both decided. Last, the pursued calls a judge said no to. Before migration 004 it says to apply it. |
 | `/requests` | **Change requests** from the portal assistant (docs/ASSISTANT.md, "Approvals"). Requests waiting for approval come first, oldest first, each with who asked, why, and the preview of what approving would do, plus Approve and Reject buttons and an optional note. Below them, the last 50 decided requests with their status, who decided, and the result, or what an approved request is waiting for. The Requests link in the top bar shows how many are waiting. |
@@ -54,9 +54,15 @@ appended). Saving your own current decision again with a note only appends the n
 note it changes nothing. Choosing a different decision changes the call's decision: the
 newest change wins on `calls`, and both people's decisions stay in `decisions`.
 
-Every form carries the decision the page showed. If the call was decided or changed by
-someone else after the page loaded, nothing is written and the page says what the call is
-now. A queue row therefore cannot overwrite a decision made in another tab.
+On the review queue while everyone decides every call (the default; DASHBOARD_QUEUE=each), the
+first decision becomes the call's decision and every later one is added beside it without
+changing it, whatever it says. A call's decision changes only from All calls.
+
+Every form carries the decision the page showed. On All calls, and on a shared queue, if the
+call was decided or changed by someone else after the page loaded, nothing is written and the
+page says what the call is now. While everyone decides every call, a queue button adds your
+decision beside the one made meanwhile. Either way, a queue row cannot overwrite a decision
+made in another tab.
 
 The reviewer's RECENT HUMAN DECISIONS block reads these columns, so every decision made here
 shapes the next review.

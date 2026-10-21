@@ -4,7 +4,8 @@ import { TitleLink } from "@/components/bits";
 import { agreementText, JUDGES } from "@/lib/judges";
 import { displayPerson } from "@/lib/people";
 import { judgeAgreement, judgeRecords, scoreboardRows } from "@/lib/queries";
-import { judgedMisses, peopleAgreement, personRecords } from "@/lib/scoreboard";
+import { judgedMisses, peopleAgreement, peopleSplit, personRecords, votesByCall } from "@/lib/scoreboard";
+import { isDecision, STATUS_LABELS } from "@/lib/values";
 import { allowlist } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,8 @@ function Scoreboard({
 }) {
   const people = personRecords(rows.decisions, rows.judgments, JUDGE_KEYS, name);
   const pairs = peopleAgreement(rows.decisions, name);
+  const decided = new Map(rows.calls.map((c) => [c.id, c]));
+  const splits = [...votesByCall(rows.decisions, name)].filter(([, votes]) => peopleSplit(votes));
   const misses = new Map<string, { title: string | null; url: string | null; judges: string[] }>();
   for (const m of judgedMisses(rows.calls, rows.judgments, JUDGE_KEYS)) {
     const entry = misses.get(m.id) ?? { title: m.title, url: m.url, judges: [] };
@@ -149,6 +152,22 @@ function Scoreboard({
           {pairs.map((p) => (
             <li key={`${p.a}|${p.b}`}>
               {p.a} and {p.b} both decided {count(p.shared, "call", "calls")} and agree on {p.agree} ({pct(p.agree, p.shared)}).
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h2>Calls where people disagree</h2>
+      {splits.length === 0 ? (
+        <p className="muted">None so far.</p>
+      ) : (
+        <ul>
+          {splits.map(([id, votes]) => (
+            <li key={id}>
+              <TitleLink title={decided.get(id)?.title ?? null} url={decided.get(id)?.url ?? null} fallback={id} />{" "}
+              <span className="muted">
+                ({votes.map((v) => `${v.person}: ${isDecision(v.status) ? STATUS_LABELS[v.status] : v.status}`).join(", ")})
+              </span>
             </li>
           ))}
         </ul>

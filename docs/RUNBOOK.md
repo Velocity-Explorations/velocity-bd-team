@@ -190,6 +190,10 @@ restart the dashboard. With more than one name, each person picks who they are i
 Everyone's decisions are kept in the `decisions` table (migration 004) and scored on `/judges`;
 the Monday summary ends with one line scoring each judge against the team's decisions.
 
+While the judges are being trained, everyone decides every call: each person's review queue
+holds the calls they have not decided. To go back to one decision per call, set
+`DASHBOARD_QUEUE=shared` in `dashboard/.env.local` and restart the dashboard.
+
 ## Running the stages separately
 
 The stage commands from earlier phases still work and share the same ledger:
