@@ -15,7 +15,8 @@ The portal assistant's scheduled jobs (docs/ASSISTANT.md) also run from here, be
 is the one place that wires components together (AGENTS.md, hard rule 1):
 
     python run.py --remind                 # Slack: calls marked Pursue and due within 14 days
-    python run.py --post-summary           # Slack: each portal's week and its scraper health
+    python run.py --post-summary           # Slack: each portal's week and its scraper health (and the brief)
+    python run.py --write-brief            # the dashboard's Monday brief for this week, no Slack post
     python run.py --apply-requests         # carry out change requests approved on the dashboard
 
 A lock file (data/pipeline.lock) stops two pipelines running at once; --apply-requests takes
@@ -37,7 +38,7 @@ import sys
 import threading
 import time
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,7 @@ from ledger.queries import (
     get_call,
     get_run,
     judge_records,
+    save_brief,
     list_requests,
     new_calls,
     note_request,
@@ -74,6 +76,8 @@ LOCK_POLL_S = 15
 REMIND_DAYS = 14
 APPLY_KINDS = ("keyword_change", "rereview", "scan", "fault_report")   # drafts belong to the Writer
 SETTINGS_BRANCH = "main"
+BRIEF_TOP = 10              # calls in the Monday brief's Top 10 across portals
+BRIEF_AUTHOR = "pipeline"   # briefs.written_by; a portal's bot may write its own brief later
 GIT_TIMEOUT_S = 60
 ISSUE_TIMEOUT_S = 120
 GITHUB_TOKEN_KEY = "BD_GITHUB_TOKEN"   # the pipeline's own GitHub token; see "GitHub token" in docs/RUNBOOK.md
@@ -418,9 +422,39 @@ def remind() -> int:
     return 0 if ts else 1
 
 
+def write_brief(portals: list[Portal], now: datetime | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Store this week's Monday brief for the dashboard: each portal's week with its scraper line, and
+    the Top 10 across portals. Returns (summaries, health, judges), so the Slack post shows the same."""
+    from assistant.tools import RANKING, scraper_health, top_calls, weekly_summary
+
+    moment = now or datetime.now(timezone.utc)
+    week_of = (moment.date() - timedelta(days=moment.weekday())).isoformat()
+    summaries = [weekly_summary(p.slug, now=moment) for p in portals]
+    health = [entry for p in portals for entry in scraper_health(p.slug, now=moment)["portals"]]
+    judges = judge_records()
+    scraper = {entry.get("name"): entry.get("text", "") for entry in health}
+    for summary in summaries:
+        save_brief(week_of, summary["portal"], {**summary, "health": scraper.get(summary["portal"], "")}, BRIEF_AUTHOR)
+    save_brief(week_of, None, {"top": top_calls(BRIEF_TOP, now=moment), "ranked_by": RANKING, "judges": judges},
+               BRIEF_AUTHOR)
+    return summaries, health, judges
+
+
+def store_brief() -> int:
+    """`--write-brief`: this week's brief for the dashboard, with no Slack post."""
+    _console_logging()
+    portals = registry.discover()
+    if not portals:
+        print("No portals registered; nothing to store.")
+        return 0
+    summaries, _, _ = write_brief(portals)
+    print(f"Stored this week's brief: {len(summaries)} portal(s) and the Top {BRIEF_TOP} across portals.")
+    return 0
+
+
 def post_summary() -> int:
-    """Post the Monday summary, every portal's week and scraper health, as one Slack message."""
-    from assistant.tools import scraper_health, weekly_summary
+    """Post the Monday summary, every portal's week and scraper health, as one Slack message, after
+    storing the same week as the dashboard's Monday brief."""
     from slack.sink import post_text, weekly_summary_message
 
     _console_logging()
@@ -428,9 +462,8 @@ def post_summary() -> int:
     if not portals:
         print("No portals registered; nothing to post.")
         return 0
-    summaries = [weekly_summary(p.slug) for p in portals]
-    health = [entry for p in portals for entry in scraper_health(p.slug)["portals"]]
-    text, blocks = weekly_summary_message(summaries, health, judges=judge_records())
+    summaries, health, judges = write_brief(portals)
+    text, blocks = weekly_summary_message(summaries, health, judges=judges)
     ts = post_text(text, blocks=blocks)
     print("Posted the weekly summary" + ("" if ts else " (Slack did not accept the post; see the log)"))
     return 0 if ts else 1
@@ -763,6 +796,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="if another run holds the lock, wait up to this many minutes for it")
     parser.add_argument("--remind", action="store_true", help="post Slack reminders for Pursue calls due soon, then exit")
     parser.add_argument("--post-summary", action="store_true", help="post the weekly summary to Slack, then exit")
+    parser.add_argument("--write-brief", action="store_true",
+                        help="store this week's Monday brief for the dashboard without posting to Slack, then exit")
     parser.add_argument("--apply-requests", action="store_true",
                         help="carry out change requests approved on the dashboard, then exit")
     parser.add_argument("--backfill-judgments", action="store_true",
@@ -776,6 +811,8 @@ def main(argv: list[str] | None = None) -> int:
         return remind()
     if args.post_summary:
         return post_summary()
+    if args.write_brief:
+        return store_brief()
     if args.apply_requests:
         return apply_requests(wait_s=args.wait_lock * 60)
     if args.backfill_judgments:

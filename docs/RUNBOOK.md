@@ -119,6 +119,10 @@ Mondays at 09:00 (`--post-summary`), and approved change requests daily at 12:07
 (`--apply-requests`). Every scan also alerts when it reads too many pages badly. Details in
 docs/ASSISTANT.md.
 
+The weekly summary also stores its week for the dashboard's Monday brief (`/brief`).
+`python run.py --write-brief` stores this week's brief without posting to Slack, for example to
+fill the page before the first Monday run.
+
 Change requests:
 
 - `python -m assistant requests` lists them; the dashboard's Requests page is where they

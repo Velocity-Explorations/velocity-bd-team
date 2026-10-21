@@ -4,6 +4,7 @@ from __future__ import annotations
 import subprocess
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -234,6 +235,9 @@ def test_post_summary_covers_each_portal_and_the_scraper(isolated, slack_posts, 
     assert pipeline.main(["--post-summary"]) == 0
     assert len(slack_posts) == 1 and slack_posts[0].startswith("Weekly BD summary, week of")
     assert "*Fake*: 1 new this week" in slack_posts[0] and "Scraper: Fake" in slack_posts[0]
+    today = datetime.now(timezone.utc).date()
+    week = lq.briefs_for_week((today - timedelta(days=today.weekday())).isoformat())
+    assert {b["portal"] for b in week} == {"Fake", None}   # the same week, kept for the dashboard
 
 
 # ------------------------------------------------------------------------ waiting for the lock

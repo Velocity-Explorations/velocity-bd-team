@@ -34,6 +34,7 @@ VERDICTS = ("yes", "maybe", "no")
 OVERDUE_DAYS = 8          # scans run weekly; more than this without a completed one is worth saying
 CLOSING_WINDOW_DAYS = 14
 TOP_PICKS = 5   # open, undecided calls the weekly summary ranks
+RANKING = "yes before maybe, then the nearest deadline, then the newest"   # how top picks are ordered
 NOTE_LINE = re.compile(r"^\[(\S+) ([^\]]+)\] ?(.*)$")
 STOPWORDS = {
     "with", "from", "into", "that", "this", "their", "they", "have", "will", "your", "call", "calls",
@@ -410,6 +411,34 @@ def _bucket(row: dict[str, Any]) -> str:
     return row.get("ai_verdict") or "not reviewed yet"
 
 
+def _waiting(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[str, Any], datetime | None]]:
+    """Open, undecided calls the review kept and rated yes or maybe, best first, with their deadlines."""
+    waiting = []
+    for row in rows:
+        if row.get("human_status") or row.get("filter_result") != "kept" or row.get("ai_verdict") not in ("yes", "maybe"):
+            continue
+        due = parse_due(row.get("due_date"))
+        if _flag(_extra(row), "_closed") or (due is not None and due < moment):
+            continue
+        waiting.append((row, due))
+    # RANKING, in two stable sorts. The fit score will replace this order (PRO-487).
+    waiting.sort(key=lambda pair: pair[0].get("first_seen_at") or "", reverse=True)
+    waiting.sort(key=lambda pair: (pair[0]["ai_verdict"] != "yes", pair[1] is None, pair[1] or moment))
+    return waiting
+
+
+def _pick(row: dict[str, Any], due: datetime | None, moment: datetime) -> dict[str, Any]:
+    return _call_ref(row, verdict=row["ai_verdict"], deadline=row.get("due_date"),
+                     days_left=days_until(due, moment) if due else None, reason=_first_sentence(row.get("ai_reasoning")))
+
+
+def top_calls(limit: int = 10, now: datetime | None = None) -> list[dict[str, Any]]:
+    """The best open, undecided calls across every portal, in the weekly summary's order (RANKING)."""
+    moment = _now(now)
+    _, rows = _portal_rows(None)
+    return [_pick(r, d, moment) for r, d in _waiting(rows, moment)[:limit]]
+
+
 def weekly_summary(portal: str | None = None, days: int = 7, now: datetime | None = None) -> dict[str, Any]:
     """What is new, what is closing soon, and what the team decided, over the last `days`."""
     moment = _now(now)
@@ -429,21 +458,8 @@ def weekly_summary(portal: str | None = None, days: int = 7, now: datetime | Non
             closing.append((due, _call_ref(row, deadline=row.get("due_date"), days_left=days_until(due, moment),
                                            status=row.get("human_status"))))
     closing_soon = [item for _, item in sorted(closing, key=lambda pair: pair[0])]
-    # Open, undecided calls the review kept and rated yes or maybe, best first: yes before maybe,
-    # then the nearest deadline, then the newest. The fit score will replace this order (PRO-487).
-    waiting = []
-    for row in rows:
-        if row.get("human_status") or row.get("filter_result") != "kept" or row.get("ai_verdict") not in ("yes", "maybe"):
-            continue
-        due = parse_due(row.get("due_date"))
-        if _flag(_extra(row), "_closed") or (due is not None and due < moment):
-            continue
-        waiting.append((row, due))
-    waiting.sort(key=lambda pair: pair[0].get("first_seen_at") or "", reverse=True)
-    waiting.sort(key=lambda pair: (pair[0]["ai_verdict"] != "yes", pair[1] is None, pair[1] or moment))
-    top_picks = [_call_ref(r, verdict=r["ai_verdict"], deadline=r.get("due_date"),
-                           days_left=days_until(d, moment) if d else None, reason=_first_sentence(r.get("ai_reasoning")))
-                 for r, d in waiting[:TOP_PICKS]]
+    waiting = _waiting(rows, moment)
+    top_picks = [_pick(r, d, moment) for r, d in waiting[:TOP_PICKS]]
     decided = sorted((r for r in rows if r.get("human_status") and (r.get("human_at") or "") >= cutoff),
                      key=lambda r: r.get("human_at") or "", reverse=True)
     decided_refs = [_call_ref(r, status=r["human_status"], by=r.get("human_by"), at=r.get("human_at")) for r in decided]

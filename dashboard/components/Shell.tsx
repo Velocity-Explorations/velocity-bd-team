@@ -6,6 +6,7 @@ import { allowlist, currentViewer, viewerHeader } from "@/lib/viewer";
 
 const LINKS = [
   { key: "queue", href: "/", label: "Review queue" },
+  { key: "brief", href: "/brief", label: "Monday brief" },
   { key: "calls", href: "/calls", label: "All calls" },
   { key: "judges", href: "/judges", label: "Judges" },
   { key: "requests", href: "/requests", label: "Requests" },
