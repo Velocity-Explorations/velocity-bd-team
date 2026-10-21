@@ -64,6 +64,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- SSC Front Door (2026-10-21): portals/ssc_front_door/ reads the site's public Events list over
+  plain HTTP, with no login and no browser, and stores listings that have not ended. Most are events
+  (conferences, industry days, webinars); both judges rate those on their topic. It runs with the
+  Sunday scan; `python run.py --portal ssc_front_door --dry-run` tests it.
 - Second judge (2026-10-20): Grok (grok-4.7) judges every call the Claude review rates, with the
   same prompt, when BD_XAI_API_KEY is set. Both verdicts go to the judgments table (migration 003)
   and show on the dashboard with how often they agree; Claude's verdict still decides what is

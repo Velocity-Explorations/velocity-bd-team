@@ -50,6 +50,17 @@ Velocity does NOT do: hardware development or manufacturing; physical constructi
 A good opportunity for Velocity involves: building software, developing AI/ML models, modernizing legacy systems, creating C2 tools, or conducting R&D in AI/autonomy/NLP.
 """
 
+# Listing types that are events, not contracts (SSC Front Door writes these). The company context
+# says Velocity does not do event participation; for an event the question is whether its topic is
+# worth attending, so these listings get one more instruction.
+EVENT_TYPES = ("Industry day", "Webinar", "Conference", "Event")
+EVENT_GUIDANCE = (
+    "This listing is an event (an industry day, webinar or conference), not a contract to bid on. "
+    "Rate it on its topic: yes if the topic is close to Velocity's core work, so attending would help "
+    "find or win related work; maybe if it is partly related; no if it is unrelated. Do not rate it no "
+    "only because it is an event."
+)
+
 PROMPT_TEMPLATE = """{company_context}{past_experience_block}{feedback_examples_block}
 
 Evaluate this government opportunity for Velocity Explorations:
@@ -138,11 +149,14 @@ def build_prompt(
     extra_context: str = "",
 ) -> str:
     context = " ".join((extra_context or "").split())
+    blocks = [f"{EVENT_GUIDANCE}\n"] if (row.get("type") or "") in EVENT_TYPES else []
+    if context:
+        blocks.append(f"Context from the team: {context}\n")
     return PROMPT_TEMPLATE.format(
         company_context=COMPANY_CONTEXT,
         past_experience_block=past_experience_block or "",
         feedback_examples_block=feedback_examples_block or "",
-        extra_context_block=f"Context from the team: {context}\n" if context else "",
+        extra_context_block="".join(blocks),
         title=row.get("title") or "",
         portal=row.get("portal") or "",
         type=row.get("type") or "",
