@@ -8,7 +8,7 @@ import { isoNow } from "./format";
 import type { RequestChoice } from "./requests";
 import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine } from "./text";
-import { planDecision, type Decision } from "./values";
+import { isDecision, planDecision, type Decision } from "./values";
 
 // ------------------------------------------------------------------------------ calls
 
@@ -23,6 +23,7 @@ export type QueueRow = {
   match_tier: string | null;
   first_seen_at: string;
   extra: string | null;
+  human_status: string | null;
 };
 
 /** The filter panel's choices (lib/filters.ts). No portals ticked means every portal. */
@@ -72,20 +73,31 @@ async function hasTable(db: Db, name: string): Promise<boolean> {
   return Boolean(row?.present);
 }
 
-/** The triage backlog from LEDGER_SCHEMA.md, newest first unless sorted otherwise. A call a later keyword change dropped leaves it. */
-export async function reviewQueue(f: PanelFilters & { verdict: string }): Promise<QueueRow[]> {
+/**
+ * The triage backlog, newest first unless sorted otherwise. With `waitingFor` (the names one
+ * person's decisions are recorded under, while everyone decides every call): the calls that
+ * person has not decided. Otherwise, and before migration 004: the calls nobody has decided,
+ * the "Triage backlog" query in LEDGER_SCHEMA.md. A call a later keyword change dropped leaves it.
+ */
+export async function reviewQueue(
+  f: PanelFilters & { verdict: string },
+  waitingFor: string[] | null,
+): Promise<{ rows: QueueRow[]; perPerson: boolean }> {
   const db = sql();
+  const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
   const rows = await db<QueueRow[]>`
-    SELECT id, portal, title, url, ai_verdict, ai_reasoning, due_date, match_tier, first_seen_at, extra
+    SELECT id, portal, title, url, ai_verdict, ai_reasoning, due_date, match_tier, first_seen_at, extra, human_status
     FROM calls
     WHERE ai_verdict IN ('yes', 'maybe')
-      AND human_status IS NULL
+      AND ${perPerson
+        ? db`NOT EXISTS (SELECT 1 FROM decisions AS d WHERE d.call_id = calls.id AND d.decided_by IN ${db(waitingFor ?? [])})`
+        : db`human_status IS NULL`}
       AND filter_result = 'kept'
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
       ${panelWhere(db, f)}
     ${panelOrder(db, f)}
     LIMIT 500`;
-  return [...rows];
+  return { rows: [...rows], perPerson };
 }
 
 /** "New calls this week" from LEDGER_SCHEMA.md, as a count. */
@@ -183,7 +195,9 @@ export async function listCalls(f: CallFilters, limit = 200): Promise<{ rows: Ca
   return { rows: [...rows], total: count[0]?.n ?? 0 };
 }
 
-export type DecideResult = { ok: true; title: string; plan: "decide" | "agree" | "note" } | { ok: false; reason: string };
+export type DecideResult =
+  | { ok: true; title: string; plan: "decide" | "add" | "note"; callStatus: Decision | null }
+  | { ok: false; reason: string };
 
 /** The newest decision recorded under any of these names on a call, or null. */
 async function latestDecisionBy(db: Db, callId: string, aliases: string[]): Promise<string | null> {
@@ -198,27 +212,43 @@ async function latestDecisionBy(db: Db, callId: string, aliases: string[]): Prom
  * human_status, human_by, human_at, plus an optional note appended in append_note()'s
  * format, and a row in `decisions` (migration 004) so every person's decision is kept.
  * Choosing the decision a call already has, when it is someone else's, adds yours without
- * changing the call. `expected` is the decision the page showed; if the call changed since
- * (another tab, another person), nothing is written and the reason says what it is now.
- * `aliases` are the names the person's earlier decisions are recorded under.
+ * changing the call; so does any decision with `keepCallDecision` (the review queue while
+ * everyone decides every call) once the call has one. Otherwise `expected` is the decision
+ * the page showed; if the call changed since (another tab, another person), nothing is
+ * written and the reason says what it is now. `aliases` are the names the person's earlier
+ * decisions are recorded under.
  */
 export async function decideCall(input: {
   id: string;
   status: Decision;
   expected: Decision | null;
+  keepCallDecision: boolean;
   by: string;
   aliases: string[];
   note: string;
 }): Promise<DecideResult> {
   const db = sql();
   const history = await hasTable(db, "decisions");
-  const mine = history ? await latestDecisionBy(db, input.id, input.aliases) : input.expected;
-  const plan = planDecision(input.expected, input.status, input.note, mine);
-  if (plan === "noop") return { ok: false, reason: "Nothing to save: choose a different decision or add a note." };
+  const mine = history ? await latestDecisionBy(db, input.id, input.aliases) : null;
   const now = isoNow();
   const line = noteLine(now, input.by, input.note) || null;
-  const updated = await db.begin(async (tx) => {
-    const rows = await tx<{ title: string | null }[]>`
+  return db.begin(async (tx): Promise<DecideResult> => {
+    const [call] = await tx<{ title: string | null; human_status: string | null; human_by: string | null }[]>`
+      SELECT title, human_status, human_by FROM calls WHERE id = ${input.id} FOR UPDATE`;
+    if (!call) return { ok: false, reason: "That call is no longer in the ledger." };
+    const current = isDecision(call.human_status) ? call.human_status : null;
+    const keep = input.keepCallDecision && history;
+    if (current !== input.expected && !keep) {
+      return {
+        ok: false,
+        reason: current
+          ? `It was changed meanwhile to ${current} by ${call.human_by}. Nothing saved; reload and try again.`
+          : "Its decision was cleared meanwhile. Nothing saved; reload and try again.",
+      };
+    }
+    const plan = planDecision(current, input.status, input.note, history ? mine : current, keep);
+    if (plan === "noop") return { ok: false, reason: "Nothing to save: choose a different decision or add a note." };
+    await tx`
       UPDATE calls
       SET ${plan === "decide" ? tx`human_status = ${input.status}, human_by = ${input.by}, human_at = ${now},` : tx``}
           updated_at = ${now},
@@ -226,26 +256,14 @@ export async function decideCall(input: {
             WHEN ${line}::text IS NULL THEN human_notes
             ELSE COALESCE(NULLIF(human_notes, '') || chr(10), '') || ${line}::text
           END
-      WHERE id = ${input.id}
-        AND human_status IS NOT DISTINCT FROM ${input.expected}::text
-      RETURNING title`;
-    if (rows.length === 1 && history && plan !== "note") {
+      WHERE id = ${input.id}`;
+    if (history && plan !== "note") {
       await tx`
         INSERT INTO decisions (call_id, decided_by, status, note, decided_at)
         VALUES (${input.id}, ${input.by}, ${input.status}, ${input.note.trim() || null}, ${now})`;
     }
-    return rows.map((r) => ({ title: r.title }));
+    return { ok: true, title: call.title ?? input.id, plan, callStatus: plan === "decide" ? input.status : current };
   });
-  if (updated.length === 1) return { ok: true, title: updated[0].title ?? input.id, plan };
-  const [existing] = await db<{ human_status: string | null; human_by: string | null }[]>`
-    SELECT human_status, human_by FROM calls WHERE id = ${input.id}`;
-  if (!existing) return { ok: false, reason: "That call is no longer in the ledger." };
-  return {
-    ok: false,
-    reason: existing.human_status
-      ? `It was changed meanwhile to ${existing.human_status} by ${existing.human_by}. Nothing saved; reload and try again.`
-      : "Its decision was cleared meanwhile. Nothing saved; reload and try again.",
-  };
 }
 
 // ------------------------------------------------------------------ decisions, judges

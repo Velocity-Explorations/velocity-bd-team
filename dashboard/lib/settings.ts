@@ -1,4 +1,10 @@
 import path from "node:path";
+import { pickQueueMode, type QueueMode } from "./values";
+
+/** Whether everyone decides every call in the review queue (see pickQueueMode). */
+export function queueMode(): QueueMode {
+  return pickQueueMode(process.env.DASHBOARD_QUEUE);
+}
 
 /** IANA zone for every displayed time. The ledger itself stores UTC. */
 export function displayTimeZone(): string {

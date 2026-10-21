@@ -25,18 +25,35 @@ export function isDecision(value: unknown): value is Decision {
   return typeof value === "string" && (HUMAN_STATUSES as readonly string[]).includes(value);
 }
 
-export type DecisionPlan = "decide" | "agree" | "note" | "noop";
+export type DecisionPlan = "decide" | "add" | "note" | "noop";
 
 /**
- * What saving a decision form does, given the decision the page showed (`expected`) and the
- * person's own latest decision on the call (`mine`, null if they have not decided it):
- * a different decision changes the call's decision; the same decision, when it is someone
- * else's, adds theirs beside it; otherwise a note is only appended.
+ * What saving a decision does, given the call's decision (`current`), the person's own latest
+ * decision on the call (`mine`, null if they have not decided it) and whether the call's
+ * decision must stay as it is (`keepCallDecision`: the review queue while everyone decides
+ * every call). "decide" sets the call's decision and records the person's; "add" records the
+ * person's beside the call's, which stays; "note" only appends the note.
  */
-export function planDecision(expected: Decision | null, chosen: Decision, note: string, mine: string | null): DecisionPlan {
-  if (chosen !== expected) return "decide";
-  if (chosen !== mine) return "agree";
+export function planDecision(
+  current: Decision | null,
+  chosen: Decision,
+  note: string,
+  mine: string | null,
+  keepCallDecision = false,
+): DecisionPlan {
+  if (current === null || (chosen !== current && !keepCallDecision)) return "decide";
+  if (chosen !== mine) return "add";
   return note.trim() ? "note" : "noop";
+}
+
+export type QueueMode = "each" | "shared";
+
+/**
+ * DASHBOARD_QUEUE. "each" (the default, for the training phase): a call stays in each person's
+ * review queue until they decide it. "shared": the first decision takes it off everyone's.
+ */
+export function pickQueueMode(raw: string | undefined): QueueMode {
+  return raw?.trim().toLowerCase() === "shared" ? "shared" : "each";
 }
 
 /** A search-param value if it is one of `allowed`, else "". */

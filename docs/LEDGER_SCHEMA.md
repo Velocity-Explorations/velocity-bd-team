@@ -203,8 +203,9 @@ and `human_at`).
 | decided_at | TEXT timestamp, not null | when the person decided | same |
 
 Index: `(call_id, id)`. Rows are only added. A person who changes their mind adds a row; their
-newest row is their decision. A person who agrees with the call's current decision adds a row
-without changing `calls`.
+newest row is their decision. A row that does not change the call's decision (agreeing with
+it, or any decision after the first made from the review queue while everyone decides every
+call) leaves `calls` as it is.
 
 ## Table: schema_migrations
 
