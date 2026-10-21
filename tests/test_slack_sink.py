@@ -138,6 +138,7 @@ def test_weekly_summary_message_reads_as_a_brief(monkeypatch: pytest.MonkeyPatch
     assert blocks[0]["type"] == "header" and blocks[0]["text"]["text"] == "Weekly BD summary, week of 19 Oct"
     assert "*Vulcan SOF*: 3 new this week, 13 open calls waiting for a decision" in body
     assert "<https://bd.example.invalid/?state=open|Open the review queue>" in body
+    assert "<https://bd.example.invalid/brief|Monday brief>" in body
     assert "1. <https://portal.invalid/1|IT &amp; Cyber &lt;Ops&gt;>: yes, closes Tue 27 Oct (7 days)" in body
     assert "Builds C2 software." in body
     assert "Picked call, closes Thu 22 Oct (2 days)" in body and body.count("IT &amp; Cyber") == 1

@@ -472,6 +472,14 @@ ul.notes li + li {
   margin-top: 0.3rem;
 }
 
+.board {
+  margin-top: 1.5rem;
+}
+
+.board li + li {
+  margin-top: 0.35rem;
+}
+
 ul.votes {
   min-width: 0;
   margin-top: 0.3rem;

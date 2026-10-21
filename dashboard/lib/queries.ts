@@ -340,6 +340,41 @@ export async function scoreboardRows(): Promise<{ decisions: DecisionRow[]; judg
   }
 }
 
+// ------------------------------------------------------------------------- Monday brief
+
+export type BriefRow = { week_of: string; portal: string | null; body: string; written_by: string; created_at: string };
+
+/** Weeks that have a Monday brief, newest first; null before migration 005. */
+export async function briefWeeks(limit = 26): Promise<string[] | null> {
+  try {
+    const rows = await sql()<{ week_of: string }[]>`
+      SELECT DISTINCT week_of FROM briefs ORDER BY week_of DESC LIMIT ${limit}`;
+    return rows.map((r) => r.week_of);
+  } catch {
+    return null;   // briefs table missing (migration 005)
+  }
+}
+
+/** One week's brief rows, in the order they were written; body is the JSON the Monday job stored. */
+export async function briefRows(week: string): Promise<BriefRow[]> {
+  const rows = await sql()<BriefRow[]>`
+    SELECT week_of, portal, body, written_by, created_at FROM briefs WHERE week_of = ${week} ORDER BY id`;
+  return [...rows];
+}
+
+export type CallDecision = { status: string | null; by: string | null; at: string | null };
+
+/** The decision each of these calls has now, by call id. */
+export async function currentDecisions(ids: string[]): Promise<Map<string, CallDecision>> {
+  const found = new Map<string, CallDecision>();
+  if (ids.length === 0) return found;
+  const db = sql();
+  const rows = await db<{ id: string; human_status: string | null; human_by: string | null; human_at: string | null }[]>`
+    SELECT id, human_status, human_by, human_at FROM calls WHERE id IN ${db(ids)}`;
+  for (const r of rows) found.set(r.id, { status: r.human_status, by: r.human_by, at: r.human_at });
+  return found;
+}
+
 // -------------------------------------------------------------------- change requests
 
 export type RequestRow = {

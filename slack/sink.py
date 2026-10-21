@@ -306,6 +306,9 @@ def weekly_summary_message(summaries: list[dict[str, Any]], health: list[dict[st
     queue = f"<{base}/?state=open|Open the review queue>" if base else "Decide on the dashboard's review queue."
     scraper = {entry.get("name"): entry.get("text", "") for entry in health}
     blocks: list[dict[str, Any]] = [{"type": "header", "text": {"type": "plain_text", "text": title}}]
+    if base:
+        blocks.append({"type": "context", "elements": [{"type": "mrkdwn",
+                       "text": f"Also on the dashboard, with a Top 10 across portals: <{base}/brief|Monday brief>"}]})
     fallback: list[str] = []
     for i, s in enumerate(summaries):
         if i:

@@ -508,3 +508,32 @@ def decision_history(call_id: str) -> list[dict[str, Any]]:
     with tx() as conn:
         return rows(q(conn, "SELECT decided_by, status, note, decided_at FROM decisions WHERE call_id = ? ORDER BY id",
                       (call_id,)))
+
+
+# ------------------------------------------------------------------------------ briefs
+# The Monday brief, kept per week for the dashboard (migration 005): one row per portal and one
+# with no portal for the Top 10 across portals. A newer row for the same week and portal replaces it.
+
+def save_brief(week_of: str, portal: str | None, body: Mapping[str, Any], written_by: str) -> None:
+    """Store one part of a week's brief, replacing what that week already held for the portal."""
+    with tx() as conn:
+        if portal is None:
+            q(conn, "DELETE FROM briefs WHERE week_of = ? AND portal IS NULL", (week_of,))
+        else:
+            q(conn, "DELETE FROM briefs WHERE week_of = ? AND portal = ?", (week_of, portal))
+        q(conn, "INSERT INTO briefs (week_of, portal, body, written_by, created_at) VALUES (?, ?, ?, ?, ?)",
+          (week_of, portal, json.dumps(dict(body), ensure_ascii=False), written_by, now_iso()))
+
+
+def briefs_for_week(week_of: str) -> list[dict[str, Any]]:
+    """A week's brief rows in the order they were written; `body` is JSON text."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT id, week_of, portal, body, written_by, created_at FROM briefs "
+                            "WHERE week_of = ? ORDER BY id", (week_of,)))
+
+
+def brief_weeks(limit: int = 52) -> list[str]:
+    """The weeks that have a brief, newest first."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT DISTINCT week_of FROM briefs ORDER BY week_of DESC LIMIT ?", (limit,)))
+    return [r["week_of"] for r in found]

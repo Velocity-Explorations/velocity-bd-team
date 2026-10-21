@@ -207,6 +207,24 @@ newest row is their decision. A row that does not change the call's decision (ag
 it, or any decision after the first made from the review queue while everyone decides every
 call) leaves `calls` as it is.
 
+## Table: briefs
+
+The Monday brief, kept per week, so the dashboard shows the same week the Monday Slack
+summary posted. Written by `run.py --post-summary`, and by `run.py --write-brief`, which posts
+nothing. Added by `005_briefs.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| week_of | TEXT date, not null | `YYYY-MM-DD`, the Monday of the week | `save_brief` |
+| portal | TEXT | `calls.portal` for one portal's week; NULL for the Top 10 across portals | same |
+| body | TEXT JSON, not null | one portal's `weekly_summary()` plus `health`, its scraper line; or, with no portal, `top` (the Top 10 as call references), `ranked_by` and `judges` (`judge_records()`) | same |
+| written_by | TEXT, not null | `pipeline`; a portal's bot may write its own later | same |
+| created_at | TEXT timestamp, not null | | same |
+
+Index: `(week_of, id)`. Writing a week's part again replaces that part, so a rerun never
+duplicates it. The dashboard only reads this table.
+
 ## Table: schema_migrations
 
 Bookkeeping for `ledger/migrate.py`. `version` is the migration filename, `applied_at`
