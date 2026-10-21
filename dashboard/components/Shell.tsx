@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { setViewer } from "@/app/actions";
 import { countWaitingRequests } from "@/lib/queries";
-import { allowlist, currentViewer, viewerHeader } from "@/lib/viewer";
+import { allowlist, currentViewer, iapAudience, viewerHeader } from "@/lib/viewer";
 
 const LINKS = [
   { key: "queue", href: "/", label: "Review queue" },
@@ -50,16 +50,19 @@ export async function Shell({ current, children }: { current: NavKey; children: 
 
 async function ViewerControl() {
   const viewer = await currentViewer();
+  const iap = iapAudience() !== null;
   const header = viewerHeader();
   const users = allowlist();
 
-  if (header) {
+  if (iap || header) {
     return (
       <div className="viewer">
         {viewer ? (
           <span>
             Deciding as <strong>{viewer}</strong>
           </span>
+        ) : iap ? (
+          <span className="muted">Read only: this Google account is not in DASHBOARD_USERS</span>
         ) : (
           <span className="muted">Not identified: the {header} header is missing or not on the allowlist</span>
         )}
