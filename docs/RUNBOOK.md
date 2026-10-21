@@ -179,6 +179,24 @@ To fill the history once, after migration 003: `python run.py --backfill-judgmen
 Claude's past verdicts and has Grok judge every kept call it has not judged yet. It is safe
 to rerun.
 
+## Proposal Register
+
+The "00 Proposal Register" sheet in the BD Proposal Library Drive folder lists past submissions
+(docs/LIBRARY_CONVENTIONS.md). After rows are filled in or changed, or a Submissions folder is added, ask
+Claude to "sync the register". It first appends a starter row for any folder without one (submission_id,
+submitted_date and portal from the folder name, drive_link to the folder) and never changes a row people
+have filled in. Then it reads the sheet and the Submissions folder names through the Google connectors,
+writes them to
+`data/library/register_rows.json` and `data/library/folders.json`, and runs
+
+```powershell
+python -m library.register sync --rows data/library/register_rows.json --folders data/library/folders.json
+```
+
+It upserts every valid row into `proposals`, skips a row with a problem (its ledger row keeps its last
+good values), and lists the problems, folders with no row and rows with no folder. Exit code 0 when every
+row synced, 1 when some were skipped.
+
 ## Dashboard
 
 ```powershell
