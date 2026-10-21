@@ -6,12 +6,30 @@ const USERS = parseUsers("David Wood=U08V7ULPH1N, Aisha");
 
 test("parseUsers reads names with optional Slack ids, trims, skips blanks, dedupes", () => {
   assert.deepEqual(parseUsers("David Wood=U08V7ULPH1N, Aisha ,, Bob=, Aisha"), [
-    { name: "David Wood", slackId: "U08V7ULPH1N" },
-    { name: "Aisha", slackId: null },
-    { name: "Bob", slackId: null },
+    { name: "David Wood", email: null, slackId: "U08V7ULPH1N" },
+    { name: "Aisha", email: null, slackId: null },
+    { name: "Bob", email: null, slackId: null },
   ]);
   assert.deepEqual(parseUsers(undefined), []);
   assert.deepEqual(parseUsers("   "), []);
+});
+
+const TEAM = parseUsers("David Wood <David@VelocityExplorations.com>=U08V7ULPH1N, Shaun <shaun@velocityexplorations.com>, Aisha");
+
+test("parseUsers reads an optional email in angle brackets before the Slack id", () => {
+  assert.deepEqual(TEAM, [
+    { name: "David Wood", email: "David@VelocityExplorations.com", slackId: "U08V7ULPH1N" },
+    { name: "Shaun", email: "shaun@velocityexplorations.com", slackId: null },
+    { name: "Aisha", email: null, slackId: null },
+  ]);
+});
+
+test("behind a sign-in proxy an email names the person, in any case, with or without IAP's prefix", () => {
+  assert.equal(pickViewer({ users: TEAM, headerMode: true, headerValue: "david@velocityexplorations.com" }), "David Wood");
+  assert.equal(pickViewer({ users: TEAM, headerMode: true, headerValue: "accounts.google.com:SHAUN@velocityexplorations.com" }), "Shaun");
+  assert.equal(pickViewer({ users: TEAM, headerMode: true, headerValue: "Aisha" }), "Aisha");
+  assert.equal(pickViewer({ users: TEAM, headerMode: true, headerValue: "accounts.google.com:mallory@velocityexplorations.com" }), null);
+  assert.equal(pickViewer({ users: [], headerMode: true, headerValue: "accounts.google.com:someone@velocityexplorations.com" }), "someone@velocityexplorations.com");
 });
 
 test("a single allowlisted user is the default viewer", () => {

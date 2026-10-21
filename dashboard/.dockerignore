@@ -1,0 +1,9 @@
+# Keep local settings and build output out of the image (lib/deploy.test.ts checks this).
+# .env.local holds DATABASE_URL; the container gets its settings from the environment.
+.env*
+node_modules
+.next
+*.tsbuildinfo
+next-env.d.ts
+Dockerfile
+.dockerignore

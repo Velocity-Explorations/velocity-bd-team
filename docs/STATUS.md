@@ -25,8 +25,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   decisions are kept and a judges page scores Claude and Grok against them. While the judges
   are trained, everyone decides every call: each person's queue holds the calls they have not
   decided (DASHBOARD_QUEUE=each, the default). A Monday brief page (2026-10-21) shows the week
-  the Monday summary posted, with a Top 10 across portals. Runs and proposals pages too. Not deployed anywhere yet; hosting is undecided, so for now only David
-  can decide.
+  the Monday summary posted, with a Top 10 across portals. Runs and proposals pages too. Not deployed yet: since 2026-10-21 a container image
+  (dashboard/Dockerfile) is ready for Alec to host on GKE behind Google's IAP, which signs in each
+  person by email (PRO-511; the deployment is PRO-477). Until then only David can decide.
 
 - Phase 2 (Vulcan SOF login): working as of 2026-10-16. Username, password, then the emailed
   code read over Gmail IMAP (VELOCITY_GMAIL_APP_USERNAME + VELOCITY_GMAIL_APP_PASSWORD; gog CLI
