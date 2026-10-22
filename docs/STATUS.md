@@ -76,6 +76,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- NSTXL (2026-10-22): portals/nstxl/ reads the S2MARTS, SpEC, JDEC and Microelectronics Commons
+  opportunities from NSTXL's public WordPress API, with stable ids: Current and Coming Soon items,
+  less those awarded, canceled or stale. Member-only pages (mostly SpEC) are stored with their
+  title and a note; reading them needs a member sign-in (PRO-531). Deadlines are read from the
+  page text. Runs with the Sunday scan (PRO-530).
 - SAM.gov (2026-10-22): portals/sam_gov/ reads the public Opportunities API with one key
   (BD_SAM_API_KEY): open notices under five NAICS codes, solicitation and notice types Velocity
   pursues, full and open, small business and WOSB set-asides. A run spends at most 900 requests

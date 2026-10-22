@@ -189,6 +189,15 @@ def test_scraper_health_flags_a_scan_overdue(ledger_db: str, portal: Portal) -> 
     assert "no completed scan for 10 days" in tools.scraper_health("example", now=NOW)["text"]
 
 
+def test_a_call_with_no_deadline_by_design_is_not_read_badly(ledger_db: str) -> None:
+    # Coming-soon and member-only notices have no deadline to find (PRO-530).
+    run = lq.start_run("Example", component="example")
+    add_call("ex-soon", "Coming soon notice", run, description="Text", due_date=None, extra={"nstxl_no_deadline": True})
+    add_call("ex-missing", "Deadline not found", run, description="Text", due_date=None)
+    quality = tools.fetch_quality(run)
+    assert (quality["total"], quality["count"], quality["examples"]) == (2, 1, ["Deadline not found"])
+
+
 # ------------------------------------------------------------------------- weekly summary
 
 def test_weekly_summary(ledger_db: str, portal: Portal) -> None:
