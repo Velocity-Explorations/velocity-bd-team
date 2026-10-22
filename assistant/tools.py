@@ -124,7 +124,11 @@ def _days_phrase(days: int) -> str:
 
 
 def _badly_read(row: dict[str, Any]) -> bool:
-    return not (row.get("due_date") or "").strip() or _flag(_extra(row), "_description_fallback")
+    """No deadline or description found. A row whose extra marks it as having no deadline by design
+    (a key ending in _no_deadline, for example NSTXL's coming-soon notices) only counts for the description."""
+    extra = _extra(row)
+    missing_deadline = not (row.get("due_date") or "").strip() and not _flag(extra, "_no_deadline")
+    return missing_deadline or _flag(extra, "_description_fallback")
 
 
 def _notes(row: dict[str, Any]) -> list[dict[str, str | None]]:
