@@ -130,6 +130,23 @@ def get_call(call_id: str) -> dict[str, Any] | None:
         return one(q(conn, "SELECT * FROM calls WHERE id = ?", (call_id,)))
 
 
+def sam_notices_on(portal: str, key: str) -> dict[str, str]:
+    """SAM.gov notice ids that a portal's calls carry in extra[key], each with its call id.
+    SSC Front Door reposts SAM.gov notices; the SAM.gov adapter skips those (PRO-525)."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT id, extra FROM calls WHERE portal = ?", (portal,)))
+    notices: dict[str, str] = {}
+    for row in found:
+        try:
+            extra = json.loads(row["extra"] or "{}")
+        except (TypeError, ValueError):
+            continue
+        notice = extra.get(key) if isinstance(extra, dict) else None
+        if notice:
+            notices[str(notice).lower()] = row["id"]
+    return notices
+
+
 def set_filter(
     call_id: str,
     result: str,

@@ -76,6 +76,13 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- SAM.gov (2026-10-22): portals/sam_gov/ reads the public Opportunities API with one key
+  (BD_SAM_API_KEY): open notices under five NAICS codes, solicitation and notice types Velocity
+  pursues, full and open, small business and WOSB set-asides. A run spends at most 900 requests
+  and reads new notices' descriptions soonest deadline first; the rest wait for the next run.
+  Requests go over IPv4 (SAM.gov's IPv6 address hangs from the scan PC). A notice Front Door
+  reposts is stored once, by whichever adapter sees it first. Built, not yet run for real
+  (PRO-525).
 - SSC Front Door (2026-10-21): portals/ssc_front_door/ reads the site's public Events list over
   plain HTTP, with no login and no browser, and stores listings that have not ended. Most are events
   (conferences, industry days, webinars); both judges rate those on their topic. It runs with the

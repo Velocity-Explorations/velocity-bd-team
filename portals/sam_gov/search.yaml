@@ -1,0 +1,29 @@
+# What the SAM.gov adapter asks for and keeps (PRO-525). The next run uses any change here.
+# A notice outside these lists is dropped before its description is read, so it costs no request.
+
+# One search per code (SAM.gov takes a single NAICS code per query). From the Yukon scanner's
+# profile, which dropped 541330 and 561990 as noise.
+naics_codes:
+  - "541511"   # custom computer programming services
+  - "541512"   # computer systems design services
+  - "541513"   # computer facilities management services
+  - "541519"   # other computer related services
+  - "541715"   # research and development in the physical, engineering and life sciences
+
+# SAM.gov's own type names. Award notices, justifications, surplus sales and intent-to-bundle
+# notices are left out.
+notice_types:
+  - Solicitation
+  - Combined Synopsis/Solicitation
+  - Presolicitation
+  - Sources Sought
+  - Special Notice
+
+# SAM.gov's set-aside codes Velocity can bid on, as a WOSB small business (drafting/company.yaml).
+# NONE means no set-aside: full and open competition.
+set_asides:
+  - NONE
+  - SBA      # total small business
+  - SBP      # partial small business
+  - WOSB     # women-owned small business
+  - WOSBSS   # women-owned small business sole source
