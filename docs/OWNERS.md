@@ -15,6 +15,7 @@ pull request to its owner (see AGENTS.md, "Working alongside other agents").
 | assistant/ | Coordinator |
 | portals/vulcan_sof/ | Vulcan SOF agent |
 | portals/ssc_front_door/ | SSC Front Door agent |
+| portals/sam_gov/ | SAM.gov agent |
 | review/ | Reviewer |
 | library/ | Librarian |
 | drafting/ | Writer |

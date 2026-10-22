@@ -1,6 +1,7 @@
 """SSC Front Door: the public Events list, read over plain HTTP and stored as calls (PRO-482)."""
 from __future__ import annotations
 
+import copy
 import json
 import urllib.parse
 from datetime import datetime, timezone
@@ -194,6 +195,18 @@ def test_fetch_all_still_updates_a_stored_listing_once_it_ends(ledger_db: str) -
 def test_fetch_all_honours_the_limit(ledger_db: str) -> None:
     counts = scrape.fetch_all(lq.start_run("SSC Front Door"), limit=1, now=NOW, opener=FakeSite())
     assert counts["scraped"] == 1 and len(lq.calls_where(portal="SSC Front Door")) == 1
+
+
+def test_a_repost_of_a_notice_sam_gov_already_stored_is_skipped(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Whichever copy reaches the ledger first stays, so nobody decides the same notice twice (PRO-525).
+    notice = "0123456789abcdef0123456789abcdef"
+    lq.upsert_call({"id": f"samgov-{notice}", "portal": "SAM.gov", "title": "Industry days"}, lq.start_run("SAM.gov"))
+    reposted = copy.deepcopy(listing(INDUSTRY_DAYS))
+    reposted["contentNodes"]["eventURL"] = {"value": f"https://sam.gov/opp/{notice}/view"}
+    monkeypatch.setattr(scrape, "fetch_records", lambda opener=None: [reposted, listing(DEFENCE_IN_SPACE)])
+    counts = scrape.fetch_all(lq.start_run("SSC Front Door"), now=NOW)
+    assert lq.get_call(f"sscfd-{INDUSTRY_DAYS}") is None and lq.get_call(f"sscfd-{DEFENCE_IN_SPACE}") is not None
+    assert counts == {"found": 2, "scraped": 1, "new": 1, "failed": 0}
 
 
 # ------------------------------------------------------------------------ the portal entry

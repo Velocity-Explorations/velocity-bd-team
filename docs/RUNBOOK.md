@@ -179,6 +179,29 @@ To fill the history once, after migration 003: `python run.py --backfill-judgmen
 Claude's past verdicts and has Grok judge every kept call it has not judged yet. It is safe
 to rerun.
 
+## SAM.gov
+
+The SAM.gov portal reads the public Opportunities API with `BD_SAM_API_KEY` from `.env`
+(portals/sam_gov/NOTES.md). Each request counts against the key's daily limit, and each new
+notice's description is a request of its own. A run spends at most 900 requests, then stops
+cleanly; so does a run when SAM.gov answers 429 (the day's limit is reached). The notices it
+did not read wait for the next run. Every run reads the soonest deadlines first.
+
+- The run log's last SAM.gov line gives the counts: open notices, dropped, already on Front
+  Door, stored (new), waiting, failed, and requests spent.
+- If many notices are waiting after the first ingest, run it again the next day:
+
+```powershell
+python run.py --portal sam_gov
+```
+
+- To try it without storing anything or posting to Slack, cap the new notices it reads:
+  `python run.py --portal sam_gov --dry-run --limit 25` (about 30 requests).
+- HTTP 401 or 403 means the key has expired (personal keys last 90 days): generate a new one
+  in the SAM.gov account profile and replace it in `.env`.
+- NAICS codes, notice types and set-asides are in `portals/sam_gov/search.yaml`; the next run
+  uses any change.
+
 ## Proposal Register
 
 The "00 Proposal Register" sheet in the BD Proposal Library Drive folder lists past submissions

@@ -35,6 +35,7 @@ KNOWN_KEYS = [
     "SLACK_CHANNEL_ID",
     "BD_GITHUB_TOKEN",
     "BD_XAI_API_KEY",
+    "BD_SAM_API_KEY",
     "DASHBOARD_URL",
     "OLLAMA_URL",
 ]
