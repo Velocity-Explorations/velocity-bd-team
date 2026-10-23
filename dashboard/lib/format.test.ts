@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatAgo, formatDuration, formatTime, isoNow, parseStageCounts } from "./format.ts";
+import { formatAgo, formatDue, formatDuration, formatTime, isoNow, parseStageCounts } from "./format.ts";
 
 test("isoNow matches the ledger format: second precision, Z suffix", () => {
   assert.equal(isoNow(new Date("2026-10-17T09:44:33.789Z")), "2026-10-17T09:44:33Z");
@@ -45,4 +45,12 @@ test("parseStageCounts keeps numeric entries in order and tolerates junk", () =>
   assert.deepEqual(parseStageCounts(null), []);
   assert.deepEqual(parseStageCounts("garbage"), []);
   assert.deepEqual(parseStageCounts("[1, 2]"), []);
+});
+
+test("formatDue shows ISO deadlines in the dashboard's zone and leaves portal text alone", () => {
+  assert.equal(formatDue("2026-11-05T17:00:00-05:00", "America/Denver"), "2026-11-05 15:00 MST");
+  assert.equal(formatDue("2026-10-28T23:59:59-04:00", "America/Denver"), "2026-10-28 21:59 MDT");
+  assert.equal(formatDue("2026-10-30", "America/Denver"), "2026-10-30");
+  assert.equal(formatDue("30 OCT 2026 : 21:59 MDT", "America/Denver"), "30 OCT 2026 : 21:59 MDT");
+  assert.equal(formatDue(null, "UTC"), "");
 });

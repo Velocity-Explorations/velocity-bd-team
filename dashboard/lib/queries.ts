@@ -17,6 +17,10 @@ export type QueueRow = {
   portal: string;
   title: string | null;
   url: string | null;
+  type: string | null;
+  department: string | null;
+  naics_code: string | null;
+  set_aside: string | null;
   ai_verdict: string;
   ai_reasoning: string | null;
   due_date: string | null;
@@ -86,7 +90,8 @@ export async function reviewQueue(
   const db = sql();
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
   const rows = await db<QueueRow[]>`
-    SELECT id, portal, title, url, ai_verdict, ai_reasoning, due_date, match_tier, first_seen_at, extra, human_status
+    SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, due_date,
+           match_tier, first_seen_at, extra, human_status
     FROM calls
     WHERE ai_verdict IN ('yes', 'maybe')
       AND ${perPerson
@@ -160,6 +165,9 @@ export type CallRow = {
   title: string | null;
   url: string | null;
   type: string | null;
+  department: string | null;
+  naics_code: string | null;
+  set_aside: string | null;
   due_date: string | null;
   filter_result: string;
   filter_reason: string | null;
@@ -186,7 +194,7 @@ export async function listCalls(f: CallFilters, limit = 200): Promise<{ rows: Ca
   const [count, rows] = await Promise.all([
     db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${where()}`,
     db<CallRow[]>`
-      SELECT id, portal, title, url, type, due_date, filter_result, filter_reason, match_tier,
+      SELECT id, portal, title, url, type, department, naics_code, set_aside, due_date, filter_result, filter_reason, match_tier,
              ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra
       FROM calls ${where()}
       ${panelOrder(db, f)}
