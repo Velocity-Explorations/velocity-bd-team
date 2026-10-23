@@ -43,6 +43,14 @@ export function formatTime(iso: string | null | undefined, timeZone: string): st
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute} ${parts.timeZoneName}`;
 }
 
+/** A call's deadline for display. An ISO timestamp with a time (SAM.gov, DIU) shows in the given
+ *  zone like every other time; text a portal wrote ("30 OCT 2026 : 21:59 MDT") or a bare date as is. */
+export function formatDue(due: string | null | undefined, timeZone: string): string {
+  const value = (due ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return formatTime(value, timeZone) || value;
+  return value;
+}
+
 /** "45s", "2m 49s", "1h 02m". Empty when either end is missing. */
 export function formatDuration(startIso: string | null | undefined, endIso: string | null | undefined): string {
   const start = toDate(startIso);

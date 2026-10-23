@@ -3,10 +3,11 @@ import { decide } from "../actions";
 import { FilterPanel } from "@/components/FilterPanel";
 import { JudgeVerdicts } from "@/components/Judges";
 import { Shell } from "@/components/Shell";
-import { Badge, Flash, TitleLink } from "@/components/bits";
+import { Badge, Details, Flash, TitleLink } from "@/components/bits";
+import { callDetails, deadlineNote } from "@/lib/details";
 import { displayPerson } from "@/lib/people";
 import { filterHref, pickMany, pickSort, pickState } from "@/lib/filters";
-import { formatTime } from "@/lib/format";
+import { formatDue, formatTime } from "@/lib/format";
 import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
 import { decisionsOn, judgeAgreement, latestJudgments, listCalls, portals, type CallFilters } from "@/lib/queries";
 import { peopleSplit, votesByCall } from "@/lib/scoreboard";
@@ -158,7 +159,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                           <TitleLink title={r.title} url={r.url} fallback={r.id} />
                           <div className="meta">
                             <span>{r.portal}</span>
-                            {r.type ? <span>{r.type}</span> : null}
+                            <Details items={callDetails(r)} />
                             {isClosed(r.extra) ? <span className="badge tone-grey">closed</span> : null}
                           </div>
                         </td>
@@ -227,7 +228,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                             </ul>
                           ) : null}
                         </td>
-                        <td className="when">{r.due_date ?? ""}</td>
+                        <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz)}</td>
                         <td className="when">{formatTime(r.first_seen_at, tz)}</td>
                       </tr>
                     );

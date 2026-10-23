@@ -25,6 +25,15 @@ week" predicate; the judges page uses its "Judge scoreboard" query.
 `vulcan_closed`). A future portal adapter gets the badge and the filter by following the same
 convention.
 
+Under each call's title, the meta line shows its portal, then the details `lib/details.ts` reads
+from its columns and `calls.extra` (PRO-535): the type; the office (SAM.gov's agency path is
+shortened to its sub-tier, with the whole path on hover); the set-aside and NAICS code when the
+portal gives them; SAM.gov's solicitation number, first contact and attachment count; NSTXL's
+members-only badge; and Front Door's location, with a link when it reposts a SAM.gov notice.
+Deadlines written as ISO timestamps (SAM.gov, DIU) show in the dashboard's time zone, and
+hovering a due date shows where it came from when the portal says (NSTXL's sentence, DIU's
+wording).
+
 Log links open `/runs/<id>/log`, which serves the file named in runs.log_path, but only from
 the pipeline's log directory on the same machine. On any other host it says the log is not
 there.

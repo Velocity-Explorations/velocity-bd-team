@@ -1,5 +1,7 @@
 // Small presentational pieces shared by the pages.
 
+import type { Detail } from "@/lib/details";
+
 const TONES: Record<string, string> = {
   yes: "good",
   maybe: "warn",
@@ -69,5 +71,28 @@ export function TitleLink({ title, url, fallback }: { title: string | null; url:
     </a>
   ) : (
     <span>{text}</span>
+  );
+}
+
+/** A call's portal details (lib/details.ts), after the portal name in a row's meta line. */
+export function Details({ items }: { items: Detail[] }) {
+  return (
+    <>
+      {items.map((item, i) =>
+        item.tone ? (
+          <span key={i} className={`badge tone-${item.tone}`} title={item.title}>
+            {item.text}
+          </span>
+        ) : item.href ? (
+          <a key={i} href={item.href} title={item.title} {...(item.href.startsWith("mailto:") ? {} : { target: "_blank", rel: "noreferrer" })}>
+            {item.text}
+          </a>
+        ) : (
+          <span key={i} title={item.title}>
+            {item.text}
+          </span>
+        ),
+      )}
+    </>
   );
 }
