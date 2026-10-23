@@ -18,6 +18,7 @@ pull request to its owner (see AGENTS.md, "Working alongside other agents").
 | portals/sam_gov/ | SAM.gov agent |
 | portals/nstxl/ | NSTXL agent |
 | portals/diu/ | DIU agent |
+| portals/afwerx/ | AFWERX agent |
 | review/ | Reviewer |
 | library/ | Librarian |
 | drafting/ | Writer |

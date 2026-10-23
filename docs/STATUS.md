@@ -76,6 +76,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- AFWERX (2026-10-23): portals/afwerx/ reads the SBIR and STTR cycles on AFWERX's Get Funded page
+  (those with Air Force or Space Force topics): one request a run. Each cycle is one call with its
+  pre-release, open and close dates. The topics are on DSIP, whose robots.txt forbids automated
+  access, so the call links DSIP's topic search for a person to read them. Kept on "sbir" or
+  "sttr". Runs with the Sunday scan (PRO-536).
 - DIU (2026-10-23): portals/diu/ reads DIU's open CSOs, prize challenges and CLASS ACT bridge
   solicitations from the state its open-solicitations page embeds, without running the page's
   code: one request a run. Each call has the solicitation text and eligibility, and the close
