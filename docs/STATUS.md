@@ -76,6 +76,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- DIU (2026-10-23): portals/diu/ reads DIU's open CSOs, prize challenges and CLASS ACT bridge
+  solicitations from the state its open-solicitations page embeds, without running the page's
+  code: one request a run. Each call has the solicitation text and eligibility, and the close
+  time in Eastern time. Runs with the Sunday scan (PRO-534).
 - NSTXL (2026-10-22): portals/nstxl/ reads the S2MARTS, SpEC, JDEC and Microelectronics Commons
   opportunities from NSTXL's public WordPress API, with stable ids: Current and Coming Soon items,
   less those awarded, canceled or stale. Member-only pages (mostly SpEC) are stored with their
