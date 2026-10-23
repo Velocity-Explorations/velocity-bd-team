@@ -1,6 +1,6 @@
 """One SAM.gov notice to one `calls` row, and the checks that cost no request. Pure: no network, no ledger.
 
-    rules = load_rules(SEARCH_PATH)          # NAICS codes, notice types and set-asides from search.yaml
+    rules = load_rules(SEARCH_PATH)          # NAICS codes, offices, notice types and set-asides from search.yaml
     reason = keep(raw, rules)                # None, or why the notice is dropped
     rec = build_record(raw, now, text)       # dict matching the ledger's calls columns
 
@@ -9,7 +9,7 @@ The search result carries everything but the description, which is a link of its
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -38,6 +38,7 @@ class Rules:
     naics_codes: list[str]
     notice_types: set[str]
     set_asides: set[str]
+    offices: list[str] = field(default_factory=list)   # searched whatever their NAICS codes
 
 
 def load_rules(path: Path = SEARCH_PATH) -> Rules:
@@ -45,9 +46,13 @@ def load_rules(path: Path = SEARCH_PATH) -> Rules:
     for key in ("naics_codes", "notice_types", "set_asides"):
         if not isinstance(data.get(key), list) or not data[key]:
             raise ValueError(f"{path.name}: '{key}' must be a list")
+    offices = data.get("offices") or []
+    if not isinstance(offices, list):
+        raise ValueError(f"{path.name}: 'offices' must be a list")
     return Rules(naics_codes=[str(c).strip() for c in data["naics_codes"]],
                  notice_types={str(t).strip() for t in data["notice_types"]},
-                 set_asides={str(s).strip().upper() for s in data["set_asides"]})
+                 set_asides={str(s).strip().upper() for s in data["set_asides"]},
+                 offices=[str(o).strip() for o in offices if str(o).strip()])
 
 
 def notice_id(raw: dict[str, Any]) -> str:

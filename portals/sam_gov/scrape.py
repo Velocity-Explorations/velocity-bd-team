@@ -2,7 +2,8 @@
 
     counts = fetch_all(run_id)   # found, scraped, new, failed, dropped, reposts, pending, requests
 
-One search per NAICS code in search.yaml. Notices of a type or set-aside Velocity does not
+One search per NAICS code in search.yaml, then one per office listed there (IARPA), whatever
+its codes; a notice both find is kept once. Notices of a type or set-aside Velocity does not
 pursue, or with a blocklisted title, are dropped before their description is read; so is a
 notice Front Door already carries. A notice stored earlier is refreshed from the search result
 (deadline, type, closed) without another request. New notices are read soonest deadline first,
@@ -17,7 +18,7 @@ from typing import Any
 
 from config import require
 from ledger.queries import get_call, sam_notices_on, upsert_call
-from portals.sam_gov.api import Budget, Opener, SamError, SamQuota, description, ipv4_urlopen, search
+from portals.sam_gov.api import Budget, Opener, SamError, SamQuota, description, ipv4_urlopen, search, search_office
 from portals.sam_gov.records import KEYWORDS_PATH, SEARCH_PATH, build_record, deadline, keep, load_rules, notice_id
 from portals.shared.keyword_filter import load_keywords
 
@@ -45,11 +46,12 @@ def fetch_all(run_id: int, limit: int | None = None, now: datetime | None = None
     counts = {"found": 0, "scraped": 0, "new": 0, "failed": 0, "dropped": 0, "reposts": 0, "pending": 0, "requests": 0}
 
     notices: dict[str, dict[str, Any]] = {}
+    searches = [(search, code) for code in rules.naics_codes] + [(search_office, office) for office in rules.offices]
     try:
-        for code in rules.naics_codes:
-            for raw in search(code, now.date(), key, opener, budget):
+        for ask, value in searches:
+            for raw in ask(value, now.date(), key, opener, budget):
                 if notice_id(raw):
-                    notices.setdefault(notice_id(raw), raw)   # the same notice can sit under two codes
+                    notices.setdefault(notice_id(raw), raw)   # the same notice can sit under two codes or an office
     except SamQuota as exc:
         log.warning("Searches stopped early: %s", exc)
     counts["found"] = len(notices)
