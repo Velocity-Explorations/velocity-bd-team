@@ -18,7 +18,7 @@ that share one SQLite ledger database.
 | config.py | Settings loader. `require("KEY")` raises a ConfigError naming the key; `python -m config` lists which keys are set, never values. |
 | ledger/ | The shared database: connection helpers, `migrate.py`, and `migrations/` (numbered `NNN_description.sql`, additive only). |
 | portals/<slug>/ | One adapter per portal (first: `portals/vulcan_sof/`). Logs in, lists calls, extracts details, writes `calls` rows. Exposes a `PORTAL` dict that `portals/registry.py` discovers; run.py never names a portal. Keeps only what is specific to that portal, including its `keywords.yaml`. |
-| portals/shared/ | Helpers every adapter reuses: `browser` (headless Chromium), `session` (saved cookies in `data/<slug>/cookies.json`), `otp` (emailed sign-in codes, described per portal as an `OtpSource`), `keyword_filter`. Not a portal. |
+| portals/shared/ | Helpers every adapter reuses: `browser` (headless Chromium), `session` (saved cookies in `data/<slug>/cookies.json`), `otp` (emailed sign-in codes, described per portal as an `OtpSource`), `keyword_filter`, `funding_list` (the Get Funded list AFWERX and SpaceWERX share). Not a portal. |
 | review/ | Per-call review: regex blocklist, then LLM verdict. Writes verdicts to the ledger. |
 | assistant/ | The portal assistant's toolbox: read tools, and propose tools that record change requests for a person to approve. It reads the ledger and the portals' files only. See docs/ASSISTANT.md. |
 | library/ | Proposal Library of past submissions: Drive sync, text extraction, chunking, embeddings. |

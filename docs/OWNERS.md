@@ -19,6 +19,7 @@ pull request to its owner (see AGENTS.md, "Working alongside other agents").
 | portals/nstxl/ | NSTXL agent |
 | portals/diu/ | DIU agent |
 | portals/afwerx/ | AFWERX agent |
+| portals/spacewerx/ | SpaceWERX agent |
 | review/ | Reviewer |
 | library/ | Librarian |
 | drafting/ | Writer |

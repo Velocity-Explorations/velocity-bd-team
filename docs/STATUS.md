@@ -76,6 +76,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- SpaceWERX (2026-10-23): portals/spacewerx/ reads the Space Force's listings on SpaceWERX's Get
+  Funded page, which uses AFWERX's template: SBIR and STTR cycles, and STRATFI and TACFI notices
+  for Phase II holders (one, a TACFI notice open on a continuous basis, on 23 Oct). One request a
+  run; both adapters share portals/shared/funding_list.py. Kept on "sbir", "sttr", "stratfi" or
+  "tacfi". Runs with the Sunday scan (PRO-538).
 - AFWERX (2026-10-23): portals/afwerx/ reads the SBIR and STTR cycles on AFWERX's Get Funded page
   (those with Air Force or Space Force topics): one request a run. Each cycle is one call with its
   pre-release, open and close dates. The topics are on DSIP, whose robots.txt forbids automated
