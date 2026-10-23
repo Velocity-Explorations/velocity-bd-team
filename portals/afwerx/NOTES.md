@@ -22,7 +22,8 @@ read the topics.
 - The page lists each cycle twice: a grid row (badges, title, three unlabelled dates) and a
   labelled block for small screens ("SOLICITATION : ...", "PRE-RELEASE : ...", "OPEN : ...",
   "CLOSE : ..."). The scanner reads the labelled blocks and the badges above each one: AF means
-  the cycle includes Air Force topics, SF Space Force topics.
+  the cycle includes Air Force topics, SF Space Force topics. SpaceWERX's Get Funded page uses
+  the same template, so both adapters read it with portals/shared/funding_list.py (PRO-538).
 - A page without the "Open Funding Opportunities" heading, or with badges in the list but no
   labelled block, fails the run and the pipeline alerts. An empty list means no cycles.
 - The keyword filter keeps a cycle when its title says SBIR or STTR; the judges then rate it like
@@ -33,16 +34,18 @@ read the topics.
 
 - `id` is `afwerx-` and the cycle's title in lower case with dashes, for example
   `afwerx-dow-sbir-specific-topic-27-bz-27-bx-release-1`. A renamed cycle gets a new id.
-- `type` is SBIR cycle, STTR cycle, SBIR/STTR cycle or Solicitation, from the title.
+- `type` is SBIR cycle, STTR cycle, SBIR/STTR cycle, STRATFI, TACFI, STRATFI/TACFI or
+  Solicitation, from the title.
 - `posted_date` is the pre-release date (the open date when there is none) and `due_date` the
   close date, both as dates without a time, since AFWERX gives none. A cycle counts as closed
   from the day after its close date, in Eastern time.
 - `description` says what the cycle is, which services' topics it includes, its dates, and that
   the topics are on DSIP.
-- `url` is DSIP's topic search, linked for people and never fetched.
+- `url` is DSIP's topic search, linked for people and never fetched, in place of the DSIP
+  sign-in page each cycle links to. A listing that links elsewhere keeps its own link.
 - `extra`: `afwerx_branches` (Air Force, Space Force or both), `afwerx_pre_release` and
-  `afwerx_open` (ISO dates, or null when AFWERX writes TBD or N/A), `afwerx_no_deadline` (AFWERX
-  writes TBD or N/A for the close date) and `afwerx_closed`.
+  `afwerx_open` (ISO dates, or null when AFWERX writes TBD or N/A), `afwerx_no_deadline` (the
+  close date is TBD or N/A, or submissions are taken on a continuous basis) and `afwerx_closed`.
 - A cycle whose close date has passed is stored only if an earlier run stored it; then it is
   refreshed, so it shows as closed.
 

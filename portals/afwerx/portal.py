@@ -1,14 +1,19 @@
-"""AFWERX as the pipeline sees it (see portals/registry.py for the contract)."""
+"""AFWERX as the pipeline sees it (see portals/registry.py for the contract).
+
+Its Get Funded page shares SpaceWERX's site template, so both adapters read it with
+portals/shared/funding_list.py.
+"""
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
-from portals.afwerx.records import PORTAL as PORTAL_NAME
-from portals.afwerx.scrape import fetch_all
+from portals.shared.funding_list import Site, fetch_all
 from portals.shared.keyword_filter import filter_calls
 
 SLUG = "afwerx"
+SITE = Site(portal="AFWERX", prefix="afwerx", page_url="https://afwerx.com/get-funded/",
+            department="Department of the Air Force")
 KEYWORDS_PATH = Path(__file__).resolve().parent / "keywords.yaml"   # this portal's filter settings
 NOTES_PATH = Path(__file__).resolve().parent / "NOTES.md"           # what the assistant should know
 HOW_TO_SUBMIT = (
@@ -20,7 +25,7 @@ HOW_TO_SUBMIT = (
 
 def fetch(page: Any, run_id: int, limit: int | None = None) -> dict[str, int]:
     """No browser: the pipeline passes page=None for this portal."""
-    return fetch_all(run_id, limit=limit)
+    return fetch_all(run_id, SITE, limit=limit)
 
 
 def filter_rows(rows: list[dict[str, Any]]) -> tuple[list[Any], list[Any]]:
@@ -29,7 +34,7 @@ def filter_rows(rows: list[dict[str, Any]]) -> tuple[list[Any], list[Any]]:
 
 PORTAL = {
     "slug": SLUG,
-    "name": PORTAL_NAME,
+    "name": SITE.portal,
     "fetch": fetch,
     "filter": filter_rows,
     "fetch_timeout": 120,
