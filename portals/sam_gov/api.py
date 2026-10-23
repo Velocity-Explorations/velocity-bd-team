@@ -2,6 +2,7 @@
 
     budget = Budget(900)
     notices = search("541715", today, key, opener, budget)   # open notices for one NAICS code
+    notices = search_office("INTELLIGENCE ADVANCED RESEARCH PROJECTS ACTIVITY", today, key, opener, budget)
     text = description(raw["description"], key, opener, budget)
 
 Every call costs one request of the key's daily limit, a description included (the search
@@ -120,9 +121,22 @@ def _get_json(url: str, key: str, opener: Opener, budget: Budget, retries: int =
 
 
 def search(naics: str, today: date, key: str, opener: Opener, budget: Budget) -> list[dict[str, Any]]:
-    """Every open notice (response deadline today or later) posted in the last year under one NAICS code."""
+    """Every open notice posted in the last year under one NAICS code."""
+    return _search({"ncode": naics}, f"NAICS {naics}", today, key, opener, budget)
+
+
+def search_office(name: str, today: date, key: str, opener: Opener, budget: Budget) -> list[dict[str, Any]]:
+    """Every open notice posted in the last year by one organization, whatever its NAICS codes. SAM.gov
+    matches organizationName against department and sub-tier names; v2 ignores the older subtier
+    parameter and returns every notice (PRO-537)."""
+    return _search({"organizationName": name}, name, today, key, opener, budget)
+
+
+def _search(where: dict[str, str], label: str, today: date, key: str, opener: Opener,
+            budget: Budget) -> list[dict[str, Any]]:
+    """Every open notice (response deadline today or later) posted in the last year that matches `where`."""
     params = {
-        "ncode": naics,
+        **where,
         "postedFrom": (today - timedelta(days=POSTED_WINDOW_DAYS)).strftime("%m/%d/%Y"),
         "postedTo": today.strftime("%m/%d/%Y"),
         "rdlfrom": today.strftime("%m/%d/%Y"),
@@ -137,7 +151,7 @@ def search(naics: str, today: date, key: str, opener: Opener, budget: Budget) ->
         found += batch
         if offset + PAGE_SIZE >= int(data.get("totalRecords") or 0) or len(batch) < PAGE_SIZE:
             return found
-    log.warning("NAICS %s: more than %d pages of open notices; read the first %d", naics, MAX_PAGES, len(found))
+    log.warning("%s: more than %d pages of open notices; read the first %d", label, MAX_PAGES, len(found))
     return found
 
 

@@ -9,11 +9,18 @@ about the portal.
   David's SAM.gov account. No browser and no login.
 - One search per NAICS code in `search.yaml`, for open notices: a response deadline today or
   later, posted in the last year. Notices without a response deadline are not returned.
+- Then one search per office listed there, by SAM.gov's organization name, whatever the
+  notices' NAICS codes; a notice both searches find is kept once. The one office is IARPA
+  ("INTELLIGENCE ADVANCED RESEARCH PROJECTS ACTIVITY"): its own site, iarpa.gov, answers 403 to
+  the scanner on every page, robots.txt included, and it posts its BAAs, RFIs, proposers' days
+  and Solutions Marketplace on SAM.gov. On 23 Oct 2026 it had one open notice, the Solutions
+  Marketplace (IARPA-OT-26-001, a special notice under 541715, open until 31 Jul 2027) (PRO-537).
 - Every request counts against the key's daily limit, and each notice's description is a
   request of its own. SAM.gov's published limits: 1,000 requests a day for an account with a
   role in an entity registration or a non-federal system account, 10 for an account with no
   role. A run spends at most 900 and stops cleanly when SAM.gov answers 429; the notices it
-  could not read are read on the next run.
+  could not read are read on the next run. The six searches take six requests, so a key held
+  to 10 a day reads at most four descriptions a run.
 - Requests go over IPv4 only. api.sam.gov also publishes an IPv6 address that hangs from the
   scan PC: a request took over a minute that way, and about a second over IPv4.
 - Personal SAM.gov keys expire every 90 days. A run that fails with HTTP 401 or 403 needs a new

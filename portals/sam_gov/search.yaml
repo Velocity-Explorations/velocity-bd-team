@@ -10,6 +10,12 @@ naics_codes:
   - "541519"   # other computer related services
   - "541715"   # research and development in the physical, engineering and life sciences
 
+# Organizations searched whatever their NAICS codes, one search each, by SAM.gov's organization
+# name (a department or sub-tier name). IARPA's own site refuses automated clients, so its
+# notices are read here; most sit under 541715 above, but not all (PRO-537).
+offices:
+  - INTELLIGENCE ADVANCED RESEARCH PROJECTS ACTIVITY
+
 # SAM.gov's own type names. Award notices, justifications, surplus sales and intent-to-bundle
 # notices are left out.
 notice_types:

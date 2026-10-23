@@ -1,7 +1,8 @@
 """SAM.gov: the public Opportunities API, one key, read into calls (PRO-525).
 
-The fake site below answers like api.sam.gov: a search per NAICS code, paged by record offset,
-and a description link per notice that costs a request of its own. Every notice is made up.
+The fake site below answers like api.sam.gov: a search per NAICS code or office (PRO-537), paged
+by record offset, and a description link per notice that costs a request of its own. Every notice
+is made up.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ import socket
 import urllib.error
 import urllib.parse
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -24,6 +26,8 @@ KEY = "FAKEkey0123456789abcdefFAKEkey0123456789"
 NOW = datetime(2026, 10, 22, 12, 0, tzinfo=timezone.utc)
 TODAY = date(2026, 10, 22)
 ARMY = "DEPT OF DEFENSE.DEPT OF THE ARMY.AMC.ACC.ACC-APG"
+IARPA_OFFICE = "INTELLIGENCE ADVANCED RESEARCH PROJECTS ACTIVITY"
+IARPA_PATH = f"OFFICE OF THE DIRECTOR OF NATIONAL INTELLIGENCE.{IARPA_OFFICE}.IARPA CONTRACTING OFFICE"
 
 EDGE = "a" * 32       # solicitation, full and open: kept
 CYBER = "b" * 32      # combined synopsis, small business set-aside: kept
@@ -33,6 +37,7 @@ EIGHT_A = "e" * 32    # 8(a) set-aside: dropped
 REPAIR = "f" * 32     # title on the blocklist: dropped before its description is read
 SPECIAL = "1" * 32    # special notice, listed under two NAICS codes
 REPOST = "2" * 32     # sources sought that Front Door may already carry
+SPEECH = "3" * 32     # IARPA presolicitation under a NAICS code no search uses: found by office
 
 
 def desc_url(notice_id: str) -> str:
@@ -68,6 +73,8 @@ NOTICES = {
     SPECIAL: notice(SPECIAL, "Industry Day: Machine Learning for ISR", "Special Notice"),
     REPOST: notice(REPOST, "Zero Trust Architecture Sources Sought", "Sources Sought", None, "541511",
                    deadline="2026-12-01T12:00:00-05:00"),
+    SPEECH: notice(SPEECH, "Speech Translation for Low-Resource Languages", "Presolicitation", None, "541990",
+                   fullParentPathName=IARPA_PATH),
 }
 BY_CODE = {
     "541715": [EDGE, SPECIAL],
@@ -81,6 +88,7 @@ DESCRIPTIONS = {
     CYBER: "<p>Modernize the cyber range software and data pipeline.</p>",
     SPECIAL: "<p>Machine learning for ISR: an industry day.</p>",
     REPOST: "<p>Zero trust architecture for C2 software.</p>",
+    SPEECH: "<p>Speech recognition and translation for languages with little data.</p>",
 }
 
 
@@ -108,6 +116,7 @@ class FakeSam:
 
     def __init__(self, quota: int | None = None, fail: BaseException | None = None) -> None:
         self.by_code = {code: [NOTICES[n] for n in ids] for code, ids in BY_CODE.items()}
+        self.by_office: dict[str, list[dict[str, Any]]] = {IARPA_OFFICE: []}
         self.searches: list[dict[str, str]] = []
         self.descriptions: list[str] = []
         self.quota = quota
@@ -127,7 +136,7 @@ class FakeSam:
             raise http_error(url, 429)
         if parts.path == "/opportunities/v2/search":
             self.searches.append(params)
-            items = self.by_code[params["ncode"]]
+            items = self.by_code[params["ncode"]] if "ncode" in params else self.by_office[params["organizationName"]]
             offset, limit = int(params["offset"]), int(params["limit"])
             return Reply({"totalRecords": len(items), "opportunitiesData": items[offset:offset + limit]})
         if parts.path == "/prod/opportunities/v1/noticedesc":
@@ -154,6 +163,17 @@ def test_search_asks_for_open_notices_one_naics_code_at_a_time_and_pages_by_offs
     assert (first["ncode"], first["limit"], first["rdlfrom"], first["postedFrom"], first["postedTo"]) == (
         "541511", "2", "10/22/2026", "10/23/2025", "10/22/2026")
     assert "ptype" not in first   # notice types are checked here, not in the query
+
+
+def test_an_office_is_searched_by_organization_name_whatever_its_naics_codes() -> None:
+    site = FakeSam()
+    site.by_office[IARPA_OFFICE] = [NOTICES[SPEECH]]
+    found = api.search_office(IARPA_OFFICE, TODAY, KEY, site, api.Budget(10))
+    assert [n["noticeId"] for n in found] == [SPEECH]
+    query = site.searches[0]
+    assert (query["organizationName"], query["rdlfrom"], query["postedFrom"], query["postedTo"]) == (
+        IARPA_OFFICE, "10/22/2026", "10/23/2025", "10/22/2026")
+    assert "ncode" not in query
 
 
 def test_the_budget_caps_requests_and_a_429_means_the_day_is_spent() -> None:
@@ -232,6 +252,7 @@ def test_types_set_asides_and_the_closed_flag() -> None:
 def test_the_search_settings_keep_what_velocity_can_bid_on() -> None:
     rules = records.load_rules(portal.SEARCH_PATH)
     assert rules.naics_codes == ["541511", "541512", "541513", "541519", "541715"]
+    assert rules.offices == [IARPA_OFFICE]   # its site refuses automated clients (PRO-537)
     assert records.keep(NOTICES[EDGE], rules) is None
     assert records.keep(NOTICES[CYBER], rules) is None
     assert records.keep(NOTICES[DATA], rules) is None
@@ -240,15 +261,26 @@ def test_the_search_settings_keep_what_velocity_can_bid_on() -> None:
     assert records.keep(notice(EDGE, "x", set_aside="NONE"), rules) is None
 
 
+def test_offices_are_optional_in_the_search_settings(tmp_path: Path) -> None:
+    settings = tmp_path / "search.yaml"
+    base = "naics_codes: ['541511']\nnotice_types: [Solicitation]\nset_asides: [NONE]\n"
+    settings.write_text(base, encoding="utf-8")
+    assert records.load_rules(settings).offices == []
+    settings.write_text(base + f"offices: {IARPA_OFFICE}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="offices"):
+        records.load_rules(settings)
+
+
 # ------------------------------------------------------------------------------ a run
 
 def test_fetch_all_stores_new_notices_and_spends_requests_only_where_needed(ledger_db: str) -> None:
     site = FakeSam()
     counts = scrape.fetch_all(run_id(), now=NOW, opener=site, key=KEY)
-    assert sorted(s["ncode"] for s in site.searches) == ["541511", "541512", "541513", "541519", "541715"]
+    assert [s.get("ncode") or s["organizationName"] for s in site.searches] == [
+        "541511", "541512", "541513", "541519", "541715", IARPA_OFFICE]   # the codes, then the offices
     assert sorted(site.descriptions) == sorted([EDGE, CYBER, DATA, SPECIAL, REPOST])   # none for the dropped
     assert counts == {"found": 8, "scraped": 5, "new": 5, "failed": 0, "dropped": 3, "reposts": 0,
-                      "pending": 0, "requests": 10}
+                      "pending": 0, "requests": 11}
     stored = {row["id"]: row for row in lq.calls_where(portal="SAM.gov")}
     assert set(stored) == {f"samgov-{n}" for n in (EDGE, CYBER, DATA, SPECIAL, REPOST)}
     assert stored[f"samgov-{EDGE}"]["description"].startswith("Develop edge AI")
@@ -260,7 +292,7 @@ def test_a_second_run_refreshes_stored_notices_without_reading_descriptions_agai
     site = FakeSam()
     site.by_code["541715"][0] = {**NOTICES[EDGE], "responseDeadLine": "2026-12-01T17:00:00-05:00"}
     counts = scrape.fetch_all(run_id(), now=NOW, opener=site, key=KEY)
-    assert site.descriptions == [] and counts["new"] == 0 and counts["scraped"] == 5 and counts["requests"] == 5
+    assert site.descriptions == [] and counts["new"] == 0 and counts["scraped"] == 5 and counts["requests"] == 6
     edge = lq.get_call(f"samgov-{EDGE}")
     assert edge is not None and edge["due_date"] == "2026-12-01T17:00:00-05:00"
     assert edge["description"].startswith("Develop edge AI")
@@ -268,9 +300,9 @@ def test_a_second_run_refreshes_stored_notices_without_reading_descriptions_agai
 
 def test_a_spent_budget_keeps_what_was_read_and_leaves_the_rest_for_the_next_run(ledger_db: str,
                                                                                  monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(scrape, "REQUEST_BUDGET", 7)   # 5 searches, then 2 descriptions
+    monkeypatch.setattr(scrape, "REQUEST_BUDGET", 8)   # 6 searches, then 2 descriptions
     counts = scrape.fetch_all(run_id(), now=NOW, opener=FakeSam(), key=KEY)
-    assert (counts["requests"], counts["new"], counts["pending"]) == (7, 2, 3)
+    assert (counts["requests"], counts["new"], counts["pending"]) == (8, 2, 3)
     stored = {row["id"] for row in lq.calls_where(portal="SAM.gov")}
     assert stored == {f"samgov-{EDGE}", f"samgov-{CYBER}"}   # the soonest deadlines first
     monkeypatch.setattr(scrape, "REQUEST_BUDGET", 900)       # the next day
@@ -279,8 +311,19 @@ def test_a_spent_budget_keeps_what_was_read_and_leaves_the_rest_for_the_next_run
 
 
 def test_sam_gov_saying_the_day_is_spent_ends_the_run_cleanly(ledger_db: str) -> None:
-    counts = scrape.fetch_all(run_id(), now=NOW, opener=FakeSam(quota=6), key=KEY)
+    counts = scrape.fetch_all(run_id(), now=NOW, opener=FakeSam(quota=7), key=KEY)   # 6 searches, 1 description
     assert counts["new"] == 1 and counts["pending"] == 4
+
+
+def test_an_office_search_adds_notices_under_other_codes_and_stores_each_notice_once(ledger_db: str) -> None:
+    site = FakeSam()
+    site.by_office[IARPA_OFFICE] = [NOTICES[SPEECH], NOTICES[SPECIAL]]   # SPECIAL is also under 541715
+    counts = scrape.fetch_all(run_id(), now=NOW, opener=site, key=KEY)
+    assert (counts["found"], counts["new"]) == (9, 6) and site.descriptions.count(SPECIAL) == 1
+    speech = lq.get_call(f"samgov-{SPEECH}")
+    assert speech is not None and speech["naics_code"] == "541990"
+    assert speech["department"] == ("OFFICE OF THE DIRECTOR OF NATIONAL INTELLIGENCE / INTELLIGENCE ADVANCED "
+                                    "RESEARCH PROJECTS ACTIVITY / IARPA CONTRACTING OFFICE")
 
 
 def test_the_limit_caps_new_notices(ledger_db: str) -> None:
