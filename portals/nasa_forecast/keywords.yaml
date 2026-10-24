@@ -1,0 +1,58 @@
+# Relevance filter for NASA's acquisition forecast (PRO-545). Each forecast row's description names
+# its NAICS code ("NAICS 541715 (...)"), so the broad keywords keep the rows under Velocity's five
+# codes (the SAM.gov search uses the same five) and the rows that name Velocity's work. A forecast
+# row's text rarely changes, and a rejected row is never filtered again. The tight keywords and
+# blocklist are the other portals'. Matching is plain substring on lowercased title + description.
+# Blocklist entries are regular expressions, matched case-insensitively. An approved keyword change
+# on the dashboard edits this file and filters the portal's stored calls again.
+
+broad_keywords:
+  - "541511"
+  - "541512"
+  - "541513"
+  - "541519"
+  - "541715"
+  - software
+  - artificial intelligence
+  - machine learning
+  - autonomy
+  - autonomous
+  - cyber
+  - data analytics
+  - information technology
+
+tight_keywords:
+  - artificial intelligence
+  - machine learning
+  - autonomous systems
+  - command and control
+  - computer vision
+  - natural language processing
+  - cobol modernization
+  - legacy modernization
+  - transcription
+  - translation
+  - sensor fusion
+  - c5isr
+  - software defined
+  - ai hardware
+  - edge ai
+  - autonomous vehicle
+  - multi-agent
+
+blocklist_patterns:
+  - '\brepair\b'
+  - '\bspare parts\b'
+  - '\bparts kit\b'
+  - '\bnsn\s+\d'
+  - '\b\d{4}-\d{2,}-\d{2,}-\d{2,}\b'
+  - '\bhose assembly\b'
+  - '\bcircuit card\b'
+  - '\bconstruction\b.*\b(facility|building|pavement|airfield|runway)\b'
+  - '\bdocument destruction\b'
+  - '\bmedical cart\b'
+  - '\bboiler replacement\b'
+  - '\bfuel supplier\b'
+  - '\bdredging\b'
+  - '\bappraisal service\b'
+  - '\bplc training\b'
