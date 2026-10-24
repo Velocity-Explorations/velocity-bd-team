@@ -26,9 +26,11 @@ week" predicate; the judges page uses its "Judge scoreboard" query.
 convention.
 
 Under each call's title, the meta line shows its portal, then the details `lib/details.ts` reads
-from its columns and `calls.extra` (PRO-535): the type; the office (SAM.gov's agency path is
-shortened to its sub-tier, with the whole path on hover); the set-aside and NAICS code when the
-portal gives them; SAM.gov's solicitation number, first contact and attachment count; NSTXL's
+from its columns and `calls.extra` (PRO-535): the type, unless the portal name ends with it (NASA
+Forecast's "Forecast"); the office (SAM.gov's agency path is shortened to its sub-tier, with the
+whole path on hover); the set-aside ("set-aside to be determined" where NASA writes "To Be
+Determined") and NAICS code when the portal gives them; SAM.gov's solicitation number, first
+contact and attachment count; NSTXL's
 members-only badge; Front Door's location, with a link when it reposts a SAM.gov notice; and for
 AFWERX and SpaceWERX a badge per service whose topics a cycle includes, plus "opens <date>" until
 submissions open, with the pre-release date on hover (PRO-542); NASA Forecast's expected
@@ -38,7 +40,12 @@ award" badge (PRO-549). Deadlines written as ISO timestamps (SAM.gov, DIU) show 
 time zone, and hovering a due date shows where it came from when the portal says (NSTXL's or DOE's
 sentence, DIU's wording), or why there is none: a Get Funded listing with no close date, a NASA
 forecast (with its expected solicitation quarter), or an APFIT cycle, whose deadlines each
-organization sets.
+organization sets. An empty due cell says why in a word or two (forecast, members only, see
+documents, no close date, set by sponsor), with the whole reason on hover.
+
+A contact is linked to its address unless no word of the name appears in the address. NASA's
+forecast lists one person's name with another person's address on some rows, so there the name and
+the address show apart, and a click never emails someone else by surprise (PRO-551).
 
 Log links open `/runs/<id>/log`, which serves the file named in runs.log_path, but only from
 the pipeline's log directory on the same machine. On any other host it says the log is not

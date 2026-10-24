@@ -4,7 +4,7 @@ import { FilterPanel } from "@/components/FilterPanel";
 import { JudgeVerdicts } from "@/components/Judges";
 import { Shell } from "@/components/Shell";
 import { Details, Flash, TitleLink } from "@/components/bits";
-import { callDetails, deadlineNote } from "@/lib/details";
+import { callDetails, deadlineNote, noDeadlineLabel } from "@/lib/details";
 import { filterHref, pickMany, pickSort, pickState } from "@/lib/filters";
 import { formatDue, formatTime } from "@/lib/format";
 import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
@@ -163,7 +163,7 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
                             {isClosed(r.extra) ? <span className="badge tone-grey">closed</span> : null}
                           </div>
                         </td>
-                        <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz)}</td>
+                        <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz) || <span className="muted">{noDeadlineLabel(r.extra)}</span>}</td>
                         <td>{r.match_tier ?? ""}</td>
                         <td className="reason">{r.ai_reasoning ?? ""}</td>
                         <td className="when">{formatTime(r.first_seen_at, tz)}</td>

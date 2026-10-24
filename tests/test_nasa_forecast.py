@@ -169,6 +169,14 @@ def test_a_forecast_row_becomes_a_calls_row() -> None:
     }
 
 
+def test_a_quarter_still_to_be_determined_leaves_the_fiscal_year() -> None:
+    assert records.when("Q3", "2026") == "Q3 FY2026"
+    assert records.when("To Be Determined", "2026") == "FY2026"
+    assert records.when("TBD", "2027") == "FY2027"
+    assert records.when("", "2026") == "FY2026"
+    assert records.when("Q3", "") == ""
+
+
 def test_awarded_withdrawn_and_cancelled_rows_are_closed() -> None:
     autonomy, lighting, awarded, cancelled = (records.build_record(r, NOW) for r in rows())
     assert [r["extra"]["nasa_closed"] for r in (autonomy, lighting, awarded, cancelled)] == [False, False, True, True]
