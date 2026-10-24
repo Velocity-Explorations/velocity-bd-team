@@ -540,6 +540,21 @@ def tags_on(call_id: str) -> dict[str, list[str]]:
     return by_source
 
 
+def save_tag_list(entries: Sequence[tuple[str, str, str]]) -> None:
+    """Rewrite the tag list (migration 007) as (name, group, what it covers), in the list's order."""
+    with tx() as conn:
+        q(conn, "DELETE FROM tag_list")
+        for position, (name, group, covers) in enumerate(entries):
+            q(conn, "INSERT INTO tag_list (name, tag_group, covers, position) VALUES (?, ?, ?, ?)",
+              (name, group, covers or None, position))
+
+
+def tag_catalog() -> list[dict[str, Any]]:
+    """The tag list as the dashboard reads it, in order."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT name, tag_group, covers, position FROM tag_list ORDER BY position"))
+
+
 def calls_without_tags(source: str) -> list[dict[str, Any]]:
     """Kept, reviewed calls with no tags from this judge yet, oldest first."""
     with tx() as conn:

@@ -3,13 +3,14 @@ import { decide } from "../actions";
 import { FilterPanel } from "@/components/FilterPanel";
 import { JudgeVerdicts } from "@/components/Judges";
 import { Shell } from "@/components/Shell";
-import { Badge, Details, Flash, TitleLink } from "@/components/bits";
+import { Badge, Details, Flash, TagSelect, TitleLink } from "@/components/bits";
 import { callDetails, deadlineNote, noDeadlineLabel } from "@/lib/details";
 import { displayPerson } from "@/lib/people";
 import { filterHref, pickMany, pickSort, pickState } from "@/lib/filters";
 import { formatDue, formatTime } from "@/lib/format";
 import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
-import { decisionsOn, judgeAgreement, latestJudgments, listCalls, portals, type CallFilters } from "@/lib/queries";
+import { decisionsOn, judgeAgreement, latestJudgments, listCalls, portals, tagOptions, tagsOn, type CallFilters } from "@/lib/queries";
+import { tagsByCall, withoutTags } from "@/lib/tags";
 import { peopleSplit, votesByCall } from "@/lib/scoreboard";
 import { shows } from "@/lib/columns";
 import { displayTimeZone, hiddenColumns } from "@/lib/settings";
@@ -26,7 +27,7 @@ const LIMIT = 200;
 
 export default async function CallsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  const portalList = await portals();
+  const [portalList, tagChoices] = await Promise.all([portals(), tagOptions()]);
   const filters: CallFilters = {
     portals: pickMany(sp.portal, portalList),
     state: pickState(sp.state, sp.open),
@@ -36,17 +37,19 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
     verdict: pickAllowed(sp.verdict, [...VERDICTS, "none"] as const),
     status: pickAllowed(sp.status, [...HUMAN_STATUSES, "none"] as const),
     q: firstParam(sp.q, 120),
+    tag: pickAllowed(sp.tag, tagChoices.map((t) => t.name)),
   };
   const [{ rows, total }, agreement] = await Promise.all([listCalls(filters, LIMIT), judgeAgreement()]);
   const ids = rows.map((r) => r.id);
-  const [judged, decisions, viewer] = await Promise.all([latestJudgments(ids), decisionsOn(ids), currentViewer()]);
+  const [judged, decisions, viewer, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(ids), currentViewer(), tagsOn(ids)]);
+  const tagsFor = tagsByCall(tagRows);
   const tz = displayTimeZone();
   const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Settings
   const users = allowlist();
   const votes = votesByCall(decisions, (by) => displayPerson(by, users));
   const filtered = Boolean(
     filters.portals.length || filters.state || filters.sort === "due" || filters.judges || filters.filterResult ||
-      filters.verdict || filters.status || filters.q,
+      filters.verdict || filters.status || filters.q || filters.tag,
   );
   const returnTo = filterHref("/calls", {
     q: filters.q,
@@ -57,6 +60,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
     filter_result: filters.filterResult,
     verdict: filters.verdict,
     status: filters.status,
+    tag: filters.tag,
   });
 
   return (
@@ -126,6 +130,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
               <option value="none">undecided</option>
             </select>
           </label>
+          <TagSelect options={tagChoices} selected={filters.tag} />
         </FilterPanel>
 
         <section className="panel-body">
@@ -155,15 +160,21 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                     const decidedByViewer = callVotes.length
                       ? callVotes.some((v) => v.person === viewer)
                       : displayPerson(r.human_by, users) === viewer;
+                    const badges = show("tags") ? (tagsFor.get(r.id) ?? []) : [];
                     return (
                       <tr key={r.id}>
                         <td className="call">
                           <TitleLink title={r.title} url={r.url} fallback={r.id} />
                           <div className="meta">
                             <span>{r.portal}</span>
-                            <Details items={callDetails(r)} />
+                            <Details items={withoutTags(callDetails(r), badges)} />
                             {isClosed(r.extra) ? <span className="badge tone-grey">closed</span> : null}
                           </div>
+                          {badges.length ? (
+                            <div className="meta tags">
+                              <Details items={badges} />
+                            </div>
+                          ) : null}
                         </td>
                         {show("filter") ? (
                           <td>

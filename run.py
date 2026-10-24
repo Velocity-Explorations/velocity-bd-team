@@ -292,10 +292,12 @@ def second_judge(rows: list[dict[str, Any]], examples: str, extra_context: str =
 
 def tag_by_rules(run_id: int) -> int:
     """Tag every call this run saw with the tags its own data makes certain (review/tags.py), so
-    they follow the data. Returns how many calls were tagged."""
-    from ledger.queries import calls_in_run, set_tags
-    from review.tags import rule_tags, tag_list
+    they follow the data, after writing the tag list the dashboard reads. Returns how many calls
+    were tagged."""
+    from ledger.queries import calls_in_run, save_tag_list, set_tags
+    from review.tags import catalog, rule_tags, tag_list
 
+    save_tag_list(catalog(tag_list()))
     seen = calls_in_run(run_id)
     for row in seen:
         set_tags(row["id"], "rule", rule_tags(row, tag_list()))
@@ -305,11 +307,12 @@ def tag_by_rules(run_id: int) -> int:
 def backfill_tags() -> int:
     """Tag every stored call by its rules, then have Claude and Grok tag the kept, reviewed calls they
     have not tagged yet, asking for tags alone. Safe to rerun: each pass only fills what is missing."""
-    from ledger.queries import calls_where, calls_without_tags, set_tags
+    from ledger.queries import calls_where, calls_without_tags, save_tag_list, set_tags
     from review.reviewer import tag_calls
-    from review.tags import rule_tags, tag_list
+    from review.tags import catalog, rule_tags, tag_list
 
     _console_logging()
+    save_tag_list(catalog(tag_list()))
     stored = calls_where()
     for row in stored:
         set_tags(row["id"], "rule", rule_tags(row, tag_list()))

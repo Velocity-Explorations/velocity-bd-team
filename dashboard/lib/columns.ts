@@ -12,6 +12,7 @@ export const COLUMNS: Record<TablePage, Column[]> = {
   queue: [
     { key: "judges", label: "Claude / Grok" },
     { key: "call", label: "Call", fixed: true },
+    { key: "tags", label: "Tags under the title" },
     { key: "due", label: "Due" },
     { key: "tier", label: "Tier" },
     { key: "reason", label: "AI reason" },
@@ -21,6 +22,7 @@ export const COLUMNS: Record<TablePage, Column[]> = {
   ],
   calls: [
     { key: "call", label: "Call", fixed: true },
+    { key: "tags", label: "Tags under the title" },
     { key: "filter", label: "Filter" },
     { key: "judges", label: "Claude / Grok" },
     { key: "decision", label: "Decision", fixed: true },

@@ -192,7 +192,8 @@ so a full pass over about 120 calls runs some 40 minutes. It is safe to rerun: e
 about calls a judge has not tagged.
 
 To change the list, edit `review/tags.yaml`: each tag with a few words on what it covers, which
-the judges read. Names must differ across groups.
+the judges read. Names must differ across groups. The next run (or `--backfill-tags`) copies the
+list into the ledger's `tag_list`, which the dashboard's Tag filter reads.
 
 ## SAM.gov
 

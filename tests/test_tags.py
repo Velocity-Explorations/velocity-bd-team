@@ -128,3 +128,12 @@ def test_the_backfill_tags_every_call_by_rules_and_reviewed_calls_by_both_judges
     assert lq.tags_on("k-1") == {"rule": ["OTA", "SOCOM"], "claude": ["OTA", "Software"], "grok": ["OTA", "AI and ML"]}
     assert lq.tags_on("r-1") == {"rule": ["OTA", "SOCOM"]}
     assert run.backfill_tags() == 0   # a second pass finds nothing left to ask the judges
+
+
+def test_tagging_writes_the_tag_list_for_the_dashboard(ledger_db: str) -> None:
+    row = seed()
+    run.tag_by_rules(row["last_run_id"])
+    listed = lq.tag_catalog()
+    assert [entry["name"] for entry in listed] == TAGS.order
+    assert listed[0] == {"name": "White paper", "tag_group": "type", "position": 0,
+                         "covers": TAGS.groups["type"]["White paper"]}

@@ -69,6 +69,11 @@ def prompt_block(tags: TagList) -> str:
     return "\n".join(lines)
 
 
+def catalog(tags: TagList) -> list[tuple[str, str, str]]:
+    """(name, group, what it covers) for every tag, in list order: the ledger's tag_list rows."""
+    return [(name, group, covers) for group in GROUPS for name, covers in tags.groups[group].items()]
+
+
 def ordered(names: set[str], tags: TagList) -> list[str]:
     return [name for name in tags.order if name in names]
 

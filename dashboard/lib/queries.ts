@@ -4,6 +4,7 @@
 import { sql } from "./db";
 import { CLOSED_PATTERN, type CallState, type Sort } from "./filters";
 import type { JudgeFilter, Judgment } from "./judges";
+import type { TagOption, TagRow } from "./tags";
 import { isoNow } from "./format";
 import type { RequestChoice } from "./requests";
 import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
@@ -30,8 +31,8 @@ export type QueueRow = {
   human_status: string | null;
 };
 
-/** The filter panel's choices (lib/filters.ts). No portals ticked means every portal. */
-export type PanelFilters = { portals: string[]; state: CallState; sort: Sort; judges: JudgeFilter };
+/** The filter panel's choices (lib/filters.ts). No portals ticked means every portal; no tag, any tag. */
+export type PanelFilters = { portals: string[]; state: CallState; sort: Sort; judges: JudgeFilter; tag: string };
 
 type Db = ReturnType<typeof sql>;
 
@@ -42,7 +43,8 @@ function panelWhere(db: Db, f: PanelFilters) {
     ${f.state === "open" ? db`AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})` : db``}
     ${f.state === "closed" ? db`AND extra ~ ${CLOSED_PATTERN}` : db``}
     ${f.judges === "disagree" ? db`AND ${newestVerdict(db, "claude")} <> ${newestVerdict(db, "grok")}` : db``}
-    ${f.judges === "agree" ? db`AND ${newestVerdict(db, "claude")} = ${newestVerdict(db, "grok")}` : db``}`;
+    ${f.judges === "agree" ? db`AND ${newestVerdict(db, "claude")} = ${newestVerdict(db, "grok")}` : db``}
+    ${f.tag ? db`AND EXISTS (SELECT 1 FROM call_tags AS t WHERE t.call_id = calls.id AND t.tag = ${f.tag})` : db``}`;
 }
 
 /** One judge's newest verdict on the outer query's call (judgments table); NULL when it has not judged. */
@@ -272,6 +274,35 @@ export async function decideCall(input: {
     }
     return { ok: true, title: call.title ?? input.id, plan, callStatus: plan === "decide" ? input.status : current };
   });
+}
+
+// ------------------------------------------------------------------ tags
+
+/** Every tag on these calls, with who set it and its group and place in the list (call_tags and
+ *  tag_list, migrations 006 and 007); empty before those tables exist. */
+export async function tagsOn(callIds: string[]): Promise<TagRow[]> {
+  if (callIds.length === 0) return [];
+  try {
+    const db = sql();
+    const rows = await db<TagRow[]>`
+      SELECT t.call_id, t.tag, t.source, l.tag_group, l.position
+      FROM call_tags AS t LEFT JOIN tag_list AS l ON l.name = t.tag
+      WHERE t.call_id IN ${db(callIds)}
+      ORDER BY t.id`;
+    return [...rows];
+  } catch {
+    return [];   // call_tags or tag_list missing
+  }
+}
+
+/** The tag list, in order, for the Tag filter; empty before migration 007. */
+export async function tagOptions(): Promise<TagOption[]> {
+  try {
+    const rows = await sql()<TagOption[]>`SELECT name, tag_group, covers FROM tag_list ORDER BY position`;
+    return [...rows];
+  } catch {
+    return [];
+  }
 }
 
 // ------------------------------------------------------------------ decisions, judges

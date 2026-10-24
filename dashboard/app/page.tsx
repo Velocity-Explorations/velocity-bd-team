@@ -3,13 +3,14 @@ import { decide } from "./actions";
 import { FilterPanel } from "@/components/FilterPanel";
 import { JudgeVerdicts } from "@/components/Judges";
 import { Shell } from "@/components/Shell";
-import { Details, Flash, TitleLink } from "@/components/bits";
+import { Details, Flash, TagSelect, TitleLink } from "@/components/bits";
 import { callDetails, deadlineNote, noDeadlineLabel } from "@/lib/details";
 import { filterHref, pickMany, pickSort, pickState } from "@/lib/filters";
 import { formatDue, formatTime } from "@/lib/format";
 import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
 import { aliasesFor, displayPerson } from "@/lib/people";
-import { decisionsOn, judgeAgreement, latestJudgments, newThisWeek, portals, reviewQueue } from "@/lib/queries";
+import { decisionsOn, judgeAgreement, latestJudgments, newThisWeek, portals, reviewQueue, tagOptions, tagsOn } from "@/lib/queries";
+import { tagsByCall, withoutTags } from "@/lib/tags";
 import { peopleSplit, votesByCall } from "@/lib/scoreboard";
 import { shows } from "@/lib/columns";
 import { displayTimeZone, hiddenColumns, queueMode } from "@/lib/settings";
@@ -26,13 +27,14 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 export default async function ReviewQueuePage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const voted = firstParam(sp.voted, 300);   // the call just voted on, for the notice's link
-  const portalList = await portals();
+  const [portalList, tagChoices] = await Promise.all([portals(), tagOptions()]);
   const filters = {
     portals: pickMany(sp.portal, portalList),
     state: pickState(sp.state, sp.open),
     sort: pickSort(sp.sort),
     judges: pickJudgeFilter(sp.judges),
     verdict: pickAllowed(sp.verdict, ["yes", "maybe"] as const),
+    tag: pickAllowed(sp.tag, tagChoices.map((t) => t.name)),
   };
 
   // While everyone decides every call, the queue is the viewer's own: the calls they have not decided.
@@ -45,7 +47,8 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
     judgeAgreement(),
   ]);
   const ids = rows.map((r) => r.id);
-  const [judged, decisions] = await Promise.all([latestJudgments(ids), decisionsOn(perPerson ? ids : [])]);
+  const [judged, decisions, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(perPerson ? ids : []), tagsOn(ids)]);
+  const tagsFor = tagsByCall(tagRows);
   const votes = votesByCall(decisions, (by) => displayPerson(by, users));
   const tz = displayTimeZone();
   const show = shows(await hiddenColumns(), "queue");   // the columns chosen in Settings
@@ -55,10 +58,11 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
     sort: filters.sort === "due" ? "due" : "",
     judges: filters.judges,
     verdict: filters.verdict,
+    tag: filters.tag,
   });
   const yesCount = rows.filter((r) => r.ai_verdict === "yes").length;
   const filtered = Boolean(
-    filters.portals.length || filters.state || filters.sort === "due" || filters.judges || filters.verdict,
+    filters.portals.length || filters.state || filters.sort === "due" || filters.judges || filters.verdict || filters.tag,
   );
 
   return (
@@ -118,6 +122,7 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
               <option value="maybe">Maybe</option>
             </select>
           </label>
+          <TagSelect options={tagChoices} selected={filters.tag} />
         </FilterPanel>
 
         <section className="panel-body">
@@ -153,6 +158,7 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
                   {rows.map((r) => {
                     const label = r.title || r.id;
                     const callVotes = votes.get(r.id) ?? [];
+                    const badges = show("tags") ? (tagsFor.get(r.id) ?? []) : [];
                     return (
                       <tr key={r.id} data-call-id={r.id}>
                         {show("judges") ? (
@@ -164,9 +170,14 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
                           <TitleLink title={r.title} url={r.url} fallback={r.id} />
                           <div className="meta">
                             <span>{r.portal}</span>
-                            <Details items={callDetails(r)} />
+                            <Details items={withoutTags(callDetails(r), badges)} />
                             {isClosed(r.extra) ? <span className="badge tone-grey">closed</span> : null}
                           </div>
+                          {badges.length ? (
+                            <div className="meta tags">
+                              <Details items={badges} />
+                            </div>
+                          ) : null}
                         </td>
                         {show("due") ? (
                           <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz) || <span className="muted">{noDeadlineLabel(r.extra)}</span>}</td>
