@@ -104,9 +104,13 @@ shapes the next review.
 There is no login yet. Decisions are attributed by one of two means:
 
 1. **Allowlist** (default). DASHBOARD_USERS lists the people who may decide. With one name,
-   that person is assumed; with several, the "Deciding as" picker in the top bar sets a
-   cookie. Anyone who can reach the dashboard can pick any listed name, so keep it on the
-   local machine or behind an access proxy.
+   that person is assumed; with several, choosing a name in the "Deciding as" picker in the
+   top bar sets a cookie at once, and its Clear User Selection button removes it (PRO-553).
+   The cookie belongs to the host name, not the port, so two dashboards on one machine share it
+   unless they are opened under different names (localhost and 127.0.0.1). Anyone who can reach
+   the dashboard can pick any listed name, so keep it on the local machine or behind an access
+   proxy. `tests/test_dashboard_viewer.py` checks the picker against a running dashboard, the
+   same way as the layout test.
 2. **Header**. With DASHBOARD_USER_HEADER set, the viewer is taken from that request header
    only, as set by an access proxy, and must be on the allowlist when there is one.
 

@@ -102,3 +102,9 @@ export async function setViewer(formData: FormData): Promise<void> {
   }
   revalidatePath("/", "layout");
 }
+
+/** The picker's Clear User Selection button: nobody is deciding until a name is chosen again. */
+export async function clearViewer(): Promise<void> {
+  (await cookies()).delete(VIEWER_COOKIE);
+  revalidatePath("/", "layout");
+}
