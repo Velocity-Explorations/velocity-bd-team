@@ -1,0 +1,47 @@
+# Tags on each call, from this list only (PRO-556). Rules in review/tags.py set the ones a call's
+# own data makes certain; Claude and Grok pick the rest on the TAGS line of their review answers.
+# Each call gets exactly one type, and any work, customer and access tags that apply. Each tag is
+# followed by what it covers, which the judges read. Names must differ across groups.
+type:
+  White paper: BAA, CSO and AOI calls that start with a white paper or solution brief
+  Proposal: RFPs and FAR acquisitions asking for a full proposal
+  RFI: sources sought, market research and requests for information
+  OTA: other transaction prototype projects, including consortium OTs
+  SBIR or STTR: SBIR and STTR cycles and topics, and STRATFI or TACFI awards
+  Prize challenge: prize competitions and challenges
+  Demo or exercise: tech experimentation, capability demonstrations and assessment events
+  Event: conferences, industry days and webinars
+  Forecast: a planned buy with no solicitation yet
+  Other: CRADAs and anything else
+work:
+  Software: building or modernizing software applications and platforms
+  Hardware: building, buying or manufacturing physical equipment
+  AI and ML: artificial intelligence and machine learning
+  Autonomy: autonomous and unmanned systems
+  C2: command and control
+  Space: satellites, launch, space operations and space domain awareness
+  ISR: intelligence, surveillance and reconnaissance
+  Cyber: cybersecurity and cyber operations
+  Communications: networks, radios and satellite communications
+  Data and analytics: data platforms, analytics and visualization
+  Training and simulation: training, modeling, simulation and wargaming
+  Test and evaluation: test ranges, test infrastructure and evaluation
+  Services: support contracts, staffing, facilities and logistics
+customer:
+  USSF: U.S. Space Force, including Space Systems Command
+  USAF: U.S. Air Force
+  Army: U.S. Army
+  Navy: U.S. Navy
+  USMC: U.S. Marine Corps
+  SOCOM: U.S. Special Operations Command
+  DIU: Defense Innovation Unit
+  OSD: DoD-wide offices such as OUSD R&E, TRMC and DARPA
+  Intelligence community: IARPA and the intelligence agencies
+  NASA: NASA and its centers
+  DOE: the Department of Energy and its labs
+  Other buyer: state agencies, other federal agencies, commercial and other buyers
+access:
+  Members only: the listing's details are for consortium members only
+  Small business set-aside: only small businesses may bid
+  Phase II holders only: only for companies with a current or recent SBIR or STTR Phase II award
+  Sponsor needed: a company takes part through a government sponsor

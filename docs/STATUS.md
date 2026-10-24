@@ -132,5 +132,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   same prompt, when BD_XAI_API_KEY is set. Both verdicts go to the judgments table (migration 003)
   and show on the dashboard with how often they agree; Claude's verdict still decides what is
   posted. `python run.py --backfill-judgments` fills the history once.
+- Tags (2026-10-24): every call carries tags from the list in review/tags.yaml, in four groups: one
+  type, and any work, customer and access tags (call_tags, migration 006). Rules set what a call's
+  data makes certain, such as SOCOM on Vulcan calls; Claude and Grok tag the rest in the review
+  answer they already give. `python run.py --backfill-tags` tags stored calls (PRO-556).
 
 ## Known breakages

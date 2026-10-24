@@ -225,6 +225,26 @@ nothing. Added by `005_briefs.sql`.
 Index: `(week_of, id)`. Writing a week's part again replaces that part, so a rerun never
 duplicates it. The dashboard only reads this table.
 
+## Table: call_tags
+
+Tags from the set list in `review/tags.yaml` on each call: exactly one type, and any work,
+customer and access tags that apply. Kept per source, so the dashboard can show who tagged
+what. Added by `006_call_tags.sql` (PRO-556).
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| call_id | TEXT, not null | `calls.id` | `set_tags`: the pipeline's rules (`tag_by_rules`), the review and second judge, `run.py --backfill-tags` |
+| tag | TEXT, not null | a tag name from `review/tags.yaml` | same |
+| source | TEXT, not null | `rule` (the call's own data makes it certain), `claude` or `grok` (the judge picked it) | same |
+| tagged_at | TEXT timestamp, not null | when that source last tagged the call | same |
+
+Unique: `(call_id, tag, source)`. Index: `(tag)`. Setting a source's tags on a call replaces
+that source's rows and leaves the others. Rules tag every call a run sees, so their tags follow
+the data; a judge's tags change only when it answers again, and an answer without tags changes
+nothing. A tag renamed in `review/tags.yaml` stays under its old name until the call is tagged
+again.
+
 ## Table: schema_migrations
 
 Bookkeeping for `ledger/migrate.py`. `version` is the migration filename, `applied_at`
