@@ -76,6 +76,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- NASA Forecast (2026-10-24): portals/nasa_forecast/ reads NASA's acquisition forecast
+  spreadsheet with the standard library: one download a run, each planned buy one call of type
+  Forecast with no deadline, its expected solicitation and award quarters in the description.
+  Kept on Velocity's five NAICS codes or its topics. Runs with the Sunday scan (PRO-545).
 - DOE SBIR (2026-10-24): portals/doe_sbir/ reads DOE's SBIR and STTR solicitations from its
   Application Hub's public WordPress API (sbir-sttr.connectwerx.org), since the programs moved to
   DOE's Office of Technology Commercialization and the Office of Science page Yukon read is
