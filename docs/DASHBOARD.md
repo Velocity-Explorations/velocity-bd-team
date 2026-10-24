@@ -51,6 +51,15 @@ Log links open `/runs/<id>/log`, which serves the file named in runs.log_path, b
 the pipeline's log directory on the same machine. On any other host it says the log is not
 there.
 
+Every page follows the window's width, with 24px on each side. Tables wrap their text to fit
+rather than hide columns behind a sideways scroll, and below 1280px the filters move above the
+table. `tests/test_dashboard_layout.py` checks each page at widths from 1024 to 2560px against a
+running dashboard, and is skipped without one (PRO-552):
+
+```powershell
+$env:DASHBOARD_TEST_URL = "http://localhost:8000"; pytest tests/test_dashboard_layout.py
+```
+
 ## The write actions
 
 `dashboard/app/actions.ts` has two writes.
