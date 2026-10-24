@@ -199,8 +199,8 @@ python run.py --portal sam_gov
   `python run.py --portal sam_gov --dry-run --limit 25` (about 30 requests).
 - HTTP 401 or 403 means the key has expired (personal keys last 90 days): generate a new one
   in the SAM.gov account profile and replace it in `.env`.
-- NAICS codes, offices searched whatever their codes (IARPA), notice types and set-asides are in
-  `portals/sam_gov/search.yaml`; the next run uses any change.
+- NAICS codes, offices (IARPA) and title words (TRMC) searched whatever their codes, notice types
+  and set-asides are in `portals/sam_gov/search.yaml`; the next run uses any change.
 
 ## Proposal Register
 

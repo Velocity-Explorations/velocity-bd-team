@@ -39,6 +39,14 @@ class Rules:
     notice_types: set[str]
     set_asides: set[str]
     offices: list[str] = field(default_factory=list)   # searched whatever their NAICS codes
+    titles: list[str] = field(default_factory=list)    # words searched in notice titles, whatever their codes
+
+
+def _optional_list(data: dict[str, Any], key: str, name: str) -> list[str]:
+    values = data.get(key) or []
+    if not isinstance(values, list):
+        raise ValueError(f"{name}: '{key}' must be a list")
+    return [str(v).strip() for v in values if str(v).strip()]
 
 
 def load_rules(path: Path = SEARCH_PATH) -> Rules:
@@ -46,13 +54,11 @@ def load_rules(path: Path = SEARCH_PATH) -> Rules:
     for key in ("naics_codes", "notice_types", "set_asides"):
         if not isinstance(data.get(key), list) or not data[key]:
             raise ValueError(f"{path.name}: '{key}' must be a list")
-    offices = data.get("offices") or []
-    if not isinstance(offices, list):
-        raise ValueError(f"{path.name}: 'offices' must be a list")
     return Rules(naics_codes=[str(c).strip() for c in data["naics_codes"]],
                  notice_types={str(t).strip() for t in data["notice_types"]},
                  set_asides={str(s).strip().upper() for s in data["set_asides"]},
-                 offices=[str(o).strip() for o in offices if str(o).strip()])
+                 offices=_optional_list(data, "offices", path.name),
+                 titles=_optional_list(data, "titles", path.name))
 
 
 def notice_id(raw: dict[str, Any]) -> str:

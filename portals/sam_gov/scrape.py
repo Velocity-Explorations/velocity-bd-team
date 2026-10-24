@@ -2,8 +2,8 @@
 
     counts = fetch_all(run_id)   # found, scraped, new, failed, dropped, reposts, pending, requests
 
-One search per NAICS code in search.yaml, then one per office listed there (IARPA), whatever
-its codes; a notice both find is kept once. Notices of a type or set-aside Velocity does not
+One search per NAICS code in search.yaml, then one per office (IARPA) and one per title word
+(TRMC) listed there, whatever their codes; a notice two searches find is kept once. Notices of a type or set-aside Velocity does not
 pursue, or with a blocklisted title, are dropped before their description is read; so is a
 notice Front Door already carries. A notice stored earlier is refreshed from the search result
 (deadline, type, closed) without another request. New notices are read soonest deadline first,
@@ -18,7 +18,8 @@ from typing import Any
 
 from config import require
 from ledger.queries import get_call, sam_notices_on, upsert_call
-from portals.sam_gov.api import Budget, Opener, SamError, SamQuota, description, ipv4_urlopen, search, search_office
+from portals.sam_gov.api import (Budget, Opener, SamError, SamQuota, description, ipv4_urlopen, search, search_office,
+                                 search_title)
 from portals.sam_gov.records import KEYWORDS_PATH, SEARCH_PATH, build_record, deadline, keep, load_rules, notice_id
 from portals.shared.keyword_filter import load_keywords
 
@@ -46,12 +47,13 @@ def fetch_all(run_id: int, limit: int | None = None, now: datetime | None = None
     counts = {"found": 0, "scraped": 0, "new": 0, "failed": 0, "dropped": 0, "reposts": 0, "pending": 0, "requests": 0}
 
     notices: dict[str, dict[str, Any]] = {}
-    searches = [(search, code) for code in rules.naics_codes] + [(search_office, office) for office in rules.offices]
+    searches = ([(search, code) for code in rules.naics_codes] + [(search_office, office) for office in rules.offices]
+                + [(search_title, words) for words in rules.titles])
     try:
         for ask, value in searches:
             for raw in ask(value, now.date(), key, opener, budget):
                 if notice_id(raw):
-                    notices.setdefault(notice_id(raw), raw)   # the same notice can sit under two codes or an office
+                    notices.setdefault(notice_id(raw), raw)   # the same notice can turn up in two searches
     except SamQuota as exc:
         log.warning("Searches stopped early: %s", exc)
     counts["found"] = len(notices)

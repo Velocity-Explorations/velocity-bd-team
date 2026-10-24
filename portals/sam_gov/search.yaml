@@ -16,6 +16,12 @@ naics_codes:
 offices:
   - INTELLIGENCE ADVANCED RESEARCH PROJECTS ACTIVITY
 
+# Words searched in notice titles, whatever their NAICS codes, one search each. TRMC (the Test
+# Resource Management Center, which runs JMETC) posts through ACC-Orlando, sometimes with no
+# NAICS code; its T&E/S&T BAA is one (PRO-548).
+titles:
+  - TRMC
+
 # SAM.gov's own type names. Award notices, justifications, surplus sales and intent-to-bundle
 # notices are left out.
 notice_types:

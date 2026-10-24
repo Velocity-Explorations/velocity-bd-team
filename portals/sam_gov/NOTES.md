@@ -15,12 +15,17 @@ about the portal.
   the scanner on every page, robots.txt included, and it posts its BAAs, RFIs, proposers' days
   and Solutions Marketplace on SAM.gov. On 23 Oct 2026 it had one open notice, the Solutions
   Marketplace (IARPA-OT-26-001, a special notice under 541715, open until 31 Jul 2027) (PRO-537).
+- Then one search per title word listed there, whatever the notices' NAICS codes. The one word
+  is TRMC, the Test Resource Management Center, which runs JMETC: JMETC's own site has no public
+  listings, and TRMC posts through ACC-Orlando, sometimes with no NAICS code. On 24 Oct 2026 it
+  found the T&E/S&T Broad Agency Announcement (W900KK-22-R-0012), a special notice with no NAICS
+  code, open until 14 Mar 2030 (PRO-548).
 - Every request counts against the key's daily limit, and each notice's description is a
   request of its own. SAM.gov's published limits: 1,000 requests a day for an account with a
   role in an entity registration or a non-federal system account, 10 for an account with no
   role. A run spends at most 900 and stops cleanly when SAM.gov answers 429; the notices it
-  could not read are read on the next run. The six searches take six requests, so a key held
-  to 10 a day reads at most four descriptions a run.
+  could not read are read on the next run. The seven searches take seven requests, so a key held
+  to 10 a day reads at most three descriptions a run.
 - Requests go over IPv4 only. api.sam.gov also publishes an IPv6 address that hangs from the
   scan PC: a request took over a minute that way, and about a second over IPv4.
 - Personal SAM.gov keys expire every 90 days. A run that fails with HTTP 401 or 403 needs a new

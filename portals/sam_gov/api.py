@@ -132,6 +132,12 @@ def search_office(name: str, today: date, key: str, opener: Opener, budget: Budg
     return _search({"organizationName": name}, name, today, key, opener, budget)
 
 
+def search_title(words: str, today: date, key: str, opener: Opener, budget: Budget) -> list[dict[str, Any]]:
+    """Every open notice posted in the last year whose title holds `words`, whatever its NAICS codes:
+    TRMC posts some notices with none (PRO-548)."""
+    return _search({"title": words}, f"title {words}", today, key, opener, budget)
+
+
 def _search(where: dict[str, str], label: str, today: date, key: str, opener: Opener,
             budget: Budget) -> list[dict[str, Any]]:
     """Every open notice (response deadline today or later) posted in the last year that matches `where`."""
