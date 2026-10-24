@@ -16,6 +16,9 @@ export type DetailRow = {
 const MEMBERS_NOTE = "Member-only page on NSTXL: sign in as a member to read it.";
 const GET_FUNDED = ["afwerx", "spacewerx"];   // portals that read a Get Funded page (portals/shared/funding_list.py)
 const NO_CLOSE = "No close date on the Get Funded page (TBD, or submissions on a continuous basis).";
+const UPCOMING_NOTE = "DOE lists this solicitation as upcoming: it is not open yet.";
+const AWARD_NOTE = "Space Florida has posted a notice of intent to award.";
+const APFIT_NOTE = "No deadline here: each participating organization sets its own.";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function readExtra(extra: string | null | undefined): Record<string, unknown> {
@@ -55,6 +58,41 @@ function firstContact(contacts: unknown): Detail | null {
     return item;
   }
   return null;
+}
+
+/** The first non-empty text under a key ending in `suffix` ("_deadline_text" for NSTXL and DOE). */
+function bySuffix(data: Record<string, unknown>, suffix: string): string {
+  for (const [key, value] of Object.entries(data)) {
+    if (key.endsWith(suffix) && text(value)) return text(value);
+  }
+  return "";
+}
+
+/** NASA's expected solicitation quarter (award quarter on hover) and estimated value. */
+function forecastDetails(extra: Record<string, unknown>): Detail[] {
+  const items: Detail[] = [];
+  const expected = text(extra.nasa_solicitation_expected);
+  if (expected) {
+    const item: Detail = { text: `solicitation ${expected}` };
+    const award = text(extra.nasa_award_expected);
+    if (award) item.title = `Award expected ${award}`;
+    items.push(item);
+  }
+  const value = text(extra.nasa_estimated_value);
+  if (value) items.push({ text: value, title: "Estimated contract value" });
+  return items;
+}
+
+/** Space Florida's documents, linked to the first (the RFP), every name on hover. */
+function documentDetails(extra: Record<string, unknown>): Detail[] {
+  const links = Array.isArray(extra.spacefl_document_links) ? extra.spacefl_document_links : [];
+  const named = links.filter((d): d is Record<string, unknown> => !!d && typeof d === "object" && !!text((d as Record<string, unknown>).name));
+  if (!named.length) return [];
+  const item: Detail = { text: `${named.length} document${named.length === 1 ? "" : "s"}`,
+                         title: named.map((d) => text(d.name)).join("; ") };
+  const first = text(named[0].url);
+  if (first) item.href = first;
+  return [item];
 }
 
 function isoDay(value: unknown): string {
@@ -104,12 +142,16 @@ export function callDetails(row: DetailRow, now: Date = new Date()): Detail[] {
   const extra = readExtra(row.extra);
   const number = text(extra.samgov_solicitation_number);
   if (number) items.push({ text: number });
-  const contact = firstContact(extra.samgov_contacts);
+  items.push(...forecastDetails(extra));
+  const contact = firstContact(extra.samgov_contacts ?? extra.nasa_contacts);
   if (contact) items.push(contact);
   const files = Array.isArray(extra.samgov_attachments) ? extra.samgov_attachments.length : 0;
   if (files) items.push({ text: `${files} attachment${files === 1 ? "" : "s"}` });
+  items.push(...documentDetails(extra));
 
   if (extra.nstxl_members_only === true) items.push({ text: "members only", tone: "warn", title: MEMBERS_NOTE });
+  if (text(extra.doe_status) === "Upcoming") items.push({ text: "upcoming", tone: "warn", title: UPCOMING_NOTE });
+  if (extra.spacefl_intent_to_award === true) items.push({ text: "intent to award", tone: "warn", title: AWARD_NOTE });
 
   const location = text(extra.sscfd_location);
   if (location) items.push({ text: location });
@@ -121,7 +163,7 @@ export function callDetails(row: DetailRow, now: Date = new Date()): Detail[] {
 /** Hover text for the due date: where the deadline came from, when the portal says. */
 export function deadlineNote(extra: string | null | undefined): string | null {
   const data = readExtra(extra);
-  const sentence = text(data.nstxl_deadline_text);
+  const sentence = bySuffix(data, "_deadline_text");
   if (sentence) return `From the page: ${sentence}`;
   if (data.nstxl_no_deadline === true) {
     return data.nstxl_members_only === true
@@ -129,6 +171,11 @@ export function deadlineNote(extra: string | null | undefined): string | null {
       : "No deadline in the page text; see its documents.";
   }
   if (GET_FUNDED.some((prefix) => data[`${prefix}_no_deadline`] === true)) return NO_CLOSE;
+  if (data.nasa_no_deadline === true) {
+    const expected = text(data.nasa_solicitation_expected);
+    return expected ? `A forecast: NASA expects to release the solicitation in ${expected}.` : "A forecast: no solicitation yet.";
+  }
+  if (data.apfit_no_deadline === true) return APFIT_NOTE;
   const close = text(data.diu_close);
   return close ? `DIU: ${close}` : null;
 }

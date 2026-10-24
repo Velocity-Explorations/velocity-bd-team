@@ -31,10 +31,14 @@ shortened to its sub-tier, with the whole path on hover); the set-aside and NAIC
 portal gives them; SAM.gov's solicitation number, first contact and attachment count; NSTXL's
 members-only badge; Front Door's location, with a link when it reposts a SAM.gov notice; and for
 AFWERX and SpaceWERX a badge per service whose topics a cycle includes, plus "opens <date>" until
-submissions open, with the pre-release date on hover (PRO-542). Deadlines written as ISO
-timestamps (SAM.gov, DIU) show in the dashboard's time zone, and hovering a due date shows where it
-came from when the portal says (NSTXL's sentence, DIU's wording), or that a Get Funded listing has
-no close date.
+submissions open, with the pre-release date on hover (PRO-542); NASA Forecast's expected
+solicitation quarter (award quarter on hover), estimated value and first contact; DOE SBIR's
+"upcoming" badge; and Space Florida's document count, linked to the first, with an "intent to
+award" badge (PRO-549). Deadlines written as ISO timestamps (SAM.gov, DIU) show in the dashboard's
+time zone, and hovering a due date shows where it came from when the portal says (NSTXL's or DOE's
+sentence, DIU's wording), or why there is none: a Get Funded listing with no close date, a NASA
+forecast (with its expected solicitation quarter), or an APFIT cycle, whose deadlines each
+organization sets.
 
 Log links open `/runs/<id>/log`, which serves the file named in runs.log_path, but only from
 the pipeline's log directory on the same machine. On any other host it says the log is not

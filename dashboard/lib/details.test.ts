@@ -88,6 +88,67 @@ test("a SpaceWERX listing already open shows no open date, and one with no close
   assert.equal(deadlineNote(CYCLE.extra), null);
 });
 
+test("a NASA forecast row shows the expected solicitation quarter, the value and the first contact", () => {
+  const row = {
+    portal: "NASA Forecast", type: "Forecast", department: "NASA MSFC", naics_code: "541512",
+    set_aside: "Small Business Set Aside - Total",
+    extra: JSON.stringify({ nasa_solicitation_expected: "Q3 FY2026", nasa_award_expected: "Q2 FY2027",
+                            nasa_estimated_value: "$5M - $10M", nasa_no_deadline: true, nasa_closed: false,
+                            nasa_contacts: [{ name: "Example, Pat", email: "pat.example@nasa.gov", role: "technical" }] }),
+  };
+  assert.deepEqual(callDetails(row, NOW), [
+    { text: "Forecast" },
+    { text: "NASA MSFC" },
+    { text: "Small Business Set Aside - Total" },
+    { text: "NAICS 541512" },
+    { text: "solicitation Q3 FY2026", title: "Award expected Q2 FY2027" },
+    { text: "$5M - $10M", title: "Estimated contract value" },
+    { text: "Example, Pat", href: "mailto:pat.example@nasa.gov", title: "pat.example@nasa.gov" },
+  ]);
+  assert.equal(deadlineNote(row.extra), "A forecast: NASA expects to release the solicitation in Q3 FY2026.");
+  assert.equal(deadlineNote(JSON.stringify({ nasa_no_deadline: true })), "A forecast: no solicitation yet.");
+});
+
+test("DOE's upcoming badge, and the words its deadline was read from", () => {
+  const row = {
+    portal: "DOE SBIR", type: "SBIR/STTR Phase I", department: "DOE Office of Technology Commercialization",
+    naics_code: "", set_aside: "",
+    extra: JSON.stringify({ doe_status: "Upcoming", doe_deadline_text: "Submission Deadline: TBD", doe_no_deadline: true }),
+  };
+  assert.deepEqual(callDetails(row, NOW), [
+    { text: "SBIR/STTR Phase I" },
+    { text: "DOE Office of Technology Commercialization" },
+    { text: "upcoming", tone: "warn", title: "DOE lists this solicitation as upcoming: it is not open yet." },
+  ]);
+  assert.equal(deadlineNote(row.extra), "From the page: Submission Deadline: TBD");
+  const active = { ...row, extra: JSON.stringify({ doe_status: "Active", doe_deadline_text: "Submission Deadline: December 3, 2026 at 5 PM ET" }) };
+  assert.equal(callDetails(active, NOW).length, 2);
+  assert.equal(deadlineNote(active.extra), "From the page: Submission Deadline: December 3, 2026 at 5 PM ET");
+});
+
+test("Space Florida's documents, linked to the first, and its intent-to-award badge", () => {
+  const links = [{ name: "RFP-SF-02-0-2026 Space Based Data Pilot Program", url: "https://cdn.example/rfp.pdf" },
+                 { name: "RFP-SF-02-0-2026 Notice of Intent to Award", url: "https://cdn.example/nia.docx" }];
+  const row = {
+    portal: "Space Florida", type: "RFP", department: "Space Florida", naics_code: "", set_aside: "",
+    extra: JSON.stringify({ spacefl_documents: links.map((d) => d.name), spacefl_document_links: links,
+                            spacefl_intent_to_award: true, spacefl_closed: true }),
+  };
+  assert.deepEqual(callDetails(row, NOW), [
+    { text: "RFP" },
+    { text: "2 documents", href: "https://cdn.example/rfp.pdf",
+      title: "RFP-SF-02-0-2026 Space Based Data Pilot Program; RFP-SF-02-0-2026 Notice of Intent to Award" },
+    { text: "intent to award", tone: "warn", title: "Space Florida has posted a notice of intent to award." },
+  ]);
+  const one = { ...row, extra: JSON.stringify({ spacefl_document_links: links.slice(0, 1) }) };
+  assert.equal(callDetails(one, NOW)[1].text, "1 document");
+});
+
+test("an APFIT cycle's due date says each organization sets its own deadline", () => {
+  assert.equal(deadlineNote(JSON.stringify({ apfit_cycle: "FY27-2", apfit_no_deadline: true })),
+    "No deadline here: each participating organization sets its own.");
+});
+
 test("without extra, or with extra that cannot be read, only the columns show", () => {
   const plain = { portal: "Vulcan SOF", type: "CSO", department: "USSOCOM", naics_code: null, set_aside: null, extra: null };
   assert.deepEqual(callDetails(plain), [{ text: "CSO" }, { text: "USSOCOM" }]);
