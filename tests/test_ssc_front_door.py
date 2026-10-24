@@ -213,7 +213,7 @@ def test_a_repost_of_a_notice_sam_gov_already_stored_is_skipped(ledger_db: str, 
 
 def test_the_registry_finds_ssc_front_door() -> None:
     portal = registry.get("ssc_front_door")
-    assert portal.name == "SSC Front Door" and not portal.needs_browser and portal.fetch_timeout == 120
+    assert portal.name == "SSC Front Door" and not portal.needs_browser and portal.fetch_timeout == 300
     assert portal.keywords and portal.keywords.exists() and portal.notes and portal.notes.exists()
     assert "SAM.gov" in portal.how_to_submit
 
