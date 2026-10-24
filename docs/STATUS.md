@@ -76,6 +76,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- DOE SBIR (2026-10-24): portals/doe_sbir/ reads DOE's SBIR and STTR solicitations from its
+  Application Hub's public WordPress API (sbir-sttr.connectwerx.org), since the programs moved to
+  DOE's Office of Technology Commercialization and the Office of Science page Yukon read is
+  closed. One request a run. Both listings were closed on 24 Oct, so nothing is stored until the
+  next opens. Every listing reaches the judges. Runs with the Sunday scan (PRO-543).
 - SpaceWERX (2026-10-23): portals/spacewerx/ reads the Space Force's listings on SpaceWERX's Get
   Funded page, which uses AFWERX's template: SBIR and STTR cycles, and STRATFI and TACFI notices
   for Phase II holders (one, a TACFI notice open on a continuous basis, on 23 Oct). One request a

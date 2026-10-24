@@ -1,0 +1,48 @@
+# Relevance filter for DOE's SBIR and STTR solicitations (PRO-543). Every listing on DOE's
+# Application Hub is an SBIR or STTR solicitation, a few a year, and each description says so, so
+# the broad keywords keep them all and the judges rate them. That matters because a rejected row
+# is never filtered again: an upcoming listing posted before its topics must not be dropped. The
+# tight keywords and blocklist are the other portals', so a solicitation whose topics name
+# Velocity's work ranks tight. Matching is plain substring on lowercased title + description.
+# Blocklist entries are regular expressions, matched case-insensitively. An approved keyword
+# change on the dashboard edits this file and filters the portal's stored calls again.
+
+broad_keywords:
+  - sbir
+  - sttr
+
+tight_keywords:
+  - artificial intelligence
+  - machine learning
+  - autonomous systems
+  - command and control
+  - computer vision
+  - natural language processing
+  - cobol modernization
+  - legacy modernization
+  - transcription
+  - translation
+  - sensor fusion
+  - c5isr
+  - software defined
+  - ai hardware
+  - edge ai
+  - autonomous vehicle
+  - multi-agent
+
+blocklist_patterns:
+  - '\brepair\b'
+  - '\bspare parts\b'
+  - '\bparts kit\b'
+  - '\bnsn\s+\d'
+  - '\b\d{4}-\d{2,}-\d{2,}-\d{2,}\b'
+  - '\bhose assembly\b'
+  - '\bcircuit card\b'
+  - '\bconstruction\b.*\b(facility|building|pavement|airfield|runway)\b'
+  - '\bdocument destruction\b'
+  - '\bmedical cart\b'
+  - '\bboiler replacement\b'
+  - '\bfuel supplier\b'
+  - '\bdredging\b'
+  - '\bappraisal service\b'
+  - '\bplc training\b'
