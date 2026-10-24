@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { MenuController } from "@/components/MenuController";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { ViewerPicker } from "@/components/ViewerPicker";
 import { countWaitingRequests } from "@/lib/queries";
@@ -47,6 +48,7 @@ export async function Shell({ current, children }: { current: NavKey; children: 
         <SettingsDialog hidden={hidden} />
       </header>
       <main>{children}</main>
+      <MenuController />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CLOSED_PATTERN, filterHref, pickMany, pickSort, pickState } from "./filters.ts";
+import { choiceLinks, CLOSED_PATTERN, filterHref, nextSort, pickMany, pickSort, pickState, sortLink, sortParams } from "./filters.ts";
 import { isClosed } from "./text.ts";
 
 const PORTALS = ["SAM.gov", "Vulcan SOF"];
@@ -24,11 +24,39 @@ test("pickState reads open or closed, and still honours the old open=1 links", (
   assert.equal(pickState(undefined, undefined), "");
 });
 
-test("pickSort is newest first unless closing soonest is asked for", () => {
-  assert.equal(pickSort("due"), "due");
-  assert.equal(pickSort("newest"), "newest");
-  assert.equal(pickSort("anything"), "newest");
-  assert.equal(pickSort(undefined), "newest");
+test("pickSort reads a column and a direction, each column starting in its natural direction", () => {
+  assert.deepEqual(pickSort(undefined, undefined), { key: "seen", dir: "desc" });
+  assert.deepEqual(pickSort("newest", undefined), { key: "seen", dir: "desc" });   // links from before the headers
+  assert.deepEqual(pickSort("due", undefined), { key: "due", dir: "asc" });
+  assert.deepEqual(pickSort("title", "desc"), { key: "title", dir: "desc" });
+  assert.deepEqual(pickSort("verdict", "sideways"), { key: "verdict", dir: "asc" });
+  assert.deepEqual(pickSort("anything", "asc"), { key: "seen", dir: "desc" });
+  assert.deepEqual(pickSort("decision", undefined, ["seen", "due"]), { key: "seen", dir: "desc" });   // not on this page
+});
+
+test("a header reverses its own sort and starts another column in that column's direction", () => {
+  assert.deepEqual(nextSort({ key: "due", dir: "asc" }, "due"), { key: "due", dir: "desc" });
+  assert.deepEqual(nextSort({ key: "due", dir: "desc" }, "due"), { key: "due", dir: "asc" });
+  assert.deepEqual(nextSort({ key: "due", dir: "asc" }, "seen"), { key: "seen", dir: "desc" });
+});
+
+test("links leave out the default sort and a column's natural direction", () => {
+  assert.deepEqual(sortParams({ key: "seen", dir: "desc" }), { sort: "", dir: "" });
+  assert.deepEqual(sortParams({ key: "due", dir: "asc" }), { sort: "due", dir: "" });
+  assert.deepEqual(sortParams({ key: "due", dir: "desc" }), { sort: "due", dir: "desc" });
+});
+
+test("a sort link keeps the filters, and a menu choice changes only its own filter", () => {
+  assert.deepEqual(sortLink("/calls", { q: "C2", sort: "", dir: "" }, { key: "seen", dir: "desc" }, "due"),
+    { href: "/calls?q=C2&sort=due", active: false, dir: "asc" });
+  assert.deepEqual(sortLink("/calls", { q: "C2", sort: "due", dir: "" }, { key: "due", dir: "asc" }, "due"),
+    { href: "/calls?q=C2&sort=due&dir=desc", active: true, dir: "asc" });
+  const params = { portal: ["Vulcan SOF"], verdict: "yes", sort: "due" };
+  assert.deepEqual(choiceLinks("/", params, "verdict", [{ value: "", label: "Any" }, { value: "maybe", label: "Maybe" }], "yes"), [
+    { label: "Any", href: "/?portal=Vulcan+SOF&sort=due", active: false },
+    { label: "Maybe", href: "/?portal=Vulcan+SOF&verdict=maybe&sort=due", active: false },
+  ]);
+  assert.equal(choiceLinks("/", params, "verdict", [{ value: "yes", label: "Yes" }], "yes")[0].active, true);
 });
 
 test("filterHref repeats list params and skips empty ones", () => {

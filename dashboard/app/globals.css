@@ -285,99 +285,171 @@ button:hover {
   color: var(--muted);
 }
 
-/* ---------------------------------------------------------------- filter panel */
+/* ------------------------------------------------------------- filter bar and menus */
 
-.with-panel {
-  display: grid;
-  grid-template-columns: 15rem minmax(0, 1fr);
-  gap: 1rem;
-  align-items: start;
-}
-
-.panel {
-  position: sticky;
-  top: 1rem;
-  padding: 0.85rem;
+/* The filters that span the whole table, in a row above it (PRO-558). */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.75rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-.panel form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+.filter-bar input[type="search"] {
+  width: 16rem;
+  max-width: 100%;
 }
 
-.panel fieldset {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
+.filter-bar .reset {
+  margin-left: auto;
+  font-size: 0.9rem;
 }
 
-.panel legend,
-.panel label.field {
-  font-size: 0.8rem;
+/* A menu that opens below its button: the bar's Portals and Tag, and each header's filter. */
+details.menu {
+  position: relative;
+}
+
+details.menu > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+details.menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-bar details.menu > summary {
+  padding: 0.3rem 0.65rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.menu-body {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 13rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.4rem;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.15);
+  font-size: 0.9rem;
+  font-weight: 400;
+  white-space: normal;
+}
+
+.menu-body a {
+  display: block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.menu-body a:hover {
+  background: var(--grey-bg);
+}
+
+.menu-body a.active {
+  background: var(--info-bg);
+  color: var(--info-fg);
+  font-weight: 600;
+}
+
+.menu-title {
+  margin: 0.4rem 0.5rem 0.15rem;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 
-.panel legend {
-  margin-bottom: 0.3rem;
-  padding: 0;
+.menu-group + .menu-group {
+  margin-top: 0.3rem;
+  border-top: 1px solid var(--border);
 }
 
-.panel label.check {
+.menu-body form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.25rem;
+}
+
+.menu-body label.check {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.9rem;
-  color: var(--fg);
 }
 
-.panel label.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.panel select,
-.panel input[type="search"] {
-  width: 100%;
-}
-
-.panel .hint {
+.menu-body .hint {
   margin: 0;
   font-size: 0.75rem;
   color: var(--muted);
 }
 
-.panel-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.panel-actions .reset {
+/* All, Open, Closed */
+.segmented {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
   font-size: 0.9rem;
 }
 
-@media (max-width: 1279px) {
-  .with-panel {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.segmented a {
+  padding: 0.3rem 0.65rem;
+  color: var(--fg);
+  text-decoration: none;
+}
 
-  .panel {
-    position: static;
-  }
+.segmented a + a {
+  border-left: 1px solid var(--border);
+}
 
-  .panel form {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-    align-items: start;
-  }
+.segmented a.active {
+  background: var(--info-bg);
+  color: var(--info-fg);
+  font-weight: 600;
+}
+
+/* Column headers: the name sorts the table, the small button opens the column's filter. */
+th .th {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+th a.th-sort {
+  color: inherit;
+  text-decoration: none;
+}
+
+th a.th-sort:hover,
+th a.th-sort.active {
+  color: var(--fg);
+}
+
+th .th-filter {
+  padding: 0 0.25rem;
+  border-radius: 4px;
+}
+
+th .th-filter.active {
+  background: var(--info-bg);
+  color: var(--info-fg);
 }
 
 .flash {
@@ -399,10 +471,17 @@ button:hover {
 /* ------------------------------------------------------------------ tables */
 
 .table-wrap {
-  overflow-x: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+/* At 1024px and wider every table fits (tests/test_dashboard_layout.py), so its header menus may
+   open past its edge; narrower, a table scrolls sideways on its own. */
+@media (max-width: 1023px) {
+  .table-wrap {
+    overflow-x: auto;
+  }
 }
 
 table {

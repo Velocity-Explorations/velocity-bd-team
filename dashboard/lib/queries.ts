@@ -62,15 +62,37 @@ function dueDate(db: Db) {
 }
 
 /**
- * Newest first, or closing soonest: upcoming deadlines first, then undated calls, then past ones.
- * Under the disagree filter, calls where one judge said yes and the other no come first.
+ * The column a header sorts by (PRO-558), then newest first. Closing soonest puts upcoming deadlines
+ * first, then undated calls, then past ones. Verdict, tier, decision and filter sort by rank: yes,
+ * tight, pursue and kept come first. Under the disagree filter, calls where one judge said yes and
+ * the other no come first whatever the sort.
  */
 function panelOrder(db: Db, f: { sort: Sort; judges: JudgeFilter }) {
   const conflictsFirst = f.judges === "disagree"
     ? db`(${newestVerdict(db, "claude")} IN ('yes', 'no') AND ${newestVerdict(db, "grok")} IN ('yes', 'no')) IS NOT TRUE,`
     : db``;
-  if (f.sort !== "due") return db`ORDER BY ${conflictsFirst} first_seen_at DESC, id`;
-  return db`ORDER BY ${conflictsFirst} (${dueDate(db)} < CURRENT_DATE) IS TRUE, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id`;
+  const dir = f.sort.dir === "desc" ? db`DESC` : db`ASC`;
+  switch (f.sort.key) {
+    case "due":
+      return f.sort.dir === "asc"
+        ? db`ORDER BY ${conflictsFirst} (${dueDate(db)} < CURRENT_DATE) IS TRUE, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id`
+        : db`ORDER BY ${conflictsFirst} ${dueDate(db)} DESC NULLS LAST, first_seen_at DESC, id`;
+    case "title":
+      return db`ORDER BY ${conflictsFirst} lower(title) ${dir} NULLS LAST, first_seen_at DESC, id`;
+    case "verdict":
+      return db`ORDER BY ${conflictsFirst} CASE ai_verdict WHEN 'yes' THEN 0 WHEN 'maybe' THEN 1 WHEN 'no' THEN 2 ELSE 3 END ${dir},
+                first_seen_at DESC, id`;
+    case "tier":
+      return db`ORDER BY ${conflictsFirst} CASE match_tier WHEN 'tight' THEN 0 WHEN 'broad' THEN 1 ELSE 2 END ${dir}, first_seen_at DESC, id`;
+    case "decision":
+      return db`ORDER BY ${conflictsFirst} CASE human_status WHEN 'pursue' THEN 0 WHEN 'submitted' THEN 1 WHEN 'not_relevant' THEN 2
+                WHEN 'dismissed' THEN 3 ELSE 4 END ${dir}, first_seen_at DESC, id`;
+    case "filter":
+      return db`ORDER BY ${conflictsFirst} CASE filter_result WHEN 'kept' THEN 0 WHEN 'pending' THEN 1 WHEN 'rejected' THEN 2 ELSE 3 END ${dir},
+                first_seen_at DESC, id`;
+    default:
+      return db`ORDER BY ${conflictsFirst} first_seen_at ${dir}, id`;
+  }
 }
 
 /** True when a ledger table exists; a migration may not be applied to this database yet. */
@@ -86,7 +108,7 @@ async function hasTable(db: Db, name: string): Promise<boolean> {
  * the "Triage backlog" query in LEDGER_SCHEMA.md. A call a later keyword change dropped leaves it.
  */
 export async function reviewQueue(
-  f: PanelFilters & { verdict: string },
+  f: PanelFilters & { verdict: string; tier: string },
   waitingFor: string[] | null,
 ): Promise<{ rows: QueueRow[]; perPerson: boolean }> {
   const db = sql();
@@ -101,6 +123,7 @@ export async function reviewQueue(
         : db`human_status IS NULL`}
       AND filter_result = 'kept'
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
+      ${f.tier ? db`AND match_tier = ${f.tier}` : db``}
       ${panelWhere(db, f)}
     ${panelOrder(db, f)}
     LIMIT 500`;
