@@ -22,6 +22,7 @@ pull request to its owner (see AGENTS.md, "Working alongside other agents").
 | portals/spacewerx/ | SpaceWERX agent |
 | portals/doe_sbir/ | DOE SBIR agent |
 | portals/nasa_forecast/ | NASA Forecast agent |
+| portals/space_florida/ | Space Florida agent |
 | review/ | Reviewer |
 | library/ | Librarian |
 | drafting/ | Writer |
