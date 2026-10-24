@@ -44,6 +44,7 @@ from typing import Any
 
 import config
 from ledger.db import dry_run_session
+from ledger.db import release as release_connection
 from ledger.queries import (
     calls_where,
     claim_request,
@@ -190,6 +191,8 @@ def run_fetch(portal: Portal, run_id: int, timeout_s: int, limit: int | None) ->
         except BaseException as exc:   # noqa: BLE001  (recorded, never propagated)
             result["error"] = exc
             result["trace"] = traceback.format_exc()
+        finally:
+            release_connection()   # the thread's reused ledger connection (PRO-550)
 
     thread = threading.Thread(target=worker, name=f"fetch-{portal.slug}", daemon=True)
     thread.start()

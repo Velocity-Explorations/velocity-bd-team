@@ -214,6 +214,6 @@ def test_fetch_all_honours_the_limit(ledger_db: str) -> None:
 
 def test_the_registry_finds_nstxl() -> None:
     found = registry.get("nstxl")
-    assert found.name == "NSTXL" and not found.needs_browser and found.fetch_timeout == 120
+    assert found.name == "NSTXL" and not found.needs_browser and found.fetch_timeout == 300
     assert found.keywords and found.keywords.exists() and found.notes and found.notes.exists()
     assert "member" in found.how_to_submit

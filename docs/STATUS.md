@@ -8,7 +8,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   2026-10-16, 002_change_requests on 2026-10-17, 003_judgments and 004_decisions on
   2026-10-20. Tables: calls, change_requests, decisions, judgments, proposals, runs,
   schema_migrations. Connect through the Session pooler URL (the
-  direct URL is IPv6-only and unreachable from David's network).
+  direct URL is IPv6-only and unreachable from David's network). Each thread keeps one
+  connection open across its transactions (`ledger/db.py`): reconnecting cost about 585 ms a
+  query against 183 ms reused, and ran two portals' fetches past their limit in the first full
+  scan on 24 Oct (PRO-550).
 
 ## In progress
 

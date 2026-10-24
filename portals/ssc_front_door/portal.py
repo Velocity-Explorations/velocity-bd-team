@@ -31,7 +31,7 @@ PORTAL = {
     "name": PORTAL_NAME,
     "fetch": fetch,
     "filter": filter_rows,
-    "fetch_timeout": 120,
+    "fetch_timeout": 300,   # every listing is checked against the ledger (PRO-550)
     "needs_browser": False,
     "keywords": KEYWORDS_PATH,
     "how_to_submit": HOW_TO_SUBMIT,

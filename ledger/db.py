@@ -14,7 +14,9 @@ Never log or print DATABASE_URL: it carries the password.
 """
 from __future__ import annotations
 
+import atexit
 import sqlite3
+import threading
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -100,15 +102,60 @@ def dry_run_session(url: str | None = None) -> Iterator[Any]:
             conn.close()
 
 
-@contextmanager
-def tx(url: str | None = None) -> Iterator[Any]:
-    """Connection scoped to one transaction: commit on success, roll back on error, always close.
+# Each thread keeps one Postgres connection open across its transactions: opening one costs about
+# half a second against Supabase, which ran two portals' fetches past their limit (PRO-550).
+_local = threading.local()
+_open: set[Any] = set()
+_open_lock = threading.Lock()
 
-    Inside dry_run_session() the shared connection is yielded instead and nothing commits.
-    """
-    if _shared is not None and url is None:
-        yield _shared
+
+def _drop() -> None:
+    """Close this thread's reused connection; the next tx() opens a new one."""
+    conn = getattr(_local, "conn", None)
+    _local.conn = None
+    if conn is None:
         return
+    with _open_lock:
+        _open.discard(conn)
+    try:
+        conn.close()
+    except Exception:   # noqa: BLE001  (a connection that is already gone)
+        pass
+
+
+def release() -> None:
+    """Close this thread's reused connection. The pipeline calls it when a fetch thread ends."""
+    _drop()
+
+
+@atexit.register
+def _close_all() -> None:
+    with _open_lock:
+        conns = list(_open)
+        _open.clear()
+    for conn in conns:
+        try:
+            conn.close()
+        except Exception:   # noqa: BLE001
+            pass
+
+
+def _reused(url: str) -> Any:
+    """This thread's connection for url, opened on first use and again after it dropped."""
+    conn = getattr(_local, "conn", None)
+    if conn is not None and (getattr(_local, "url", None) != url or getattr(conn, "closed", False)):
+        _drop()
+        conn = None
+    if conn is None:
+        conn = connect(url)
+        _local.conn, _local.url = conn, url
+        with _open_lock:
+            _open.add(conn)
+    return conn
+
+
+@contextmanager
+def _own_connection(url: str) -> Iterator[Any]:
     conn = connect(url)
     try:
         yield conn
@@ -118,6 +165,41 @@ def tx(url: str | None = None) -> Iterator[Any]:
         raise
     finally:
         conn.close()
+
+
+@contextmanager
+def tx(url: str | None = None) -> Iterator[Any]:
+    """One transaction: commit on success, roll back on error.
+
+    On Postgres the thread's connection stays open for its next transaction, and one that broke
+    is replaced. SQLite, and a tx() opened inside another, get a connection of their own, closed
+    afterwards, so transaction boundaries are as before. Inside dry_run_session() the shared
+    connection is yielded instead and nothing commits.
+    """
+    if _shared is not None and url is None:
+        yield _shared
+        return
+    url = url or database_url()
+    if dialect_of(url) == "sqlite" or getattr(_local, "busy", False):
+        with _own_connection(url) as conn:
+            yield conn
+        return
+    conn = _reused(url)
+    _local.busy = True
+    try:
+        yield conn
+        conn.commit()
+    except BaseException:
+        try:
+            conn.rollback()
+        except Exception:   # noqa: BLE001  (the connection is gone: drop it, raise the caller's error)
+            _drop()
+        else:
+            if getattr(conn, "broken", False) or getattr(conn, "closed", False):
+                _drop()
+        raise
+    finally:
+        _local.busy = False
 
 
 def q(conn: Any, sql: str, params: Sequence[Any] = ()) -> Any:
