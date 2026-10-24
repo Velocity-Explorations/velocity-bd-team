@@ -7,16 +7,18 @@ from pathlib import Path
 import pytest
 
 from assistant import tools
+from assistant.dates import parse_due
 from ledger import queries as lq
 from ledger.db import q, tx
 from portals.registry import Portal
 
 UTC = timezone.utc
-NOW = datetime.now(UTC).replace(microsecond=0)
+NOW = datetime.now(UTC).replace(second=30, microsecond=0)   # mid-minute: see due()
 
 
 def due(days: float) -> str:
-    """A deadline the way Vulcan writes one, `days` from now."""
+    """A deadline the way Vulcan writes one, `days` from now. It drops the seconds, so with NOW
+    mid-minute it is always 30 seconds earlier than asked, never exactly on a day boundary."""
     return (NOW + timedelta(days=days)).strftime("%d %b %Y : %H:%M UTC").upper()
 
 
@@ -131,6 +133,13 @@ def test_brief_a_call(ledger_db: str, portal: Portal) -> None:
     for words in ("Edge AI", "10 days left", "OTA Prototype, Market Research", "Quad Chart Template",
                   "Detect drones", "https://example.invalid/ex-brief"):
         assert words in b["text"], words
+
+
+def test_a_deadline_written_to_the_minute_is_a_little_earlier_than_asked() -> None:
+    # due() drops the seconds, as Vulcan does. With the clock mid-minute, "two days ago" is always a
+    # little over two days ago, whatever second the suite starts in (PRO-540).
+    assert NOW.second == 30
+    assert parse_due(due(-2)) < NOW - timedelta(days=2)
 
 
 def test_brief_falls_back_to_the_portals_how_to_submit(ledger_db: str, portal: Portal) -> None:
