@@ -6,17 +6,19 @@ import { redirect } from "next/navigation";
 import { aliasesFor } from "@/lib/people";
 import { decideCall, decideRequest, type DecideRequestResult, type DecideResult } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
-import { safeReturnTo } from "@/lib/text";
+import { decidedNotice, safeReturnTo } from "@/lib/text";
 import { isDecision, STATUS_LABELS } from "@/lib/values";
 import { allowlist, currentViewer, VIEWER_COOKIE } from "@/lib/viewer";
 
 const MAX_NOTE_CHARS = 2000;
 
-function backTo(returnTo: string, key: "notice" | "error", message: string): never {
+function backTo(returnTo: string, key: "notice" | "error", message: string, voted?: string): never {
   const url = new URL(returnTo, "http://dashboard.local");
   url.searchParams.delete("notice");
   url.searchParams.delete("error");
+  url.searchParams.delete("voted");
   url.searchParams.set(key, message);
+  if (voted) url.searchParams.set("voted", voted);   // the queue links the notice to the call on All calls
   redirect(`${url.pathname}${url.search}`);
 }
 
@@ -53,12 +55,9 @@ export async function decide(formData: FormData): Promise<void> {
   revalidatePath("/calls");
   if (result.ok) {
     const stays = result.callStatus && result.callStatus !== status ? ` The call stays ${STATUS_LABELS[result.callStatus]}.` : "";
-    const done = {
-      decide: `${STATUS_LABELS[status]}: ${result.title}`,
-      add: `Added your decision, ${STATUS_LABELS[status]}: ${result.title}.${stays}`,
-      note: `Note added: ${result.title}`,
-    };
-    backTo(returnTo, "notice", done[result.plan]);
+    const fromQueue = new URL(returnTo, "http://dashboard.local").pathname === "/";
+    const notice = decidedNotice(result.plan, STATUS_LABELS[status], result.title, stays, fromQueue);
+    backTo(returnTo, "notice", notice, fromQueue && result.plan !== "note" ? result.title : undefined);
   }
   backTo(returnTo, "error", result.reason);
 }
