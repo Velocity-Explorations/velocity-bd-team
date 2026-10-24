@@ -53,3 +53,18 @@ export function buildHref(base: string, params: Record<string, string | null | u
   const text = query.toString();
   return text ? `${base}?${text}` : base;
 }
+
+/** The notice after a decision. A vote from the review queue takes the call out of the voter's
+ *  queue, so the notice says so (PRO-554); `stays` names the call's decision when it is not yours. */
+export function decidedNotice(plan: "decide" | "add" | "note", label: string, title: string, stays: string, fromQueue: boolean): string {
+  if (plan === "note") return `Note added: ${title}`;
+  const moved = fromQueue ? " It has left your queue." : "";
+  if (plan === "decide") return fromQueue ? `${label}: ${title}.${moved}` : `${label}: ${title}`;
+  return `Added your decision, ${label}: ${title}.${stays}${moved}`;
+}
+
+/** All calls, filtered to a call's title (the title filter reads 120 characters), where every
+ *  person's vote on it shows. */
+export function votedHref(title: string): string {
+  return buildHref("/calls", { q: title.slice(0, 120) });
+}

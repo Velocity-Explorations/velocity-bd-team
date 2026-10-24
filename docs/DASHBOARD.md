@@ -88,7 +88,9 @@ newest change wins on `calls`, and both people's decisions stay in `decisions`.
 
 On the review queue while everyone decides every call (the default; DASHBOARD_QUEUE=each), the
 first decision becomes the call's decision and every later one is added beside it without
-changing it, whatever it says. A call's decision changes only from All calls.
+changing it, whatever it says. A call's decision changes only from All calls. A vote from the
+queue takes the call out of your queue, so the notice says so and links to the call on All
+calls, where every person's vote shows (PRO-554).
 
 Every form carries the decision the page showed. On All calls, and on a shared queue, if the
 call was decided or changed by someone else after the page loaded, nothing is written and the

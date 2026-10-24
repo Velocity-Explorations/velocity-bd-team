@@ -45,7 +45,7 @@ export function Badge({ value, empty = "none" }: { value: string | null | undefi
   return <span className={`badge tone-${toneOf(value)}`}>{LABELS[value] ?? value}</span>;
 }
 
-export function Flash({ notice, error }: { notice?: string; error?: string }) {
+export function Flash({ notice, error, link }: { notice?: string; error?: string; link?: { href: string; label: string } | null }) {
   if (error) {
     return (
       <p className="flash flash-error" role="alert">
@@ -57,6 +57,12 @@ export function Flash({ notice, error }: { notice?: string; error?: string }) {
     return (
       <p className="flash flash-ok" role="status">
         {notice}
+        {link ? (
+          <>
+            {" "}
+            <a href={link.href}>{link.label}</a>
+          </>
+        ) : null}
       </p>
     );
   }

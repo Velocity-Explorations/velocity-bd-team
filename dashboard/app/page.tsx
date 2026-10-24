@@ -12,7 +12,7 @@ import { aliasesFor, displayPerson } from "@/lib/people";
 import { decisionsOn, judgeAgreement, latestJudgments, newThisWeek, portals, reviewQueue } from "@/lib/queries";
 import { peopleSplit, votesByCall } from "@/lib/scoreboard";
 import { displayTimeZone, queueMode } from "@/lib/settings";
-import { firstParam, isClosed } from "@/lib/text";
+import { firstParam, isClosed, votedHref } from "@/lib/text";
 import { DECISIONS, isDecision, pickAllowed, STATUS_LABELS } from "@/lib/values";
 import { allowlist, currentViewer } from "@/lib/viewer";
 
@@ -24,6 +24,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function ReviewQueuePage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
+  const voted = firstParam(sp.voted, 300);   // the call just voted on, for the notice's link
   const portalList = await portals();
   const filters = {
     portals: pickMany(sp.portal, portalList),
@@ -95,7 +96,7 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
         </dl>
       </div>
 
-      <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} />
+      <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} link={voted ? { href: votedHref(voted), label: "See everyone's votes on All calls" } : null} />
 
       <div className="with-panel">
         <FilterPanel
