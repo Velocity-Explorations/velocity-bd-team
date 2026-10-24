@@ -20,6 +20,7 @@ pull request to its owner (see AGENTS.md, "Working alongside other agents").
 | portals/diu/ | DIU agent |
 | portals/afwerx/ | AFWERX agent |
 | portals/spacewerx/ | SpaceWERX agent |
+| portals/doe_sbir/ | DOE SBIR agent |
 | review/ | Reviewer |
 | library/ | Librarian |
 | drafting/ | Writer |
