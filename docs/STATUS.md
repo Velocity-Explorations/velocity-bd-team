@@ -76,6 +76,12 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- BidNet Direct (2026-10-24): portals/bidnet/ reads the Colorado and Florida open-bid lists, the
+  bids published in the last 8 days, titles and dates only (details are for paying members).
+  robots.txt allows the lists at one page per 5 seconds with path paging, and blocks AI companies'
+  crawlers by name; the scanner names itself and follows those terms. Keywords drop the bare "ai"
+  so "maintenance" no longer matches. Shelved on this branch, not merged: after about seven
+  requests its AWS bot protection began answering with an empty challenge (PRO-544).
 - DOE SBIR (2026-10-24): portals/doe_sbir/ reads DOE's SBIR and STTR solicitations from its
   Application Hub's public WordPress API (sbir-sttr.connectwerx.org), since the programs moved to
   DOE's Office of Technology Commercialization and the Office of Science page Yukon read is
