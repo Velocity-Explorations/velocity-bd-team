@@ -245,6 +245,23 @@ the data; a judge's tags change only when it answers again, and an answer withou
 nothing. A tag renamed in `review/tags.yaml` stays under its old name until the call is tagged
 again.
 
+## Table: tag_list
+
+The tag list from `review/tags.yaml`, so the dashboard can group and order each call's tags and
+offer every tag in its filter without reading the pipeline's files. The pipeline rewrites it
+whenever it tags (`tag_by_rules` on each run, `run.py --backfill-tags`). Added by
+`007_tag_list.sql` (PRO-557).
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| name | TEXT, primary key | the tag | `save_tag_list` |
+| tag_group | TEXT, not null | `type`, `work`, `customer`, `access` | same |
+| covers | TEXT | what the tag covers, as the judges read it | same |
+| position | INTEGER, not null | the tag's place in the list, from 0 | same |
+
+A tag in `call_tags` with no row here was renamed or dropped from the list; the dashboard shows
+it last.
+
 ## Table: schema_migrations
 
 Bookkeeping for `ledger/migrate.py`. `version` is the migration filename, `applied_at`

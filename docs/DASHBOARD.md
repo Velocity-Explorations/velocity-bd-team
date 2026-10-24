@@ -43,6 +43,14 @@ forecast (with its expected solicitation quarter), or an APFIT cycle, whose dead
 organization sets. An empty due cell says why in a word or two (forecast, members only, see
 documents, no close date, set by sponsor), with the whole reason on hover.
 
+Below the details, each call's tags show as badges (PRO-557): its one type first, in blue, then
+its work, customer and access tags in the list's order. The type is the one the call's own data
+sets, else Claude's, else Grok's. Hovering a tag says who set it ("the call's data", Claude,
+Grok), and on the type, any other type a judge picked. A detail that repeats a tag, such as
+NSTXL's "members only" badge, is left out. The review queue and All calls have a Tag filter,
+grouped as the list is, and Settings can hide the tags. The tags come from `call_tags` and the
+tag list from `tag_list` (migrations 006 and 007); before those exist the pages show no tags.
+
 A contact is linked to its address unless no word of the name appears in the address. NASA's
 forecast lists one person's name with another person's address on some rows, so there the name and
 the address show apart, and a click never emails someone else by surprise (PRO-551).

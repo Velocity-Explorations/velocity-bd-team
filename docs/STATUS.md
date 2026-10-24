@@ -135,6 +135,8 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Tags (2026-10-24): every call carries tags from the list in review/tags.yaml, in four groups: one
   type, and any work, customer and access tags (call_tags, migration 006). Rules set what a call's
   data makes certain, such as SOCOM on Vulcan calls; Claude and Grok tag the rest in the review
-  answer they already give. `python run.py --backfill-tags` tags stored calls (PRO-556).
+  answer they already give. `python run.py --backfill-tags` tags stored calls (PRO-556). The
+  dashboard shows them under each title, type first, with a Tag filter (tag_list, migration 007,
+  PRO-557).
 
 ## Known breakages

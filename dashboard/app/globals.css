@@ -453,6 +453,10 @@ td.reason {
   overflow-wrap: anywhere;
 }
 
+.meta.tags {
+  margin-top: 0.3rem;
+}
+
 td.decide {
   min-width: 12rem;
 }
