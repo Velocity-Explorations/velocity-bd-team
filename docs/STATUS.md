@@ -76,6 +76,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- APFIT (2026-10-24): portals/apfit/ reads the cycle-status posts on the APFIT page, one request
+  a run: one call per cycle with its status, and how a company takes part (through a government
+  sponsor). A cycle in final selection, evaluation or awarded is closed; both on 24 Oct were, so
+  nothing was stored. Runs with the Sunday scan (PRO-547).
 - Space Florida (2026-10-24): portals/space_florida/ reads the active RFPs on Space Florida's
   solicitations page, one request a run: title, documents, notes, published and due dates. An RFP
   past its due date or with a notice of intent to award counts as closed; the one listed on 24
