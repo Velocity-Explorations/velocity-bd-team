@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { setViewer } from "@/app/actions";
+import { ViewerPicker } from "@/components/ViewerPicker";
 import { countWaitingRequests } from "@/lib/queries";
 import { allowlist, currentViewer, iapAudience, viewerHeader } from "@/lib/viewer";
 
@@ -81,20 +81,5 @@ async function ViewerControl() {
       </div>
     );
   }
-  return (
-    <form action={setViewer} className="viewer">
-      <label htmlFor="viewer">Deciding as</label>
-      <select id="viewer" name="viewer" defaultValue={viewer ?? ""}>
-        <option value="" disabled>
-          Choose your name
-        </option>
-        {users.map((person) => (
-          <option key={person.name} value={person.name}>
-            {person.name}
-          </option>
-        ))}
-      </select>
-      <button type="submit">Set</button>
-    </form>
-  );
+  return <ViewerPicker names={users.map((person) => person.name)} viewer={viewer} />;
 }
