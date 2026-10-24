@@ -20,6 +20,7 @@ const UPCOMING_NOTE = "DOE lists this solicitation as upcoming: it is not open y
 const AWARD_NOTE = "Space Florida has posted a notice of intent to award.";
 const APFIT_NOTE = "No deadline here: each participating organization sets its own.";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const TO_BE_DETERMINED = /^(to be determined|tbd)\.?$/i;   // NASA's set-aside on many forecast rows
 
 function readExtra(extra: string | null | undefined): Record<string, unknown> {
   if (!extra) return {};
@@ -43,21 +44,44 @@ function office(department: string, portal: string): Detail | null {
   return parts.length > 1 ? { text: parts[1], title: department } : { text: department };
 }
 
-function firstContact(contacts: unknown): Detail | null {
-  if (!Array.isArray(contacts)) return null;
+/** "NASA Forecast" already says "Forecast": a type the portal name ends with is not repeated. */
+function repeats(portal: string, type: string): boolean {
+  const name = portal.toLowerCase();
+  const kind = type.toLowerCase();
+  return name === kind || name.endsWith(` ${kind}`);
+}
+
+/** Whether an address plausibly belongs to the named person: a word of the name (three letters or more,
+ *  the office code in parentheses left out) appears before the @. NASA's forecast lists one person's
+ *  name with another person's address on some rows. */
+function sameNameAndAddress(name: string, email: string): boolean {
+  const local = email.split("@")[0].toLowerCase().replace(/[^a-z]/g, "");
+  const words = name.replace(/\([^)]*\)/g, " ").toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 3);
+  return !words.length || words.some((w) => local.includes(w));
+}
+
+/** The first named contact, linked to its address, or shown apart from an address that looks like
+ *  someone else's, so a click never emails a different person by surprise. */
+function firstContact(contacts: unknown): Detail[] {
+  if (!Array.isArray(contacts)) return [];
   for (const entry of contacts) {
     if (!entry || typeof entry !== "object") continue;
     const person = entry as Record<string, unknown>;
     const name = text(person.name);
     if (!name) continue;
     const email = text(person.email);
+    const phone = text(person.phone);
+    if (email && !sameNameAndAddress(name, email)) {
+      return [phone ? { text: name, title: phone } : { text: name },
+              { text: email, href: `mailto:${email}`, title: `Listed with ${name}, though the address looks like someone else's` }];
+    }
     const item: Detail = { text: name };
     if (email) item.href = `mailto:${email}`;
-    const title = [email, text(person.phone)].filter(Boolean).join(", ");
+    const title = [email, phone].filter(Boolean).join(", ");
     if (title) item.title = title;
-    return item;
+    return [item];
   }
-  return null;
+  return [];
 }
 
 /** The first non-empty text under a key ending in `suffix` ("_deadline_text" for NSTXL and DOE). */
@@ -133,18 +157,18 @@ function cycleDetails(extra: Record<string, unknown>, now: Date): Detail[] {
 export function callDetails(row: DetailRow, now: Date = new Date()): Detail[] {
   const items: Detail[] = [];
   const type = text(row.type);
-  if (type) items.push({ text: type });
+  if (type && !repeats(text(row.portal), type)) items.push({ text: type });
   const where = office(text(row.department), text(row.portal));
   if (where) items.push(where);
-  if (text(row.set_aside)) items.push({ text: text(row.set_aside) });
+  const setAside = text(row.set_aside);
+  if (setAside) items.push({ text: TO_BE_DETERMINED.test(setAside) ? "set-aside to be determined" : setAside });
   if (text(row.naics_code)) items.push({ text: `NAICS ${text(row.naics_code)}` });
 
   const extra = readExtra(row.extra);
   const number = text(extra.samgov_solicitation_number);
   if (number) items.push({ text: number });
   items.push(...forecastDetails(extra));
-  const contact = firstContact(extra.samgov_contacts ?? extra.nasa_contacts);
-  if (contact) items.push(contact);
+  items.push(...firstContact(extra.samgov_contacts ?? extra.nasa_contacts));
   const files = Array.isArray(extra.samgov_attachments) ? extra.samgov_attachments.length : 0;
   if (files) items.push({ text: `${files} attachment${files === 1 ? "" : "s"}` });
   items.push(...documentDetails(extra));
@@ -178,4 +202,13 @@ export function deadlineNote(extra: string | null | undefined): string | null {
   if (data.apfit_no_deadline === true) return APFIT_NOTE;
   const close = text(data.diu_close);
   return close ? `DIU: ${close}` : null;
+}
+
+/** A word or two for an empty due cell, saying why there is no date; deadlineNote gives the rest on hover. */
+export function noDeadlineLabel(extra: string | null | undefined): string | null {
+  const data = readExtra(extra);
+  if (data.nasa_no_deadline === true) return "forecast";
+  if (data.nstxl_no_deadline === true) return data.nstxl_members_only === true ? "members only" : "see documents";
+  if (data.apfit_no_deadline === true) return "set by sponsor";
+  return Object.entries(data).some(([key, value]) => key.endsWith("_no_deadline") && value === true) ? "no close date" : null;
 }

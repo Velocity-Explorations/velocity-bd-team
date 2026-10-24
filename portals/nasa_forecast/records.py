@@ -22,11 +22,14 @@ def _get(row: dict[str, Any], name: str) -> str:
     return " ".join(str(row.get(name) or "").split())
 
 
+TBD = ("to be determined", "tbd")   # a quarter NASA has not set yet
+
+
 def when(quarter: str, year: str) -> str:
-    """ "Q3 FY2026", "FY2026", or empty."""
+    """ "Q3 FY2026", "FY2026" when the quarter is not set yet, or empty."""
     if not year:
         return ""
-    return f"{quarter} FY{year}" if quarter else f"FY{year}"
+    return f"{quarter} FY{year}" if quarter and quarter.lower() not in TBD else f"FY{year}"
 
 
 def is_closed(row: dict[str, Any]) -> bool:

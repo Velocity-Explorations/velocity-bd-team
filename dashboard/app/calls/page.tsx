@@ -4,7 +4,7 @@ import { FilterPanel } from "@/components/FilterPanel";
 import { JudgeVerdicts } from "@/components/Judges";
 import { Shell } from "@/components/Shell";
 import { Badge, Details, Flash, TitleLink } from "@/components/bits";
-import { callDetails, deadlineNote } from "@/lib/details";
+import { callDetails, deadlineNote, noDeadlineLabel } from "@/lib/details";
 import { displayPerson } from "@/lib/people";
 import { filterHref, pickMany, pickSort, pickState } from "@/lib/filters";
 import { formatDue, formatTime } from "@/lib/format";
@@ -228,7 +228,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                             </ul>
                           ) : null}
                         </td>
-                        <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz)}</td>
+                        <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz) || <span className="muted">{noDeadlineLabel(r.extra)}</span>}</td>
                         <td className="when">{formatTime(r.first_seen_at, tz)}</td>
                       </tr>
                     );

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { callDetails, deadlineNote } from "./details.ts";
+import { callDetails, deadlineNote, noDeadlineLabel } from "./details.ts";
 
 const SAM = {
   portal: "SAM.gov",
@@ -97,7 +97,6 @@ test("a NASA forecast row shows the expected solicitation quarter, the value and
                             nasa_contacts: [{ name: "Example, Pat", email: "pat.example@nasa.gov", role: "technical" }] }),
   };
   assert.deepEqual(callDetails(row, NOW), [
-    { text: "Forecast" },
     { text: "NASA MSFC" },
     { text: "Small Business Set Aside - Total" },
     { text: "NAICS 541512" },
@@ -166,4 +165,39 @@ test("the due date's hover text says where the deadline came from", () => {
   assert.equal(deadlineNote(JSON.stringify({ vulcan_closed: false })), null);
   assert.equal(deadlineNote(null), null);
   assert.equal(deadlineNote("{oops"), null);
+});
+
+test("a contact listed with someone else's address shows the name and the address apart", () => {
+  const nasa = (name: string, email: string) => ({
+    portal: "NASA Forecast", type: "Forecast", department: "NASA AFRC", naics_code: null, set_aside: null,
+    extra: JSON.stringify({ nasa_contacts: [{ name, email, role: "technical" }] }),
+  });
+  assert.deepEqual(callDetails(nasa("Example, Pat (AFRC-500)", "lee.q.sample@nasa.gov"), NOW), [
+    { text: "NASA AFRC" },
+    { text: "Example, Pat (AFRC-500)" },
+    { text: "lee.q.sample@nasa.gov", href: "mailto:lee.q.sample@nasa.gov",
+      title: "Listed with Example, Pat (AFRC-500), though the address looks like someone else's" },
+  ]);
+  // the same person under a changed surname, or with a long surname cut short in the address
+  assert.equal(callDetails(nasa("Rivera, Dana S (ARC-DIB)", "dana.a.lopez@nasa.gov"), NOW)[1].href, "mailto:dana.a.lopez@nasa.gov");
+  assert.equal(callDetails(nasa("Brown De Sample, Eric C. (GSFC-6180)", "eric.c.browndesamp@nasa.gov"), NOW)[1].href,
+    "mailto:eric.c.browndesamp@nasa.gov");
+});
+
+test("a set-aside still to be determined says what it is, and a type the portal name ends with is not repeated", () => {
+  const row = { portal: "NASA Forecast", type: "Forecast", department: "NASA ARC", naics_code: "541715",
+                set_aside: "To Be Determined", extra: null };
+  assert.deepEqual(callDetails(row, NOW), [{ text: "NASA ARC" }, { text: "set-aside to be determined" }, { text: "NAICS 541715" }]);
+});
+
+test("an empty due cell says why there is no date", () => {
+  assert.equal(noDeadlineLabel(JSON.stringify({ nasa_no_deadline: true, nasa_solicitation_expected: "Q3 FY2026" })), "forecast");
+  assert.equal(noDeadlineLabel(JSON.stringify({ nstxl_no_deadline: true, nstxl_members_only: true })), "members only");
+  assert.equal(noDeadlineLabel(JSON.stringify({ nstxl_no_deadline: true })), "see documents");
+  assert.equal(noDeadlineLabel(JSON.stringify({ spacewerx_no_deadline: true })), "no close date");
+  assert.equal(noDeadlineLabel(JSON.stringify({ doe_no_deadline: true })), "no close date");
+  assert.equal(noDeadlineLabel(JSON.stringify({ apfit_no_deadline: true })), "set by sponsor");
+  assert.equal(noDeadlineLabel(JSON.stringify({ afwerx_no_deadline: false })), null);
+  assert.equal(noDeadlineLabel(null), null);
+  assert.equal(noDeadlineLabel("{oops"), null);
 });

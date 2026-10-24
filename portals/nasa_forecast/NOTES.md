@@ -41,10 +41,15 @@ solicitation.
   re-compete, value, contract type, competition, NAICS), then the row's Summary and Description.
 - `extra`: `nasa_source_id`, `nasa_status` (AcquisitionStatus: New, Revised, Awarded, Withdrawn),
   `nasa_phase` (AcquisitionPhase), `nasa_solicitation_expected` and `nasa_award_expected` (for
-  example "Q3 FY2026", NASA's fiscal years), `nasa_estimated_value`, `nasa_requirement`
+  example "Q3 FY2026", NASA's fiscal years, or "FY2026" alone while NASA has not set the quarter), `nasa_estimated_value`, `nasa_requirement`
   (Services, Research & Development and so on), `nasa_contacts` (the technical contact and small
   business specialist), `nasa_no_deadline` (always true) and `nasa_closed` (awarded, withdrawn or
   cancelled). A closed row is stored only if an earlier run stored it.
+- The technical contact's name (Tech POC Name) and address (TechnicalPOC) sometimes belong to
+  different people: on 24 Oct, 27 of the 103 rows with both had an address without the name's
+  surname, some of them one person under a changed name. They are stored as NASA gives them; the
+  dashboard shows the name and the address apart when no word of the name is in the address
+  (PRO-551).
 
 ## How to respond
 
