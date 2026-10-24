@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { SettingsDialog } from "@/components/SettingsDialog";
 import { ViewerPicker } from "@/components/ViewerPicker";
 import { countWaitingRequests } from "@/lib/queries";
+import { hiddenColumns } from "@/lib/settings";
 import { allowlist, currentViewer, iapAudience, viewerHeader } from "@/lib/viewer";
 
 const LINKS = [
@@ -17,7 +19,7 @@ const LINKS = [
 export type NavKey = (typeof LINKS)[number]["key"];
 
 export async function Shell({ current, children }: { current: NavKey; children: ReactNode }) {
-  const waiting = await countWaitingRequests();
+  const [waiting, hidden] = await Promise.all([countWaitingRequests(), hiddenColumns()]);
   return (
     <>
       <header className="topbar">
@@ -42,6 +44,7 @@ export async function Shell({ current, children }: { current: NavKey; children: 
           ))}
         </nav>
         <ViewerControl />
+        <SettingsDialog hidden={hidden} />
       </header>
       <main>{children}</main>
     </>
