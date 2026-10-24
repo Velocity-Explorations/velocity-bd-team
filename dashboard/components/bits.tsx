@@ -1,7 +1,6 @@
 // Small presentational pieces shared by the pages.
 
 import type { Detail } from "@/lib/details";
-import { optionGroups, type TagOption } from "@/lib/tags";
 
 const TONES: Record<string, string> = {
   yes: "good",
@@ -104,24 +103,3 @@ export function Details({ items }: { items: Detail[] }) {
   );
 }
 
-/** The filter panel's Tag choice, grouped as the tag list is; nothing until the list exists. */
-export function TagSelect({ options, selected }: { options: TagOption[]; selected: string }) {
-  if (options.length === 0) return null;
-  return (
-    <label className="field">
-      Tag
-      <select name="tag" defaultValue={selected}>
-        <option value="">Any</option>
-        {optionGroups(options).map((group) => (
-          <optgroup key={group.label} label={group.label}>
-            {group.names.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-    </label>
-  );
-}
