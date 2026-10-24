@@ -14,6 +14,9 @@ export type DetailRow = {
 };
 
 const MEMBERS_NOTE = "Member-only page on NSTXL: sign in as a member to read it.";
+const GET_FUNDED = ["afwerx", "spacewerx"];   // portals that read a Get Funded page (portals/shared/funding_list.py)
+const NO_CLOSE = "No close date on the Get Funded page (TBD, or submissions on a continuous basis).";
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function readExtra(extra: string | null | undefined): Record<string, unknown> {
   if (!extra) return {};
@@ -54,8 +57,42 @@ function firstContact(contacts: unknown): Detail | null {
   return null;
 }
 
+function isoDay(value: unknown): string {
+  const day = text(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
+}
+
+/** "28 Oct" for an ISO date, with the year when it is not `now`'s. */
+function shortDate(iso: string, now: Date): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const shown = `${day} ${MONTHS[month - 1]}`;
+  return year === now.getUTCFullYear() ? shown : `${shown} ${year}`;
+}
+
+/** AFWERX and SpaceWERX: a badge per service whose topics the cycle includes, and when it opens
+ *  while that is still ahead, so a cycle in pre-release does not look open. */
+function cycleDetails(extra: Record<string, unknown>, now: Date): Detail[] {
+  const items: Detail[] = [];
+  const today = now.toISOString().slice(0, 10);
+  for (const prefix of GET_FUNDED) {
+    const branches = extra[`${prefix}_branches`];
+    for (const branch of Array.isArray(branches) ? branches : []) {
+      const name = text(branch);
+      if (name) items.push({ text: name, tone: "info", title: `Includes U.S. ${name} topics` });
+    }
+    const opens = isoDay(extra[`${prefix}_open`]);
+    if (opens && opens > today) {
+      const item: Detail = { text: `opens ${shortDate(opens, now)}`, tone: "warn" };
+      const pre = isoDay(extra[`${prefix}_pre_release`]);
+      if (pre) item.title = `Pre-release from ${shortDate(pre, now)}; submissions open ${shortDate(opens, now)}`;
+      items.push(item);
+    }
+  }
+  return items;
+}
+
 /** Type, office, set-aside and NAICS from the columns, then what each portal keeps in extra. */
-export function callDetails(row: DetailRow): Detail[] {
+export function callDetails(row: DetailRow, now: Date = new Date()): Detail[] {
   const items: Detail[] = [];
   const type = text(row.type);
   if (type) items.push({ text: type });
@@ -78,7 +115,7 @@ export function callDetails(row: DetailRow): Detail[] {
   if (location) items.push({ text: location });
   const repost = text(extra.sscfd_sam_url);
   if (repost) items.push({ text: "also on SAM.gov", href: repost });
-  return items;
+  return [...items, ...cycleDetails(extra, now)];
 }
 
 /** Hover text for the due date: where the deadline came from, when the portal says. */
@@ -91,6 +128,7 @@ export function deadlineNote(extra: string | null | undefined): string | null {
       ? "Member-only page: sign in to NSTXL to see the deadline."
       : "No deadline in the page text; see its documents.";
   }
+  if (GET_FUNDED.some((prefix) => data[`${prefix}_no_deadline`] === true)) return NO_CLOSE;
   const close = text(data.diu_close);
   return close ? `DIU: ${close}` : null;
 }

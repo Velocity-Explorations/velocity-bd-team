@@ -53,6 +53,41 @@ test("a Front Door repost links to the SAM.gov notice", () => {
   ]);
 });
 
+const NOW = new Date("2026-10-24T12:00:00Z");
+const CYCLE = {
+  portal: "AFWERX", type: "SBIR cycle", department: "Department of the Air Force", naics_code: "", set_aside: "",
+  extra: JSON.stringify({ afwerx_branches: ["Air Force", "Space Force"], afwerx_pre_release: "2026-10-07",
+                          afwerx_open: "2026-10-28", afwerx_no_deadline: false, afwerx_closed: false }),
+};
+
+test("an AFWERX cycle in pre-release shows its services and when it opens", () => {
+  assert.deepEqual(callDetails(CYCLE, NOW), [
+    { text: "SBIR cycle" },
+    { text: "Department of the Air Force" },
+    { text: "Air Force", tone: "info", title: "Includes U.S. Air Force topics" },
+    { text: "Space Force", tone: "info", title: "Includes U.S. Space Force topics" },
+    { text: "opens 28 Oct", tone: "warn", title: "Pre-release from 7 Oct; submissions open 28 Oct" },
+  ]);
+  const openDay = new Date("2026-10-28T12:00:00Z");
+  assert.equal(callDetails(CYCLE, openDay).some((d) => d.text.startsWith("opens")), false);   // open from that day
+  const nextYear = { ...CYCLE, extra: JSON.stringify({ afwerx_branches: ["Air Force"], afwerx_open: "2027-01-05" }) };
+  assert.deepEqual(callDetails(nextYear, NOW).slice(2), [
+    { text: "Air Force", tone: "info", title: "Includes U.S. Air Force topics" },
+    { text: "opens 5 Jan 2027", tone: "warn" },
+  ]);
+});
+
+test("a SpaceWERX listing already open shows no open date, and one with no close date says so on hover", () => {
+  const row = {
+    portal: "SpaceWERX", type: "TACFI", department: "U.S. Space Force", naics_code: "", set_aside: "",
+    extra: JSON.stringify({ spacewerx_branches: [], spacewerx_pre_release: null, spacewerx_open: "2026-06-05",
+                            spacewerx_no_deadline: true, spacewerx_closed: false }),
+  };
+  assert.deepEqual(callDetails(row, NOW), [{ text: "TACFI" }, { text: "U.S. Space Force" }]);
+  assert.equal(deadlineNote(row.extra), "No close date on the Get Funded page (TBD, or submissions on a continuous basis).");
+  assert.equal(deadlineNote(CYCLE.extra), null);
+});
+
 test("without extra, or with extra that cannot be read, only the columns show", () => {
   const plain = { portal: "Vulcan SOF", type: "CSO", department: "USSOCOM", naics_code: null, set_aside: null, extra: null };
   assert.deepEqual(callDetails(plain), [{ text: "CSO" }, { text: "USSOCOM" }]);
