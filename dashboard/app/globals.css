@@ -91,6 +91,11 @@ td.nowrap {
   white-space: nowrap;
 }
 
+td.when {
+  min-width: 7rem;   /* room for a date, so a narrow window breaks it before the time */
+  white-space: normal;
+}
+
 /* ------------------------------------------------------------------ top bar */
 
 .topbar {
@@ -98,7 +103,7 @@ td.nowrap {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 1.5rem;
-  padding: 0.7rem 1.25rem;
+  padding: 0.7rem 24px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -141,9 +146,7 @@ td.nowrap {
 }
 
 main {
-  max-width: 1500px;
-  margin: 0 auto;
-  padding: 1.25rem;
+  padding: 1.25rem 24px;
 }
 
 /* ------------------------------------------------------------------ page head */
@@ -317,13 +320,19 @@ button:hover {
   font-size: 0.9rem;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1279px) {
   .with-panel {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .panel {
     position: static;
+  }
+
+  .panel form {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    align-items: start;
   }
 }
 
@@ -361,7 +370,7 @@ th,
 td {
   text-align: left;
   vertical-align: top;
-  padding: 0.55rem 0.7rem;
+  padding: 0.55rem 0.5rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -377,13 +386,13 @@ tbody tr:last-child td {
 }
 
 td.call {
-  min-width: 15rem;
+  min-width: 11rem;
   max-width: 24rem;
   font-weight: 550;
 }
 
 td.reason {
-  min-width: 18rem;
+  min-width: 12rem;
   max-width: 34rem;
   font-size: 0.88rem;
 }
@@ -397,10 +406,11 @@ td.reason {
   flex-wrap: wrap;
   gap: 0.35rem;
   align-items: center;
+  overflow-wrap: anywhere;
 }
 
 td.decide {
-  min-width: 20rem;
+  min-width: 12rem;
 }
 
 td.decide input[type="text"] {
