@@ -18,6 +18,7 @@ portal content.
 - Dashboard: filter panel (#8), Monday brief with a Top 10 (#16), container with Google sign-in through IAP (#20), portal details on call rows (#25, #31, #37). Slack Monday summary (#9); weekly scan on Sunday night (#10).
 - Drafting and library: drafting port (#2), a person writes each opening (#17), slop check gate (#18), Proposal Register sync (#19). Flaky assistant test fixed (#29).
 - 24 Oct: a dry run of all eleven portals passed, then David started the first full scan a day early: 32 cards (Claude 2 yes, 30 maybe). NSTXL and Front Door ran past their fetch limit because every ledger query opened a new Supabase connection; one reused connection per thread fixed it (#39, PRO-550, 585 to 183 ms a query). Checking its rows on the dashboard led to clearer NASA contacts, set-asides and empty due cells (#40, PRO-551), and every page now fits the window with 24px each side, checked by `tests/test_dashboard_layout.py` against a running dashboard (#42, PRO-552). Review doc for Shaun ("BD Automation Review") is current; its Decisions section lists what waits on him.
+- 24 Oct, later: choosing a name under "Deciding as" applies at once, with a Clear User Selection button (#44, PRO-553); a vote's notice says the call left your queue and links to everyone's votes (#45, PRO-554); a Settings dialog picks each table's columns per browser, Tier hidden by default (#46, PRO-555); tags from `review/tags.yaml` on every call, by rules, Claude and Grok (#47, PRO-556; backfill: 183 calls by rule, 121 by each judge), shown under titles with a Tag filter (#48, PRO-557); the filter panel became a bar above the table, and headers sort and filter (#49, PRO-558). A two-person voting demo ran on a throwaway Docker database and was removed.
 
 ### Key Decisions
 - No getting around a site's block: DSIP (robots.txt) gets cards linking its topic search (PRO-536); IARPA (403) and TRMC (no public listings) come through SAM.gov office and title searches (PRO-537, PRO-548); BidNet (AWS bot challenge after a few requests) is shelved (PRO-544).
@@ -25,6 +26,7 @@ portal content.
 - SpaceWERX keeps STRATFI and TACFI notices and AFWERX drops them, until Shaun says whether Velocity holds a Phase II (PRO-538). DOE SBIR and APFIT keep every listing for the judges, since a rejected row is never filtered again.
 - Since 24 Oct David's standing rule: PRs are merged without asking once verified.
 - A contact links to its address only when a word of the name is in it: NASA's forecast pairs one person's name with another person's address on some rows (PRO-551).
+- Tags: David approved the list (one type, plus work, customer and access tags; the customer catch-all is "Other buyer"). Rules set what a call's data makes certain and both judges tag on a TAGS line of their review answers, so no extra model calls. The pipeline copies the list into the ledger's `tag_list` so the dashboard never reads review files (AGENTS rule 1).
 
 ### Key Files Modified
 | File | Change |
@@ -32,10 +34,12 @@ portal content.
 | `portals/` | ten adapters, `shared/funding_list.py`, SAM.gov office and title searches |
 | `dashboard/`, `review/`, `drafting/`, `library/` | Filters, brief, container and IAP, portal details; judges; drafting gates; Register |
 | `ledger/db.py` | One Postgres connection kept per thread across transactions (PRO-550) |
+| `review/tags.yaml`, `review/tags.py`, migrations 006 and 007 | Tag list, rules, `call_tags` and `tag_list` (PRO-556, PRO-557) |
+| `dashboard/components/` | FilterBar, HeaderCell, MenuController, SettingsDialog, ViewerPicker (PRO-553 to PRO-558) |
 | `docs/` | STATUS, RUNBOOK, LEDGER_SCHEMA and OWNERS for each portal |
 
 ### In Progress
-- Monday: check Sunday's 22:00 run, the first to read SAM.gov (24 Oct's 10 requests went to the dry run), and its SAM.gov rows on the dashboard.
+- Monday: check Sunday's 22:00 run, the first to read SAM.gov (24 Oct's 10 requests went to the dry run) and the first to tag new calls in the review, and its SAM.gov rows on the dashboard.
 - SAM.gov role for David's key, waiting on Velocity's entity administrator, then the first full ingest (PRO-529). Hosting with Alec (PRO-477), NSTXL member sign-in (PRO-531), shared portal account (PRO-509), Register judgment columns (PRO-480).
 
 ### Blockers
