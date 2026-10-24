@@ -149,6 +149,50 @@ main {
   padding: 1.25rem 24px;
 }
 
+/* ------------------------------------------------------------------ settings dialog */
+
+dialog.settings {
+  width: min(36rem, calc(100vw - 48px));
+  padding: 1.25rem;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+dialog.settings::backdrop {
+  background: rgb(0 0 0 / 0.35);
+}
+
+.settings-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.settings fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.settings label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
 /* ------------------------------------------------------------------ page head */
 
 .page-head {

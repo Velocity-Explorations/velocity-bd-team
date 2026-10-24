@@ -11,7 +11,8 @@ import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
 import { aliasesFor, displayPerson } from "@/lib/people";
 import { decisionsOn, judgeAgreement, latestJudgments, newThisWeek, portals, reviewQueue } from "@/lib/queries";
 import { peopleSplit, votesByCall } from "@/lib/scoreboard";
-import { displayTimeZone, queueMode } from "@/lib/settings";
+import { shows } from "@/lib/columns";
+import { displayTimeZone, hiddenColumns, queueMode } from "@/lib/settings";
 import { firstParam, isClosed, votedHref } from "@/lib/text";
 import { DECISIONS, isDecision, pickAllowed, STATUS_LABELS } from "@/lib/values";
 import { allowlist, currentViewer } from "@/lib/viewer";
@@ -47,6 +48,7 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
   const [judged, decisions] = await Promise.all([latestJudgments(ids), decisionsOn(perPerson ? ids : [])]);
   const votes = votesByCall(decisions, (by) => displayPerson(by, users));
   const tz = displayTimeZone();
+  const show = shows(await hiddenColumns(), "queue");   // the columns chosen in Settings
   const returnTo = filterHref("/", {
     portal: filters.portals,
     state: filters.state,
@@ -137,13 +139,13 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
               <table>
                 <thead>
                   <tr>
-                    <th>Claude / Grok</th>
+                    {show("judges") ? <th>Claude / Grok</th> : null}
                     <th>Call</th>
-                    <th>Due</th>
-                    <th>Tier</th>
-                    <th>AI reason</th>
-                    <th>First seen</th>
-                    {perPerson ? <th>Decided so far</th> : null}
+                    {show("due") ? <th>Due</th> : null}
+                    {show("tier") ? <th>Tier</th> : null}
+                    {show("reason") ? <th>AI reason</th> : null}
+                    {show("seen") ? <th>First seen</th> : null}
+                    {perPerson && show("votes") ? <th>Decided so far</th> : null}
                     <th>Decide</th>
                   </tr>
                 </thead>
@@ -153,9 +155,11 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
                     const callVotes = votes.get(r.id) ?? [];
                     return (
                       <tr key={r.id} data-call-id={r.id}>
-                        <td>
-                          <JudgeVerdicts verdicts={verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning)} reasonsFor={["grok"]} />
-                        </td>
+                        {show("judges") ? (
+                          <td>
+                            <JudgeVerdicts verdicts={verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning)} reasonsFor={["grok"]} />
+                          </td>
+                        ) : null}
                         <td className="call">
                           <TitleLink title={r.title} url={r.url} fallback={r.id} />
                           <div className="meta">
@@ -164,11 +168,13 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
                             {isClosed(r.extra) ? <span className="badge tone-grey">closed</span> : null}
                           </div>
                         </td>
-                        <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz) || <span className="muted">{noDeadlineLabel(r.extra)}</span>}</td>
-                        <td>{r.match_tier ?? ""}</td>
-                        <td className="reason">{r.ai_reasoning ?? ""}</td>
-                        <td className="when">{formatTime(r.first_seen_at, tz)}</td>
-                        {perPerson ? (
+                        {show("due") ? (
+                          <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz) || <span className="muted">{noDeadlineLabel(r.extra)}</span>}</td>
+                        ) : null}
+                        {show("tier") ? <td>{r.match_tier ?? ""}</td> : null}
+                        {show("reason") ? <td className="reason">{r.ai_reasoning ?? ""}</td> : null}
+                        {show("seen") ? <td className="when">{formatTime(r.first_seen_at, tz)}</td> : null}
+                        {perPerson && show("votes") ? (
                           <td>
                             {callVotes.length ? (
                               <ul className="notes votes">

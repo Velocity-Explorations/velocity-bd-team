@@ -1,9 +1,16 @@
 import path from "node:path";
+import { cookies } from "next/headers";
+import { COLUMNS_COOKIE, readHidden, type Hidden } from "./columns";
 import { pickQueueMode, type QueueMode } from "./values";
 
 /** Whether everyone decides every call in the review queue (see pickQueueMode). */
 export function queueMode(): QueueMode {
   return pickQueueMode(process.env.DASHBOARD_QUEUE);
+}
+
+/** The columns this browser has hidden in the Settings dialog (PRO-555). */
+export async function hiddenColumns(): Promise<Hidden> {
+  return readHidden((await cookies()).get(COLUMNS_COOKIE)?.value);
 }
 
 /** IANA zone for every displayed time. The ledger itself stores UTC. */

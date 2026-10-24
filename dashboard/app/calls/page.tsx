@@ -11,7 +11,8 @@ import { formatDue, formatTime } from "@/lib/format";
 import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
 import { decisionsOn, judgeAgreement, latestJudgments, listCalls, portals, type CallFilters } from "@/lib/queries";
 import { peopleSplit, votesByCall } from "@/lib/scoreboard";
-import { displayTimeZone } from "@/lib/settings";
+import { shows } from "@/lib/columns";
+import { displayTimeZone, hiddenColumns } from "@/lib/settings";
 import { firstParam, isClosed, parseNoteLine } from "@/lib/text";
 import { DECISIONS, FILTER_RESULTS, HUMAN_STATUSES, isDecision, pickAllowed, STATUS_LABELS, VERDICTS } from "@/lib/values";
 import { allowlist, currentViewer } from "@/lib/viewer";
@@ -40,6 +41,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
   const ids = rows.map((r) => r.id);
   const [judged, decisions, viewer] = await Promise.all([latestJudgments(ids), decisionsOn(ids), currentViewer()]);
   const tz = displayTimeZone();
+  const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Settings
   const users = allowlist();
   const votes = votesByCall(decisions, (by) => displayPerson(by, users));
   const filtered = Boolean(
@@ -138,12 +140,12 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                 <thead>
                   <tr>
                     <th>Call</th>
-                    <th>Filter</th>
-                    <th>Claude / Grok</th>
+                    {show("filter") ? <th>Filter</th> : null}
+                    {show("judges") ? <th>Claude / Grok</th> : null}
                     <th>Decision</th>
-                    <th>Notes</th>
-                    <th>Due</th>
-                    <th>First seen</th>
+                    {show("notes") ? <th>Notes</th> : null}
+                    {show("due") ? <th>Due</th> : null}
+                    {show("seen") ? <th>First seen</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -163,14 +165,18 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                             {isClosed(r.extra) ? <span className="badge tone-grey">closed</span> : null}
                           </div>
                         </td>
-                        <td>
-                          <Badge value={r.filter_result} />
-                          {r.match_tier ? <div className="meta">{r.match_tier} tier</div> : null}
-                          {r.filter_result === "rejected" && r.filter_reason ? <div className="meta">{r.filter_reason}</div> : null}
-                        </td>
-                        <td>
-                          <JudgeVerdicts verdicts={verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning)} reasonsFor={["claude", "grok"]} />
-                        </td>
+                        {show("filter") ? (
+                          <td>
+                            <Badge value={r.filter_result} />
+                            {r.match_tier ? <div className="meta">{r.match_tier} tier</div> : null}
+                            {r.filter_result === "rejected" && r.filter_reason ? <div className="meta">{r.filter_reason}</div> : null}
+                          </td>
+                        ) : null}
+                        {show("judges") ? (
+                          <td>
+                            <JudgeVerdicts verdicts={verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning)} reasonsFor={["claude", "grok"]} />
+                          </td>
+                        ) : null}
                         <td>
                           <Badge value={r.human_status} empty="undecided" />
                           {peopleSplit(callVotes) ? <span className="badge tone-warn">people disagree</span> : null}
@@ -210,26 +216,30 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                             </form>
                           </details>
                         </td>
-                        <td>
-                          {notes.length ? (
-                            <ul className="notes">
-                              {notes.map((n, i) => (
-                                <li key={i}>
-                                  {n.text}
-                                  {n.by ? (
-                                    <span className="muted">
-                                      {" "}
-                                      ({displayPerson(n.by, users)}
-                                      {n.at ? `, ${formatTime(n.at, tz)}` : ""})
-                                    </span>
-                                  ) : null}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </td>
-                        <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz) || <span className="muted">{noDeadlineLabel(r.extra)}</span>}</td>
-                        <td className="when">{formatTime(r.first_seen_at, tz)}</td>
+                        {show("notes") ? (
+                          <td>
+                            {notes.length ? (
+                              <ul className="notes">
+                                {notes.map((n, i) => (
+                                  <li key={i}>
+                                    {n.text}
+                                    {n.by ? (
+                                      <span className="muted">
+                                        {" "}
+                                        ({displayPerson(n.by, users)}
+                                        {n.at ? `, ${formatTime(n.at, tz)}` : ""})
+                                      </span>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </td>
+                        ) : null}
+                        {show("due") ? (
+                          <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz) || <span className="muted">{noDeadlineLabel(r.extra)}</span>}</td>
+                        ) : null}
+                        {show("seen") ? <td className="when">{formatTime(r.first_seen_at, tz)}</td> : null}
                       </tr>
                     );
                   })}

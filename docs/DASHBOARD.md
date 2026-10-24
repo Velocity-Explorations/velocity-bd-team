@@ -60,6 +60,12 @@ running dashboard, and is skipped without one (PRO-552):
 $env:DASHBOARD_TEST_URL = "http://localhost:8000"; pytest tests/test_dashboard_layout.py
 ```
 
+The Settings button in the top bar opens a dialog where each person turns the review queue's and
+All calls' columns on or off; Call and Decide (Decision on All calls) always show. The choice is
+kept in a cookie for that browser, and Reset to defaults clears it. By default Tier, the keyword
+filter's match strength, is hidden (PRO-555). `tests/test_dashboard_settings.py` checks the dialog
+against a running dashboard, the same way.
+
 ## The write actions
 
 `dashboard/app/actions.ts` has two writes.

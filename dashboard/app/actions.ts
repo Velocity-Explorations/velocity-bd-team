@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { COLUMNS_COOKIE, hiddenFromForm } from "@/lib/columns";
 import { aliasesFor } from "@/lib/people";
 import { decideCall, decideRequest, type DecideRequestResult, type DecideResult } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
@@ -105,5 +106,18 @@ export async function setViewer(formData: FormData): Promise<void> {
 /** The picker's Clear User Selection button: nobody is deciding until a name is chosen again. */
 export async function clearViewer(): Promise<void> {
   (await cookies()).delete(VIEWER_COOKIE);
+  revalidatePath("/", "layout");
+}
+
+/** The Settings dialog's Save: which columns each table shows, kept for this browser (PRO-555). */
+export async function saveColumns(formData: FormData): Promise<void> {
+  const hidden = hiddenFromForm(new Set(formData.keys()));
+  (await cookies()).set(COLUMNS_COOKIE, JSON.stringify(hidden), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+  revalidatePath("/", "layout");
+}
+
+/** The Settings dialog's Reset to defaults. */
+export async function resetColumns(): Promise<void> {
+  (await cookies()).delete(COLUMNS_COOKIE);
   revalidatePath("/", "layout");
 }
