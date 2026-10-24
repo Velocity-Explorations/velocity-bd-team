@@ -290,6 +290,40 @@ def second_judge(rows: list[dict[str, Any]], examples: str, extra_context: str =
     return len(judged)
 
 
+def tag_by_rules(run_id: int) -> int:
+    """Tag every call this run saw with the tags its own data makes certain (review/tags.py), so
+    they follow the data. Returns how many calls were tagged."""
+    from ledger.queries import calls_in_run, set_tags
+    from review.tags import rule_tags, tag_list
+
+    seen = calls_in_run(run_id)
+    for row in seen:
+        set_tags(row["id"], "rule", rule_tags(row, tag_list()))
+    return len(seen)
+
+
+def backfill_tags() -> int:
+    """Tag every stored call by its rules, then have Claude and Grok tag the kept, reviewed calls they
+    have not tagged yet, asking for tags alone. Safe to rerun: each pass only fills what is missing."""
+    from ledger.queries import calls_where, calls_without_tags, set_tags
+    from review.reviewer import tag_calls
+    from review.tags import rule_tags, tag_list
+
+    _console_logging()
+    stored = calls_where()
+    for row in stored:
+        set_tags(row["id"], "rule", rule_tags(row, tag_list()))
+    print(f"Rules tagged {len(stored)} call(s).")
+    pending = calls_without_tags("claude")
+    print(f"Claude tagged {tag_calls(pending, review_model(), 'claude')} of {len(pending)} call(s).")
+    pending = calls_without_tags("grok")
+    if not grok_enabled():
+        print(f"{GROK_KEY} is not set, so Grok did not tag the {len(pending)} call(s) waiting for it.")
+        return 0
+    print(f"Grok tagged {tag_calls(pending, grok_model(), 'grok')} of {len(pending)} call(s).")
+    return 0
+
+
 def backfill_judgments() -> int:
     """Copy the Claude review's existing verdicts into judgments, then have Grok judge every kept,
     reviewed call it has not judged yet. Safe to rerun: each pass only fills what is missing."""
@@ -755,6 +789,11 @@ def run_portal(portal: Portal, args: argparse.Namespace, log_path: Path) -> dict
         counts["filtered"] = run_filter(portal)
         log.info("FILTER: %d rows (%.1fs)", counts["filtered"], time.time() - t0)
 
+        try:
+            log.info("TAGS: rules tagged %d call(s)", tag_by_rules(run_id))
+        except Exception as exc:   # tags are a convenience: never let them stop a scan
+            log.warning("TAGS: rules skipped (%s: %s)", type(exc).__name__, str(exc)[:120])
+
         t0 = time.time()
         counts["reviewed"] = run_review(portal, args.limit, args.no_review)
         log.info("REVIEW: %d rows (%.1fs)", counts["reviewed"], time.time() - t0)
@@ -805,6 +844,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="carry out change requests approved on the dashboard, then exit")
     parser.add_argument("--backfill-judgments", action="store_true",
                         help="record Claude's past verdicts as judgments and have Grok judge the backlog, then exit")
+    parser.add_argument("--backfill-tags", action="store_true",
+                        help="tag every stored call by its rules and have Claude and Grok tag the reviewed ones, then exit")
     return parser.parse_args(argv)
 
 
@@ -820,6 +861,8 @@ def main(argv: list[str] | None = None) -> int:
         return apply_requests(wait_s=args.wait_lock * 60)
     if args.backfill_judgments:
         return backfill_judgments()
+    if args.backfill_tags:
+        return backfill_tags()
     try:
         acquire_lock(wait_s=args.wait_lock * 60)
     except LockHeld as exc:

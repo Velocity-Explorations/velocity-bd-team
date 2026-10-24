@@ -516,6 +516,38 @@ def judge_records() -> list[dict[str, Any]]:
         return rows(q(conn, JUDGE_RECORDS_SQL))
 
 
+# --------------------------------------------------------------------------------- tags
+# Tags from the set list in review/tags.yaml on each call (migration 006), kept per source: "rule"
+# for what the call's own data makes certain, "claude" and "grok" for each judge's picks.
+
+def set_tags(call_id: str, source: str, tags: Sequence[str]) -> None:
+    """Replace one source's tags on a call; the other sources' tags stay."""
+    now = now_iso()
+    with tx() as conn:
+        q(conn, "DELETE FROM call_tags WHERE call_id = ? AND source = ?", (call_id, source))
+        for tag in dict.fromkeys(tags):
+            q(conn, "INSERT INTO call_tags (call_id, tag, source, tagged_at) VALUES (?, ?, ?, ?)",
+              (call_id, tag, source, now))
+
+
+def tags_on(call_id: str) -> dict[str, list[str]]:
+    """One call's tags by source, each in the order it was set."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT tag, source FROM call_tags WHERE call_id = ? ORDER BY id", (call_id,)))
+    by_source: dict[str, list[str]] = {}
+    for row in found:
+        by_source.setdefault(row["source"], []).append(row["tag"])
+    return by_source
+
+
+def calls_without_tags(source: str) -> list[dict[str, Any]]:
+    """Kept, reviewed calls with no tags from this judge yet, oldest first."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM calls WHERE filter_result = 'kept' AND ai_verdict IS NOT NULL "
+                            "AND NOT EXISTS (SELECT 1 FROM call_tags AS t WHERE t.call_id = calls.id AND t.source = ?) "
+                            "ORDER BY first_seen_at, id", (source,)))
+
+
 # --------------------------------------------------------------------------------- decisions
 # Every decision on every call, kept per person (migration 004). calls.human_status is the
 # latest of them, the team's current decision.

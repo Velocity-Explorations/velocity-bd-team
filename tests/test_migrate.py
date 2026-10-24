@@ -9,9 +9,11 @@ from ledger.db import sqlite_path
 def test_migrate_creates_tables_and_is_idempotent(tmp_path: Path) -> None:
     url = f"sqlite:///{(tmp_path / 'm.db').as_posix()}"
     first = migrate.apply(url)
-    assert first == ["001_initial.sql", "002_change_requests.sql", "003_judgments.sql", "004_decisions.sql", "005_briefs.sql"]
+    assert first == ["001_initial.sql", "002_change_requests.sql", "003_judgments.sql", "004_decisions.sql", "005_briefs.sql",
+                     "006_call_tags.sql"]
     assert migrate.apply(url) == []
-    assert migrate.list_tables(url) == ["briefs", "calls", "change_requests", "decisions", "judgments", "proposals", "runs", "schema_migrations"]
+    assert migrate.list_tables(url) == ["briefs", "call_tags", "calls", "change_requests", "decisions", "judgments", "proposals", "runs",
+                                         "schema_migrations"]
 
 
 def test_dialect_tokens_differ() -> None:

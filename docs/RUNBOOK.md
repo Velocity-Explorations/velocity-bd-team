@@ -179,6 +179,21 @@ To fill the history once, after migration 003: `python run.py --backfill-judgmen
 Claude's past verdicts and has Grok judge every kept call it has not judged yet. It is safe
 to rerun.
 
+## Tags
+
+Every call carries tags from `review/tags.yaml`: one type, plus work, customer and access tags
+(PRO-556). Rules set the tags a call's own data makes certain, on every call each run sees;
+Claude and Grok pick the rest on a TAGS line of the review answer they already give, so tags cost
+no extra model calls. A tagging failure only logs a warning.
+
+After migration 006, `python run.py --backfill-tags` tags every stored call by its rules and has
+Claude and Grok tag the kept, reviewed calls, asking for tags alone. Grok takes about 20 s a call,
+so a full pass over about 120 calls runs some 40 minutes. It is safe to rerun: each pass only asks
+about calls a judge has not tagged.
+
+To change the list, edit `review/tags.yaml`: each tag with a few words on what it covers, which
+the judges read. Names must differ across groups.
+
 ## SAM.gov
 
 The SAM.gov portal reads the public Opportunities API with `BD_SAM_API_KEY` from `.env`

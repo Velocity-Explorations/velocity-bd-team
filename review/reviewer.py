@@ -7,6 +7,9 @@ Each call gets one retry after a second; both failing yields verdict "maybe" wit
 "Review error" reason. Two prompt slots stay empty for now: past_experience_block (the
 library component, later) and feedback_examples_block (Phase 8). A third, extra_context,
 carries the team's note when a person approves a re-review (docs/ASSISTANT.md).
+
+The answer also carries a TAGS line: each judge tags the call from review/tags.yaml in the same
+call (PRO-556). Tagging is best-effort and never changes a verdict.
 """
 from __future__ import annotations
 
@@ -18,7 +21,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from ledger.queries import add_judgment, set_review
+from ledger.queries import add_judgment, set_review, set_tags
+from review.tags import parse_tags, prompt_block, tag_list
 
 log = logging.getLogger("review")
 
@@ -75,9 +79,27 @@ Description: {description}
 Respond with exactly this format (no other text):
 VERDICT: yes|no|maybe
 REASON: [one sentence explaining why]
+TAGS: [tags from the list below, separated by commas]
 
 Use "yes" if clearly relevant, "no" if clearly not, "maybe" if uncertain.
-If past experience shows similar work has been pursued or won, weight that positively."""
+If past experience shows similar work has been pursued or won, weight that positively.
+
+{tags_block}"""
+
+# Tags alone, for calls reviewed before tagging began (run.py --backfill-tags).
+TAG_PROMPT_TEMPLATE = """Tag this government opportunity.
+
+Title: {title}
+Portal: {portal}
+Type: {type}
+NAICS: {naics_code}
+Agency: {department}
+Description: {description}
+
+{tags_block}
+
+Respond with exactly one line (no other text):
+TAGS: [tags from the list, separated by commas]"""
 
 
 class ModelClient(Protocol):
@@ -163,6 +185,19 @@ def build_prompt(
         naics_code=row.get("naics_code") or "",
         department=row.get("department") or "",
         description=(row.get("description") or "")[:DESCRIPTION_CHARS],
+        tags_block=prompt_block(tag_list()),
+    )
+
+
+def build_tag_prompt(row: Mapping[str, Any]) -> str:
+    return TAG_PROMPT_TEMPLATE.format(
+        title=row.get("title") or "",
+        portal=row.get("portal") or "",
+        type=row.get("type") or "",
+        naics_code=row.get("naics_code") or "",
+        department=row.get("department") or "",
+        description=(row.get("description") or "")[:DESCRIPTION_CHARS],
+        tags_block=prompt_block(tag_list()),
     )
 
 
@@ -189,14 +224,14 @@ def is_judgment(reason: str) -> bool:
     return not (reason.startswith("Review error") or reason == UNPARSEABLE_REASON)
 
 
-def ask_model(prompt: str, model: ModelClient, sleep: Callable[[float], None] = time.sleep) -> tuple[str, str]:
-    """One call plus one retry. Any failure on both -> ("maybe", "Review error: ...")."""
+def complete_text(prompt: str, model: ModelClient, sleep: Callable[[float], None] = time.sleep) -> tuple[str, str]:
+    """(text, error): the model's answer after at most one retry, or "" and the first error."""
     first_error = ""
     for attempt in (1, 2):
         try:
             text = model.complete(prompt, timeout=CALL_TIMEOUT_S)
             if text and text.strip():
-                return parse_response(text)
+                return text, ""
             raise RuntimeError("empty response")
         except Exception as exc:
             message = f"{type(exc).__name__}: {str(exc)[:200]}"
@@ -204,7 +239,35 @@ def ask_model(prompt: str, model: ModelClient, sleep: Callable[[float], None] = 
             log.warning("Model call attempt %d failed: %s", attempt, message[:160])
             if attempt == 1:
                 sleep(RETRY_DELAY_S)
-    return "maybe", f"Review error: {first_error[:80]}"
+    return "", first_error
+
+
+def ask(prompt: str, model: ModelClient, sleep: Callable[[float], None] = time.sleep) -> tuple[str, str, str]:
+    """ask_model, plus the answer's text for its TAGS line ("" after a failure)."""
+    text, error = complete_text(prompt, model, sleep)
+    if not text:
+        return "maybe", f"Review error: {error[:80]}", ""
+    verdict, reason = parse_response(text)
+    return verdict, reason, text
+
+
+def ask_model(prompt: str, model: ModelClient, sleep: Callable[[float], None] = time.sleep) -> tuple[str, str]:
+    """One call plus one retry. Any failure on both -> ("maybe", "Review error: ...")."""
+    verdict, reason, _ = ask(prompt, model, sleep)
+    return verdict, reason
+
+
+def store_tags(call_id: str, source: str, text: str) -> list[str]:
+    """Keep the tags an answer picked. An answer without them changes nothing, and a failure to
+    store them only logs: tagging never stops a review."""
+    picked = parse_tags(text, tag_list())
+    if picked:
+        try:
+            set_tags(call_id, source, picked)
+        except Exception as exc:
+            log.warning("Could not store %s's tags on %s: %s", source, call_id, type(exc).__name__)
+            return []
+    return picked
 
 
 def review_calls(
@@ -223,10 +286,11 @@ def review_calls(
         prompt = build_prompt(row, past, feedback_examples_block, extra_context)
         if n == 0:
             log.debug("Rendered prompt for first row:\n%s", prompt)
-        verdict, reason = ask_model(prompt, model_client, sleep)
+        verdict, reason, text = ask(prompt, model_client, sleep)
         set_review(row["id"], verdict, reason)
         if is_judgment(reason):
             add_judgment(row["id"], "claude", getattr(model_client, "model", MODEL_ID), verdict, reason)
+            store_tags(row["id"], "claude", text)
         reviewed = Reviewed(row["id"], str(row.get("title") or ""), verdict, reason, row.get("match_tier"))
         log.info("AI review [%s]: %s", verdict, reviewed.title[:80])
         if verdict == "no":
@@ -256,10 +320,11 @@ def judge_calls(
     name = getattr(model_client, "model", judge)
     for n, row in enumerate(rows):
         prompt = build_prompt(row, "", feedback_examples_block, extra_context)
-        verdict, reason = ask_model(prompt, model_client, sleep)
+        verdict, reason, text = ask(prompt, model_client, sleep)
         title = str(row.get("title") or "")
         if is_judgment(reason):
             add_judgment(row["id"], judge, name, verdict, reason)
+            store_tags(row["id"], judge, text)
             judged.append(Reviewed(row["id"], title, verdict, reason, row.get("match_tier")))
             log.info("%s judged [%s]: %s", judge, verdict, title[:80])
         else:
@@ -267,3 +332,23 @@ def judge_calls(
         if n < len(rows) - 1:
             sleep(BETWEEN_CALLS_S)
     return judged
+
+
+def tag_calls(
+    rows: list[Mapping[str, Any]],
+    model_client: ModelClient,
+    source: str,
+    sleep: Callable[[float], None] = time.sleep,
+) -> int:
+    """Have one judge tag calls reviewed before tagging began, asking for tags alone. Returns how many
+    it tagged; a call it could not tag gets none and is asked again on the next pass."""
+    tagged = 0
+    for n, row in enumerate(rows):
+        text, error = complete_text(build_tag_prompt(row), model_client, sleep)
+        if store_tags(row["id"], source, text):
+            tagged += 1
+        elif error:
+            log.warning("%s could not tag %s: %s", source, row["id"], error[:120])
+        if n < len(rows) - 1:
+            sleep(BETWEEN_CALLS_S)
+    return tagged
