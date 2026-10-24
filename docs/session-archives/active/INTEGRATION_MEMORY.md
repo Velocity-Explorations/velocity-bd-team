@@ -10,30 +10,32 @@ portal content.
 ## Current Session
 
 **Date**: 2026-10-24 (covers 20 to 24 Oct)
-**Focus**: Ten new portals, two judges and the review queue, the dashboard's hosting container, Proposal Register, drafting gates
+**Focus**: Ten new portals and the first full scan, two judges and the review queue, the dashboard's hosting container, Proposal Register, drafting gates
 
 ### What Was Done
 - Portals: SSC Front Door (PR #15), SAM.gov (#22, Yukon prior art #21), NSTXL (#23), DIU (#24), AFWERX (#26), SpaceWERX (#28), DOE SBIR (#32), NASA Forecast (#33), Space Florida (#34), APFIT (#35); IARPA (#27) and TRMC/JMETC (#36) through SAM.gov searches. AFWERX and SpaceWERX share `portals/shared/funding_list.py`. BidNet is built but shelved, unmerged, on `bidnet/adapter` (PRO-544).
 - Judges and queue: each judge's verdict kept (#11), judges scored against people's decisions (#13), everyone decides every call during training (#14).
 - Dashboard: filter panel (#8), Monday brief with a Top 10 (#16), container with Google sign-in through IAP (#20), portal details on call rows (#25, #31, #37). Slack Monday summary (#9); weekly scan on Sunday night (#10).
 - Drafting and library: drafting port (#2), a person writes each opening (#17), slop check gate (#18), Proposal Register sync (#19). Flaky assistant test fixed (#29).
-- 24 Oct: a dry run of all eleven portals passed (fetch and filter, about 67 calls for the judges), then David started the first full scan a day early. Review doc for Shaun ("BD Automation Review") is current; its Decisions section lists what waits on him.
+- 24 Oct: a dry run of all eleven portals passed, then David started the first full scan a day early: 32 cards (Claude 2 yes, 30 maybe). NSTXL and Front Door ran past their fetch limit because every ledger query opened a new Supabase connection; one reused connection per thread fixed it (#39, PRO-550, 585 to 183 ms a query). Checking its rows on the dashboard led to clearer NASA contacts, set-asides and empty due cells (#40, PRO-551). Review doc for Shaun ("BD Automation Review") is current; its Decisions section lists what waits on him.
 
 ### Key Decisions
 - No getting around a site's block: DSIP (robots.txt) gets cards linking its topic search (PRO-536); IARPA (403) and TRMC (no public listings) come through SAM.gov office and title searches (PRO-537, PRO-548); BidNet (AWS bot challenge after a few requests) is shelved (PRO-544).
 - One SAM.gov key with an entity role, not rotated keys (PRO-529). A Front Door repost of a SAM.gov notice is stored once, first copy wins (PRO-525). SAM.gov's v2 search ignores `subtier`; offices are searched by `organizationName`.
 - SpaceWERX keeps STRATFI and TACFI notices and AFWERX drops them, until Shaun says whether Velocity holds a Phase II (PRO-538). DOE SBIR and APFIT keep every listing for the judges, since a rejected row is never filtered again.
 - Since 24 Oct David's standing rule: PRs are merged without asking once verified.
+- A contact links to its address only when a word of the name is in it: NASA's forecast pairs one person's name with another person's address on some rows (PRO-551).
 
 ### Key Files Modified
 | File | Change |
 |------|--------|
 | `portals/` | ten adapters, `shared/funding_list.py`, SAM.gov office and title searches |
 | `dashboard/`, `review/`, `drafting/`, `library/` | Filters, brief, container and IAP, portal details; judges; drafting gates; Register |
+| `ledger/db.py` | One Postgres connection kept per thread across transactions (PRO-550) |
 | `docs/` | STATUS, RUNBOOK, LEDGER_SCHEMA and OWNERS for each portal |
 
 ### In Progress
-- Check the first full scan's runs, cards and dashboard rows. SAM.gov's 10 requests for 24 Oct went to the dry run, so SAM.gov reads nothing in it; Sunday's 22:00 run picks SAM.gov up.
+- Monday: check Sunday's 22:00 run, the first to read SAM.gov (24 Oct's 10 requests went to the dry run), and its SAM.gov rows on the dashboard.
 - SAM.gov role for David's key, waiting on Velocity's entity administrator, then the first full ingest (PRO-529). Hosting with Alec (PRO-477), NSTXL member sign-in (PRO-531), shared portal account (PRO-509), Register judgment columns (PRO-480).
 
 ### Blockers
