@@ -28,6 +28,8 @@ TODAY = date(2026, 10, 22)
 ARMY = "DEPT OF DEFENSE.DEPT OF THE ARMY.AMC.ACC.ACC-APG"
 IARPA_OFFICE = "INTELLIGENCE ADVANCED RESEARCH PROJECTS ACTIVITY"
 IARPA_PATH = f"OFFICE OF THE DIRECTOR OF NATIONAL INTELLIGENCE.{IARPA_OFFICE}.IARPA CONTRACTING OFFICE"
+TRMC = "TRMC"
+ORLANDO = "DEPT OF DEFENSE.DEPT OF THE ARMY.AMC.ACC.ACC-CTRS.ACC-APG.W6QK ACC-APG-ORLANDO"
 
 EDGE = "a" * 32       # solicitation, full and open: kept
 CYBER = "b" * 32      # combined synopsis, small business set-aside: kept
@@ -38,6 +40,7 @@ REPAIR = "f" * 32     # title on the blocklist: dropped before its description i
 SPECIAL = "1" * 32    # special notice, listed under two NAICS codes
 REPOST = "2" * 32     # sources sought that Front Door may already carry
 SPEECH = "3" * 32     # IARPA presolicitation under a NAICS code no search uses: found by office
+BAA = "4" * 32        # TRMC's special notice with no NAICS code: found by title
 
 
 def desc_url(notice_id: str) -> str:
@@ -71,6 +74,8 @@ NOTICES = {
     EIGHT_A: notice(EIGHT_A, "Software Sustainment Services", "Solicitation", "8A", "541511"),
     REPAIR: notice(REPAIR, "Repair of Circuit Card Assemblies", naics="541511"),
     SPECIAL: notice(SPECIAL, "Industry Day: Machine Learning for ISR", "Special Notice"),
+    BAA: notice(BAA, "Broad Agency Announcement _ TRMC _ TE-ST _ W900KK-22-R-0012", "Special Notice", None, None,
+                deadline="2030-03-14T17:00:00-04:00", fullParentPathName=ORLANDO, naicsCodes=[]),
     REPOST: notice(REPOST, "Zero Trust Architecture Sources Sought", "Sources Sought", None, "541511",
                    deadline="2026-12-01T12:00:00-05:00"),
     SPEECH: notice(SPEECH, "Speech Translation for Low-Resource Languages", "Presolicitation", None, "541990",
@@ -85,6 +90,7 @@ BY_CODE = {
 }
 DESCRIPTIONS = {
     EDGE: "<p>Develop edge AI for contested logistics.</p><p>Phase I &amp; II.</p>",
+    BAA: "<p>Test and evaluation technology at TRL 3 to 6, including autonomy test tools.</p>",
     CYBER: "<p>Modernize the cyber range software and data pipeline.</p>",
     SPECIAL: "<p>Machine learning for ISR: an industry day.</p>",
     REPOST: "<p>Zero trust architecture for C2 software.</p>",
@@ -117,6 +123,7 @@ class FakeSam:
     def __init__(self, quota: int | None = None, fail: BaseException | None = None) -> None:
         self.by_code = {code: [NOTICES[n] for n in ids] for code, ids in BY_CODE.items()}
         self.by_office: dict[str, list[dict[str, Any]]] = {IARPA_OFFICE: []}
+        self.by_title: dict[str, list[dict[str, Any]]] = {TRMC: []}
         self.searches: list[dict[str, str]] = []
         self.descriptions: list[str] = []
         self.quota = quota
@@ -136,7 +143,12 @@ class FakeSam:
             raise http_error(url, 429)
         if parts.path == "/opportunities/v2/search":
             self.searches.append(params)
-            items = self.by_code[params["ncode"]] if "ncode" in params else self.by_office[params["organizationName"]]
+            if "ncode" in params:
+                items = self.by_code[params["ncode"]]
+            elif "organizationName" in params:
+                items = self.by_office[params["organizationName"]]
+            else:
+                items = self.by_title[params["title"]]
             offset, limit = int(params["offset"]), int(params["limit"])
             return Reply({"totalRecords": len(items), "opportunitiesData": items[offset:offset + limit]})
         if parts.path == "/prod/opportunities/v1/noticedesc":
@@ -174,6 +186,15 @@ def test_an_office_is_searched_by_organization_name_whatever_its_naics_codes() -
     assert (query["organizationName"], query["rdlfrom"], query["postedFrom"], query["postedTo"]) == (
         IARPA_OFFICE, "10/22/2026", "10/23/2025", "10/22/2026")
     assert "ncode" not in query
+
+
+def test_titles_are_searched_whatever_their_naics_codes() -> None:
+    site = FakeSam()
+    site.by_title[TRMC] = [NOTICES[BAA]]
+    found = api.search_title(TRMC, TODAY, KEY, site, api.Budget(10))
+    assert [n["noticeId"] for n in found] == [BAA]
+    query = site.searches[0]
+    assert (query["title"], query["rdlfrom"]) == (TRMC, "10/22/2026") and "ncode" not in query
 
 
 def test_the_budget_caps_requests_and_a_429_means_the_day_is_spent() -> None:
@@ -253,6 +274,7 @@ def test_the_search_settings_keep_what_velocity_can_bid_on() -> None:
     rules = records.load_rules(portal.SEARCH_PATH)
     assert rules.naics_codes == ["541511", "541512", "541513", "541519", "541715"]
     assert rules.offices == [IARPA_OFFICE]   # its site refuses automated clients (PRO-537)
+    assert rules.titles == [TRMC]            # its notices can carry no NAICS code (PRO-548)
     assert records.keep(NOTICES[EDGE], rules) is None
     assert records.keep(NOTICES[CYBER], rules) is None
     assert records.keep(NOTICES[DATA], rules) is None
@@ -265,9 +287,12 @@ def test_offices_are_optional_in_the_search_settings(tmp_path: Path) -> None:
     settings = tmp_path / "search.yaml"
     base = "naics_codes: ['541511']\nnotice_types: [Solicitation]\nset_asides: [NONE]\n"
     settings.write_text(base, encoding="utf-8")
-    assert records.load_rules(settings).offices == []
+    assert records.load_rules(settings).offices == [] and records.load_rules(settings).titles == []
     settings.write_text(base + f"offices: {IARPA_OFFICE}\n", encoding="utf-8")
     with pytest.raises(ValueError, match="offices"):
+        records.load_rules(settings)
+    settings.write_text(base + f"titles: {TRMC}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="titles"):
         records.load_rules(settings)
 
 
@@ -276,11 +301,11 @@ def test_offices_are_optional_in_the_search_settings(tmp_path: Path) -> None:
 def test_fetch_all_stores_new_notices_and_spends_requests_only_where_needed(ledger_db: str) -> None:
     site = FakeSam()
     counts = scrape.fetch_all(run_id(), now=NOW, opener=site, key=KEY)
-    assert [s.get("ncode") or s["organizationName"] for s in site.searches] == [
-        "541511", "541512", "541513", "541519", "541715", IARPA_OFFICE]   # the codes, then the offices
+    assert [s.get("ncode") or s.get("organizationName") or s["title"] for s in site.searches] == [
+        "541511", "541512", "541513", "541519", "541715", IARPA_OFFICE, TRMC]   # codes, offices, then titles
     assert sorted(site.descriptions) == sorted([EDGE, CYBER, DATA, SPECIAL, REPOST])   # none for the dropped
     assert counts == {"found": 8, "scraped": 5, "new": 5, "failed": 0, "dropped": 3, "reposts": 0,
-                      "pending": 0, "requests": 11}
+                      "pending": 0, "requests": 12}
     stored = {row["id"]: row for row in lq.calls_where(portal="SAM.gov")}
     assert set(stored) == {f"samgov-{n}" for n in (EDGE, CYBER, DATA, SPECIAL, REPOST)}
     assert stored[f"samgov-{EDGE}"]["description"].startswith("Develop edge AI")
@@ -292,7 +317,7 @@ def test_a_second_run_refreshes_stored_notices_without_reading_descriptions_agai
     site = FakeSam()
     site.by_code["541715"][0] = {**NOTICES[EDGE], "responseDeadLine": "2026-12-01T17:00:00-05:00"}
     counts = scrape.fetch_all(run_id(), now=NOW, opener=site, key=KEY)
-    assert site.descriptions == [] and counts["new"] == 0 and counts["scraped"] == 5 and counts["requests"] == 6
+    assert site.descriptions == [] and counts["new"] == 0 and counts["scraped"] == 5 and counts["requests"] == 7
     edge = lq.get_call(f"samgov-{EDGE}")
     assert edge is not None and edge["due_date"] == "2026-12-01T17:00:00-05:00"
     assert edge["description"].startswith("Develop edge AI")
@@ -300,9 +325,9 @@ def test_a_second_run_refreshes_stored_notices_without_reading_descriptions_agai
 
 def test_a_spent_budget_keeps_what_was_read_and_leaves_the_rest_for_the_next_run(ledger_db: str,
                                                                                  monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(scrape, "REQUEST_BUDGET", 8)   # 6 searches, then 2 descriptions
+    monkeypatch.setattr(scrape, "REQUEST_BUDGET", 9)   # 7 searches, then 2 descriptions
     counts = scrape.fetch_all(run_id(), now=NOW, opener=FakeSam(), key=KEY)
-    assert (counts["requests"], counts["new"], counts["pending"]) == (8, 2, 3)
+    assert (counts["requests"], counts["new"], counts["pending"]) == (9, 2, 3)
     stored = {row["id"] for row in lq.calls_where(portal="SAM.gov")}
     assert stored == {f"samgov-{EDGE}", f"samgov-{CYBER}"}   # the soonest deadlines first
     monkeypatch.setattr(scrape, "REQUEST_BUDGET", 900)       # the next day
@@ -311,8 +336,18 @@ def test_a_spent_budget_keeps_what_was_read_and_leaves_the_rest_for_the_next_run
 
 
 def test_sam_gov_saying_the_day_is_spent_ends_the_run_cleanly(ledger_db: str) -> None:
-    counts = scrape.fetch_all(run_id(), now=NOW, opener=FakeSam(quota=7), key=KEY)   # 6 searches, 1 description
+    counts = scrape.fetch_all(run_id(), now=NOW, opener=FakeSam(quota=8), key=KEY)   # 7 searches, 1 description
     assert counts["new"] == 1 and counts["pending"] == 4
+
+
+def test_a_title_search_adds_notices_without_a_naics_code(ledger_db: str) -> None:
+    site = FakeSam()
+    site.by_title[TRMC] = [NOTICES[BAA]]
+    counts = scrape.fetch_all(run_id(), now=NOW, opener=site, key=KEY)
+    assert (counts["found"], counts["new"]) == (9, 6)
+    baa = lq.get_call(f"samgov-{BAA}")
+    assert baa is not None and baa["naics_code"] == "" and baa["type"] == "Special notice"
+    assert baa["description"].startswith("Test and evaluation technology")
 
 
 def test_an_office_search_adds_notices_under_other_codes_and_stores_each_notice_once(ledger_db: str) -> None:
