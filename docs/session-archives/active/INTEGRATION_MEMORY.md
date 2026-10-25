@@ -9,6 +9,34 @@ portal content.
 
 ## Current Session
 
+**Date**: 2026-10-25
+**Focus**: Dashboard redesign brief for Claude Design: spec, snapshot, build prompts and the Velocity Theme, in the repo
+
+### What Was Done
+- Redesign brief: a design spec of every dashboard requirement and decision (IDs Q1 to B9, the theme's fit, open questions), a static snapshot of the seven pages on public-portal data with sample votes by Analyst A and Analyst B, and six build prompts (0 for Claude Design, 1 to 5 for Claude Code).
+- Claude Design runs on the Velocity login, which cannot open David's personal artifacts, so the brief moved into docs/design with the Velocity Theme (PR #51, PRO-559); `tests/test_design_brief.py` checks that every link resolves and nothing written has a dash. The spec and prompts Claude Docs now point at the repo.
+
+### Key Decisions
+- The theme zip's example text came from an internal slide deck; the public copy uses this project's own text and writes ranges with "to". The snapshot went in as captured (David).
+- The repo copies are the ones to keep current. A finished design comes back as an export in docs/design/redesign/ by pull request, because Claude Code cannot open designs on the Velocity login.
+
+### Key Files Modified
+| File | Change |
+|------|--------|
+| `docs/design/` | Index, spec, build prompts, snapshot pages and screens, velocity-theme |
+| `tests/test_design_brief.py` | Parts exist; markdown, HTML, font and GitHub links resolve; no dashes |
+| `AGENTS.md`, `docs/STATUS.md`, `docs/DASHBOARD.md` | Point at docs/design |
+
+### In Progress
+- David runs prompt 0 in Claude Design; prompts 1 to 5 then build the design, one PR each.
+- Monday: check Sunday's 22:00 run, the first to read SAM.gov and to tag new calls in the review.
+- Still open from 24 Oct: SAM.gov role (PRO-529), hosting with Alec (PRO-477), NSTXL member sign-in (PRO-531), shared portal account (PRO-509), Register judgment columns (PRO-480).
+
+### Blockers
+- AI vendor clearance (PRO-473) is still open. SAM.gov allows 10 requests a day until the role is approved.
+
+## Session: 2026-10-24
+
 **Date**: 2026-10-24 (covers 20 to 24 Oct)
 **Focus**: Ten new portals and the first full scan, two judges and the review queue, the dashboard's hosting container, Proposal Register, drafting gates
 
