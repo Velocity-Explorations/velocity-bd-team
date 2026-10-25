@@ -1,0 +1,90 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../bundle.css">
+<meta charset="utf-8">
+<title>Velocity Theme</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--font-sans); overflow: hidden; }
+  .cover { position: relative; height: 288px; overflow: hidden; }
+  .art { position: absolute; top: 0; left: 480px; width: 480px; height: 288px; overflow: hidden; }
+  .art svg { display: block; width: 496px; height: 288px; }
+  .accent { fill: var(--accent); }
+  .relief { fill: var(--ink-secondary); }
+  .muted { fill: var(--ink-muted); }
+  .grey { fill: var(--line-strong); }
+  .band { rx: var(--radius-card); }
+  .dot { fill: var(--line-strong); }
+  .words { position: absolute; left: var(--space-40); bottom: var(--space-40); max-width: 440px; }
+  .name { margin: 0; font-size: 88px; line-height: .95; font-weight: 700; letter-spacing: -0.024em; color: var(--ink); }
+  .tag { margin: var(--space-8) 0 0 2px; font-size: 14px; line-height: 20px; color: var(--ink-secondary); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="art" aria-hidden="true">
+<svg viewBox="0 0 496 288" width="496" height="288">
+<!--
+  blocks      accent 480x56 (the identity colour, largest) · ink-secondary 384x56 · ink-muted 288x56 · line-strong 192x56, each bleeding off the right edge; about 27% of 960x288
+  arrangement a schedule staircase: each band starts one step later than the one above, like phases on the Phased Delivery Plan, stacked with space-16 gaps and fading toward the ground
+  pattern     square dots, from the square bullets and "corners stay nearly square": bullet-lead (8px) squares at a space-24 pitch in line-strong, filling the empty steps under the staircase, stopping space-16 short of each band
+  scales      band height badge (56px); steps 96 (space-48 x2); gaps space-16; corners radius-card; dots bullet-lead at space-24
+-->
+<rect class="accent band" x="0" y="16" width="496" height="56" rx="2"/>
+<rect class="relief band" x="96" y="88" width="400" height="56" rx="2"/>
+<rect class="muted band" x="192" y="160" width="304" height="56" rx="2"/>
+<rect class="grey band" x="288" y="232" width="208" height="56" rx="2"/>
+<rect class="dot" x="8" y="96" width="8" height="8"/>
+<rect class="dot" x="32" y="96" width="8" height="8"/>
+<rect class="dot" x="56" y="96" width="8" height="8"/>
+<rect class="dot" x="8" y="120" width="8" height="8"/>
+<rect class="dot" x="32" y="120" width="8" height="8"/>
+<rect class="dot" x="56" y="120" width="8" height="8"/>
+<rect class="dot" x="8" y="168" width="8" height="8"/>
+<rect class="dot" x="32" y="168" width="8" height="8"/>
+<rect class="dot" x="56" y="168" width="8" height="8"/>
+<rect class="dot" x="80" y="168" width="8" height="8"/>
+<rect class="dot" x="104" y="168" width="8" height="8"/>
+<rect class="dot" x="128" y="168" width="8" height="8"/>
+<rect class="dot" x="152" y="168" width="8" height="8"/>
+<rect class="dot" x="8" y="192" width="8" height="8"/>
+<rect class="dot" x="32" y="192" width="8" height="8"/>
+<rect class="dot" x="56" y="192" width="8" height="8"/>
+<rect class="dot" x="80" y="192" width="8" height="8"/>
+<rect class="dot" x="104" y="192" width="8" height="8"/>
+<rect class="dot" x="128" y="192" width="8" height="8"/>
+<rect class="dot" x="152" y="192" width="8" height="8"/>
+<rect class="dot" x="8" y="240" width="8" height="8"/>
+<rect class="dot" x="32" y="240" width="8" height="8"/>
+<rect class="dot" x="56" y="240" width="8" height="8"/>
+<rect class="dot" x="80" y="240" width="8" height="8"/>
+<rect class="dot" x="104" y="240" width="8" height="8"/>
+<rect class="dot" x="128" y="240" width="8" height="8"/>
+<rect class="dot" x="152" y="240" width="8" height="8"/>
+<rect class="dot" x="176" y="240" width="8" height="8"/>
+<rect class="dot" x="200" y="240" width="8" height="8"/>
+<rect class="dot" x="224" y="240" width="8" height="8"/>
+<rect class="dot" x="248" y="240" width="8" height="8"/>
+<rect class="dot" x="8" y="264" width="8" height="8"/>
+<rect class="dot" x="32" y="264" width="8" height="8"/>
+<rect class="dot" x="56" y="264" width="8" height="8"/>
+<rect class="dot" x="80" y="264" width="8" height="8"/>
+<rect class="dot" x="104" y="264" width="8" height="8"/>
+<rect class="dot" x="128" y="264" width="8" height="8"/>
+<rect class="dot" x="152" y="264" width="8" height="8"/>
+<rect class="dot" x="176" y="264" width="8" height="8"/>
+<rect class="dot" x="200" y="264" width="8" height="8"/>
+<rect class="dot" x="224" y="264" width="8" height="8"/>
+<rect class="dot" x="248" y="264" width="8" height="8"/>
+</svg>
+</div>
+<div class="words">
+<h1 class="name">Velocity<br>Theme</h1>
+<p class="tag">A near-black ground and one yellow accent that marks what matters.</p>
+</div>
+</div>
+</body>
+</html>

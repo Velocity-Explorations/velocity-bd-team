@@ -1,0 +1,54 @@
+<!-- @dsCard group="Charts" height=290 width=1920 subtitle="Value against complexity" -->
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>PriorityMatrix preview</title></head>
+<body>
+<div class="vx-canvas" style="padding-left: calc(var(--space-100) + var(--space-40)); padding-bottom: var(--space-80)">
+<div class="vx-matrix">
+  <div class="vx-chart" style="height: 560px">
+    <div class="vx-quad vx-quad--tl"><p class="vx-quadrant">Easy wins</p><p class="vx-micro-note">High value / low complexity</p></div>
+    <div class="vx-quad vx-quad--tr"><p class="vx-quadrant">Strategic initiatives</p><p class="vx-micro-note">High value / high complexity</p></div>
+    <div class="vx-quad vx-quad--bl vx-quad--low"><p class="vx-quadrant">Low-value quick</p><p class="vx-micro-note">Low value / low complexity</p></div>
+    <div class="vx-quad vx-quad--br vx-quad--low"><p class="vx-quadrant">Deprioritize</p><p class="vx-micro-note">Low value / high complexity</p></div>
+    <span class="vx-dot vx-marker" style="left: 20.0%; top: 40.0%">1</span>
+    <span class="vx-dot vx-marker" style="left: 40.0%; top: 22.5%">2</span>
+    <span class="vx-dot vx-marker" style="left: 55.0%; top: 30.0%">3</span>
+    <span class="vx-dot vx-marker" style="left: 65.0%; top: 15.0%">4</span>
+    <span class="vx-dot vx-marker" style="left: 60.0%; top: 25.0%">5</span>
+    <span class="vx-dot vx-marker vx-dot--excluded" style="left: 22.5%; top: 60.0%">6</span>
+    <span class="vx-dot vx-marker" style="left: 42.5%; top: 45.0%">7</span>
+    <span class="vx-dot vx-marker" style="left: 77.5%; top: 15.0%">8</span>
+    <span class="vx-dot vx-marker" style="left: 90.0%; top: 17.5%">9</span>
+    <span class="vx-tick vx-tick-x" style="left: 0%">1</span>
+    <span class="vx-tick vx-tick-x" style="left: 25%">2</span>
+    <span class="vx-tick vx-tick-x" style="left: 50%">3</span>
+    <span class="vx-tick vx-tick-x" style="left: 75%">4</span>
+    <span class="vx-tick vx-tick-x" style="left: 100%">5</span>
+    <span class="vx-tick vx-tick-y" style="top: 100%">1</span>
+    <span class="vx-tick vx-tick-y" style="top: 75%">2</span>
+    <span class="vx-tick vx-tick-y" style="top: 50%">3</span>
+    <span class="vx-tick vx-tick-y" style="top: 25%">4</span>
+    <span class="vx-tick vx-tick-y" style="top: 0%">5</span>
+    <p class="vx-axis vx-axis-x">Complexity →</p>
+    <p class="vx-axis vx-axis-y">Value ↑</p>
+  </div>
+  <div>
+    <p class="vx-legend-title">Feature legend</p>
+    <div class="vx-legend-rows">
+      <div class="vx-legend-row"><span class="vx-dot vx-dot--legend vx-micro">1</span><span class="vx-legend">Google sign-in</span><span class="vx-data">V 3.40 · C 1.80</span></div>
+      <div class="vx-legend-row"><span class="vx-dot vx-dot--legend vx-micro">2</span><span class="vx-legend">Grok reasons</span><span class="vx-data">V 4.10 · C 2.60</span></div>
+      <div class="vx-legend-row"><span class="vx-dot vx-dot--legend vx-micro">3</span><span class="vx-legend">Shared accounts</span><span class="vx-data">V 3.80 · C 3.20</span></div>
+      <div class="vx-legend-row"><span class="vx-dot vx-dot--legend vx-micro">4</span><span class="vx-legend">Drive sync</span><span class="vx-data">V 4.40 · C 3.60</span></div>
+      <div class="vx-legend-row"><span class="vx-dot vx-dot--legend vx-micro">5</span><span class="vx-legend">Portal assistant</span><span class="vx-data">V 4.00 · C 3.40</span></div>
+      <div class="vx-legend-row vx-legend-row--excluded"><span class="vx-dot vx-dot--legend vx-dot--excluded vx-micro">6</span><span class="vx-legend">Tags</span><span class="vx-data">V 2.60 · C 1.90</span></div>
+      <div class="vx-legend-row"><span class="vx-dot vx-dot--legend vx-micro">7</span><span class="vx-legend">Proposal Library</span><span class="vx-data">V 3.20 · C 2.70</span></div>
+      <div class="vx-legend-row"><span class="vx-dot vx-dot--legend vx-micro">8</span><span class="vx-legend">Past win rates</span><span class="vx-data">V 4.40 · C 4.10</span></div>
+      <div class="vx-legend-row"><span class="vx-dot vx-dot--legend vx-micro">9</span><span class="vx-legend">Scan health</span><span class="vx-data">V 4.30 · C 4.60</span></div>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>

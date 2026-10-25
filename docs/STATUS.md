@@ -138,5 +138,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   answer they already give. `python run.py --backfill-tags` tags stored calls (PRO-556). The
   dashboard shows them under each title, type first, with a Tag filter (tag_list, migration 007,
   PRO-557).
+- Dashboard redesign brief (2026-10-25): docs/design/ holds the design spec, a static snapshot
+  of the dashboard on public-portal data, the Velocity Theme design system and the build prompts,
+  so Claude Design on the Velocity account can read them from GitHub (PRO-559). The redesign
+  itself waits on that design.
 
 ## Known breakages
