@@ -2,7 +2,7 @@
 
 25 Oct 2026, David; revised 26 Oct for Home and the four sections
 
-Every requirement and decision behind the Velocity BD triage dashboard as of 26 Oct 2026, written as a brief for redesigning it in the Velocity Theme design system. A redesign keeps every requirement here; how each one looks is open. On 26 Oct the seven pages became four sections, Home, Calls, Proposals and Admin (section Pages); the snapshot still shows the seven pages they come from.
+Every requirement and decision behind the Velocity BD triage dashboard as of 26 Oct 2026, written as a brief for redesigning it in the Velocity Theme design system. A redesign keeps every requirement here; how each one looks is open. On 26 Oct the seven pages became four sections, Home, Calls, Proposals and Automation (section Pages); the snapshot still shows the seven pages they come from.
 
 ## Purpose and users
 
@@ -30,7 +30,7 @@ David's design goal, 24 Oct: use the space effectively. Long reasons, tags, deta
 
 ## Pages
 
-Four sections share one top bar; they replaced seven pages on 26 Oct. The bar carries the brand (Velocity BD), the four section links with the current one highlighted, a count badge on Admin when requests wait, the Deciding as picker with Clear User Selection, and the Settings button. A section with more than one view shows tabs under the page title.
+Four sections share one top bar; they replaced seven pages on 26 Oct. The bar carries the brand (Velocity BD), the four section links with the current one highlighted, a count badge on Automation when requests wait, and the account menu (section Account menu and profile). A section with more than one view shows tabs under the page title.
 
 | Section | Tab and path | What it is for | What it shows |
 | --- | --- | --- | --- |
@@ -40,19 +40,19 @@ Four sections share one top bar; they replaced seven pages on 26 Oct. The bar ca
 | Proposals | Pursuing, /proposals | The calls being worked toward a submission | Calls decided Pursue, nearest deadline first (section Proposals) |
 | Proposals | Submitted, /proposals/submitted | Submissions waiting on a response | Calls decided Submitted, longest waiting first (section Proposals) |
 | Proposals | Results, /proposals/results | Past submissions and win rate | Today's Proposals page: the proposals table with win rate by portal; an empty state until the Proposal Library fills it |
-| Admin | Requests, /requests | Approve the portal assistant's change requests | Waiting requests first (who asked, why, a preview of the change, Approve and Reject with a note), then the last 50 decided with their result |
-| Admin | Runs, /runs | Scan health | The latest run on top (status, start, duration, stage counts, error, log link), then the last 100 runs; a run still running after two hours is flagged |
-| Admin | Judges, /judges | How Claude and Grok compare with people | Per judge: matched, misses, false alarms, maybes; per person: calls decided and how often each judge matched them; between people: agreement; pursued calls a judge said no to |
+| Automation | Requests, /requests | Approve the portal assistant's change requests | Waiting requests first (who asked, why, a preview of the change, Approve and Reject with a note), then the last 50 decided with their result |
+| Automation | Scans, /runs | Scan health (today's Runs page) | The latest run on top (status, start, duration, stage counts, error, log link), then the last 100 runs; a run still running after two hours is flagged |
+| Automation | Judges, /judges | How Claude and Grok compare with people | Per judge: matched, misses, false alarms, maybes; per person: calls decided and how often each judge matched them; between people: agreement; pursued calls a judge said no to |
 
 Past weekly briefs keep a page at /brief, outside the top bar and linked from Home, because Monday's Slack post links there. It shows the week as the Monday 9:00 job posted it: a Top 10 across portals, then a bulletin board per portal (new calls by verdict, calls waiting, top picks, pursued calls closing within 14 days, the week's decisions, the scraper line), each call's decision as of now, and earlier weeks linked at the top.
 
 | ID | Requirement |
 | --- | --- |
-| N1 | The top bar shows four sections: Home, Calls, Proposals and Admin. The current section is highlighted whichever of its tabs is open. Admin opens on Requests. |
+| N1 | The top bar shows four sections: Home, Calls, Proposals and Automation. The current section is highlighted whichever of its tabs is open. Automation opens on Requests. |
 | N2 | Tabs sit under the page title and show which one is open. Each tab has its own address, so a link opens the right view. |
-| N3 | While requests wait, their count shows as a badge on Admin and on the Requests tab. |
+| N3 | While requests wait, their count shows as a badge on Automation and on the Requests tab. |
 | N4 | Old addresses keep working: /calls with its filters (the vote notice and shared links use them), /brief (Monday's Slack post), /judges, /requests, /runs and /proposals. A bookmark to / now opens Home, which links to To review. |
-| N5 | The Deciding as picker, Clear User Selection and Settings stay in the top bar on every page. |
+| N5 | The account menu sits at the right of the top bar on every page (U1). |
 | N6 | The Calls tabs share the filter bar: switching between To review and All keeps the portal, tag and open or closed filters. |
 
 The rest of this spec calls To review the queue and All the All calls page. They get the most use and carry most of the requirements below.
@@ -67,7 +67,7 @@ Home is the landing page: one screen that answers what needs attention now. Each
 | H2 | Top 10: the best open calls nobody has decided, across portals, ranked as the Monday brief ranks them: yes before maybe, then the nearest deadline, then the newest. Each shows both judges' verdicts, the title linked to its portal page, the portal and the deadline, and links to the call on All calls. |
 | H3 | Due in the next 14 days: pursued calls first, then undecided calls rated yes or maybe, soonest first, each with its deadline and days left. A call whose deadline is not a date (a forecast quarter, members only, no close date) is left out. |
 | H4 | Submitted, waiting on a response: every call whose decision is Submitted, longest waiting first, with its portal, who marked it Submitted and when, and days waiting, then a link to Proposals, Submitted. |
-| H5 | A status line: requests waiting (linked to Admin, Requests), the last scan's result and when it ran (a failed scan says so in words), and how often Claude and Grok agree. |
+| H5 | A status line: requests waiting (linked to Automation, Requests), the last scan's result and when it ran (linked to Scans) (a failed scan says so in words), and how often Claude and Grok agree. |
 | H6 | A link to the past weekly briefs (/brief). |
 | H7 | Home records nothing; decisions stay on Calls. |
 
@@ -87,7 +87,7 @@ To review (/review) is today's review queue. It lists the calls Claude rated yes
 | Q6 | Due cell: the deadline in the dashboard's time zone; hover says where it came from; a blank deadline says why in a word or two (section Formats). |
 | Q7 | AI reason cell: Claude's one-sentence reason, often 40 to 70 words, the longest text in the row. |
 | Q8 | Decided so far (each-person mode only): other people's votes as Name: Decision, nobody yet when none, and a people disagree badge when one said yes and another no. |
-| Q9 | Decide cell: an optional note (up to 2,000 characters) and four buttons that record at one click: Pursue (green), Not relevant (grey), Submitted (blue), Dismiss (grey). |
+| Q9 | Decide cell: a Decide menu listing Pursue (green), Not relevant (grey), Submitted (blue) and Dismiss (grey); choosing one records it. Add a note under the menu opens an optional note (up to 2,000 characters). The menu replaced four one-click buttons on 26 Oct. |
 | Q10 | After a vote the call leaves the voter's queue. The notice reads, for example, Pursue: PY26.2 TACFI Notice of Opportunity. It has left your queue. See everyone's votes on All calls, with that last part a link to the call on All calls. |
 | Q11 | Empty states: No calls match these filters, Nothing waiting for you, or Nothing waiting for a decision, each with a line on when new calls arrive. |
 | Q12 | The page's lead line explains the mode: everyone decides every call while the judges are trained, the first decision becomes the call's decision, later ones are kept beside it. |
@@ -169,13 +169,13 @@ Filters that span the whole table sit in a bar between the metric cards and the 
 
 ## Deciding
 
-There is no login until the dashboard is hosted behind Google's sign-in (PRO-477); until then a picker says who is deciding, and every person's every decision is kept.
+There is no login until the dashboard is hosted behind Google's sign-in (PRO-477); until then the account menu says who is deciding, and every person's every decision is kept.
 
 | ID | Requirement |
 | --- | --- |
-| V1 | Deciding as: a picker in the top bar lists the allowed people (DASHBOARD_USERS). Choosing a name applies at once; there is no Set step (PRO-553). |
-| V2 | Clear User Selection beside the picker removes the choice; it is disabled while nobody is chosen. |
-| V3 | With one allowed person the bar just says Deciding as that person. Behind Google's sign-in it shows the signed-in person, or that the account cannot decide. |
+| V1 | Deciding as: the account menu shows who is deciding. Until Google sign-in is live, its Switch user list holds the other allowed people (DASHBOARD_USERS), with a line saying why; choosing one applies at once, with no Set step (PRO-553). |
+| V2 | Log out in the account menu clears the choice, as Clear User Selection does today; behind Google's sign-in it signs the person out. |
+| V3 | With one allowed person the menu has no Switch user list. Behind Google's sign-in it shows the signed-in person, or that the account cannot decide. |
 | V4 | Deciding with nobody chosen refuses with: Choose who you are (top right) before deciding. |
 | V5 | Decisions are Pursue, Not relevant, Submitted and Dismiss. Pursue and Submitted count as yes, Not relevant and Dismiss as no, when scoring the judges. |
 | V6 | On the queue, the first decision becomes the call's decision; later ones are added beside it without changing it. A call's decision changes only from All calls. |
@@ -185,7 +185,7 @@ There is no login until the dashboard is hosted behind Google's sign-in (PRO-477
 
 ## Settings
 
-A Settings button in the top bar opens a dialog where each person chooses which columns the review queue and All calls show (PRO-555, PRO-557).
+Table settings, in the account menu and beside the filter bar, opens a dialog where each person chooses which columns the review queue and All calls show (PRO-555, PRO-557).
 
 | ID | Requirement |
 | --- | --- |
@@ -196,7 +196,20 @@ A Settings button in the top bar opens a dialog where each person chooses which 
 | S5 | Save keeps the choice for this browser; Reset to defaults clears it; Cancel closes without saving. |
 | S6 | The tables render without the hidden columns, so hidden columns give their width to the rest. |
 
-David's broader idea for Settings, not built: more choices than columns, such as which detail fields show. Choices could follow each person across devices once sign-in identifies them.
+David's broader idea for Table settings, not built: more choices than columns, such as which detail fields show. Profile settings are a separate page (section Account menu and profile).
+
+## Account menu and profile
+
+The account menu at the right of the top bar is each person's own corner: who is deciding, their settings, and signing out (26 Oct).
+
+| ID | Requirement |
+| --- | --- |
+| U1 | The menu opens from the person's initials and name, with Deciding under the name. It holds the name with Decisions are recorded as you, Profile settings, Table settings, Switch user (until Google sign-in, V1) and Log out (V2). |
+| U2 | Profile settings is a page at /profile. It shows the person's display name and initials and, after Google sign-in (PRO-477), the account they are signed in with. |
+| U3 | Where the dashboard opens: Home (the default) or To review. Opening / takes the person there. |
+| U4 | Default filters for Calls: portals, tags and open or closed, applied when Calls opens with no filters in its address; a shared link's own filters still win (F10). |
+| U5 | Time zone: every time and converted deadline (T1, T2) shows in the person's zone in place of the dashboard's America/Denver. |
+| U6 | Profile settings are kept for this browser until sign-in identifies people; keeping them per person across devices needs sign-in and a ledger table (Not built yet). |
 
 ## Layout and responsiveness
 
@@ -234,7 +247,7 @@ Today's accessibility basics stay, and the dashboard's words follow David's writ
 
 | ID | Requirement |
 | --- | --- |
-| A1 | The sorted column carries aria-sort; header filter buttons are labelled (Filter Claude / Grok); the search box, picker and note boxes have labels. |
+| A1 | The sorted column carries aria-sort; header filter buttons are labelled (Filter Claude / Grok); the search box, the account menu and note boxes have labels. |
 | A2 | Notices use role=status, errors role=alert. Escape closes an open menu or the Settings dialog. |
 | A3 | Every control is a link, button or form field, reachable by keyboard. |
 | A4 | Much secondary information lives in hover text today (a deadline's source, a tag's author, a contact's address). A redesign should keep it reachable without a mouse. |
@@ -250,9 +263,9 @@ A design must be buildable in the current stack and architecture; these are fixe
 | ID | Constraint |
 | --- | --- |
 | B1 | Next.js 16 (App Router) with React server components. Pages render on the server on every request, reading the ledger (Postgres on Supabase) directly; there is no API layer. |
-| B2 | Filters and sort are URL parameters, so every view is a plain link. Writes are server actions: decide, approve or reject a request, choose or clear the viewer, save or reset Settings. |
-| B3 | Client-side code stays small: today only the picker, the Settings dialog and the menu behaviour run in the browser. |
-| B4 | Two cookies: bd_viewer (who is deciding) and bd_columns (Settings). |
+| B2 | Filters and sort are URL parameters, so every view is a plain link. Writes are server actions: decide, approve or reject a request, choose or clear the viewer, save or reset Table settings, save Profile settings. |
+| B3 | Client-side code stays small: today only the picker (to become the account menu), the Settings dialog and the menu behaviour run in the browser. |
+| B4 | Cookies: bd_viewer (who is deciding) and bd_columns (Table settings) today; Profile settings add one more until sign-in (U6). |
 | B5 | The dashboard reads only the ledger, never another component's files (AGENTS rule 1). The tag list, for example, reaches it through the tag_list table. |
 | B6 | Hosting: a container for Google Kubernetes Engine behind Google's Identity-Aware Proxy, which signs people in by email (PRO-511 built it; PRO-477, hosting with Alec, is open). |
 | B7 | Tests: unit tests (node --test) for the display logic, and Playwright browser tests for layout widths, Settings, the picker, and the filter bar and headers, run against a dashboard. A redesign keeps the behaviour those tests check; their selectors can follow the new markup. |
@@ -297,7 +310,7 @@ Each call is one row in the ledger's calls table, with its judgments, decisions,
 | call_tags | Each tag with who set it (rule, claude, grok) | Tags line |
 | extra | Portal fields: closed flag, contacts, attachments, documents, services, open and pre-release dates, deadline sentences, members-only flag | Details line, badges, due hover |
 
-The other tables behind the other pages: briefs (past weekly briefs), change_requests (Admin, Requests, and Home's status line), runs (Admin, Runs, and Home's status line), proposals (Proposals, Results), tag_list (the Tag filter).
+The other tables behind the other pages: briefs (past weekly briefs), change_requests (Automation, Requests, and Home's status line), runs (Automation, Scans, and Home's status line), proposals (Proposals, Results), tag_list (the Tag filter).
 
 ## Not built yet and open questions
 
@@ -313,14 +326,14 @@ Shaun's column list (BD Automation Review, Columns) asks for fields the dashboar
 | Standard opportunity type, category tags, open or closed | Done: the Type tag, the tags, the closed badge and filter |
 | Recording won or lost for a submitted call | Not started; Results reads the Proposal Register until then |
 | Linking Proposal Register rows to calls | Not started: the Register has no call id |
+| Profile settings that follow a person across devices | Needs Google sign-in (PRO-477) and a ledger table (U6) |
 
 Open questions for the design:
 
 - [ ] How dense should a row be, and what can fold away (the AI reason, the tags, the details) without slowing triage?
 - [ ] How should hover-only information reach keyboard and touch users?
-- [ ] Should the decide controls stay in every row, or move to a side panel or a row action?
 - [ ] What fits on Home at 1440px without scrolling, and in what order?
-- [ ] How should Proposals, Admin and the past weekly briefs look in the design system? Today's Monday brief, Judges, Requests, Runs and Proposals pages follow the queue's look.
+- [ ] How should Proposals, Automation and the past weekly briefs look in the design system? Today's Monday brief, Judges, Requests, Runs and Proposals pages follow the queue's look.
 - [ ] Final column list: Shaun's decision (Decisions, BD Automation Review).
 
 ## Current UI
@@ -342,6 +355,7 @@ Every decision that shaped the dashboard, newest first.
 
 | Date | Decision | Ticket |
 | --- | --- | --- |
+| 26 Oct | The fourth section is Automation, not Admin, with tabs Requests, Scans (today's Runs) and Judges; an account menu replaces the Deciding as picker and the Settings button, with Profile settings (name, where the dashboard opens, default filters, time zone); deciding on To review uses a Decide menu in place of four buttons | PRO-561 |
 | 26 Oct | Seven pages become four sections: Home (a new landing page in place of the Monday brief page, whose weeks stay at /brief), Calls (To review and All), Proposals (Pursuing, Submitted, Results) and Admin (Requests, Runs, Judges); submissions waiting on a response come from calls marked Submitted | PRO-560 |
 | 24 Oct | The left filter panel became a bar above the table; column headers sort and filter; choices apply at once, the Portals menu on close | PRO-558 |
 | 24 Oct | Tags show under each title, type first in blue; a Tag filter; Settings can hide them | PRO-557 |

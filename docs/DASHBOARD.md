@@ -6,7 +6,7 @@ decisions are made; Slack posts the cards and carries the discussion. How to run
 it is in [dashboard/README.md](../dashboard/README.md).
 
 The brief for redesigning it in the Velocity Theme, including the planned move from seven pages
-to four sections (Home, Calls, Proposals, Admin), is in [docs/design/](design/README.md).
+to four sections (Home, Calls, Proposals, Automation), is in [docs/design/](design/README.md).
 
 ## Pages
 

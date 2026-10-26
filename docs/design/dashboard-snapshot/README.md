@@ -8,7 +8,7 @@ A working copy of the triage dashboard the BD team uses today, for redesigning i
 
 ## The seven pages
 
-These are the pages from before the 26 Oct restructure; the spec's Pages section gives each its new place. Home replaces the Monday brief, Calls holds the review queue (as To review) and All calls, Proposals holds Pursuing, Submitted and Results (this Proposals page), and Admin holds Requests, Runs and Judges.
+These are the pages from before the 26 Oct restructure; the spec's Pages section gives each its new place. Home replaces the Monday brief, Calls holds the review queue (as To review) and All calls, Proposals holds Pursuing, Submitted and Results (this Proposals page), and Automation holds Requests, Scans (this Runs page) and Judges.
 
 | Page | Path | What it is for |
 | --- | --- | --- |
