@@ -37,7 +37,7 @@ Four sections share one top bar; they replaced seven pages on 26 Oct. The bar ca
 | Home | /, no tabs | What needs attention now | Ready for review, the Top 10, calls due in the next 14 days, submissions waiting on a response, and a status line (section Home) |
 | Calls | To review, /review | Triage: decide each call rated yes or maybe | Today's review queue: five metric cards, the filter bar, then one row per call with decide buttons (section Calls: To review) |
 | Calls | All, /calls | Find any call, change a decision, read votes and notes | Every call scanned, rejected ones too, up to 200 rows, with a Showing N of M line (section Calls: All) |
-| Proposals | Pursuing, /proposals | The calls being worked toward a submission | Calls decided Pursue, nearest deadline first (section Proposals) |
+| Proposals | Pursuing, /proposals | The calls being worked toward a submission | Calls decided Pursue in two sections: Ready to draft, with a Draft button, and Drafting (section Proposals) |
 | Proposals | Submitted, /proposals/submitted | Submissions waiting on a response | Calls decided Submitted, longest waiting first (section Proposals) |
 | Proposals | Results, /proposals/results | Past submissions and win rate | Today's Proposals page: the proposals table with win rate by portal; an empty state until the Proposal Library fills it |
 | Automation | Requests, /requests | Approve the portal assistant's change requests | Waiting requests first (who asked, why, a preview of the change, Approve and Reject with a note), then the last 50 decided with their result |
@@ -113,10 +113,14 @@ Proposals follows a call from Pursue to its result. Pursuing and Submitted read 
 
 | ID | Requirement |
 | --- | --- |
-| P1 | Pursuing: calls whose decision is Pursue, nearest deadline first: the title linked to its portal page, the portal, the deadline and days left, who decided and when, and the notes. |
+| P1 | Pursuing: calls whose decision is Pursue, in two sections, Ready to draft and Drafting (P5 to P8), nearest deadline first in each: the title linked to its portal page, the portal, the deadline and days left, who decided and when, and the notes. |
 | P2 | Submitted: calls whose decision is Submitted, longest waiting first: the title, the portal, who marked it Submitted and when, days waiting, and the notes. |
 | P3 | Results: past submissions from the Proposal Register with their outcome, and win rate by portal (today's Proposals page). |
 | P4 | Decisions change on All calls, as today; each row here links to its call there. |
+| P5 | Ready to draft: pursued calls that are still open (the deadline has not passed), have no draft yet, and have solicitation text the Writer can read; each has a Draft button. A pursued call that cannot be drafted says why in place of the button, for example needs the solicitation first for a members-only page. |
+| P6 | Draft starts a draft at once: the click is the person's approval, since a draft takes 20 to 60 minutes and costs money. The call moves to Drafting. A second draft of the same call, or a call marked not relevant, is refused with the reason. |
+| P7 | Drafting: queued and running drafts with their progress and Cancel; finished drafts with their readiness line (for example Not ready: 1 PERSON WRITES, 34 NEEDS INPUT) and Open; failed drafts with the reason and Retry. |
+| P8 | The Draft button and draft progress need the drafts queue and worker from the Draft-Ready Upgrade (U1) and the Writer Plan (W2a), in docs/plans. Until they exist, both sections list their calls and Draft says Drafting is not set up yet. |
 
 ## Details, tags and badges
 
@@ -263,7 +267,7 @@ A design must be buildable in the current stack and architecture; these are fixe
 | ID | Constraint |
 | --- | --- |
 | B1 | Next.js 16 (App Router) with React server components. Pages render on the server on every request, reading the ledger (Postgres on Supabase) directly; there is no API layer. |
-| B2 | Filters and sort are URL parameters, so every view is a plain link. Writes are server actions: decide, approve or reject a request, choose or clear the viewer, save or reset Table settings, save Profile settings. |
+| B2 | Filters and sort are URL parameters, so every view is a plain link. Writes are server actions: decide, approve or reject a request, choose or clear the viewer, save or reset Table settings, save Profile settings, and, once the drafts queue exists, request, cancel or retry a draft. |
 | B3 | Client-side code stays small: today only the picker (to become the account menu), the Settings dialog and the menu behaviour run in the browser. |
 | B4 | Cookies: bd_viewer (who is deciding) and bd_columns (Table settings) today; Profile settings add one more until sign-in (U6). |
 | B5 | The dashboard reads only the ledger, never another component's files (AGENTS rule 1). The tag list, for example, reaches it through the tag_list table. |
@@ -327,6 +331,7 @@ Shaun's column list (BD Automation Review, Columns) asks for fields the dashboar
 | Recording won or lost for a submitted call | Not started; Results reads the Proposal Register until then |
 | Linking Proposal Register rows to calls | Not started: the Register has no call id |
 | Profile settings that follow a person across devices | Needs Google sign-in (PRO-477) and a ledger table (U6) |
+| The Draft button and draft progress on Pursuing | Needs the drafts queue and worker (Draft-Ready Upgrade U1, Writer Plan W2a), a schema change (P8) |
 
 Open questions for the design:
 
@@ -355,6 +360,7 @@ Every decision that shaped the dashboard, newest first.
 
 | Date | Decision | Ticket |
 | --- | --- | --- |
+| 26 Oct | Pursuing splits into Ready to draft, with a Draft button per call, and Drafting, with progress and finished drafts; a call is ready when it is pursued, still open, without a draft and with readable solicitation text | PRO-562 |
 | 26 Oct | The fourth section is Automation, not Admin, with tabs Requests, Scans (today's Runs) and Judges; an account menu replaces the Deciding as picker and the Settings button, with Profile settings (name, where the dashboard opens, default filters, time zone); deciding on To review uses a Decide menu in place of four buttons | PRO-561 |
 | 26 Oct | Seven pages become four sections: Home (a new landing page in place of the Monday brief page, whose weeks stay at /brief), Calls (To review and All), Proposals (Pursuing, Submitted, Results) and Admin (Requests, Runs, Judges); submissions waiting on a response come from calls marked Submitted | PRO-560 |
 | 24 Oct | The left filter panel became a bar above the table; column headers sort and filter; choices apply at once, the Portals menu on close | PRO-558 |

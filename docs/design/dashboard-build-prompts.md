@@ -46,7 +46,7 @@ Artboards, 1440px wide unless noted:
 - Calls, All: a call with two people's disagreeing votes, a rejected call, and the decide control open.
 - Menus open: a column header's filter, Portals, Tag.
 - The account menu open, the Table settings dialog, and the Profile settings page.
-- Proposals: Pursuing, Submitted and Results.
+- Proposals: Pursuing (Ready to draft with Draft buttons, and Drafting with a queued, a running, a finished and a failed draft), Submitted and Results.
 - Automation: Requests (with the count badge), Scans and Judges.
 - A past weekly brief.
 - Notices: done, refused, and the vote notice with its link.
@@ -113,11 +113,12 @@ Phase 2 of 6 of the dashboard redesign: the four sections, Home and the account 
 
 Read first: AGENTS.md, docs/STATUS.md and docs/DASHBOARD.md; the design <DESIGN_LINK> (the top bar, the tabs, Home, Proposals, Automation, the account menu and Profile settings); the spec docs/design/dashboard-design-spec.md, sections Pages, Home, Proposals, Deciding, Settings, and Account menu and profile; then every page under dashboard/app/, dashboard/lib/queries.ts and dashboard/lib/brief.ts. If you cannot open the design, ask David to export it into docs/design/redesign/.
 
-Build N1 to N6, H1 to H7, P1 to P4 and U1 to U6, keeping V1 to V9 and S1 to S6:
+Build N1 to N6, H1 to H7, P1 to P8 and U1 to U6, keeping V1 to V9 and S1 to S6:
 - Top bar: Home, Calls, Proposals and Automation, with the Requests count as a badge on Automation, and the account menu (U1): the picker becomes Switch user, Clear User Selection becomes Log out, and Settings becomes Table settings, which also stays beside the filter bar.
 - Addresses: Home at /; Calls with To review at /review (today's queue, moved from /) and All at /calls; Proposals with Pursuing at /proposals, Submitted at /proposals/submitted and Results at /proposals/results (today's Proposals page); Automation with Requests at /requests, Scans at /runs and Judges at /judges; Profile settings at /profile; past weekly briefs stay at /brief, linked from Home. Every old address keeps working (N4).
 - Home, built as designed: the blocks in H1 to H7, read live from the ledger. The Top 10 ranks yes before maybe, then the nearest deadline, then the newest, the order assistant/tools.py (RANKING) uses for the Monday brief; write that order in the dashboard's own query, since the dashboard reads only the ledger (AGENTS.md rule 1).
 - Pursuing and Submitted read each call's decision (human_status pursue or submitted, with human_by and human_at), in phase 1's look; phase 5 brings them, Results and Automation to the design.
+- Pursuing's two sections (P5 to P8): the Draft button and draft progress need the drafts queue and worker (docs/plans, Draft-Ready Upgrade U1 and Writer Plan W2a). If they are not on main yet, list the calls in both sections, show Draft as not set up yet, and say so in the PR.
 - Profile settings (U2 to U6): display name and initials, where the dashboard opens, default filters for Calls and time zone, kept for this browser until sign-in.
 - Where the design and the spec disagree, the spec wins on behaviour and the design on look; ask David about anything else with the questions prompt.
 
@@ -190,7 +191,7 @@ Phase 5 of 6 of the dashboard redesign: bring Proposals (Pursuing, Submitted, Re
 Read first: AGENTS.md, docs/STATUS.md and docs/DASHBOARD.md (its Pages table and The write actions); the design <DESIGN_LINK> (these pages' artboards and the empty states); the spec docs/design/dashboard-design-spec.md, sections Pages, Proposals, Formats and empty states, Accessibility and writing rules, Build constraints; then each of these pages under dashboard/app/. If you cannot open the design, ask David to export it into docs/design/redesign/.
 
 Keep what each does today:
-- Pursuing and Submitted: P1, P2 and P4, each row linked to its call on All.
+- Pursuing and Submitted: P1, P2, P4 and P5 to P8, each row linked to its call on All.
 - Results: past submissions from the Proposal Register with win rate by portal, and its empty state (P3).
 - Requests: waiting requests first (who asked, why, the preview, Approve and Reject with a note), then the last 50 decided with their result, and the count on Automation in the top bar (N3). A request decided elsewhere is never overwritten.
 - Scans (today's Runs page): the latest run on top with status, start, duration, stage counts, error and log link, then the last 100; a run still running after two hours is flagged.
@@ -242,13 +243,13 @@ Update the BD dashboard design you made earlier. On 26 Oct the structure changed
 
 Read first, from the public repo Velocity-Explorations/velocity-bd-team (plain text: https://raw.githubusercontent.com/Velocity-Explorations/velocity-bd-team/main/ followed by the path):
 - docs/design/dashboard-design-spec.md: https://github.com/Velocity-Explorations/velocity-bd-team/blob/main/docs/design/dashboard-design-spec.md
-  The sections that changed: Pages (N1 to N6), Home (H1 to H7), Proposals (P1 to P4), Account menu and profile (U1 to U6), Deciding (V1 to V4), Q9 under Calls: To review, and the 26 Oct rows of the Decision log. The rest is unchanged since your first design.
+  The sections that changed: Pages (N1 to N6), Home (H1 to H7), Proposals (P1 to P8), Account menu and profile (U1 to U6), Deciding (V1 to V4), Q9 under Calls: To review, and the 26 Oct rows of the Decision log. The rest is unchanged since your first design.
 
 The new structure:
 - Top bar: Home, Calls, Proposals and Automation, with the Requests count as a badge on Automation, and your account menu at the right.
 - Home (/): the new landing page.
 - Calls: tabs To review (/review, your Review queue screen) and All (/calls, your All calls screen). Switching tabs keeps the portal, tag and open or closed filters.
-- Proposals: tabs Pursuing (/proposals) and Submitted (/proposals/submitted), both new, and Results (/proposals/results, your Proposals screen).
+- Proposals: tabs Pursuing (/proposals) and Submitted (/proposals/submitted), both new, and Results (/proposals/results, your Proposals screen). Pursuing has two sections: Ready to draft, with a Draft button on each call, and Drafting.
 - Automation: tabs Requests, Scans (your Runs screen, renamed) and Judges. Automation opens on Requests.
 - Past weekly briefs (/brief): your Monday brief screen, now outside the top bar and linked from Home.
 - Account menu: as you drew it (Profile settings, Table settings, Switch user, Log out). Profile settings is a new page.
@@ -259,7 +260,8 @@ Artboards, 1440px wide unless noted:
 - Home at 1024px.
 - Home with every block empty.
 - The tab component, and the top bar with each section selected.
-- Proposals: Pursuing and Submitted.
+- Proposals, Pursuing: Ready to draft with Draft buttons, plus a members-only call that cannot be drafted and says why; Drafting with a queued, a running (with progress), a finished (with its readiness line and Open) and a failed draft (with Retry).
+- Proposals, Submitted.
 - Profile settings: display name and initials, the signed-in account (shown once Google sign-in is live), where the dashboard opens (Home or To review), default filters for Calls (portals, tags, open or closed) and time zone, with Save.
 - Every existing screen moved into the new top bar and tabs: To review, All, Results, Requests, Scans, Judges and the past brief.
 
