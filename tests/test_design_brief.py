@@ -100,3 +100,12 @@ def test_prompts_are_numbered_in_order() -> None:
     assert headings == list(range(last + 1))
     assert [int(n) for n, _ in phases] == list(range(1, last + 1))
     assert {int(total) for _, total in phases} == {last}
+
+
+def test_update_prompt_covers_the_new_structure() -> None:
+    """A design made before 26 Oct is updated in Claude Design, not redrawn; the build phases then use it."""
+    text = PROMPTS.read_text(encoding="utf-8")
+    blocks = re.findall(r"^## Update prompt: Claude Design.*?```text\n(.*?)```", text, flags=re.M | re.S)
+    assert len(blocks) == 1
+    for ids in ("N1 to N6", "H1 to H7", "P1 to P4", "U1 to U6", "Q9"):
+        assert ids in blocks[0]

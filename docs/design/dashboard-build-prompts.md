@@ -13,6 +13,8 @@ Run the prompts in order; each Claude Code run starts from main after the previo
 3. In every Claude Code prompt below, replace `<DESIGN_LINK>` with `docs/design/redesign/` (or the link).
 4. Paste prompts 1 to 6 into Claude Code in `C:\Projects\velocity-bd-team`, one session each. Each ends with its pull request merged, its Linear issue done, and a row in Shaun's review doc (BD Automation Review).
 
+Already have a design from the earlier prompt 0, made before 26 Oct for the seven pages? Paste the update prompt at the end of this file into the same Claude Design project instead of prompt 0, export the design as in step 2, then run prompts 1 to 6 as written.
+
 Each Claude Code prompt stands alone (AGENTS.md rule 6) and repeats the rules that matter. Where the design leaves a choice open, Claude Code asks you through the questions prompt rather than guessing.
 
 The inputs every prompt reads are in this folder: the [design spec](dashboard-design-spec.md), the [dashboard snapshot](dashboard-snapshot/README.md) and the [Velocity Theme](velocity-theme/README.md). The snapshot shows the seven pages from before 26 Oct; the spec's Pages section has the four sections that the design and the build follow.
@@ -30,7 +32,7 @@ Its README.md says what each part is. To read a file as plain text, use https://
 
 Read these first:
 1. The design spec: https://github.com/Velocity-Explorations/velocity-bd-team/blob/main/docs/design/dashboard-design-spec.md
-   Every requirement and decision behind the dashboard. Keep all of them; only their look is open. Its Pages section sets the structure: four sections, Home, Calls, Proposals and Admin, replace the seven pages of today's dashboard, and Home is new. Its "Velocity Theme fit" section lists where the theme and the dashboard collide (status colours, dark only, date format, where the yellow accent goes, missing app components). Resolve each one and say how.
+   Every requirement and decision behind the dashboard. Keep all of them; only their look is open. Its Pages section sets the structure: four sections, Home, Calls, Proposals and Automation, replace the seven pages of today's dashboard, and Home is new. Its "Velocity Theme fit" section lists where the theme and the dashboard collide (status colours, dark only, date format, where the yellow accent goes, missing app components). Resolve each one and say how.
 2. The design system: https://github.com/Velocity-Explorations/velocity-bd-team/tree/main/docs/design/velocity-theme
    README.md is the brand book; tokens.json and tokens.css hold the tokens; components/ holds each component's guidelines and an example; fonts/ and assets/Logos/ hold the typefaces and the Velocity logo. It was made for slides, so extend it to app components rather than replace it.
 3. The snapshot of today's UI: https://github.com/Velocity-Explorations/velocity-bd-team/tree/main/docs/design/dashboard-snapshot
@@ -43,9 +45,9 @@ Artboards, 1440px wide unless noted:
 - One To review row enlarged, with every detail, badge and tag variant.
 - Calls, All: a call with two people's disagreeing votes, a rejected call, and the decide control open.
 - Menus open: a column header's filter, Portals, Tag.
-- The Settings dialog.
+- The account menu open, the Table settings dialog, and the Profile settings page.
 - Proposals: Pursuing, Submitted and Results.
-- Admin: Requests (with the count badge), Runs and Judges.
+- Automation: Requests (with the count badge), Scans and Judges.
 - A past weekly brief.
 - Notices: done, refused, and the vote notice with its link.
 - Empty states for each Home block, To review and All.
@@ -76,7 +78,7 @@ If you cannot open the design, stop and ask David to export it into docs/design/
 Build:
 1. dashboard/app/globals.css: one token layer from the theme (ground, surface, line, ink and its steps, accent) plus the status tones the design adds, replacing today's --bg, --surface, --fg, --muted, --border, --accent and the good, warn, bad, info and grey tones. Components read tokens only; no literal colours outside the token layer.
 2. Self-host Inter Tight and Chakra Petch from the theme's woff2 files with next/font/local and real fallbacks; commit the OFL licence texts beside them.
-3. Restyle the shared pieces to the design: top bar (Velocity mark, page links, the Requests count, Deciding as picker, Clear User Selection, Settings), page head, tabs, metric cards, badges and tags, buttons, text fields and selects, menus (details.menu), the Settings dialog, notices and tables. Keep today's markup and class names where you can, so pages take the look without edits. The top bar keeps today's seven links; phase 2 changes them to the four sections.
+3. Restyle the shared pieces to the design: top bar (Velocity mark, page links, the Requests count, and today's picker and Settings button, which phase 2 folds into the account menu), page head, tabs, metric cards, badges and tags, buttons, text fields and selects, menus (details.menu), the Settings dialog, notices and tables. Keep today's markup and class names where you can, so pages take the look without edits. The top bar keeps today's seven links; phase 2 changes them to the four sections.
 4. Light and dark exactly as the design decides; if it is dark only, drop the light values and say so in docs/DASHBOARD.md.
 5. Where the design leaves a choice open, ask David with the questions prompt (recommended option first) rather than guess.
 
@@ -104,28 +106,29 @@ Done when every page shows the Velocity look through the new tokens, nothing mov
 
 ## Prompt 2: the four sections and Home
 
-Replaces the seven top bar links with Home, Calls, Proposals and Admin, moves each page under its section, and builds Home.
+Replaces the seven top bar links with Home, Calls, Proposals and Automation, moves each page under its section, and builds Home, the account menu and Profile settings.
 
 ```text
-Phase 2 of 6 of the dashboard redesign: the four sections and Home. Phase 1 (theme tokens, fonts and shared components) is merged on main.
+Phase 2 of 6 of the dashboard redesign: the four sections, Home and the account menu. Phase 1 (theme tokens, fonts and shared components) is merged on main.
 
-Read first: AGENTS.md, docs/STATUS.md and docs/DASHBOARD.md; the design <DESIGN_LINK> (the top bar, the tabs, Home, Proposals and Admin); the spec docs/design/dashboard-design-spec.md, sections Pages, Home and Proposals; then every page under dashboard/app/, dashboard/lib/queries.ts and dashboard/lib/brief.ts. If you cannot open the design, ask David to export it into docs/design/redesign/.
+Read first: AGENTS.md, docs/STATUS.md and docs/DASHBOARD.md; the design <DESIGN_LINK> (the top bar, the tabs, Home, Proposals, Automation, the account menu and Profile settings); the spec docs/design/dashboard-design-spec.md, sections Pages, Home, Proposals, Deciding, Settings, and Account menu and profile; then every page under dashboard/app/, dashboard/lib/queries.ts and dashboard/lib/brief.ts. If you cannot open the design, ask David to export it into docs/design/redesign/.
 
-Build N1 to N6, H1 to H7 and P1 to P4:
-- Top bar: Home, Calls, Proposals and Admin, with the Requests count as a badge on Admin; the picker, Clear User Selection and Settings stay.
-- Addresses: Home at /; Calls with To review at /review (today's queue, moved from /) and All at /calls; Proposals with Pursuing at /proposals, Submitted at /proposals/submitted and Results at /proposals/results (today's Proposals page); Admin with Requests at /requests, Runs at /runs and Judges at /judges; past weekly briefs stay at /brief, linked from Home. Every old address keeps working (N4).
+Build N1 to N6, H1 to H7, P1 to P4 and U1 to U6, keeping V1 to V9 and S1 to S6:
+- Top bar: Home, Calls, Proposals and Automation, with the Requests count as a badge on Automation, and the account menu (U1): the picker becomes Switch user, Clear User Selection becomes Log out, and Settings becomes Table settings, which also stays beside the filter bar.
+- Addresses: Home at /; Calls with To review at /review (today's queue, moved from /) and All at /calls; Proposals with Pursuing at /proposals, Submitted at /proposals/submitted and Results at /proposals/results (today's Proposals page); Automation with Requests at /requests, Scans at /runs and Judges at /judges; Profile settings at /profile; past weekly briefs stay at /brief, linked from Home. Every old address keeps working (N4).
 - Home, built as designed: the blocks in H1 to H7, read live from the ledger. The Top 10 ranks yes before maybe, then the nearest deadline, then the newest, the order assistant/tools.py (RANKING) uses for the Monday brief; write that order in the dashboard's own query, since the dashboard reads only the ledger (AGENTS.md rule 1).
-- Pursuing and Submitted read each call's decision (human_status pursue or submitted, with human_by and human_at), in phase 1's look; phase 5 brings them, Results and Admin to the design.
+- Pursuing and Submitted read each call's decision (human_status pursue or submitted, with human_by and human_at), in phase 1's look; phase 5 brings them, Results and Automation to the design.
+- Profile settings (U2 to U6): display name and initials, where the dashboard opens, default filters for Calls and time zone, kept for this browser until sign-in.
 - Where the design and the spec disagree, the spec wins on behaviour and the design on look; ask David about anything else with the questions prompt.
 
 Tests first:
 - Failing unit tests (dashboard/lib/*.test.ts) for Home's logic: the Top 10 order, the 14-day window (pursued calls first, deadlines that are not dates left out), and days waiting for submitted calls.
-- Browser tests (tests/test_dashboard_*.py): the top bar shows the four sections, each tab opens at its own address, old addresses still land on the right view, and Home shows its blocks or their empty states. Browser tests only read: none may record a decision.
+- Browser tests (tests/test_dashboard_*.py): the top bar shows the four sections, each tab opens at its own address, old addresses still land on the right view, Home shows its blocks or their empty states, the account menu switches user and logs out, and each Profile setting takes effect (landing page, default filters, time zone). Browser tests only read and set cookies: none may record a decision.
 - At the end: npm test, npm run build, pytest, and every tests/test_dashboard_*.py against the dev server with DASHBOARD_TEST_URL set. Point the existing browser tests at /review where they used the queue at /; never weaken what they check.
 
-Process, as in phase 1: a Linear issue first (team Product, project BD Automation); branch dashboard/structure-and-home; commit feat(dashboard): Home, and Calls, Proposals and Admin in place of seven pages PRO-NNN with a ref line and nothing else; no en or em dashes anywhere; nothing login-gated committed; update docs/DASHBOARD.md (its Pages table) and docs/STATUS.md; open the PR, squash-merge once verified, switch to main and pull, mark the issue Done with a comment, and add a row to the "Since 21 Oct" table in Shaun's review doc.
+Process, as in phase 1: a Linear issue first (team Product, project BD Automation); branch dashboard/structure-and-home; commit feat(dashboard): Home, four sections and the account menu PRO-NNN with a ref line and nothing else; no en or em dashes anywhere; nothing login-gated committed; update docs/DASHBOARD.md (its Pages table) and docs/STATUS.md; open the PR, squash-merge once verified, switch to main and pull, mark the issue Done with a comment, and add a row to the "Since 21 Oct" table in Shaun's review doc.
 
-Done when the four sections and Home work at their addresses, old links still land, all tests pass and the PR is merged.
+Done when the four sections, Home, the account menu and Profile settings work at their addresses, old links still land, all tests pass and the PR is merged.
 ```
 
 ## Prompt 3: To review
@@ -138,7 +141,7 @@ Phase 3 of 6 of the dashboard redesign: rebuild Calls, To review (/review, the r
 Read first: AGENTS.md, docs/STATUS.md and docs/DASHBOARD.md; the design <DESIGN_LINK> (the To review artboards, the enlarged row, the menus, notices and empty states); the spec docs/design/dashboard-design-spec.md, sections Pages, Calls: To review, Details tags and badges, Filters sorting and links, Deciding, Settings, Layout and responsiveness, Formats and empty states, Accessibility and writing rules; then the To review page under dashboard/app/ and the components and lib files it uses. If you cannot open the design, ask David to export it into docs/design/redesign/.
 
 Build To review as designed while keeping Q1 to Q12, N5 to N6, F1 to F11, V1 to V9, S1 to S6, L1 to L7, T1 to T7, A1 to A5 and W1 to W3. In particular:
-- Denser rows that still show everything a decision needs: both judges' verdicts and the disagreement flags, Grok's reason, the title link, the details line, the tags line, the deadline and why one is missing, Claude's reason, first seen, the votes so far, the note and the four decisions.
+- Denser rows that still show everything a decision needs: both judges' verdicts and the disagreement flags, Grok's reason, the title link, the details line, the tags line, the deadline and why one is missing, Claude's reason, first seen, the votes so far, the note and the Decide menu (Q9).
 - Information that is hover-only today stays reachable from the keyboard (A4).
 - Settings still hides and shows each column and the tags line; hidden columns give their width to the rest.
 - No sideways scroll and no hidden columns from 1024px to 2560px.
@@ -177,20 +180,20 @@ Process, as in phase 1: a Linear issue first (team Product, project BD Automatio
 Done when All matches the design, every listed requirement holds, all tests pass and the PR is merged.
 ```
 
-## Prompt 5: Proposals, Admin and past briefs
+## Prompt 5: Proposals, Automation and past briefs
 
-Brings Proposals' three tabs, Admin's three tabs and the past weekly briefs to the design, keeping what each does.
+Brings Proposals' three tabs, Automation's three tabs and the past weekly briefs to the design, keeping what each does.
 
 ```text
-Phase 5 of 6 of the dashboard redesign: bring Proposals (Pursuing, Submitted, Results), Admin (Requests, Runs, Judges) and the past weekly briefs (/brief) to the design. Phases 1 to 4 are merged on main.
+Phase 5 of 6 of the dashboard redesign: bring Proposals (Pursuing, Submitted, Results), Automation (Requests, Scans, Judges) and the past weekly briefs (/brief) to the design. Phases 1 to 4 are merged on main.
 
 Read first: AGENTS.md, docs/STATUS.md and docs/DASHBOARD.md (its Pages table and The write actions); the design <DESIGN_LINK> (these pages' artboards and the empty states); the spec docs/design/dashboard-design-spec.md, sections Pages, Proposals, Formats and empty states, Accessibility and writing rules, Build constraints; then each of these pages under dashboard/app/. If you cannot open the design, ask David to export it into docs/design/redesign/.
 
 Keep what each does today:
 - Pursuing and Submitted: P1, P2 and P4, each row linked to its call on All.
 - Results: past submissions from the Proposal Register with win rate by portal, and its empty state (P3).
-- Requests: waiting requests first (who asked, why, the preview, Approve and Reject with a note), then the last 50 decided with their result, and the count on Admin in the top bar (N3). A request decided elsewhere is never overwritten.
-- Runs: the latest run on top with status, start, duration, stage counts, error and log link, then the last 100; a run still running after two hours is flagged.
+- Requests: waiting requests first (who asked, why, the preview, Approve and Reject with a note), then the last 50 decided with their result, and the count on Automation in the top bar (N3). A request decided elsewhere is never overwritten.
+- Scans (today's Runs page): the latest run on top with status, start, duration, stage counts, error and log link, then the last 100; a run still running after two hours is flagged.
 - Judges: per judge (matched, misses, false alarms, maybes), per person, between people, and the pursued calls a judge said no to. Only verdicts given before anyone decided the call count.
 - Past briefs: the week as Monday's Slack post had it; the Top 10 across portals; a board per portal (new calls by verdict, calls waiting, top picks, pursued calls closing within 14 days, the week's decisions, the scraper line); each call's decision as of now; links to earlier weeks.
 - Every page's empty state, and its migration notice where one applies.
@@ -198,7 +201,7 @@ Keep what each does today:
 
 Tests first, as in phase 3, plus a browser test per page that it renders with the new look. Browser tests only read: none may approve or reject a request or record a decision. Then npm test, npm run build, pytest and every tests/test_dashboard_*.py against the dev server; compare screenshots with the design.
 
-Process, as in phase 1: a Linear issue first (team Product, project BD Automation); branch dashboard/pages-redesign; commit feat(dashboard): Proposals, Admin and past briefs in the Velocity Theme PRO-NNN with a ref line and nothing else; no en or em dashes anywhere; nothing login-gated committed; update docs/DASHBOARD.md and docs/STATUS.md; open the PR, squash-merge once verified, switch to main and pull, mark the issue Done with a comment, and add a row to the "Since 21 Oct" table in Shaun's review doc.
+Process, as in phase 1: a Linear issue first (team Product, project BD Automation); branch dashboard/pages-redesign; commit feat(dashboard): Proposals, Automation and past briefs in the Velocity Theme PRO-NNN with a ref line and nothing else; no en or em dashes anywhere; nothing login-gated committed; update docs/DASHBOARD.md and docs/STATUS.md; open the PR, squash-merge once verified, switch to main and pull, mark the issue Done with a comment, and add a row to the "Since 21 Oct" table in Shaun's review doc.
 
 Done when these pages match the design, all tests pass and the PR is merged.
 ```
@@ -213,7 +216,7 @@ Phase 6 of 6 of the dashboard redesign: the finishing pass. Phases 1 to 5 are me
 Read first: AGENTS.md, docs/STATUS.md and docs/DASHBOARD.md; the design <DESIGN_LINK>; and the whole spec docs/design/dashboard-design-spec.md, especially Accessibility and writing rules, Layout and responsiveness, and the Decision log. If you cannot open the design, ask David to export it into docs/design/redesign/.
 
 Check and fix, across every page:
-1. Keyboard: tab from the top bar through Home and To review to a decision, open and close each menu, switch tabs, open Settings and leave it with Escape; focus always visible.
+1. Keyboard: tab from the top bar through Home and To review to a decision, open and close each menu, switch tabs, open the account menu and Table settings and leave each with Escape; focus always visible.
 2. Contrast: text and badges meet WCAG AA (4.5:1 for text) in every theme the design has.
 3. Widths: no sideways scroll and no hidden columns from 1024px to 2560px; below 1024px the page stays usable and only a table scrolls inside itself.
 4. Words: no en or em dash anywhere in the UI, code or docs (read the files as UTF-8 when you search, since piping text through the shell on this PC decodes it as cp1252); labels in sentence case; status always written as a word.
@@ -228,4 +231,41 @@ Then:
 Process, as in phase 1: a Linear issue first (team Product, project BD Automation); branch dashboard/redesign-finish; commit fix(dashboard): accessibility, widths and cleanup after the redesign PRO-NNN with a ref line and nothing else; no en or em dashes anywhere; nothing login-gated committed; open the PR, squash-merge once verified, switch to main and pull, mark the issue Done with a comment, and add a row to the "Since 21 Oct" table in Shaun's review doc. Then ask David what to work on next with the questions prompt.
 
 Done when every spec requirement is ticked off or explained, all tests pass and the PR is merged.
+```
+
+## Update prompt: Claude Design
+
+For a design made from the earlier prompt 0, before 26 Oct, for the seven pages. Paste it into the same Claude Design project: it keeps what is drawn and adds what changed.
+
+```text
+Update the BD dashboard design you made earlier. On 26 Oct the structure changed: four sections replace the seven pages, Home is new, and your account menu is now part of the spec. Keep everything already designed (tokens, components, rows, menus, notices, the account menu); move the existing screens into the new structure and design only what is new.
+
+Read first, from the public repo Velocity-Explorations/velocity-bd-team (plain text: https://raw.githubusercontent.com/Velocity-Explorations/velocity-bd-team/main/ followed by the path):
+- docs/design/dashboard-design-spec.md: https://github.com/Velocity-Explorations/velocity-bd-team/blob/main/docs/design/dashboard-design-spec.md
+  The sections that changed: Pages (N1 to N6), Home (H1 to H7), Proposals (P1 to P4), Account menu and profile (U1 to U6), Deciding (V1 to V4), Q9 under Calls: To review, and the 26 Oct rows of the Decision log. The rest is unchanged since your first design.
+
+The new structure:
+- Top bar: Home, Calls, Proposals and Automation, with the Requests count as a badge on Automation, and your account menu at the right.
+- Home (/): the new landing page.
+- Calls: tabs To review (/review, your Review queue screen) and All (/calls, your All calls screen). Switching tabs keeps the portal, tag and open or closed filters.
+- Proposals: tabs Pursuing (/proposals) and Submitted (/proposals/submitted), both new, and Results (/proposals/results, your Proposals screen).
+- Automation: tabs Requests, Scans (your Runs screen, renamed) and Judges. Automation opens on Requests.
+- Past weekly briefs (/brief): your Monday brief screen, now outside the top bar and linked from Home.
+- Account menu: as you drew it (Profile settings, Table settings, Switch user, Log out). Profile settings is a new page.
+- Decide: keep your Decide menu; the spec now asks for it (Q9).
+
+Artboards, 1440px wide unless noted:
+- Home with every block filled: Ready for review (waiting for you, split yes and maybe, new this week, a link to start reviewing), Top 10 (both verdicts, title, portal, deadline), Due in the next 14 days (pursued calls first, then undecided yes and maybe calls, with days left), Submitted and waiting (portal, who marked it and when, days waiting), the status line (requests waiting, the last scan's result and time, judges agree %), and the link to past briefs.
+- Home at 1024px.
+- Home with every block empty.
+- The tab component, and the top bar with each section selected.
+- Proposals: Pursuing and Submitted.
+- Profile settings: display name and initials, the signed-in account (shown once Google sign-in is live), where the dashboard opens (Home or To review), default filters for Calls (portals, tags, open or closed) and time zone, with Save.
+- Every existing screen moved into the new top bar and tabs: To review, All, Results, Requests, Scans, Judges and the past brief.
+
+Goals: Home answers what needs attention now at a glance, ideally without scrolling at 1440px. Reuse your existing components (stat tiles, badges, rows) before adding new ones.
+
+Rules, as before: no en dash or em dash anywhere (write ranges with "to"); plain sentence-case labels; status always written as a word, never shown by colour alone; real content from the snapshot (https://github.com/Velocity-Explorations/velocity-bd-team/tree/main/docs/design/dashboard-snapshot), never placeholder text. The snapshot has no submitted calls, so mark one of its yes calls Submitted for the example.
+
+Update the handoff note: list the new and changed artboards, any new components or tokens (the tabs, Home's blocks, Profile settings), and any spec requirement you could not meet and why.
 ```
