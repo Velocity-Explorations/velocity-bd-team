@@ -394,6 +394,17 @@ details.menu > summary::-webkit-details-marker {
   gap: 0.45rem;
 }
 
+.menu-body label.check .count {
+  margin-left: auto;
+  padding-left: 1rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.menu-body label.check.no-calls {
+  color: var(--muted);
+}
+
 .menu-body .hint {
   margin: 0;
   font-size: 0.75rem;

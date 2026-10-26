@@ -57,6 +57,21 @@ def test_a_header_menu_filters_its_column_and_the_bar_keeps_that_filter(page: An
     assert "state=open" in page.url and "verdict=no" in page.url
 
 
+@pytest.mark.parametrize("path", ["/", "/calls"])
+def test_the_portals_menu_lists_every_scanned_portal_with_its_call_count(page: Any, path: str) -> None:
+    """A portal that scanned but stored nothing still shows, greyed with 0 (PRO-563)."""
+    page.goto(URL + path, wait_until="load", timeout=120_000)
+    menu = page.locator(".filter-bar details.menu", has_text="Portals")
+    menu.locator("summary").click()
+    entries = menu.locator("label.check")
+    assert entries.count() > 0
+    for i in range(entries.count()):
+        entry = entries.nth(i)
+        count = entry.locator(".count").inner_text().strip()
+        assert count.isdigit(), entry.inner_text()
+        assert ("no-calls" in (entry.get_attribute("class") or "")) == (count == "0"), entry.inner_text()
+
+
 def test_the_portals_menu_applies_when_it_closes(page: Any) -> None:
     page.goto(URL + "/", wait_until="load", timeout=120_000)
     page.wait_for_timeout(800)   # the page's script has loaded

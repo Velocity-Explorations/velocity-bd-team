@@ -2,7 +2,7 @@
 // int and rates to float8 because Postgres returns bigint and numeric, which arrive as strings.
 
 import { sql } from "./db";
-import { CLOSED_PATTERN, type CallState, type Sort } from "./filters";
+import { CLOSED_PATTERN, portalOptions, type CallState, type PortalOption, type Sort } from "./filters";
 import type { JudgeFilter, Judgment } from "./judges";
 import type { TagOption, TagRow } from "./tags";
 import { isoNow } from "./format";
@@ -137,9 +137,13 @@ export async function newThisWeek(): Promise<number> {
   return row?.n ?? 0;
 }
 
-export async function portals(): Promise<string[]> {
-  const rows = await sql()<{ portal: string }[]>`SELECT DISTINCT portal FROM calls WHERE portal IS NOT NULL ORDER BY portal`;
-  return rows.map((r) => r.portal);
+/** Every portal that has completed a real scan or has calls, with its number of stored calls (PRO-563). */
+export async function portals(): Promise<PortalOption[]> {
+  const [scanned, counts] = await Promise.all([
+    sql()<{ portal: string }[]>`SELECT DISTINCT portal FROM runs WHERE portal IS NOT NULL AND dry_run = 0`,
+    sql()<{ portal: string; calls: number }[]>`SELECT portal, COUNT(*)::int AS calls FROM calls WHERE portal IS NOT NULL GROUP BY portal`,
+  ]);
+  return portalOptions(scanned.map((r) => r.portal), [...counts]);
 }
 
 /**

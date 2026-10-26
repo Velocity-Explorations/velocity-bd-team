@@ -37,7 +37,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
   const sp = await searchParams;
   const [portalList, tagChoices] = await Promise.all([portals(), tagOptions()]);
   const filters: CallFilters = {
-    portals: pickMany(sp.portal, portalList),
+    portals: pickMany(sp.portal, portalList.map((p) => p.name)),
     state: pickState(sp.state, sp.open),
     sort: pickSort(sp.sort, sp.dir, ["seen", "due", "title", "verdict", "decision", "filter"]),
     judges: pickJudgeFilter(sp.judges),
