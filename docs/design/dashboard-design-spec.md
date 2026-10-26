@@ -160,7 +160,7 @@ Filters that span the whole table sit in a bar between the metric cards and the 
 | ID | Requirement |
 | --- | --- |
 | F1 | The bar holds title search (All calls only, applied on Enter), a Portals menu, a Tag menu, an All / Open / Closed switch, and Clear filters when any filter or a non-default sort is set. |
-| F2 | Portals menu: one checkbox per portal that has calls; none ticked shows every portal. It applies when the menu closes if a box changed, and has an Apply button too. |
+| F2 | Portals menu: one checkbox per portal that has completed a scan, with its number of stored calls; a portal with none is greyed and shows 0 (PRO-563). None ticked shows every portal. It applies when the menu closes if a box changed, and has an Apply button too. |
 | F3 | Tag menu: Any, then the tags grouped as Type, Work, Customer, Access. |
 | F4 | Clicking a column's name sorts by it; a second click reverses it. An arrow marks the sorted column, which also carries aria-sort. |
 | F5 | Each column starts in its natural direction: First seen newest first, Due closing soonest (upcoming first, then undated, then past), Call A to Z, Claude / Grok yes first, Tier tight first, Decision pursue first, Filter kept first. The default is newest first. |
@@ -360,6 +360,7 @@ Every decision that shaped the dashboard, newest first.
 
 | Date | Decision | Ticket |
 | --- | --- | --- |
+| 26 Oct | The Portals menu lists every portal that has scanned, with its call count, so a portal with nothing open no longer looks missing | PRO-563 |
 | 26 Oct | Pursuing splits into Ready to draft, with a Draft button per call, and Drafting, with progress and finished drafts; a call is ready when it is pursued, still open, without a draft and with readable solicitation text | PRO-562 |
 | 26 Oct | The fourth section is Automation, not Admin, with tabs Requests, Scans (today's Runs) and Judges; an account menu replaces the Deciding as picker and the Settings button, with Profile settings (name, where the dashboard opens, default filters, time zone); deciding on To review uses a Decide menu in place of four buttons | PRO-561 |
 | 26 Oct | Seven pages become four sections: Home (a new landing page in place of the Monday brief page, whose weeks stay at /brief), Calls (To review and All), Proposals (Pursuing, Submitted, Results) and Admin (Requests, Runs, Judges); submissions waiting on a response come from calls marked Submitted | PRO-560 |

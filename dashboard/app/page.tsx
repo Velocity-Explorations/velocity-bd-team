@@ -41,7 +41,7 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
   const voted = firstParam(sp.voted, 300);   // the call just voted on, for the notice's link
   const [portalList, tagChoices] = await Promise.all([portals(), tagOptions()]);
   const filters = {
-    portals: pickMany(sp.portal, portalList),
+    portals: pickMany(sp.portal, portalList.map((p) => p.name)),
     state: pickState(sp.state, sp.open),
     sort: pickSort(sp.sort, sp.dir, ["seen", "due", "title", "verdict", "tier"]),
     judges: pickJudgeFilter(sp.judges),

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { choiceLinks, CLOSED_PATTERN, filterHref, nextSort, pickMany, pickSort, pickState, sortLink, sortParams } from "./filters.ts";
+import { choiceLinks, CLOSED_PATTERN, filterHref, nextSort, pickMany, pickSort, pickState, portalOptions, sortLink, sortParams } from "./filters.ts";
 import { isClosed } from "./text.ts";
 
 const PORTALS = ["SAM.gov", "Vulcan SOF"];
@@ -13,6 +13,14 @@ test("pickMany keeps every known value of a repeated param, once each, in the or
 test("pickMany drops unknown and empty values", () => {
   assert.deepEqual(pickMany(["Nope", "", "SAM.gov"], PORTALS), ["SAM.gov"]);
   assert.deepEqual(pickMany(undefined, PORTALS), []);
+});
+
+test("portalOptions lists every scanned portal with its call count, 0 when it stored none", () => {
+  assert.deepEqual(
+    portalOptions(["SAM.gov", "DOE SBIR", "SAM.gov", " "], [{ portal: "SAM.gov", calls: 4 }, { portal: "Vulcan SOF", calls: 61 }]),
+    [{ name: "DOE SBIR", calls: 0 }, { name: "SAM.gov", calls: 4 }, { name: "Vulcan SOF", calls: 61 }],
+  );
+  assert.deepEqual(portalOptions([], []), []);
 });
 
 test("pickState reads open or closed, and still honours the old open=1 links", () => {

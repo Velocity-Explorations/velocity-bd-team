@@ -22,6 +22,19 @@ const DEFAULT_SORT: Sort = { key: "seen", dir: "desc" };
  */
 export const CLOSED_PATTERN = '"[A-Za-z0-9_]+_closed": *true';
 
+export type PortalOption = { name: string; calls: number };
+
+/**
+ * The Portals menu: every portal that has scanned, plus any with calls, by name, each with its
+ * number of stored calls. A portal that scanned but had nothing open shows with 0 (PRO-563).
+ */
+export function portalOptions(scanned: readonly string[], counts: readonly { portal: string; calls: number }[]): PortalOption[] {
+  const byName = new Map<string, number>();
+  for (const name of scanned) if (name.trim()) byName.set(name.trim(), 0);
+  for (const { portal, calls } of counts) if (portal.trim()) byName.set(portal.trim(), calls);
+  return [...byName].map(([name, calls]) => ({ name, calls })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Every known value of a repeated search param (?portal=a&portal=b), trimmed, once each. */
 export function pickMany(raw: string | string[] | undefined, known: readonly string[], max = 50): string[] {
   const values = (Array.isArray(raw) ? raw : raw === undefined ? [] : [raw]).map((v) => v.trim());

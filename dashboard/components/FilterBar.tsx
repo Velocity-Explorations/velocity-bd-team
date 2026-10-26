@@ -1,5 +1,5 @@
 import { MenuLinks, type MenuGroup } from "@/components/HeaderCell";
-import { choiceLinks, filterHref, type CallState, type Params } from "@/lib/filters";
+import { choiceLinks, filterHref, type CallState, type Params, type PortalOption } from "@/lib/filters";
 import { optionGroups, type TagOption } from "@/lib/tags";
 
 const STATES: { value: CallState; label: string }[] = [
@@ -30,7 +30,7 @@ function Kept({ params, except }: { params: Params; except: string }) {
 export function FilterBar(props: {
   action: string;
   params: Params;
-  portals: string[];
+  portals: PortalOption[];
   selected: string[];
   tags: TagOption[];
   tag: string;
@@ -59,10 +59,11 @@ export function FilterBar(props: {
         <div className="menu-body">
           <form action={props.action}>
             <Kept params={props.params} except="portal" />
-            {props.portals.length === 0 ? <p className="hint">No calls scanned yet.</p> : null}
-            {props.portals.map((portal) => (
-              <label key={portal} className="check">
-                <input type="checkbox" name="portal" value={portal} defaultChecked={props.selected.includes(portal)} /> {portal}
+            {props.portals.length === 0 ? <p className="hint">No portals scanned yet.</p> : null}
+            {props.portals.map(({ name, calls }) => (
+              <label key={name} className={calls === 0 ? "check no-calls" : "check"} title={calls === 0 ? "Scanned, but nothing is stored yet" : undefined}>
+                <input type="checkbox" name="portal" value={name} defaultChecked={props.selected.includes(name)} /> {name}
+                <span className="count" aria-label={`${calls} calls`}>{calls}</span>
               </label>
             ))}
             <p className="hint">None ticked shows every portal. Applies when this menu closes.</p>
