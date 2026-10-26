@@ -141,6 +141,7 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Dashboard redesign brief (2026-10-25): docs/design/ holds the design spec, a static snapshot
   of the dashboard on public-portal data, the Velocity Theme design system and the build prompts,
   so Claude Design on the Velocity account can read them from GitHub (PRO-559). The redesign
-  itself waits on that design.
+  itself waits on that design. On 2026-10-26 the brief moved from seven pages to four sections:
+  Home (new), Calls, Proposals and Admin.
 
 ## Known breakages

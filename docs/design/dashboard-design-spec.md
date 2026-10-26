@@ -1,8 +1,8 @@
 # BD Dashboard Design Spec
 
-25 Oct 2026, David
+25 Oct 2026, David; revised 26 Oct for Home and the four sections
 
-Every requirement and decision behind the Velocity BD triage dashboard as of 25 Oct 2026, written as a brief for redesigning it in the Velocity Theme design system. A redesign keeps every requirement here; how each one looks is open.
+Every requirement and decision behind the Velocity BD triage dashboard as of 26 Oct 2026, written as a brief for redesigning it in the Velocity Theme design system. A redesign keeps every requirement here; how each one looks is open. On 26 Oct the seven pages became four sections, Home, Calls, Proposals and Admin (section Pages); the snapshot still shows the seven pages they come from.
 
 ## Purpose and users
 
@@ -19,37 +19,68 @@ People: David and Shaun decide today, and more can be added. While the judges ar
 
 The jobs, most frequent first:
 
+- See what needs attention at a glance: calls waiting, the best open calls, deadlines coming up and submissions waiting on a response.
 - Triage the week's new calls quickly, seeing why each was flagged.
 - Find calls by portal, tag, deadline or verdict, and revisit a decision.
-- See how Claude and Grok compare with each person, and read the Monday brief.
+- Follow pursued calls to submission, and see what is still waiting on a response.
+- See how Claude and Grok compare with each person.
 - Approve or reject the portal assistant's change requests, and check scan health.
 
 David's design goal, 24 Oct: use the space effectively. Long reasons, tags, details and up to eight columns compete for width.
 
 ## Pages
 
-Seven pages share one top bar. The bar carries the brand (Velocity BD), the seven page links with the current one highlighted, a count badge on Requests when requests wait, the Deciding as picker with Clear User Selection, and the Settings button.
+Four sections share one top bar; they replaced seven pages on 26 Oct. The bar carries the brand (Velocity BD), the four section links with the current one highlighted, a count badge on Admin when requests wait, the Deciding as picker with Clear User Selection, and the Settings button. A section with more than one view shows tabs under the page title.
 
-| Path | Page | What it is for | What it shows |
+| Section | Tab and path | What it is for | What it shows |
 | --- | --- | --- | --- |
-| / | Review queue | Triage: decide each call rated yes or maybe | Five metric cards (waiting, yes, maybe, new this week, judges agree %), the filter bar, then one row per call with decide buttons |
-| /calls | All calls | Find any call, change a decision, read votes and notes | Every call scanned, rejected ones too, up to 200 rows, with a Showing N of M line |
-| /brief | Monday brief | The week as the Monday 9:00 job posted it to Slack | A Top 10 across portals, then a bulletin board per portal: new calls by verdict, calls waiting, top picks, pursued calls closing within 14 days, the week's decisions, the scraper line; each call's decision as of now; earlier weeks linked at the top |
-| /judges | Judges | How Claude and Grok compare with people | Per judge: matched, misses, false alarms, maybes; per person: calls decided and how often each judge matched them; between people: agreement; pursued calls a judge said no to |
-| /requests | Requests | Approve the portal assistant's change requests | Waiting requests first (who asked, why, a preview of the change, Approve and Reject with a note), then the last 50 decided with their result |
-| /runs | Runs | Scan health | The latest run on top (status, start, duration, stage counts, error, log link), then the last 100 runs; a run still running after two hours is flagged |
-| /proposals | Proposals | Past submissions and win rate | The proposals table with win rate by portal; an empty state until the Proposal Library fills it |
+| Home | /, no tabs | What needs attention now | Ready for review, the Top 10, calls due in the next 14 days, submissions waiting on a response, and a status line (section Home) |
+| Calls | To review, /review | Triage: decide each call rated yes or maybe | Today's review queue: five metric cards, the filter bar, then one row per call with decide buttons (section Calls: To review) |
+| Calls | All, /calls | Find any call, change a decision, read votes and notes | Every call scanned, rejected ones too, up to 200 rows, with a Showing N of M line (section Calls: All) |
+| Proposals | Pursuing, /proposals | The calls being worked toward a submission | Calls decided Pursue, nearest deadline first (section Proposals) |
+| Proposals | Submitted, /proposals/submitted | Submissions waiting on a response | Calls decided Submitted, longest waiting first (section Proposals) |
+| Proposals | Results, /proposals/results | Past submissions and win rate | Today's Proposals page: the proposals table with win rate by portal; an empty state until the Proposal Library fills it |
+| Admin | Requests, /requests | Approve the portal assistant's change requests | Waiting requests first (who asked, why, a preview of the change, Approve and Reject with a note), then the last 50 decided with their result |
+| Admin | Runs, /runs | Scan health | The latest run on top (status, start, duration, stage counts, error, log link), then the last 100 runs; a run still running after two hours is flagged |
+| Admin | Judges, /judges | How Claude and Grok compare with people | Per judge: matched, misses, false alarms, maybes; per person: calls decided and how often each judge matched them; between people: agreement; pursued calls a judge said no to |
 
-The queue and All calls get the most use and carry most of the requirements below.
+Past weekly briefs keep a page at /brief, outside the top bar and linked from Home, because Monday's Slack post links there. It shows the week as the Monday 9:00 job posted it: a Top 10 across portals, then a bulletin board per portal (new calls by verdict, calls waiting, top picks, pursued calls closing within 14 days, the week's decisions, the scraper line), each call's decision as of now, and earlier weeks linked at the top.
 
-## Review queue
+| ID | Requirement |
+| --- | --- |
+| N1 | The top bar shows four sections: Home, Calls, Proposals and Admin. The current section is highlighted whichever of its tabs is open. Admin opens on Requests. |
+| N2 | Tabs sit under the page title and show which one is open. Each tab has its own address, so a link opens the right view. |
+| N3 | While requests wait, their count shows as a badge on Admin and on the Requests tab. |
+| N4 | Old addresses keep working: /calls with its filters (the vote notice and shared links use them), /brief (Monday's Slack post), /judges, /requests, /runs and /proposals. A bookmark to / now opens Home, which links to To review. |
+| N5 | The Deciding as picker, Clear User Selection and Settings stay in the top bar on every page. |
+| N6 | The Calls tabs share the filter bar: switching between To review and All keeps the portal, tag and open or closed filters. |
 
-The queue lists the calls Claude rated yes or maybe that the keyword filter kept and the viewer has not decided, newest first, up to 500. Its columns, in order: Claude / Grok, Call, Due, Tier (hidden by default), AI reason, First seen, Decided so far, Decide.
+The rest of this spec calls To review the queue and All the All calls page. They get the most use and carry most of the requirements below.
+
+## Home
+
+Home is the landing page: one screen that answers what needs attention now. Each block reads the ledger live, links to the full list behind it, and has an empty state.
+
+| ID | Requirement |
+| --- | --- |
+| H1 | Ready for review: how many calls wait for the viewer (for anyone, in shared mode), split into yes and maybe, and how many arrived this week, with a link to To review. These are the counts the queue's metric cards show (Q2). |
+| H2 | Top 10: the best open calls nobody has decided, across portals, ranked as the Monday brief ranks them: yes before maybe, then the nearest deadline, then the newest. Each shows both judges' verdicts, the title linked to its portal page, the portal and the deadline, and links to the call on All calls. |
+| H3 | Due in the next 14 days: pursued calls first, then undecided calls rated yes or maybe, soonest first, each with its deadline and days left. A call whose deadline is not a date (a forecast quarter, members only, no close date) is left out. |
+| H4 | Submitted, waiting on a response: every call whose decision is Submitted, longest waiting first, with its portal, who marked it Submitted and when, and days waiting, then a link to Proposals, Submitted. |
+| H5 | A status line: requests waiting (linked to Admin, Requests), the last scan's result and when it ran (a failed scan says so in words), and how often Claude and Grok agree. |
+| H6 | A link to the past weekly briefs (/brief). |
+| H7 | Home records nothing; decisions stay on Calls. |
+
+Recording whether a submission was won or lost is not part of Home yet; until it is, Results reads the Proposal Register.
+
+## Calls: To review
+
+To review (/review) is today's review queue. It lists the calls Claude rated yes or maybe that the keyword filter kept and the viewer has not decided, newest first, up to 500. Its columns, in order: Claude / Grok, Call, Due, Tier (hidden by default), AI reason, First seen, Decided so far, Decide.
 
 | ID | Requirement |
 | --- | --- |
 | Q1 | Who is waiting: while everyone decides every call (the default), each person's queue holds the calls they have not decided. In shared mode it holds the calls nobody has decided. |
-| Q2 | Metric cards above the table: Waiting (Waiting for you in each-person mode), Yes, Maybe, New this week, Judges agree % with the counts on hover. |
+| Q2 | Metric cards above the table: Waiting (Waiting for you in each-person mode), Yes, Maybe, New this week, Judges agree % with the counts on hover. Home shows the same counts (H1). |
 | Q3 | Claude / Grok cell: each judge's verdict as a badge (yes green, maybe amber, no red, not reviewed grey). Grok's reason opens from a why toggle; Claude's reason is the AI reason column. |
 | Q4 | Disagreement flags in that cell: judges disagree (amber) when the verdicts differ, and judges: yes vs no (red) when one said yes and the other no. |
 | Q5 | Call cell: the title links to the portal's page; under it the details line, then the tags line (section Details, tags and badges). |
@@ -61,9 +92,9 @@ The queue lists the calls Claude rated yes or maybe that the keyword filter kept
 | Q11 | Empty states: No calls match these filters, Nothing waiting for you, or Nothing waiting for a decision, each with a line on when new calls arrive. |
 | Q12 | The page's lead line explains the mode: everyone decides every call while the judges are trained, the first decision becomes the call's decision, later ones are kept beside it. |
 
-## All calls
+## Calls: All
 
-All calls lists every call the scanner has seen, the filter's rejects included, newest first, 200 at a time. Its columns, in order: Call, Filter, Claude / Grok, Decision, Notes, Due, First seen.
+All (/calls) lists every call the scanner has seen, the filter's rejects included, newest first, 200 at a time. Its columns, in order: Call, Filter, Claude / Grok, Decision, Notes, Due, First seen.
 
 | ID | Requirement |
 | --- | --- |
@@ -75,6 +106,17 @@ All calls lists every call the scanner has seen, the filter's rejects included, 
 | C6 | Notes cell: every note on the call with its author and time. Notes come from the dashboard and from Slack thread replies. |
 | C7 | Changing a decision here changes the call's decision; the newest change wins on the call, and every person's decision is kept. Add yours keeps both. |
 | C8 | A form that is out of date writes nothing: if someone decided or changed the call after the page loaded, the page says what the call is now. |
+
+## Proposals
+
+Proposals follows a call from Pursue to its result. Pursuing and Submitted read each call's decision; Results reads the Proposal Register.
+
+| ID | Requirement |
+| --- | --- |
+| P1 | Pursuing: calls whose decision is Pursue, nearest deadline first: the title linked to its portal page, the portal, the deadline and days left, who decided and when, and the notes. |
+| P2 | Submitted: calls whose decision is Submitted, longest waiting first: the title, the portal, who marked it Submitted and when, days waiting, and the notes. |
+| P3 | Results: past submissions from the Proposal Register with their outcome, and win rate by portal (today's Proposals page). |
+| P4 | Decisions change on All calls, as today; each row here links to its call there. |
 
 ## Details, tags and badges
 
@@ -255,7 +297,7 @@ Each call is one row in the ledger's calls table, with its judgments, decisions,
 | call_tags | Each tag with who set it (rule, claude, grok) | Tags line |
 | extra | Portal fields: closed flag, contacts, attachments, documents, services, open and pre-release dates, deadline sentences, members-only flag | Details line, badges, due hover |
 
-The other tables behind the other pages: briefs (Monday brief), change_requests (Requests), runs (Runs), proposals (Proposals), tag_list (the Tag filter).
+The other tables behind the other pages: briefs (past weekly briefs), change_requests (Admin, Requests, and Home's status line), runs (Admin, Runs, and Home's status line), proposals (Proposals, Results), tag_list (the Tag filter).
 
 ## Not built yet and open questions
 
@@ -269,18 +311,21 @@ Shaun's column list (BD Automation Review, Columns) asks for fields the dashboar
 | A Drive folder link for attachments, filled when a call is marked Pursue | Not started |
 | Parsed dates for sorting across portals | Partly done: Due sorts across the portals' two date formats |
 | Standard opportunity type, category tags, open or closed | Done: the Type tag, the tags, the closed badge and filter |
+| Recording won or lost for a submitted call | Not started; Results reads the Proposal Register until then |
+| Linking Proposal Register rows to calls | Not started: the Register has no call id |
 
 Open questions for the design:
 
 - [ ] How dense should a row be, and what can fold away (the AI reason, the tags, the details) without slowing triage?
 - [ ] How should hover-only information reach keyboard and touch users?
 - [ ] Should the decide controls stay in every row, or move to a side panel or a row action?
-- [ ] How should the Monday brief, Judges, Requests, Runs and Proposals pages look in the design system? They follow the queue's look today.
+- [ ] What fits on Home at 1440px without scrolling, and in what order?
+- [ ] How should Proposals, Admin and the past weekly briefs look in the design system? Today's Monday brief, Judges, Requests, Runs and Proposals pages follow the queue's look.
 - [ ] Final column list: Shaun's decision (Decisions, BD Automation Review).
 
 ## Current UI
 
-The [BD Dashboard Snapshot](dashboard-snapshot/README.md) is a working copy of all seven pages as of 25 Oct, with their real markup and styling, plus ten screenshots. The code is in [dashboard/](../../dashboard/) in this repo.
+The [BD Dashboard Snapshot](dashboard-snapshot/README.md) is a working copy of all seven pages as of 25 Oct, with their real markup and styling, plus ten screenshots. It shows the pages from before the 26 Oct restructure: Home has no page there, and the Monday brief is the closest to it. The code is in [dashboard/](../../dashboard/) in this repo.
 
 - Data: the 122 calls from public portals. Vulcan SOF is left out because its pages sit behind a login.
 - Samples: decisions by Analyst A and Analyst B, two proposals and two change requests, to show decided and waiting states.
@@ -297,6 +342,7 @@ Every decision that shaped the dashboard, newest first.
 
 | Date | Decision | Ticket |
 | --- | --- | --- |
+| 26 Oct | Seven pages become four sections: Home (a new landing page in place of the Monday brief page, whose weeks stay at /brief), Calls (To review and All), Proposals (Pursuing, Submitted, Results) and Admin (Requests, Runs, Judges); submissions waiting on a response come from calls marked Submitted | PRO-560 |
 | 24 Oct | The left filter panel became a bar above the table; column headers sort and filter; choices apply at once, the Portals menu on close | PRO-558 |
 | 24 Oct | Tags show under each title, type first in blue; a Tag filter; Settings can hide them | PRO-557 |
 | 24 Oct | A tag list in four groups, one type per call; rules, Claude and Grok tag; the customer catch-all is Other buyer | PRO-556 |

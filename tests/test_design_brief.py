@@ -17,6 +17,11 @@ HTML_LINK = re.compile(r"""(?:href|src)=["']([^"']+)["']""")
 CSS_URL = re.compile(r"""url\(\s*["']?([^"')]+)""")
 GITHUB = re.compile(r"https://github\.com/Velocity-Explorations/velocity-bd-team/(?:blob|tree)/main/([^\s)\"'`>]+)")
 DASHES = re.compile("[" + chr(0x2013) + chr(0x2014) + "]")   # en dash, em dash
+SPEC = DESIGN / "dashboard-design-spec.md"
+PROMPTS = DESIGN / "dashboard-build-prompts.md"
+SPEC_ID = re.compile(r"^\| ([A-Z]\d+) \|", flags=re.M)
+ID_RANGE = re.compile(r"\b([A-Z])(\d+) to \1(\d+)\b")
+ID_ONE = re.compile(r"\(([A-Z]\d+)\)")
 
 
 def _local(target: str) -> bool:
@@ -74,3 +79,24 @@ def test_no_en_or_em_dash_in_what_we_wrote() -> None:
     assert written
     for path in written:
         assert not DASHES.search(path.read_text(encoding="utf-8")), path.relative_to(DESIGN).as_posix()
+
+
+def test_prompt_ids_exist_in_the_spec() -> None:
+    """Every requirement ID a build prompt names, alone or as a range such as Q1 to Q12, is a row in the spec."""
+    prompts = PROMPTS.read_text(encoding="utf-8")
+    spec_ids = set(SPEC_ID.findall(SPEC.read_text(encoding="utf-8")))
+    named = {f"{letter}{n}" for letter, first, last in ID_RANGE.findall(prompts) for n in range(int(first), int(last) + 1)}
+    named |= set(ID_ONE.findall(prompts))
+    assert named, "the prompts name no requirement IDs"
+    assert sorted(named - spec_ids) == []
+
+
+def test_prompts_are_numbered_in_order() -> None:
+    """Prompt 0 is for Claude Design; prompts 1 to N are phases 1 to N of N."""
+    text = PROMPTS.read_text(encoding="utf-8")
+    headings = [int(n) for n in re.findall("^## Prompt ([0-9]+):", text, flags=re.M)]
+    phases = re.findall("Phase ([0-9]+) of ([0-9]+)", text)
+    last = len(headings) - 1
+    assert headings == list(range(last + 1))
+    assert [int(n) for n, _ in phases] == list(range(1, last + 1))
+    assert {int(total) for _, total in phases} == {last}

@@ -5,8 +5,8 @@ the pipeline. No API layer sits between them. Since 2026-10-17 it is the only pl
 decisions are made; Slack posts the cards and carries the discussion. How to run and deploy
 it is in [dashboard/README.md](../dashboard/README.md).
 
-The brief for redesigning it in the Velocity Theme (design spec, snapshot, theme and build
-prompts) is in [docs/design/](design/README.md).
+The brief for redesigning it in the Velocity Theme, including the planned move from seven pages
+to four sections (Home, Calls, Proposals, Admin), is in [docs/design/](design/README.md).
 
 ## Pages
 
