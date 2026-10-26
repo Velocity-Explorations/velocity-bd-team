@@ -107,5 +107,5 @@ def test_update_prompt_covers_the_new_structure() -> None:
     text = PROMPTS.read_text(encoding="utf-8")
     blocks = re.findall(r"^## Update prompt: Claude Design.*?```text\n(.*?)```", text, flags=re.M | re.S)
     assert len(blocks) == 1
-    for ids in ("N1 to N6", "H1 to H7", "P1 to P4", "U1 to U6", "Q9"):
+    for ids in ("N1 to N6", "H1 to H7", "P1 to P8", "U1 to U6", "Q9"):
         assert ids in blocks[0]
