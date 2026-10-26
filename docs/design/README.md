@@ -7,7 +7,7 @@ Everything needed to redesign the BD triage dashboard in the Velocity Theme, kep
 | [dashboard-design-spec.md](dashboard-design-spec.md) | Every requirement and decision behind the dashboard, with IDs (Q1, C1, F1 and so on), how the theme fits, and the open design questions |
 | [dashboard-snapshot/](dashboard-snapshot/README.md) | Today's seven pages as static HTML with their real markup and styling, and ten screenshots |
 | [velocity-theme/](velocity-theme/README.md) | The Velocity Theme design system: brand book, tokens, fonts, logos and components |
-| [dashboard-build-prompts.md](dashboard-build-prompts.md) | Prompt 0 for Claude Design, then prompts 1 to 5 for Claude Code to build the design |
+| [dashboard-build-prompts.md](dashboard-build-prompts.md) | Prompt 0 for Claude Design, then prompts 1 to 6 for Claude Code to build the design |
 
 ## Reading order for a design
 
@@ -24,6 +24,7 @@ Claude Code runs on David's own login, which cannot open designs on the Velocity
 
 ## About these copies
 
+- On 26 Oct the seven pages became four sections: Home, Calls, Proposals and Admin. The spec and the prompts describe the four; the snapshot shows the seven they come from.
 - The theme is David's Velocity-Theme.zip of 8 Oct 2026 with two changes. The example text in the component previews, guidelines and tokens came from an internal slide deck and now uses this project's own content, and ranges are written with "to" instead of an en dash. Colours, type, sizes, fonts, logos and component markup are unchanged.
 - The snapshot was captured on 25 Oct 2026 from a copy of the ledger holding only public-portal calls, with sample decisions by Analyst A and Analyst B. Vulcan SOF is left out because its pages sit behind a login.
 - The spec and prompts began as Claude Docs on 25 Oct 2026. These files are now the ones to keep current.
