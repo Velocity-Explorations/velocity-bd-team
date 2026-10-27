@@ -9,7 +9,7 @@ Read on 27 Oct 2026 from commit `65a5fce` (main, after PR #56). Discovery only: 
 3. **The `proposals` table name is taken** by the Proposal Register's past submissions, and its outcome values do not include "cancelled by the agency" (question 1).
 4. **No real identity until Google sign-in (PRO-477).** Anyone who can open the dashboard can pick any name, and there are no owners or roles, so owner and leadership approvals cannot be enforced yet (question 3).
 5. **Three versions of the proposal workflow** (two claude.ai skills on David's PC, the repo's `drafting/` pipeline, and the design) and two Drive folder conventions. One of each has to be chosen (questions 5 and 10).
-6. **The spec is behind the design.** View cards, the full workspace, badges on every row, results with an expected-by date and the "no news yet" reminder are not in the spec, and the build prompts and tests key off the spec's requirement IDs (question 12).
+6. **The spec is behind the design.** View cards, the full workspace, badges on every row, results with an expected-by date and the "no news yet" reminder are not in the spec, and the build prompts and tests key off the spec's requirement IDs (question 13).
 7. **No CI.** Tests run locally before each pull request (question 11).
 
 ## 0. The spec
@@ -432,7 +432,35 @@ So build a `pursuit_steps` state machine (question 1) and a worker (question 2),
 - nothing login-gated, no credentials and no CUI in commits, fixtures or screenshots (`AGENTS.md:59`);
 - a squash-merged PR whose subject ends in the ticket id, with a `ref` line.
 
-## 12. Anything else
+## 12. Call descriptions
+
+**Yes: every stored call has a description.** In the live ledger on 27 Oct, all 187 calls had one (a query over `calls` grouped by portal).
+- **Where:** `calls.description` (`ledger/migrations/001_initial.sql:30`), as plain text cut to a limit each adapter sets.
+- **Not on the dashboard yet:** the dashboard neither selects nor shows it (`dashboard/lib/queries.ts` never reads `description`).
+- **Used in review:** Claude and Grok read its first 1,500 characters in their prompt (`review/reviewer.py:38`, `:187`, `:199`).
+
+| Portal | What the description is | Limit (characters) | Stored on 27 Oct: calls, average length, longest |
+|---|---|---|---|
+| Vulcan SOF | The description from the call's detail page. When that pattern misses, a slice of the page body, flagged `vulcan_description_fallback` in `extra` | 1,500 (`portals/vulcan_sof/scrape.py:47`, `:92`, `:100`) | 61, 1,461, 1,500 |
+| SAM.gov | The notice's description, read with one extra API request per notice | 4,000 (`portals/sam_gov/records.py:21`, `portals/sam_gov/api.py:174-180`) | 4, 509, 1,089 |
+| NASA Forecast | A sentence the adapter builds from the forecast row (office, expected quarters, value, NAICS), then the row's own Summary and Description | 4,000 (`portals/nasa_forecast/records.py:17`, `:51-66`) | 94, 829, 1,306 |
+| NSTXL | The project page's text. For a members-only page, only "Member-only page on NSTXL: sign in as a member to read it." | 3,000 (`portals/nstxl/records.py:21-23`, `:199`) | 16, 1,436, 3,000 |
+| SSC Front Door | The listing's text | 1,500 (`portals/ssc_front_door/records.py:22`, `:129`) | 7, 422, 580 |
+| DIU | The area of interest's text | 4,000 (`portals/diu/records.py:21`, `:65`, `:79`) | 2, 4,000, 4,000 |
+| AFWERX, SpaceWERX | Not a synopsis: a few sentences the adapter writes (what the listing is, its dates, the DSIP or Phase II note) | none (`portals/shared/funding_list.py:225-240`, `:262`) | 2 and 1, about 300 to 360 |
+| DOE SBIR | The solicitation's summary and body | 4,000 (`portals/doe_sbir/records.py:23`, `:150`) | none stored yet |
+| Space Florida | The RFP's text | 4,000 (`portals/space_florida/records.py:19`, `:84`) | none stored yet |
+| APFIT | A fixed paragraph about APFIT plus the cycle's status | none (`portals/apfit/records.py:21`, `:60`) | none stored yet |
+
+**For the design's Description column:**
+- **No scanner change is needed to show it.** The dashboard's queries add the column.
+- **How much fits in a cell.** The longest descriptions are 3,000 to 4,000 characters, so 200 rows of All calls could carry up to 800 KB of text. Select the first few hundred characters for the table and load the rest when a row is opened.
+- **Some text isn't the portal's own synopsis.** The adapters write the text for AFWERX, SpaceWERX and APFIT, and NASA's first sentence. NSTXL's members-only note is a placeholder. The design should say whether these show as they are or are labelled.
+- **SAM.gov text costs quota.** SAM.gov stores a notice only after reading its description, at one request per notice (`portals/sam_gov/scrape.py:1-12`). With 10 requests a day, 266 notices were still waiting on 26 Oct.
+- **Vulcan SOF text is login-gated.** It's fine on the dashboard, which will sit behind sign-in once hosted, but never in the public repo, the snapshot or test fixtures.
+- **The spec is out of date here.** Its "Data per call" row says "Up to 1,500 characters"; the limits run from 1,500 to 4,000, so that row needs correcting.
+
+## 13. Anything else
 
 **Conflicts between the codebase and the design:**
 1. **The `proposals` table name is taken** (question 1).
