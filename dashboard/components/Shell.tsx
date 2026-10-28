@@ -12,7 +12,7 @@ import { defaultFilters, drafting, initialsOf, labeler, me, timeZone } from "@/l
 import { countLabel, SECTIONS, type Section } from "@/lib/nav";
 import { callsHref } from "@/lib/profile";
 import { aliasesFor } from "@/lib/people";
-import { sortIntoViews } from "@/lib/proposals";
+import { overdueCount, sortIntoViews } from "@/lib/proposals";
 import { countStepsReadyFor, countWaitingRequests, proposalCalls, queueCounts } from "@/lib/queries";
 import { hiddenColumns, queueMode } from "@/lib/settings";
 import { allowlist, iapAudience, viewerHeader } from "@/lib/viewer";
@@ -25,7 +25,10 @@ async function sectionCounts(viewer: string | null): Promise<Record<Exclude<Sect
   const names = viewer ? aliasesFor(viewer, users) : [];
   const [queue, toDraft, ready, requests] = await Promise.all([
     queueCounts({ portals: [], state: "", tag: "" }, queueMode() === "each" && viewer ? names : null),
-    proposalCalls({ portals: [], state: "", tag: "" }).then((rows) => sortIntoViews(rows)["to-draft"].length),
+    proposalCalls({ portals: [], state: "", tag: "" }).then((rows) => {
+      const views = sortIntoViews(rows);   // overdue results count too (P4)
+      return views["to-draft"].length + overdueCount(views.submitted, new Date().toISOString().slice(0, 10));
+    }),
     countStepsReadyFor(names),
     countWaitingRequests(),
   ]);

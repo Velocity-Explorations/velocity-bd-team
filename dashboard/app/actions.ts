@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
+import { isoNow, zonedToIso } from "@/lib/format";
+import { timeZone } from "@/lib/me";
 import { aliasesFor } from "@/lib/people";
 import { profileFromForm } from "@/lib/profile";
 import { FORMATS } from "@/lib/proposals";
@@ -19,9 +21,12 @@ import {
   decideRequest,
   deleteProfile,
   isChangeDecision,
+  markSubmitted,
   noGoStep,
+  noNewsYet,
   portals,
   raiseCap,
+  recordResult,
   retryStep,
   saveProfile,
   setCollaborators,
@@ -408,4 +413,54 @@ export async function acceptAllAction(formData: FormData): Promise<void> {
 export async function checkAgainAction(formData: FormData): Promise<void> {
   const { viewer, back, pursuit } = await workspaceActor(formData, "contribute");
   await workspaceWrite(back, () => checkAgain({ pursuitId: pursuit.id, by: viewer }));
+}
+
+/** Mark submitted at the Submit gate (PW14, P7): the owner records the submission, then the call is recorded Submitted. */
+export async function markSubmittedAction(formData: FormData): Promise<void> {
+  const { viewer, back, found } = await workspaceActor(formData, "decide");
+  const { stepId, expected } = stepFields(formData);
+  const tz = await timeZone();
+  const submittedAt = zonedToIso(String(formData.get("submitted_at") ?? ""), tz);
+  if (!submittedAt) backTo(back, "error", "Give the date and time it was submitted.");
+  if (submittedAt > isoNow()) backTo(back, "error", "The submission time is in the future.");
+  const resultBy = String(formData.get("result_by") ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(resultBy)) backTo(back, "error", "Give the date the result is expected by.");
+  const expectedCall = String(formData.get("expected_call") ?? "") || null;
+  const confirmation = String(formData.get("confirmation") ?? "").slice(0, 200);
+  // The date's source stays the default's when the owner kept the default, else it is theirs.
+  const resultSource = resultBy === String(formData.get("default_result_by") ?? "")
+    ? String(formData.get("result_source") ?? "").slice(0, 300)
+    : `set at the Submit gate by ${viewer}`;
+  await workspaceWrite(back, async () => {
+    const marked = await markSubmitted({ stepId, by: viewer, expected, expectedCall, confirmation, submittedAt, resultBy, resultSource });
+    if (!marked.ok) return marked;
+    const call = await decideCall({
+      id: found.call.id, status: "submitted", expected: isDecision(expectedCall) ? expectedCall : null, keepCallDecision: false,
+      by: viewer, aliases: aliasesFor(viewer, allowlist()), note: `Submitted at the Submit gate${confirmation.trim() ? `; confirmation ${confirmation.trim()}` : ""}`,
+    });
+    return call.ok ? marked : { ok: true, notice: `${marked.notice} The call's decision was not changed: ${call.reason}` };
+  });
+}
+
+/** No news yet and Record result on Submitted and waiting (P4): anyone logged in, back to the list. */
+async function submittedActor(formData: FormData): Promise<{ viewer: string; callId: string }> {
+  const viewer = await currentViewer();
+  if (!viewer) backTo("/proposals/submitted", "error", "Log in (top right) first.");
+  const callId = String(formData.get("call_id") ?? "");
+  if (!callId) backTo("/proposals/submitted", "error", "That call is no longer listed. Reload to see the list.");
+  return { viewer, callId };
+}
+
+export async function noNewsYetAction(formData: FormData): Promise<void> {
+  const { viewer, callId } = await submittedActor(formData);
+  const days = Number(formData.get("days"));
+  await workspaceWrite("/proposals/submitted", () => noNewsYet({ callId, by: viewer, shown: String(formData.get("shown") ?? ""), days }));
+}
+
+export async function recordResultAction(formData: FormData): Promise<void> {
+  const { viewer, callId } = await submittedActor(formData);
+  await workspaceWrite("/proposals/submitted", () => recordResult({
+    callId, by: viewer, result: String(formData.get("result") ?? ""),
+    debrief: String(formData.get("debrief") ?? "").slice(0, MAX_NOTE_CHARS), nextTime: String(formData.get("next_time") ?? "").slice(0, MAX_NOTE_CHARS),
+  }));
 }

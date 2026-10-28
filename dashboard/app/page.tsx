@@ -8,7 +8,7 @@ import { Flash } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
 import { formatAgo, formatTime } from "@/lib/format";
 import { dayMonth, kindsLine } from "@/lib/home";
-import { sortIntoViews } from "@/lib/proposals";
+import { overdueCount, sortIntoViews } from "@/lib/proposals";
 import { aliasesFor, displayPerson } from "@/lib/people";
 import {
   judgeAgreement,
@@ -61,6 +61,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     judgeAgreement(),
   ]);
   const run = latest[0];
+  const overdue = overdueCount(proposals.submitted, new Date().toISOString().slice(0, 10));
 
   const cards: ViewCard[] = [
     {
@@ -91,7 +92,15 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       needsYou: false,
     },
     { key: "to-draft", label: "Proposals to draft", count: proposals["to-draft"].length, description: "pursued, open, no draft yet", href: "/proposals", current: false, needsYou: false },
-    { key: "submitted", label: "Submitted and waiting", count: proposals.submitted.length, description: "waiting on a result", href: "/proposals/submitted", current: false, needsYou: false },
+    {
+      key: "submitted",
+      label: "Submitted and waiting",
+      count: proposals.submitted.length,
+      description: overdue ? `${overdue} ${overdue === 1 ? "result" : "results"} overdue` : "waiting on a result",
+      href: "/proposals/submitted",
+      current: false,
+      needsYou: overdue > 0,
+    },
   ];
 
   return (

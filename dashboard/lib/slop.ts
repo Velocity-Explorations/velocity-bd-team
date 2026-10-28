@@ -308,3 +308,33 @@ export function slopHref(step: string, first?: number, last?: number, anchor?: s
   if (first) query.set("lines", last && last !== first ? `${first}-${last}` : String(first));
   return `?${query.toString()}${anchor ? `#${anchor}` : ""}`;
 }
+
+// ------------------------------------------------------------------- Final checks (PW13, phase 9b)
+
+const FINAL = "draft_final";
+
+/** Why Final checks cannot be approved yet, or null (PW13, PW21): the newest scan must be of the final version and Ready. */
+export function finalGate(scan: ScanRow | null): string | null {
+  if (!scan || !(scan.draft_name ?? "").startsWith(FINAL)) return "No AI slop check of the final version is saved yet. Choose Check again.";
+  if (scan.ready) return null;
+  return `The AI slop check says ${scan.verdict}. Fill what is left in the final version, then choose Check again.`;
+}
+
+export type FinalCheck = { check: string; ok: boolean | null; result?: string; detail: string };
+
+/** The step's seven checks, with the placeholder sweep and the slop check's final pass taken from a newer scan of the
+ *  final version when Check again has run since the step was saved. */
+export function finalChecks(checks: FinalCheck[], scan: ScanRow | null, finishedAt: string | null): FinalCheck[] {
+  if (!scan || !(scan.draft_name ?? "").startsWith(FINAL) || (finishedAt && scan.scanned_at <= finishedAt)) return checks;
+  const open = slopView(scan).open;
+  return checks.map((c) => {
+    if (c.check === "Placeholder sweep") {
+      return open ? { ...c, ok: false, result: `${open} left`, detail: `${open} still open, checked again` }
+        : { ...c, ok: true, result: "none left", detail: "none left, checked again" };
+    }
+    if (c.check === "AI slop check, final pass") {
+      return { ...c, ok: Boolean(scan.ready), result: scan.ready ? "ready" : "not ready", detail: `${scan.verdict}, checked again` };
+    }
+    return c;
+  });
+}

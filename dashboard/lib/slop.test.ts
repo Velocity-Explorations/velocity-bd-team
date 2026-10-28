@@ -9,6 +9,8 @@ import {
   draftLabel,
   excerpt,
   familyLabel,
+  finalChecks,
+  finalGate,
   jobState,
   lineNotes,
   parseLines,
@@ -233,4 +235,30 @@ test("line links open the result page at a line or a range, back at the item tha
   assert.equal(slopHref("reviews"), "?step=reviews&view=slop");
   assert.equal(slopHref("reviews", 3, 3, "p-3"), "?step=reviews&view=slop&lines=3#p-3");
   assert.equal(slopHref("final", 86, 94, "h-1"), "?step=final&view=slop&lines=86-94#h-1");
+});
+
+
+test("Final checks is approved only once the newest scan of the final version says Ready (PW13, PW21)", () => {
+  assert.equal(finalGate(null), "No AI slop check of the final version is saved yet. Choose Check again.");
+  assert.equal(finalGate(scan({ draft_name: "draft_v2.md", ready: 1 })), "No AI slop check of the final version is saved yet. Choose Check again.");
+  assert.equal(finalGate(scan({ draft_name: "draft_final.md" })),
+    "The AI slop check says Not ready: 1 PERSON WRITES, 2 NEEDS INPUT; band light (provisional). Fill what is left in the final version, then choose Check again.");
+  assert.equal(finalGate(scan({ draft_name: "draft_final.md", ready: 1, verdict: "Ready: band light (provisional)" })), null);
+});
+
+test("a newer scan of the final version updates the placeholder sweep and the slop check's final pass", () => {
+  const checks = [
+    { check: "Formatting check", ok: true, result: "done", detail: "ran" },
+    { check: "Placeholder sweep", ok: false, result: "3 left", detail: "1 PERSON WRITES, 2 NEEDS INPUT, for David Wood" },
+    { check: "AI slop check, final pass", ok: false, result: "not ready", detail: "Not ready: 3 placeholders" },
+  ];
+  const ready = scan({ draft_name: "draft_final.md", ready: 1, verdict: "Ready: band light (provisional)", scanned_at: "2026-11-20T10:00:00Z",
+                       result_json: JSON.stringify({ ...REPORT, findings: [] }) });
+  assert.deepEqual(finalChecks(checks, ready, "2026-11-19T10:00:00Z").map((c) => [c.check, c.result, c.ok, c.detail]), [
+    ["Formatting check", "done", true, "ran"],
+    ["Placeholder sweep", "none left", true, "none left, checked again"],
+    ["AI slop check, final pass", "ready", true, "Ready: band light (provisional), checked again"],
+  ]);
+  assert.deepEqual(finalChecks(checks, ready, "2026-11-21T10:00:00Z"), checks);   // the step is newer than the scan
+  assert.deepEqual(finalChecks(checks, scan({ draft_name: "draft_v2.md", scanned_at: "2026-11-20T10:00:00Z" }), "2026-11-19T10:00:00Z"), checks);
 });

@@ -294,7 +294,7 @@ and its heartbeat in `workers`, not `runs`.
 | submitted_at | TEXT timestamp | when Mark submitted was chosen | the Submit gate |
 | submitted_by | TEXT | who chose it | same |
 | confirmation_number | TEXT | the portal's confirmation number | same |
-| result_expected_by | TEXT date | `YYYY-MM-DD`, when the result is expected (P4); No news yet moves it 30 days on | Discovery, the Submit gate, No news yet |
+| result_expected_by | TEXT date | `YYYY-MM-DD`, when the result is expected (P4); No news yet moves it 30 or 60 days on, guarded on the date the page showed | Discovery, the Submit gate, No news yet |
 | result_expected_source | TEXT | where that date came from: the call's words and where they were found, or `default, 90 days after the deadline` | same |
 | result | TEXT | `won`, `lost`, `withdrawn`, `cancelled_by_agency`, or NULL until recorded | Record result |
 | result_at | TEXT timestamp | when the result was recorded | same |
@@ -306,7 +306,12 @@ and its heartbeat in `workers`, not `runs`.
 | updated_at | TEXT timestamp, not null | touched by every write | every writer |
 
 Unique index: `(call_id)`. Start the draft is refused, with the reason, for a call that has a
-pursuit already or is marked Not relevant. The result keeps the workspace's own values; when the
+pursuit already or is marked Not relevant. Mark submitted writes `state`, `submitted_at`,
+`submitted_by`, `confirmation_number`, `result_expected_by` and `result_expected_source` in one
+transaction with the Submit gate's step, guarded on the step and on the call's decision the page
+showed (C8). A call marked Submitted outside the workspace gets a pursuit (`state` `submitted`,
+`current_step` `submit`, the owner and submitter from `calls.human_by`) the first time No news yet or
+Record result is used on it, so its result is kept like any other. The result keeps the workspace's own values; when the
 Register row is written, `cancelled_by_agency` becomes `no_award`, since `proposals.outcome`
 cannot take a new value without a non-additive change.
 

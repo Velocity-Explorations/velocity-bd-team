@@ -89,3 +89,31 @@ export function parseStageCounts(text: string | null | undefined): [string, numb
     (entry): entry is [string, number] => typeof entry[1] === "number",
   );
 }
+
+/** A zone's wall time at an instant, as if it were UTC, in milliseconds. */
+function wallTime(at: number, timeZone: string): number {
+  const parts: Record<string, string> = {};
+  for (const p of formatterFor(timeZone).formatToParts(new Date(at))) parts[p.type] = p.value;
+  return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute));
+}
+
+/** A wall time typed in a zone ("2026-11-24T15:40", a datetime field's value) as ISO UTC, or null when it is not one. */
+export function zonedToIso(local: string, timeZone: string): string | null {
+  const found = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
+  if (!found) return null;
+  const [year, month, day, hour, minute] = found.slice(1).map(Number);
+  const asUtc = Date.UTC(year, month - 1, day, hour, minute);
+  const check = new Date(asUtc);
+  if (check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day || hour > 23 || minute > 59) return null;
+  // The zone's offset at that moment, read twice so a time near a clock change lands on the right side of it.
+  let at = asUtc - (wallTime(asUtc, timeZone) - asUtc);
+  at = asUtc - (wallTime(at, timeZone) - at);
+  return isoNow(new Date(at));
+}
+
+/** A ledger timestamp as the zone's wall time, for a datetime field's value ("2026-11-24T15:40"). */
+export function localInput(iso: string | null | undefined, timeZone: string): string {
+  const d = toDate(iso);
+  if (!d) return "";
+  return new Date(wallTime(d.getTime(), timeZone)).toISOString().slice(0, 16);
+}

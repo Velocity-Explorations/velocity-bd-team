@@ -5,8 +5,12 @@ import {
   draftBlock,
   draftFormat,
   folderName,
+  overdueCount,
+  overdueFirst,
   proposalCards,
+  pushDate,
   resultExpected,
+  resultWord,
   sortIntoViews,
   startRefusal,
   stepLabel,
@@ -22,7 +26,7 @@ function call(id: string, over: Partial<ProposalCall> = {}): ProposalCall {
     due_date: "2026-11-10", days_left: 13, default_result_by: "2027-02-08", extra: null, ai_verdict: "yes", ai_reasoning: null,
     human_status: "pursue", human_by: "David Wood", human_at: "2026-10-20T10:00:00Z",
     pursuit_id: null, owner: null, pursuit_state: null, current_step: null, step_state: null, drive_folder_id: null,
-    submitted_at: null, submitted_by: null, confirmation_number: null, result_expected_by: null, result_expected_source: null,
+    submitted_at: null, submitted_by: null, confirmation_number: null, result_expected_by: null, result_expected_source: null, debrief: null, next_time: null,
     result: null, result_at: null,
     ...over,
   };
@@ -87,6 +91,7 @@ test("Proposals has five cards, To draft in the accent, each keeping the bar's f
     counts: { closing: 0, "to-draft": 0, drafting: 1, submitted: 2, results: 2 },
     dueBy: "8 Nov",
     longestWait: 1,
+    overdue: 1,
     results: { won: 1, lost: 1 },
   });
   assert.deepEqual(
@@ -95,13 +100,13 @@ test("Proposals has five cards, To draft in the accent, each keeping the bar's f
       ["Closing in 14 days", "/proposals?view=closing&portal=NSTXL&state=open", 0, "pursued, by 8 Nov", false, false],
       ["To draft", "/proposals?portal=NSTXL&state=open", 0, "pursued, no draft yet", false, true],
       ["Drafting", "/proposals?view=drafting&portal=NSTXL&state=open", 1, "draft started, not submitted", false, false],
-      ["Submitted and waiting", "/proposals/submitted?portal=NSTXL&state=open", 2, "longest 1 day", true, false],
+      ["Submitted and waiting", "/proposals/submitted?portal=NSTXL&state=open", 2, "1 result overdue", true, true],
       ["Results", "/proposals/results?portal=NSTXL&state=open", 2, "1 won, 1 lost, 50.0% win rate", false, false],
     ],
   );
   const empty = proposalCards({
     current: "to-draft", params: {}, counts: { closing: 0, "to-draft": 0, drafting: 0, submitted: 0, results: 0 },
-    dueBy: "8 Nov", longestWait: 0, results: { won: 0, lost: 0 },
+    dueBy: "8 Nov", longestWait: 0, overdue: 0, results: { won: 0, lost: 0 },
   });
   assert.deepEqual(empty.map((c) => c.description).slice(3), ["none waiting", "no results yet"]);
 });
@@ -153,4 +158,23 @@ test("a draft's format starts from the call's type, and its folder follows the L
   assert.equal(folderName("2026-10-28", "SAM.gov", "RFI-FY27-SI Powered Communications and Video Intelligence"),
     "Submissions/2026-10-28_sam-gov_rfi-fy27-si-powered-communications/");
   assert.equal(folderName("2026-10-28", "SSC Front Door", "A"), "Submissions/2026-10-28_ssc-front-door_a/");
+});
+
+
+test("overdue results come first, the rest keep their order (P4)", () => {
+  const rows = [
+    call("waiting", { human_status: "submitted", result_expected_by: "2027-01-10" }),
+    call("late-2", { human_status: "submitted", result_expected_by: "2026-10-20" }),
+    call("late-1", { human_status: "submitted", result_expected_by: "2026-09-01" }),
+    call("default-late", { human_status: "submitted", result_expected_by: null, default_result_by: "2026-10-01" }),
+  ];
+  assert.deepEqual(overdueFirst(rows, "2026-10-28").map((r) => r.id), ["late-1", "default-late", "late-2", "waiting"]);
+  assert.equal(overdueCount(rows, "2026-10-28"), 3);
+});
+
+test("No news yet moves the date on, and results read in words", () => {
+  assert.equal(pushDate("2027-02-22", 30), "2027-03-24");
+  assert.equal(pushDate("2026-12-15", 60), "2027-02-13");
+  assert.deepEqual(["won", "lost", "withdrawn", "cancelled_by_agency", "odd"].map(resultWord),
+    ["won", "lost", "withdrawn", "cancelled by the agency", "odd"]);
 });

@@ -11,7 +11,7 @@ test("the bar has four sections, and Automation opens on Agent update requests (
 
 test("each count chip says what it counts (N3)", () => {
   assert.equal(countLabel("calls", 28), "28 waiting for you");
-  assert.equal(countLabel("proposals", 1), "1 to draft or ready for you");
+  assert.equal(countLabel("proposals", 1), "1 to draft, ready for you or overdue");
   assert.equal(countLabel("automation", 1), "1 request waiting");
   assert.equal(countLabel("automation", 2), "2 requests waiting");
 });

@@ -24,6 +24,7 @@ const TONES: Record<string, string> = {
   shortlisted: "info",
   no_award: "grey",
   withdrawn: "grey",
+  cancelled_by_agency: "grey",
   proposed: "warn",
   approved: "info",
   applying: "info",
@@ -35,6 +36,7 @@ const LABELS: Record<string, string> = {
   not_relevant: "not relevant",
   skipped_timeout: "timeout",
   no_award: "no award",
+  cancelled_by_agency: "cancelled by the agency",
   proposed: "waiting",
 };
 
