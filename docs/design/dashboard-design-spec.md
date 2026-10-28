@@ -259,7 +259,7 @@ Table settings, in the account menu and beside the filter bar, opens a dialog wh
 | S1 | One list per table, in column order, each column a checkbox. Needs review's list also sets the details under the title, the AI reason box and the note box; All calls has its own list. |
 | S2 | Call and Decide (Decision on All calls) always show: ticked, disabled, marked always shown. |
 | S3 | Tags under the title is a choice on both tables, shown by default. |
-| S4 | Defaults: everything shows except Tier. |
+| S4 | Defaults: everything shows except First seen, and All calls' Notes column until the notes panel replaces it (PRO-571). |
 | S5 | Save keeps the choice for this browser; Reset to defaults clears it; Cancel closes without saving. |
 | S6 | The tables render without the hidden columns, so hidden columns give their width to the rest. |
 

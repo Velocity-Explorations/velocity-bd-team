@@ -5,9 +5,10 @@ import { useEffect } from "react";
 /** What arrow keys move between inside an open menu. */
 const ITEMS = "a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled])";
 
-/** Which boxes in a menu are ticked, to tell whether closing it changed anything. */
-function ticks(menu: HTMLDetailsElement): string {
-  return [...menu.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].map((box) => (box.checked ? "1" : "0")).join("");
+/** Whether any box differs from the page as served, the filter now applied. Comparing with the served
+ *  state, not with the boxes when the menu opened, keeps a quick tick from racing the toggle event. */
+function changed(menu: HTMLDetailsElement): boolean {
+  return [...menu.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].some((box) => box.checked !== box.defaultChecked);
 }
 
 function itemsOf(menu: HTMLDetailsElement): HTMLElement[] {
@@ -57,12 +58,10 @@ export function MenuController() {
     const onToggle = (event: Event) => {
       const menu = event.target;
       if (!(menu instanceof HTMLDetailsElement) || !menu.matches("details.menu")) return;
-      const applies = menu.matches("[data-apply-on-close]");
       if (menu.open) {
         const items = itemsOf(menu);
         (items.find((item) => item.matches(".active, [aria-current], :checked")) ?? items[0])?.focus({ preventScroll: true });
-        if (applies) menu.dataset.ticks = ticks(menu);
-      } else if (applies && menu.dataset.ticks !== undefined && ticks(menu) !== menu.dataset.ticks) {
+      } else if (menu.matches("[data-apply-on-close]") && changed(menu)) {
         menu.querySelector("form")?.requestSubmit();
       }
     };

@@ -38,7 +38,7 @@ def test_settings_hide_a_column_and_reset_restores_the_defaults() -> None:
         page.wait_for_timeout(1000)
         first = headers(page)
         page.locator(".filter-bar").get_by_role("button", name="Table settings").click()
-        page.locator("dialog.settings").get_by_label("AI reason").uncheck()
+        page.locator("dialog.settings fieldset", has_text="Needs review").get_by_label("AI reason").uncheck()
         page.locator("dialog.settings").get_by_role("button", name="Save").click()
         after_save = reloaded(page)
         page.locator(".filter-bar").get_by_role("button", name="Table settings").click()

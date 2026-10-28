@@ -26,13 +26,14 @@ export function MenuLinks({ groups }: { groups: MenuGroup[] }) {
  * button beside it opens the column's own filter, when it has one. Links only, so every view can be
  * shared.
  */
-export function HeaderCell({ label, sort, menu }: {
+export function HeaderCell({ label, sort, menu, className }: {
   label: string;
   sort?: { href: string; active: boolean; dir: SortDir };
   menu?: { active: boolean; groups: MenuGroup[] };
+  className?: string;
 }) {
   return (
-    <th aria-sort={sort?.active ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}>
+    <th className={className} aria-sort={sort?.active ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}>
       <span className="th">
         {sort ? (
           <a className={sort.active ? "th-sort active" : "th-sort"} href={sort.href} title={`Sort by ${label}`}>

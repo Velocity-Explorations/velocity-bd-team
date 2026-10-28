@@ -1228,8 +1228,106 @@ td.reason {
   margin-top: 6px;
 }
 
-td.decide {
+td.decide,
+th.decide {
+  width: 176px;
+  min-width: 176px;
+}
+
+/* The title, 14px 600, linked to the portal's page with the external-link icon. */
+.call-title {
+  font: var(--type-row-title);
+}
+
+a.call-title svg {
+  width: 12px;
+  height: 12px;
+  margin-left: 4px;
+  color: var(--ink-3);
+  vertical-align: -1px;
+}
+
+a.call-title:hover svg {
+  color: var(--accent);
+}
+
+.call-body {
+  min-width: 0;
+}
+
+/* The details line: the portal, then the portal's facts, separated by dots. */
+.meta.details {
+  gap: 4px 6px;
+}
+
+.meta.details > * + *::before {
+  content: "·";
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--ink-4);
+  text-decoration: none;
+}
+
+.meta.badges {
+  gap: 4px;
+  margin-top: 6px;
+}
+
+/* Votes: the judges, then, under a dashed rule, each person's latest vote. */
+.people-votes {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+td.description {
   min-width: 12rem;
+  max-width: 30rem;
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+/* Up to four lines; the whole text on hover and keyboard focus. */
+.clamp-4 {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.desc-label {
+  font: var(--type-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--caution);
+}
+
+td.due .days-left {
+  margin-top: 2px;
+}
+
+/* Below 1280px the description hides and Claude's reason folds under the call (Q13, H2). */
+.folded-reason {
+  display: none;
+}
+
+@media (max-width: 1279px) {
+  .wide {
+    display: none;
+  }
+
+  .folded-reason {
+    display: block;
+    margin: 8px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--line-subtle);
+    font: var(--type-small);
+    color: var(--ink-2);
+  }
 }
 
 td.decide input[type="text"] {
@@ -1593,11 +1691,6 @@ ul.votes {
   -webkit-line-clamp: 6;
 }
 
-@media (max-width: 1279px) {
-  .top-ten .wide {
-    display: none;
-  }
-}
 
 .status-line {
   display: flex;

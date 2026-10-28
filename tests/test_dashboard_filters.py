@@ -49,7 +49,7 @@ def test_a_header_sorts_and_a_second_click_reverses_it(page: Any) -> None:
 
 def test_a_header_menu_filters_its_column_and_the_bar_keeps_that_filter(page: Any) -> None:
     page.goto(URL + "/calls", wait_until="load", timeout=120_000)
-    header = page.locator("thead th", has_text="Claude / Grok")
+    header = page.locator("thead th", has_text="Votes")
     header.locator("summary").click()
     go(page, lambda: header.get_by_role("link", name="no", exact=True).click())
     assert "verdict=no" in page.url
@@ -78,5 +78,6 @@ def test_the_portals_menu_applies_when_it_closes(page: Any) -> None:
     menu = page.locator(".filter-bar details.menu", has_text="Portals")
     menu.locator("summary").click()
     menu.locator("input[type=checkbox]").first.check()
-    go(page, lambda: menu.locator("summary").click())
+    menu.locator("summary").click()
+    page.wait_for_url("**/review?*portal=*", timeout=30_000)   # the form is sent when the menu closes
     assert "portal=" in page.url

@@ -21,6 +21,10 @@ SECTION_OF = {
     "/brief": "Home",
     "/review": "Calls",
     "/review?view=due-soon": "Calls",
+    "/review?view=top10": "Calls",
+    "/review?view=judges-agree": "Calls",
+    "/review?view=judges-disagree": "Calls",
+    "/review?view=new": "Calls",
     "/calls": "Calls",
     "/proposals": "Proposals",
     "/requests": "Automation",
@@ -30,6 +34,10 @@ SECTION_OF = {
 CARD_PAGES = {
     "/review": "Needs review",
     "/review?view=due-soon": "Due soon",
+    "/review?view=top10": "Top 10",
+    "/review?view=judges-agree": "Judges agree",
+    "/review?view=judges-disagree": "Judges disagree",
+    "/review?view=new": "New this week",
     "/calls": "All calls",
     "/requests": "Agent update requests",
     "/runs": "Scans",
@@ -85,7 +93,7 @@ def test_each_section_opens_on_view_cards_with_its_view_pressed(page: Any, path:
 
 def test_switching_cards_keeps_the_bar_filters_and_drops_the_sort(page: Any) -> None:
     open_page(page, "/review?state=open&sort=due&verdict=yes")
-    href = page.locator(".view-cards .vt-card", has_text="All calls").get_attribute("href")
+    href = page.locator(".view-cards .vt-card", has=page.locator(".vt-card__label", has_text="All calls")).get_attribute("href")
     assert href == "/calls?state=open"
 
 

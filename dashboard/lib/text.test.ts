@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildHref, decidedNotice, escapeLike, firstParam, isClosed, noteLine, parseNoteLine, safeReturnTo, votedHref } from "./text.ts";
+import { buildHref, decidedNotice, escapeLike, firstParam, fromQueue, isClosed, noteLine, parseNoteLine, safeReturnTo, votedHref } from "./text.ts";
 
 test("noteLine matches the pipeline's append_note format and stays on one line", () => {
   assert.equal(
@@ -70,4 +70,11 @@ test("a vote from the review queue says the call has left your queue; elsewhere 
 test("the link after a vote finds the call on All calls by its title", () => {
   assert.equal(votedHref("PY26.2 TACFI Notice of Opportunity"), "/calls?q=PY26.2+TACFI+Notice+of+Opportunity");
   assert.equal(votedHref("x".repeat(200)), "/calls?q=" + "x".repeat(120));   // the title filter reads 120 characters
+});
+
+test("a decision sent from Needs review, any view, counts as from the queue (PRO-571)", () => {
+  assert.equal(fromQueue("/review"), true);
+  assert.equal(fromQueue("/review?view=top10&portal=NSTXL"), true);
+  assert.equal(fromQueue("/"), false);
+  assert.equal(fromQueue("/calls?q=x"), false);
 });

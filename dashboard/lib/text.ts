@@ -63,6 +63,11 @@ export function decidedNotice(plan: "decide" | "add" | "note", label: string, ti
   return `Added your decision, ${label}: ${title}.${stays}${moved}`;
 }
 
+/** Whether a decision's return address is the queue (Needs review and its views, at /review since PRO-570). */
+export function fromQueue(returnTo: string): boolean {
+  return new URL(returnTo, "http://dashboard.local").pathname === "/review";
+}
+
 /** All calls, filtered to a call's title (the title filter reads 120 characters), where every
  *  person's vote on it shows. */
 export function votedHref(title: string): string {
