@@ -50,3 +50,8 @@ def test_known_keys_match_env_example() -> None:
 
 def test_pipeline_github_token_is_a_known_key() -> None:
     assert "BD_GITHUB_TOKEN" in config.KNOWN_KEYS
+
+
+def test_google_service_account_file_is_a_known_key() -> None:
+    """The proposal workspace's worker reaches Drive and Sheets with a service account key file (PRO-567)."""
+    assert "GOOGLE_SERVICE_ACCOUNT_FILE" in config.KNOWN_KEYS

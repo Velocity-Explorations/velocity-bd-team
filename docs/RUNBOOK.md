@@ -236,6 +236,61 @@ It upserts every valid row into `proposals`, skips a row with a problem (its led
 good values), and lists the problems, folders with no row and rows with no folder. Exit code 0 when every
 row synced, 1 when some were skipped.
 
+## Google Drive and Sheets (setup for the proposal workspace)
+
+The proposal workspace's worker uses Google Drive to make each proposal's folder, save its Word files and
+index past work for Builds on, and Google Sheets to add the Proposal Register row when a proposal is
+submitted. It signs in as a **service account**, a Google account for a program rather than a person, so
+nothing depends on anyone's own login. The dashboard itself never calls Google (AGENTS rule 1). The OAuth
+client for people's Google sign-in is a separate step, done with the sign-in phase.
+
+You need to be signed in to Google as a Velocity admin, or have one with you, for steps 1, 4 and 5. It takes
+about 20 minutes. Nothing from these steps goes into the repo, a commit, a ticket or a chat: the key file
+stays on this PC.
+
+1. **Create the project.** Open https://console.cloud.google.com, sign in with your Velocity account, open
+   the project picker at the top of the page, choose **New project**, name it `velocity-bd-team`, keep
+   velocityexplorations.com as the organization, and choose **Create**. Make sure the new project is
+   selected in the picker before the next step.
+2. **Turn on the two APIs.** In the left menu choose **APIs and services**, then **Library**. Search for
+   **Google Drive API**, open it and choose **Enable**. Go back to the Library, search for
+   **Google Sheets API**, and enable it the same way.
+3. **Create the service account.** In the left menu choose **IAM and admin**, then **Service accounts**,
+   then **Create service account**. Name it `bd-worker`, choose **Create and continue**, skip the optional
+   roles, and choose **Done**. Copy its email address (it ends in `iam.gserviceaccount.com`); step 5 needs it.
+4. **Make its key file.** Open `bd-worker`, go to the **Keys** tab, choose **Add key**, then
+   **Create new key**, keep **JSON**, and choose **Create**. A file downloads.
+   - If Google says key creation is turned off by an organization policy (new Google Cloud
+     organizations block it by default), an admin opens **IAM and admin**, then **Organization policies**,
+     finds **Disable service account key creation**, and sets an exception for the `velocity-bd-team`
+     project only. Then repeat this step.
+   - Move the file out of Downloads to a folder outside the repo, for example
+     `C:\Users\<you>\.velocity\bd-worker.json`. Do not open it in a chat, email it, or put it in Drive.
+5. **Give it the Proposal Library on a shared drive.** The worker can only reach files shared with its email,
+   and a shared drive keeps the files owned by Velocity rather than by one person.
+   - In Google Drive choose **Shared drives** in the left menu. If the BD Proposal Library is not on one
+     yet, choose **New**, name the shared drive `BD Proposal Library`, and move the existing
+     "BD Proposal Library" folder into it (right-click the folder, **Organize**, **Move**, then pick the
+     shared drive). The folder keeps its id, so `LIBRARY_DRIVE_FOLDER_ID` in `.env` stays as it is.
+   - Open the shared drive, choose **Manage members**, paste the service account's email from step 3,
+     set its access to **Content manager**, untick **Notify people**, and choose **Share**.
+   - Shared drives need a Google Workspace plan that includes them. If **Shared drives** is missing from the
+     menu, the plan does not include them; tell Claude, and the worker will use a folder shared with the
+     service account instead.
+6. **Point the repo at the key file.** Open `.env` in the repo folder in a text editor and add one line with
+   the file's full path, for example:
+   ```
+   GOOGLE_SERVICE_ACCOUNT_FILE=C:\Users\<you>\.velocity\bd-worker.json
+   ```
+   Save the file. `.env` is never committed.
+7. **Check it.** In the repo folder, with the venv active, run `python -m config`. It should list
+   `GOOGLE_SERVICE_ACCOUNT_FILE` as set (it never shows values). Once the worker's Drive support is
+   built, `python -m worker drive-check` lists the library folder through the service account, which proves
+   steps 1 to 6 worked.
+
+If a key file is ever exposed (pasted, emailed or committed), delete that key on the service account's
+**Keys** tab, make a new one (step 4), and replace the file on this PC.
+
 ## Dashboard
 
 ```powershell
