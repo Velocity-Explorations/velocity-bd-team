@@ -225,6 +225,7 @@ Each PR gets its own Linear ticket and branch, starts from failing tests, update
 | 7 | The workspace page | 9 | 4, 5 | L |
 | 8 | Reviews and the AI slop check | 10 | 7 | M |
 | 9 | Final checks, Submit and results | 11 | 7, 6 | M |
+| 9c | An executive summary for each call, in place of the portal's own words | None (added 28 Oct) | None | S |
 | 10 | Slack threads and jobs | 12 | 5 | S to M |
 | 11 | Sign-in and ownership | 13, revised | OAuth client, hosting (PRO-477) | M |
 
@@ -350,6 +351,18 @@ Phases 2 and 3 change only `dashboard/`, and phase 5 changes only the worker and
 - **Results:** recorded results combined with the Register.
 - **On submit:** a Register row is written (Sheets), files move to `01_submitted/`, and the debrief goes to `03_outcome/`.
 - **Tests:** cancelled by the agency maps to `no_award`; the overdue and No news yet dates; the stale-form guard (C8) on Mark submitted.
+
+### Phase 9c: an executive summary for each call (S)
+Added on 28 Oct at David's request; built right after phase 9.
+- **Why:** the Description column shows the portal's own words, cut at 300 characters, so understanding a call takes a full read of it.
+- **The review:** the per-call review (claude-haiku-5-5) already reads each call. Its prompt asks for one more line, `SUMMARY:`, two plain sentences for an executive: what the agency wants, what kind of award and how much, and the date that matters. New calls need no extra model call.
+- **The ledger:** migration 009 adds `calls.ai_summary` (additive), written by the review. LEDGER_SCHEMA.md changes in the same PR.
+- **Backfill:** `run.py --backfill-summaries` writes a summary for each open call that has none, with a summary-only prompt. A dry run counts the calls and estimates the cost first; at Haiku's prices it is well under a dollar per thousand calls.
+- **The dashboard:** the Description cell shows the summary, labelled Summary, with the portal's own description in full on hover and focus. A call without a summary shows its description as today.
+- **Tests:**
+  - the review reads `SUMMARY:` and still works when the line is missing;
+  - the backfill picks only open calls without a summary;
+  - the cell prefers the summary and keeps the original on hover.
 
 ### Phase 10: Slack (S to M)
 - **Threads:** `thread_ts`, and a card posted when a pursuit starts on a call without one.
