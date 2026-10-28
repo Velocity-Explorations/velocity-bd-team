@@ -9,7 +9,7 @@ export const DESCRIPTION_READ = 1200;
 /** Portals whose description the scanner writes, not the portal (handover-discovery, question 12). */
 const WRITTEN_BY_SCANNER = new Set(["AFWERX", "SpaceWERX", "APFIT", "NASA Forecast"]);
 
-export type DescriptionCell = { label: "Scanner summary" | "Members only" | null; text: string; full: string };
+export type DescriptionCell = { label: "Summary" | "Scanner summary" | "Members only" | null; text: string; full: string };
 
 function membersOnly(extra: string | null | undefined): boolean {
   if (!extra) return false;
@@ -22,12 +22,19 @@ function membersOnly(extra: string | null | undefined): boolean {
 }
 
 /**
- * The first 300 characters of a call's description, labelled where the text is not the portal's own:
- * Scanner summary for the text an adapter writes, Members only for NSTXL's placeholder.
+ * Claude's executive summary of the call when the review wrote one (phase 9c), else the first 300 characters of its
+ * description, labelled where the text is not the portal's own: Scanner summary for the text an adapter writes,
+ * Members only for NSTXL's placeholder. The cell's hover shows the description in full either way.
  */
-export function descriptionCell(portal: string, description: string | null | undefined, extra: string | null | undefined): DescriptionCell {
+export function descriptionCell(
+  portal: string,
+  description: string | null | undefined,
+  extra: string | null | undefined,
+  summary?: string | null,
+): DescriptionCell {
   const full = (description ?? "").trim();
   if (membersOnly(extra)) return { label: "Members only", text: "", full };
+  if (summary?.trim()) return { label: "Summary", text: summary.trim(), full };
   const text = full.length > SHOWN ? `${full.slice(0, SHOWN).trimEnd()}…` : full;
   return { label: full && WRITTEN_BY_SCANNER.has(portal) ? "Scanner summary" : null, text, full };
 }

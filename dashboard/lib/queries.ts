@@ -45,6 +45,7 @@ export type QueueRow = {
   set_aside: string | null;
   ai_verdict: string;
   ai_reasoning: string | null;
+  ai_summary: string | null;
   due_date: string | null;
   days_left: number | null;
   description: string | null;
@@ -121,6 +122,20 @@ function panelOrder(db: Db, f: { sort: Sort; judges: JudgeFilter }) {
   }
 }
 
+/** True when a column exists; a migration may not be applied to this database yet. */
+async function hasColumn(db: Db, table: string, column: string): Promise<boolean> {
+  const [row] = await db<{ present: boolean }[]>`
+    SELECT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_schema = current_schema() AND table_name = ${table} AND column_name = ${column}) AS present`;
+  return Boolean(row?.present);
+}
+
+/** Claude's executive summary of each call (migration 009), or NULL before the migration is applied. A fragment, so
+ *  never awaited: awaiting it would run it. */
+function summaryColumn(db: Db, present: boolean) {
+  return present ? db`ai_summary` : db`NULL::text AS ai_summary`;
+}
+
 /** True when a ledger table exists; a migration may not be applied to this database yet. */
 async function hasTable(db: Db, name: string): Promise<boolean> {
   const [row] = await db<{ present: boolean }[]>`SELECT to_regclass(${name}::text) IS NOT NULL AS present`;
@@ -178,8 +193,9 @@ export async function reviewQueue(
   const db = sql();
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
   if (f.view === "top10" && !f.ids?.length) return { rows: [], perPerson };
+  const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
   const rows = await db<QueueRow[]>`
-    SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, due_date,
+    SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, ${summary}, due_date,
            (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
            match_tier, first_seen_at, extra, human_status, human_notes
     FROM calls
@@ -379,6 +395,7 @@ export type CallRow = {
   match_tier: string | null;
   ai_verdict: string | null;
   ai_reasoning: string | null;
+  ai_summary: string | null;
   human_status: string | null;
   human_by: string | null;
   human_at: string | null;
@@ -396,10 +413,11 @@ export async function listCalls(f: CallFilters, limit = 200): Promise<{ rows: Ca
       ${f.status === "none" ? db`AND human_status IS NULL` : f.status ? db`AND human_status = ${f.status}` : db``}
       ${keywordWhere(db, f)}
       ${panelWhere(db, f)}`;
+  const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
   const [count, rows] = await Promise.all([
     db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${where()}`,
     db<CallRow[]>`
-      SELECT id, portal, title, url, type, department, naics_code, set_aside, due_date,
+      SELECT id, portal, title, url, type, department, naics_code, set_aside, ${summary}, due_date,
              (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
              filter_result, filter_reason, match_tier,
              ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra

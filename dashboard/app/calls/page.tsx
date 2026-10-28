@@ -274,7 +274,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                           notesBy={new Set(notes.map((n) => nameOf(n.by)).filter(Boolean))}
                         />
                       ) : null}
-                      {show("description") ? <DescriptionCell portal={r.portal} description={r.description} extra={r.extra} /> : null}
+                      {show("description") ? <DescriptionCell portal={r.portal} description={r.description} extra={r.extra} summary={r.ai_summary} /> : null}
                       {show("reason") ? <td className="reason wide">{r.ai_reasoning ?? ""}</td> : null}
                       {show("due") ? <DueCell due={r.due_date} daysLeft={r.days_left} extra={r.extra} tz={tz} /> : null}
                       {show("seen") ? <td className="when">{formatTime(r.first_seen_at, tz)}</td> : null}
