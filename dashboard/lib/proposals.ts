@@ -192,3 +192,74 @@ export function proposalCards(input: {
     needsYou: view === "to-draft",
   }));
 }
+
+// ------------------------------------------------------------------------- Start the draft
+
+/** The formats a draft can take; Start the draft picks one from the call's type (P6). */
+export const FORMATS = ["White paper", "RFI response", "SBIR or STTR technical volume", "Full proposal", "Pitch deck", "Other"];
+
+/** The format a call's type suggests. */
+export function draftFormat(type: string | null): string {
+  const t = (type ?? "").toLowerCase();
+  if (/\brfi\b|sources sought|request for information/.test(t)) return "RFI response";
+  if (/\bsbir\b|\bsttr\b/.test(t)) return "SBIR or STTR technical volume";
+  if (t.includes("white paper")) return "White paper";
+  if (/solicitation|\brfp\b|\bbaa\b|proposal/.test(t)) return "Full proposal";
+  return "White paper";
+}
+
+function slug(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/** The draft's folder in the Proposal Library (docs/LIBRARY_CONVENTIONS.md): Submissions/YYYY-MM-DD_portal_short-title/. */
+export function folderName(date: string, portal: string, title: string): string {
+  const short = slug(title.trim().split(/\s+/).slice(0, 3).join(" ")) || "untitled";
+  return `Submissions/${date}_${slug(portal)}_${short}/`;
+}
+
+/** Minutes without a heartbeat after which the worker counts as offline. */
+export const WORKER_STALE_MINUTES = 10;
+
+/** Whether drafting can start (P8): not set up until the worker has been seen; offline once it goes quiet. */
+export function workerReadiness(worker: { seen_at: string; state: string } | null, now: Date): "ready" | "offline" | "not set up" {
+  if (!worker) return "not set up";
+  if (worker.state === "stopped") return "offline";
+  return now.getTime() - new Date(worker.seen_at).getTime() > WORKER_STALE_MINUTES * 60 * 1000 ? "offline" : "ready";
+}
+
+/**
+ * Why Start the draft is refused, or null when it may go ahead (P2, P6, P8). An offline worker does not
+ * refuse: Discovery waits in the queue until it is back.
+ */
+export function startRefusal(
+  call: { human_status: string | null; extra: string | null },
+  held: { owner: string; created_at: string } | null,
+  readiness: "ready" | "offline" | "not set up",
+): string | null {
+  if (readiness === "not set up") return "Drafting is not set up yet.";
+  if (held) return `This call already has a draft, started by ${held.owner} on ${held.created_at.slice(0, 10)}.`;
+  if (call.human_status === "not_relevant") return "This call is marked Not relevant.";
+  if (call.human_status !== "pursue") return "Choose Pursue for this call first.";
+  const block = draftBlock(call);
+  if (block === "closed") return "This call is closed.";
+  if (block) return "This call needs its solicitation first: its page is members only, so the worker cannot read it.";
+  return null;
+}
+
+/**
+ * A call's draft badge (DB1, DB2): draft started, step N while it is worked, Go or no-go at the gate,
+ * draft finished at the Submit gate, or submitted with its date. Null for a call with no draft.
+ */
+export function draftBadge(p: { pursuit_state: string | null; current_step: string | null; step_state: string | null; submitted_at: string | null }):
+  { text: string; tone: "info" | "good" | "grey" } | null {
+  if (!p.pursuit_state) return null;
+  if (p.pursuit_state === "submitted") return { text: p.submitted_at ? `submitted ${p.submitted_at.slice(0, 10)}` : "submitted", tone: "info" };
+  if (p.pursuit_state === "no_go") return { text: "no-go", tone: "grey" };
+  if (p.pursuit_state === "closed") return { text: "draft closed", tone: "grey" };
+  if (p.current_step === "submit") return { text: "draft finished", tone: "good" };
+  if (p.current_step === "go_no_go") return { text: "Go or no-go", tone: "info" };
+  if (p.current_step === "discovery" && p.step_state === "queued") return { text: "draft started", tone: "info" };
+  const number = /^Step (\d+)/.exec(stepLabel(p.current_step))?.[1];
+  return { text: number ? `step ${number}` : "draft started", tone: "info" };
+}

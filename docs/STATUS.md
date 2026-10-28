@@ -172,6 +172,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   - Phase 3c, part 2 (PRO-574): Profile settings at /profile, kept in the profiles table: display name
     and initials, where the dashboard opens, Calls' default filters, and time zone.
   - Phase 4a (PRO-575): Proposals opens on five views (Closing in 14 days, To draft, Drafting,
-    Submitted and waiting, Results). Start the draft and the draft badges follow in 4b.
+    Submitted and waiting, Results).
+  - Phase 4b (PRO-576): Start the draft opens from To draft, a pursued call's Decide cell, and Pursue
+    and start the draft, and writes the pursuit with Discovery queued. Until the worker has run
+    (phase 5) it says Drafting is not set up yet and holds Start back. Calls with a draft carry a
+    badge with a menu on every table, and Open workspace replaces Start the draft in the Decide cell.
 
 ## Known breakages

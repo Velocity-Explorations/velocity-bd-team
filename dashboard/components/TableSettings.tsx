@@ -40,7 +40,7 @@ export function TableSettings({ hidden }: { hidden: Hidden }) {
   };
 
   return (
-    <dialog ref={dialog} className="settings" aria-labelledby="settings-title" onClose={giveFocusBack}>
+    <dialog ref={dialog} id="table-settings" className="settings" aria-labelledby="settings-title" onClose={giveFocusBack}>
       <form key={JSON.stringify(hidden)} action={saveColumns} onSubmit={() => dialog.current?.close()}>
         <h2 id="settings-title">Table settings</h2>
         <p className="lead">Columns each table shows, for this browser.</p>

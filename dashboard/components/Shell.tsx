@@ -3,10 +3,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { AccountMenu, type ViewerMode } from "@/components/AccountMenu";
 import { MenuController } from "@/components/MenuController";
+import { StartDraftDialog } from "@/components/StartDraftDialog";
 import { TableController } from "@/components/TableController";
 import { TableSettings } from "@/components/TableSettings";
 import { TooltipController } from "@/components/TooltipController";
-import { defaultFilters, initialsOf, labeler, me } from "@/lib/me";
+import { formatTime } from "@/lib/format";
+import { defaultFilters, drafting, initialsOf, labeler, me, timeZone } from "@/lib/me";
 import { countLabel, SECTIONS, type Section } from "@/lib/nav";
 import { callsHref } from "@/lib/profile";
 import { aliasesFor } from "@/lib/people";
@@ -43,17 +45,20 @@ function viewerMode(): { mode: ViewerMode; why: string } {
 /**
  * Every page's frame (PRO-570, PRO-574): the top bar with the brand, the four sections with their
  * counts and the account menu; then the page. Calls opens with the viewer's default filters. On Calls,
- * Table settings is offered in the account menu and the filter bar. Pages outside the sections
- * (Profile settings) mark none.
+ * Table settings is offered in the account menu and the filter bar. Calls and Proposals carry the
+ * Start the draft dialog (P6). Pages outside the sections (Profile settings) mark none.
  */
 export async function Shell({ section, children }: { section: Section | null; children: ReactNode }) {
   const { viewer } = await me();
   const tableSettings = section === "calls";
-  const [counts, hidden, label, filters] = await Promise.all([
+  const startsDrafts = section === "calls" || section === "proposals";
+  const [counts, hidden, label, filters, draft, tz] = await Promise.all([
     sectionCounts(viewer),
     tableSettings ? hiddenColumns() : null,
     labeler(),
     defaultFilters(),
+    startsDrafts ? drafting() : null,
+    timeZone(),
   ]);
   const people = await Promise.all(allowlist().map(async (p) => ({ name: p.name, label: label(p.name), initials: await initialsOf(p.name) })));
   const { mode, why } = viewerMode();
@@ -90,6 +95,14 @@ export async function Shell({ section, children }: { section: Section | null; ch
       </header>
       <main>{children}</main>
       {hidden ? <TableSettings hidden={hidden} /> : null}
+      {draft ? (
+        <StartDraftDialog
+          people={people.filter((p) => p.name !== viewer).map(({ name, label }) => ({ name, label }))}
+          owner={viewer ? label(viewer) : null}
+          readiness={draft.readiness}
+          lastSeen={draft.seenAt ? formatTime(draft.seenAt, tz) : null}
+        />
+      ) : null}
       <MenuController />
       <TooltipController />
       <TableController />

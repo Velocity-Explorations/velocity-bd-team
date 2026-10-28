@@ -1,13 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  draftBadge,
   draftBlock,
+  draftFormat,
+  folderName,
   proposalCards,
   resultExpected,
   sortIntoViews,
+  startRefusal,
   stepLabel,
   stepStateWords,
   waitingDays,
+  workerReadiness,
   type ProposalCall,
 } from "./proposals.ts";
 
@@ -99,4 +104,53 @@ test("Proposals has five cards, To draft in the accent, each keeping the bar's f
     dueBy: "8 Nov", longestWait: 0, results: { won: 0, lost: 0 },
   });
   assert.deepEqual(empty.map((c) => c.description).slice(3), ["none waiting", "no results yet"]);
+});
+
+test("a call's draft badge says where its draft stands (DB1, DB2)", () => {
+  const p = (over: object) => ({ pursuit_state: "working", current_step: "discovery", step_state: "queued", submitted_at: null, ...over });
+  assert.deepEqual(draftBadge(p({})), { text: "draft started", tone: "info" });
+  assert.deepEqual(draftBadge(p({ current_step: "outline", step_state: "ready" })), { text: "step 5", tone: "info" });
+  assert.deepEqual(draftBadge(p({ current_step: "go_no_go", step_state: "ready" })), { text: "Go or no-go", tone: "info" });
+  assert.deepEqual(draftBadge(p({ current_step: "submit", step_state: "ready" })), { text: "draft finished", tone: "good" });
+  assert.deepEqual(draftBadge(p({ pursuit_state: "submitted", submitted_at: "2026-10-25T10:00:00Z" })), { text: "submitted 2026-10-25", tone: "info" });
+  assert.deepEqual(draftBadge(p({ pursuit_state: "no_go" })), { text: "no-go", tone: "grey" });
+  assert.deepEqual(draftBadge(p({ pursuit_state: "closed" })), { text: "draft closed", tone: "grey" });
+});
+
+test("Start the draft is refused with the reason (P2, P6, P8)", () => {
+  const call = (over: object) => ({ human_status: "pursue", extra: null, ...over });
+  assert.equal(startRefusal(call({}), null, "ready"), null);
+  assert.equal(startRefusal(call({}), null, "offline"), null);
+  assert.equal(startRefusal(call({}), null, "not set up"), "Drafting is not set up yet.");
+  assert.equal(startRefusal(call({ human_status: "not_relevant" }), null, "ready"), "This call is marked Not relevant.");
+  assert.equal(startRefusal(call({ human_status: null }), null, "ready"), "Choose Pursue for this call first.");
+  assert.equal(
+    startRefusal(call({}), { owner: "Shaun Jones", created_at: "2026-10-27T15:00:00Z" }, "ready"),
+    "This call already has a draft, started by Shaun Jones on 2026-10-27.",
+  );
+  assert.equal(startRefusal(call({ extra: JSON.stringify({ sam_closed: true }) }), null, "ready"), "This call is closed.");
+  assert.equal(
+    startRefusal(call({ extra: JSON.stringify({ nstxl_members_only: true }) }), null, "ready"),
+    "This call needs its solicitation first: its page is members only, so the worker cannot read it.",
+  );
+});
+
+test("drafting is set up once the worker has been seen, and it is offline after ten minutes without a beat", () => {
+  assert.equal(workerReadiness(null, NOW), "not set up");
+  assert.equal(workerReadiness({ seen_at: "2026-10-28T11:55:00Z", state: "idle" }, NOW), "ready");
+  assert.equal(workerReadiness({ seen_at: "2026-10-28T11:00:00Z", state: "working" }, NOW), "offline");
+  assert.equal(workerReadiness({ seen_at: "2026-10-28T11:59:00Z", state: "stopped" }, NOW), "offline");
+});
+
+test("a draft's format starts from the call's type, and its folder follows the Library's naming", () => {
+  assert.equal(draftFormat("Sources Sought"), "RFI response");
+  assert.equal(draftFormat("RFI"), "RFI response");
+  assert.equal(draftFormat("SBIR or STTR"), "SBIR or STTR technical volume");
+  assert.equal(draftFormat("STTR cycle"), "SBIR or STTR technical volume");
+  assert.equal(draftFormat("White paper"), "White paper");
+  assert.equal(draftFormat("Solicitation"), "Full proposal");
+  assert.equal(draftFormat(null), "White paper");
+  assert.equal(folderName("2026-10-28", "SAM.gov", "RFI-FY27-SI Powered Communications and Video Intelligence"),
+    "Submissions/2026-10-28_sam-gov_rfi-fy27-si-powered-communications/");
+  assert.equal(folderName("2026-10-28", "SSC Front Door", "A"), "Submissions/2026-10-28_ssc-front-door_a/");
 });

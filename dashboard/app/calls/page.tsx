@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CallCell, DescriptionCell, DueCell, VotesCell } from "@/components/CallCells";
 import { DecideCell } from "@/components/DecideCell";
+import { DraftBadge } from "@/components/DraftBadge";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
 import { NotesPanel, ReasonsPanel } from "@/components/RowPanels";
@@ -14,13 +15,14 @@ import { yourVote } from "@/lib/decide";
 import { callDetails, deadlineNote } from "@/lib/details";
 import { detailSources } from "@/lib/description";
 import { choiceLinks, filterHref, JUDGE_CHOICES, pickMany, pickSort, pickState, sortChoices, sortLink, sortParams, type Params } from "@/lib/filters";
-import { formatTime } from "@/lib/format";
+import { formatDue, formatTime } from "@/lib/format";
 import { dayMonth } from "@/lib/home";
 import { pickJudgeFilter, verdictsFor } from "@/lib/judges";
 import { aliasesFor, displayPerson } from "@/lib/people";
 import {
   countAmong,
   decisionsOn,
+  draftsFor,
   judgeAgreement,
   latestJudgments,
   listCalls,
@@ -32,7 +34,8 @@ import {
   type CallFilters,
 } from "@/lib/queries";
 import { votesByCall } from "@/lib/scoreboard";
-import { defaultsRedirect, labeler, timeZone } from "@/lib/me";
+import { defaultsRedirect, drafting, labeler, timeZone } from "@/lib/me";
+import { draftBlock, draftFormat } from "@/lib/proposals";
 import { hiddenColumns, queueMode } from "@/lib/settings";
 import { tagsByCall } from "@/lib/tags";
 import { firstParam, parseNoteLine } from "@/lib/text";
@@ -87,7 +90,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
     judgeAgreement(),
   ]);
   const ids = rows.map((r) => r.id);
-  const [judged, decisions, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids)]);
+  const [judged, decisions, tagRows, drafts, { readiness }] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids), draftsFor(ids), drafting()]);
   const tagsFor = tagsByCall(tagRows);
   const tz = await timeZone();
   const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Table settings
@@ -245,6 +248,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                   const callVotes = votes.get(r.id) ?? [];
                   const verdicts = verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning);
                   const rank = top.ids.indexOf(r.id);
+                  const draft = drafts.get(r.id);
                   return [
                     <tr key={r.id} data-call-id={r.id}>
                       <CallCell
@@ -253,6 +257,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                         details={show("details")}
                         reason={show("reason") ? r.ai_reasoning : null}
                         topRank={rank >= 0 ? rank + 1 : undefined}
+                        draft={draft ? <DraftBadge draft={draft} nameOf={nameOf} /> : null}
                       />
                       {show("filter") ? (
                         <td>
@@ -284,6 +289,9 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                         keep={false}
                         note
                         tz={tz}
+                        draft={draft}
+                        drafting={readiness !== "not set up"}
+                        start={{ portal: r.portal, due: formatDue(r.due_date, tz), format: draftFormat(r.type), block: draftBlock(r) }}
                       />
                     </tr>,
                     <ReasonsPanel

@@ -1,18 +1,20 @@
 import { FolderOpen } from "lucide-react";
 import { CallCell, DueCell } from "@/components/CallCells";
+import { DraftBadge } from "@/components/DraftBadge";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
 import { Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
 import { Badge, Flash } from "@/components/bits";
 import { filterHref, pickMany, pickState, type Params } from "@/lib/filters";
-import { formatTime } from "@/lib/format";
+import { formatDue, formatTime } from "@/lib/format";
 import { dayMonth } from "@/lib/home";
 import { verdictsFor, type Verdicts } from "@/lib/judges";
-import { labeler, timeZone } from "@/lib/me";
+import { drafting, labeler, timeZone } from "@/lib/me";
 import { displayPerson } from "@/lib/people";
 import {
   draftBlock,
+  draftFormat,
   proposalCards,
   resultExpected,
   sortIntoViews,
@@ -23,7 +25,7 @@ import {
   type ProposalCall,
   type ProposalView,
 } from "@/lib/proposals";
-import { latestJudgments, listProposals, portals, proposalCalls, tagOptions, winRateByPortal } from "@/lib/queries";
+import { latestJudgments, listProposals, portals, proposalCalls, tagOptions, winRateByPortal, type DraftInfo } from "@/lib/queries";
 import { firstParam } from "@/lib/text";
 import { pickAllowed } from "@/lib/values";
 import { allowlist } from "@/lib/viewer";
@@ -70,6 +72,22 @@ function Judges({ verdicts }: { verdicts: Verdicts }) {
   );
 }
 
+/** The call's draft as the badge reads it (DB1, DB2), or null when it has none. */
+function draftOf(r: ProposalCall): DraftInfo | null {
+  if (r.pursuit_id === null || !r.pursuit_state) return null;
+  return {
+    call_id: r.id,
+    owner: r.owner ?? "",
+    pursuit_state: r.pursuit_state,
+    current_step: r.current_step,
+    step_state: r.step_state,
+    drive_folder_id: r.drive_folder_id,
+    submitted_at: r.submitted_at,
+    submitted_by: r.submitted_by,
+    result_expected_by: r.result_expected_by,
+  };
+}
+
 function Empty({ view, filtered, clearHref }: { view: ProposalView; filtered: boolean; clearHref: string }) {
   const lines: Record<ProposalView, [string, string]> = {
     closing: [`Nothing pursued closes in the next ${CLOSING_DAYS} days.`, "Pursued calls and drafts under way show here as their deadlines come near."],
@@ -92,7 +110,8 @@ function Empty({ view, filtered, clearHref }: { view: ProposalView; filtered: bo
 /**
  * The Proposals section (P1 to P5, PRO-575): five view cards over the pursued, drafting and submitted
  * calls and the Proposal Register, the filter bar as on Calls, and each view's table with its key
- * column sortable.
+ * column sortable. A pursued call with no draft offers Start the draft (P6, PRO-576); a call with a
+ * draft shows its badge (DB1 to DB3).
  */
 export async function ProposalsView({ view, sp }: { view: ProposalView; sp: SearchParams }) {
   const [portalList, tagChoices] = await Promise.all([portals(), tagOptions()]);
@@ -103,12 +122,13 @@ export async function ProposalsView({ view, sp }: { view: ProposalView; sp: Sear
   };
   const key = KEYS[view];
   const dir = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : key.first;
-  const [rows, register, rates, tz, label] = await Promise.all([
+  const [rows, register, rates, tz, label, { readiness }] = await Promise.all([
     proposalCalls(bar),
     listProposals(bar.portals, view === "results" ? dir : "desc"),
     winRateByPortal(),
     timeZone(),
     labeler(),
+    drafting(),
   ]);
   const views = sortIntoViews(rows);
   const users = allowlist();
@@ -117,6 +137,11 @@ export async function ProposalsView({ view, sp }: { view: ProposalView; sp: Sear
   const today = now.toISOString().slice(0, 10);
   const listed = dir === key.first ? views[view] : [...views[view]].reverse();
   const judged = await latestJudgments(listed.map((r) => r.id));
+  // After Pursue and start the draft: the call to open the dialog for, when this view does not list it.
+  const startId = firstParam(sp.start, 300);
+  const startCall = startId && !listed.some((r) => r.id === startId)
+    ? rows.find((r) => r.id === startId && r.human_status === "pursue" && r.pursuit_id === null && !draftBlock(r))
+    : undefined;
   const won = rates.reduce((sum, r) => sum + r.won, 0) + views.results.filter((r) => r.result === "won").length;
   const lost = rates.reduce((sum, r) => sum + (r.decided - r.won), 0) + views.results.filter((r) => r.result === "lost").length;
   const barParams: Params = { portal: bar.portals, state: bar.state, tag: bar.tag };
@@ -153,6 +178,17 @@ export async function ProposalsView({ view, sp }: { view: ProposalView; sp: Sear
         })}
       />
       <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} />
+      {startCall ? (
+        <button
+          type="button"
+          hidden
+          data-start-draft={startCall.id}
+          data-title={startCall.title || startCall.id}
+          data-portal={startCall.portal}
+          data-due={formatDue(startCall.due_date, tz)}
+          data-format={draftFormat(startCall.type)}
+        />
+      ) : null}
       <FilterBar
         action={path}
         params={params}
@@ -271,9 +307,10 @@ export async function ProposalsView({ view, sp }: { view: ProposalView; sp: Sear
                 listed.map((r) => {
                   const expected = resultExpected(r, today);
                   const days = waitingDays(r, now);
+                  const draft = draftOf(r);
                   return (
                     <tr key={r.id} data-call-id={r.id}>
-                      <CallCell row={r} tags={[]} details={false} reason={null} />
+                      <CallCell row={r} tags={[]} details={false} reason={null} draft={draft ? <DraftBadge draft={draft} nameOf={nameOf} /> : null} />
                       <td>{nameOf(r.submitted_by ?? r.human_by)}</td>
                       <td className="when">{formatTime(r.submitted_at ?? r.human_at, tz)}</td>
                       <td className="num">
@@ -306,9 +343,10 @@ export async function ProposalsView({ view, sp }: { view: ProposalView; sp: Sear
                 listed.map((r) => {
                   const block = draftBlock(r);
                   const drive = r.drive_folder_id ? `https://drive.google.com/drive/folders/${encodeURIComponent(r.drive_folder_id)}` : null;
+                  const draft = draftOf(r);
                   return (
                     <tr key={r.id} data-call-id={r.id}>
-                      <CallCell row={r} tags={[]} details reason={null} />
+                      <CallCell row={r} tags={[]} details reason={null} draft={draft ? <DraftBadge draft={draft} nameOf={nameOf} /> : null} />
                       <DueCell due={r.due_date} daysLeft={r.days_left} extra={r.extra} tz={tz} />
                       {view === "to-draft" ? (
                         <td>
@@ -353,10 +391,18 @@ export async function ProposalsView({ view, sp }: { view: ProposalView; sp: Sear
                           <span className="muted">Cannot draft: {block}</span>
                         ) : (
                           <>
-                            <button type="button" disabled>
+                            <button
+                              type="button"
+                              className="fn-approve"
+                              data-start-draft={r.id}
+                              data-title={r.title || r.id}
+                              data-portal={r.portal}
+                              data-due={formatDue(r.due_date, tz)}
+                              data-format={draftFormat(r.type)}
+                            >
                               Start the draft
                             </button>
-                            <div className="meta">Drafting is not set up yet.</div>
+                            {readiness === "not set up" ? <div className="meta">Drafting is not set up yet.</div> : null}
                           </>
                         )}
                       </td>
