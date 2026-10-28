@@ -8,6 +8,27 @@ it is in [dashboard/README.md](../dashboard/README.md).
 The brief for redesigning it in the Velocity Theme, including the planned move from seven pages
 to four sections (Home, Calls, Proposals, Automation), is in [docs/design/](design/README.md).
 
+## Look
+
+The dashboard is dark only and wears the BD Team theme from Claude Design's handoff (PRO-569).
+
+- **Tokens:** `dashboard/app/theme.css` copies the handoff's `tokens-app.css` and `card.css`
+  (`docs/design/handoff/velocity-theme/`), and `tests/test_dashboard_theme.py` keeps the two equal.
+  `app/globals.css` takes every colour, size and font from those tokens.
+- **Fonts:** Inter Tight and Chakra Petch are served from `dashboard/public/fonts/`, so no page
+  reaches Google Fonts. The container image copies `public/` beside the standalone build.
+- **Icons:** `lucide-react`, pinned to one version.
+- **Components:** each follows its guide in `docs/design/handoff/velocity-theme/components/`.
+  - Buttons fill by function on hover: green to approve, blue to change or add, red to stop or
+    reject.
+  - Badges are a tone square and the word. Tags sit on their own line, with the type tag in the
+    info tone.
+  - Notices (Done, Refused) have a close button that also drops the notice from the address.
+- **Keyboard:** menus take focus when they open, the arrow keys move between items, and Escape
+  hands focus back to the menu's button. Hover-only text (a detail's source, a tag's setter) shows
+  as a tooltip on keyboard focus too. `tests/test_dashboard_components.py` checks both against a
+  running dashboard.
+
 ## Pages
 
 | Path | What it shows |

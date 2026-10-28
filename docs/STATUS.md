@@ -150,5 +150,8 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     step_changes, pursuit_events, checklist_items, drive_items, slop_scans, profiles, worker_jobs,
     workers) and `ledger/queries.py` the pursuit lifecycle. `ledger/schema.sql` had stopped at 002;
     it now matches every migration, and a test keeps it so.
+  - Phase 2a (PRO-569): every page wears the dark BD Team theme from the handoff (tokens, fonts,
+    Lucide icons, buttons, badges, tags, menus, notices, tooltips, tables, fields), with no change
+    in what the pages do. The top bar keeps its seven links until the shell and Home land together.
 
 ## Known breakages

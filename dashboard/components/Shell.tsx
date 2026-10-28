@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { MenuController } from "@/components/MenuController";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { TooltipController } from "@/components/TooltipController";
 import { ViewerPicker } from "@/components/ViewerPicker";
 import { countWaitingRequests } from "@/lib/queries";
 import { hiddenColumns } from "@/lib/settings";
@@ -37,7 +38,7 @@ export async function Shell({ current, children }: { current: NavKey; children: 
             >
               {link.label}
               {link.key === "requests" && waiting ? (
-                <span className="badge tone-warn nav-count" aria-label={`${waiting} waiting for approval`}>
+                <span className="count-chip" aria-label={`${waiting} waiting for approval`}>
                   {waiting}
                 </span>
               ) : null}
@@ -49,6 +50,7 @@ export async function Shell({ current, children }: { current: NavKey; children: 
       </header>
       <main>{children}</main>
       <MenuController />
+      <TooltipController />
     </>
   );
 }

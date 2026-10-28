@@ -1,3 +1,4 @@
+import { ArrowDown, ArrowUp, ChevronDown } from "lucide-react";
 import type { MenuItem, SortDir } from "@/lib/filters";
 
 export type MenuGroup = { title?: string; items: MenuItem[] };
@@ -36,7 +37,7 @@ export function HeaderCell({ label, sort, menu }: {
         {sort ? (
           <a className={sort.active ? "th-sort active" : "th-sort"} href={sort.href} title={`Sort by ${label}`}>
             {label}
-            {sort.active ? <span aria-hidden="true">{sort.dir === "asc" ? " ▲" : " ▼"}</span> : null}
+            {sort.active ? sort.dir === "asc" ? <ArrowUp aria-hidden="true" /> : <ArrowDown aria-hidden="true" /> : null}
           </a>
         ) : (
           label
@@ -44,7 +45,7 @@ export function HeaderCell({ label, sort, menu }: {
         {menu ? (
           <details className="menu">
             <summary className={menu.active ? "th-filter active" : "th-filter"} aria-label={`Filter ${label}`} title={`Filter ${label}`}>
-              ▾
+              <ChevronDown aria-hidden="true" />
             </summary>
             <div className="menu-body">
               <MenuLinks groups={menu.groups} />
