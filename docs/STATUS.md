@@ -193,5 +193,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   - Phase 6a (PRO-579): every workspace document gets a Word file beside its Markdown, in the format
     the call sets (font, size, margins, spacing), placeholders highlighted yellow. Drive (6b) waits
     for the Google service account (RUNBOOK, Google Drive and Sheets).
+  - Phase 7a (PRO-580): the proposal workspace at /proposals/{call id}: the header with People,
+    Checklist and Show history, the stage strip, the step list and the step card, with Approve and
+    continue, Ask for changes, Add material, Stop here no-go, the gate's Go, Go with conditions and
+    No-go, Retry, Raise the cap and checklist ticks, each guarded and owner-only where the spec says.
+    Its browser tests run on a throwaway Postgres (RUNBOOK, Dashboard). Each step's own screen
+    follows in 7b.
 
 ## Known breakages

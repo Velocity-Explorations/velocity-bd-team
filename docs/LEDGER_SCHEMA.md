@@ -417,7 +417,9 @@ added. Added by `008_pursuits.sql`.
 | text | TEXT, not null | the line in words, for example `Discovery approved`, or the link someone added | same |
 
 Index: `(pursuit_id, id)`. Add material (PW4: a link or a note) writes a `material` row; the
-worker reads the pursuit's `material` rows when it next works a step.
+worker reads the pursuit's `material` rows when it next works a step (PRO-580). The workspace's actions
+write `approved`, `go`, `go_with_conditions`, `changes_asked`, `retried`, `no_go`, `material`, `budget` and
+`checklist` rows, as the helpers in `ledger/queries.py` do.
 
 ## Table: checklist_items
 

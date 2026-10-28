@@ -345,6 +345,17 @@ If a key file is ever exposed (pasted, emailed or committed), delete that key on
 
 ## Dashboard
 
+The workspace's browser tests press its buttons, so they run against a throwaway Postgres, never the
+ledger: build the dashboard first (`npm run build` in dashboard/), make sure Docker Desktop is running,
+then in PowerShell from the repo folder:
+
+```powershell
+$env:WORKSPACE_TESTS = "1"; pytest tests/test_dashboard_workspace.py; Remove-Item Env:WORKSPACE_TESTS
+```
+
+They start a `postgres:17-alpine` container and the built dashboard on port 8002 against it, seed
+pursuits in every state, and remove both at the end.
+
 ```powershell
 cd dashboard
 npm run dev      # http://localhost:8000

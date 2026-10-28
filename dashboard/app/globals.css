@@ -2439,3 +2439,466 @@ dialog.start-draft {
     transform: none;
   }
 }
+
+/* ------------------------------------------------------------------ the proposal workspace (PW1 to PW4) */
+
+.ws-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  margin: 4px 0 12px;
+}
+
+.ws-head .logo-tile {
+  width: 44px;
+  height: 44px;
+}
+
+.ws-crumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: var(--type-detail);
+  color: var(--ink-3);
+}
+
+.ws-crumb svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ws-crumb a {
+  color: var(--ink-2);
+}
+
+.ws-title {
+  margin: 2px 0 4px;
+  font: 700 22px/1.2 'Inter Tight', sans-serif;
+}
+
+.ws-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  font: var(--type-detail);
+  color: var(--ink-2);
+}
+
+.ws-facts strong {
+  color: var(--ink);
+}
+
+.ws-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ws-folder svg {
+  width: 13px;
+  height: 13px;
+}
+
+.ws-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ws-panel {
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+}
+
+.ws-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ws-panel h2 {
+  margin: 0 0 8px;
+  font: var(--type-section);
+}
+
+.ws-history {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--type-small);
+}
+
+.ws-history li {
+  display: grid;
+  grid-template-columns: 11rem 9rem minmax(0, 1fr);
+  gap: 12px;
+}
+
+.ws-history-who {
+  color: var(--ink-2);
+}
+
+/* Six stages with a 3px rule: done in the good green, now in the accent, next in the line grey. */
+.ws-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-stage {
+  display: grid;
+  padding-top: 6px;
+  border-top: 3px solid var(--line);
+}
+
+.ws-stage.done {
+  border-top-color: var(--good);
+}
+
+.ws-stage.now {
+  border-top-color: var(--accent);
+}
+
+.ws-stage-name {
+  font: var(--type-header);
+}
+
+.ws-stage-state {
+  font: var(--type-detail);
+  color: var(--ink-3);
+}
+
+.ws-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.ws-steps h2.ws-steps-stage {
+  margin: 12px 0 4px;
+  font: var(--type-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ws-steps ol {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-steps a,
+.ws-step-unreached {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-card);
+  color: var(--ink);
+  font: var(--type-small);
+  text-decoration: none;
+}
+
+.ws-steps a:hover {
+  background: var(--surface-raised);
+}
+
+.ws-steps li.open a {
+  background: var(--surface-raised);
+  border-color: var(--line-hover);
+  font-weight: 600;
+}
+
+.ws-step-unreached {
+  color: var(--ink-3);
+}
+
+.ws-step-num {
+  color: var(--ink-3);
+  text-align: right;
+}
+
+/* The open step: a 2px ink border, a band with the step's title and state, then its body. */
+.ws-card {
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.ws-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #383838;
+}
+
+.ws-band h2 {
+  margin: 0;
+  font: var(--type-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ws-attempt {
+  color: var(--ink-3);
+}
+
+.ws-card-body {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px 16px;
+}
+
+.ws-purpose,
+.ws-redo {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.ws-redo {
+  font: var(--type-small);
+}
+
+.ws-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--line-hover);
+  background: var(--field);
+  font: var(--type-small);
+}
+
+.ws-notice p {
+  margin: 0 0 8px;
+}
+
+.ws-notice p:last-child {
+  margin-bottom: 0;
+}
+
+.ws-notice.tone-info {
+  border-left-color: var(--info-line);
+}
+
+.ws-notice.tone-warn {
+  border-left-color: var(--caution-line);
+}
+
+.ws-notice.tone-conflict {
+  border-left-color: var(--conflict-line);
+}
+
+.ws-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+
+.ws-inline-form input[type="number"] {
+  width: 8rem;
+  height: var(--field-height);
+}
+
+.ws-files {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-files li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--field);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-card);
+}
+
+.ws-files li > span {
+  display: grid;
+}
+
+.ws-files svg {
+  width: 16px;
+  height: 16px;
+  color: var(--info);
+}
+
+.ws-points ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 4px;
+}
+
+.ws-document > summary {
+  cursor: pointer;
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+.ws-doc {
+  max-height: 32rem;
+  overflow: auto;
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--field);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-card);
+  font: var(--type-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Your call: the accent label on the field colour, the question, then the actions. */
+.ws-call {
+  padding: 12px 14px 14px;
+  background: var(--field);
+  border-radius: var(--radius-card);
+}
+
+.ws-call-label {
+  margin: 0 0 4px;
+  font: var(--type-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.ws-question {
+  margin: 0 0 10px;
+  font: var(--type-row-title);
+}
+
+.ws-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ws-actions form {
+  margin: 0;
+}
+
+.ws-actions .ws-stop {
+  margin-left: auto;
+}
+
+.ws-more > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.ws-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ws-more[open] {
+  flex-basis: 100%;
+}
+
+.ws-more-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  max-width: 40rem;
+}
+
+.ws-more-form textarea {
+  width: 100%;
+}
+
+.ws-more-form > button {
+  justify-self: start;
+}
+
+.ws-checklist {
+  display: grid;
+  gap: 12px;
+}
+
+.ws-check-part ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-check-part li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 9rem 6rem 4.5rem;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line-subtle);
+  font: var(--type-small);
+}
+
+.ws-check-part form {
+  margin: 0;
+}
+
+.ws-tick {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--line-hover);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--ground);
+}
+
+.ws-check-part li.done .ws-tick {
+  background: var(--good);
+  border-color: var(--good);
+}
+
+.ws-tick svg {
+  width: 13px;
+  height: 13px;
+}
+
+.ws-check-owner {
+  color: var(--ink-2);
+}
+
+@media (max-width: 1100px) {
+  .ws-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ws-head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .ws-tools {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}

@@ -74,3 +74,18 @@ def test_the_clash_check_finds_reposts_and_pursued_calls_closing_near_the_deadli
     assert [c["id"] for c in clashes["same_title"]] == ["ssc-9"]
     assert [c["id"] for c in clashes["closing_near"]] == ["sam-2"]
     assert clashes["register"] == []
+
+
+def test_material_the_team_adds_reaches_every_later_prompt(ledger_db: str) -> None:
+    pursuit_id = _pursued()
+    lq.add_event(pursuit_id, "Shaun Jones", "material", "The parent BAA is at https://example.invalid/baa.pdf")
+    facts = inputs.call_facts(inputs.gather(pursuit_id), today=date(2026, 10, 28))
+    assert "MATERIAL THE TEAM ADDED" in facts
+    assert "Shaun Jones: The parent BAA is at https://example.invalid/baa.pdf" in facts
+    assert "MATERIAL THE TEAM ADDED" not in inputs.call_facts(inputs.gather(_other_pursuit()), today=date(2026, 10, 28))
+
+
+def _other_pursuit() -> int:
+    run_id = lq.start_run("sam_gov")
+    lq.upsert_call({"id": "sam-9", "portal": "SAM.gov", "title": "Another call", "due_date": "2026-12-09"}, run_id)
+    return lq.start_pursuit("sam-9", "David Wood")
