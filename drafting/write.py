@@ -4,17 +4,18 @@ the reference pipeline's prompts, whose words stay unchanged (drafting/prompts.p
 
     RUNNERS["outline"](ctx) -> StepResult
 
-Outline, First draft, Compliance check and the review passes send the reference prompt with a workspace
-block after it: the owner's direction and chosen past work, the skill's part for the step, the no-dash
-rule, and on a redo the owner's note. Reviews runs the reference pipeline's four review passes until
-phase 8 brings the reviewers' changes the owner decides one by one (PW12). Final checks runs the
-reference's last phases: the readiness checklist, the formatting pass, the opening held for a person to
-write (PRO-494) and the AI slop check (PRO-510), with the dashes replaced before the scan. The Submit
-gate checks what the skill asks before the owner submits and writes the packet: each file's portal slot
-and the portal's steps (PW14). The owner submits on the portal, then chooses Mark submitted.
+Outline, First draft and Compliance check send the reference prompt with a workspace block after it: the
+owner's direction and chosen past work, the skill's part for the step, the no-dash rule, and on a redo the
+owner's note. Reviews runs three reviewers in turn, who propose changes the owner decides one by one
+(PW12). Final checks puts the decided changes into Draft v3, then runs the reference's last phases: the
+readiness checklist, the formatting pass, the opening held for a person to write (PRO-494), the
+compliance check once more as a report only, and the AI slop check (PRO-510), with the dashes replaced
+before the scan. It reports seven checks in words and adds what is left to fill to the checklist (PW13).
+The Submit gate checks what the skill asks before the owner submits and writes the packet: each file's
+portal slot and the portal's steps (PW14). The owner submits on the portal, then chooses Mark submitted.
 
 Drafts are numbered in the pursuit's folder: draft_v1 (First draft), draft_v2 (Compliance check),
-draft_v3 (Reviews) and draft_final (Final checks).
+draft_v3 (the reviewers' decided changes) and draft_final (Final checks).
 """
 from __future__ import annotations
 
@@ -27,8 +28,9 @@ from drafting.company import profile
 from drafting.inputs import builds_on_text, draft_inputs
 from drafting.phases import Phase
 from drafting.prompts import Prompt
-from drafting.steps import (StepContext, StepResult, bullets, count_dashes, fix_dashes, latest_draft, placeholder_counts,
-                            placeholder_line, points, skill_part, split_reply, strings, system_prompt, user_prompt)
+from drafting.steps import (OTHER_NOTE, PLACEHOLDER, StepContext, StepResult, bullets, count_dashes, fix_dashes, latest_draft,
+                            placeholder_counts, placeholder_line, points, skill_part, split_reply, strings, system_prompt,
+                            user_prompt)
 from ledger import queries as lq
 
 SKILL = Path(__file__).resolve().parent / "skills" / "proposal_drafting.md"
@@ -332,10 +334,88 @@ def _apply_changes(ctx: StepContext) -> tuple[str, int, int]:
     return (ctx.work_dir / "draft_v3.md").read_text(encoding="utf-8"), applied, missed
 
 
+def _check(name: str, ok: bool | None, detail: str, result: str | None = None) -> dict[str, Any]:
+    """One check's outcome: passing, failing, or not known yet; with the word the page shows when it has one."""
+    found = {"check": name, "ok": ok, "detail": detail}
+    return found | {"result": result} if result is not None else found
+
+
+RECHECK_TOKENS = pipeline.MAX_TOKENS["6.75"]   # the model thinks first; a small ceiling leaves no room for the report
+REPORT_ONLY = ("\n\nThis is the final version, checked once more before submission. Give only the report, with the same "
+               "marks; do not write the corrected draft. The owner fixes what the report finds.")
+KIND_TASKS = {"PERSON WRITES": ("Write the place marked PERSON WRITES in the final version, in your own words",
+                                "Write the {n} places marked PERSON WRITES in the final version, in your own words"),
+              "NEEDS INPUT": ("Fill the NEEDS INPUT placeholder in the final version", "Fill the {n} NEEDS INPUT placeholders in the final version"),
+              "NEEDS EVIDENCE": ("Give a source for the claim marked NEEDS EVIDENCE", "Give sources for the {n} claims marked NEEDS EVIDENCE"),
+              "other": ("Clear the other bracketed note in the final version", "Clear the {n} other bracketed notes in the final version")}
+
+
+def placeholder_list(text: str) -> list[dict[str, Any]]:
+    """Each open placeholder in a text, in order: its kind, its text, its line and the heading it sits under (PW13)."""
+    found = []
+    section = ""
+    for n, line in enumerate(text.splitlines(), start=1):
+        if line.lstrip().startswith("#"):
+            section = line.strip().lstrip("#").strip()
+        for match in PLACEHOLDER.finditer(line):
+            found.append({"kind": match.group(1).upper(), "text": match.group(0)[:300], "line": n, "section": section})
+        for match in OTHER_NOTE.finditer(line):
+            found.append({"kind": "other", "text": match.group(0)[:300], "line": n, "section": section})
+    return found
+
+
+def checklist_check(items: list[dict[str, Any]]) -> dict[str, Any]:
+    """Checklist updated (PW13): how much is done, and whether every open item has an owner and a date."""
+    if not items:
+        return _check("Checklist updated", None, "no checklist yet", "not run")
+    done = sum(1 for item in items if item["done"])
+    loose = sum(1 for item in items if not item["done"] and not (item["owner"] and item["due_date"]))
+    head = f"{done} of {len(items)} done"
+    if not loose:
+        return _check("Checklist updated", True, f"{head}; every open item has an owner and a date", "updated")
+    return _check("Checklist updated", False, f"{head}; {loose} open {'item has' if loose == 1 else 'items have'} no owner or no date",
+                  "updated")
+
+
+def _recheck(ctx: StepContext, text: str) -> tuple[dict[str, Any], dict[str, str] | None]:
+    """The compliance check once more on the final version (PW13): its report only; the final version stays as it is."""
+    name = "Final compliance re-check"
+    d = draft_inputs(ctx.record)
+    p = prompts.p675_compliance(company=profile(), knowledge_base=d.company_context, alignment_context=_alignment(ctx),
+                                title=d.title, agency=d.agency, opp_type=d.opp_type, due_date=d.due_date,
+                                requirements=ctx.earlier("requirements.md", 25_000), draft=text[:50_000])
+    try:
+        reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, direction=False, placeholders=True) + REPORT_ONLY),
+                        "final compliance re-check", RECHECK_TOKENS)
+    except llm.PhaseError as exc:
+        return _check(name, None, f"did not run: {str(exc)[:200]}", "not run"), None
+    report = reply.split(prompts.CORRECTED_DRAFT_SEPARATOR, 1)[0].strip()
+    if not report:
+        return _check(name, None, "the check gave no report", "not run"), None
+    saved = ctx.save("final_compliance.md", report, name)
+    fix, warn = report.count(CORRECTION), report.count(WARNING)
+    if fix:
+        return _check(name, False, f"{fix} to fix, {warn} to check; the report is final_compliance.md", f"{fix} to fix"), saved
+    if warn:
+        return _check(name, True, f"{warn} to check; the report is final_compliance.md", "passed"), saved
+    return _check(name, True, "every check from step 7 passes on the final version", "passed"), saved
+
+
+def _final_checklist(ctx: StepContext, counts: dict[str, int]) -> None:
+    """What is left to fill joins the checklist for the owner, due by the internal submit-by date (PW13)."""
+    try:
+        due = json.loads(ctx.pursuit.get("target_dates") or "{}").get("submit_by")
+    except ValueError:
+        due = None
+    items = [{"part": "inputs", "text": (one if n == 1 else many.format(n=n)), "source": "Final checks", "owner": ctx.pursuit["owner"],
+              "due_date": due} for kind, (one, many) in KIND_TASKS.items() if (n := counts.get(kind, 0))]
+    lq.save_checklist(ctx.pursuit["id"], items, "final")
+
+
 def final(ctx: StepContext) -> StepResult:
-    """Step 9: Draft v3 with the decided changes, the readiness checklist, the formatting pass, the opening held for a
-    person to write, the dashes replaced, then the AI slop check's verdict on the final version (PW13 lists the
-    checks the page adds)."""
+    """Step 9 (PW13): Draft v3 with the decided changes, the readiness checklist, the formatting pass, the opening held
+    for a person to write, the dashes replaced, the compliance check once more, and the AI slop check's verdict on
+    the final version; then the seven checks in words, the open placeholders, and the checklist updated."""
     current, applied, missed = _apply_changes(ctx)
     d, hooks = draft_inputs(ctx.record), _Quiet()
     state = _pipeline_state(ctx, current)
@@ -351,29 +431,49 @@ def final(ctx: StepContext) -> StepResult:
     person_writes = int(state.stats.get("person_writes") or 0)
     dashes += _undash(final_path)
     _undash(ctx.work_dir / "checklist.md")
+    recheck, report = _recheck(ctx, final_path.read_text(encoding="utf-8"))
     slop = _scan(ctx, "draft_final.md")
     verdict = slop["verdict"]
     document = final_path.read_text(encoding="utf-8")
     files = [ctx.entry("draft_final.md", "Final version"), ctx.entry("checklist.md", "Submission readiness checklist")]
     if (ctx.work_dir / "slop_report.md").exists():
         files.append(ctx.entry("slop_report.md", "AI slop check report"))
-    lines = [f"AI slop check: {verdict}", placeholder_line(placeholder_counts(document))]
+    if report:
+        files.append(report)
+    counts = placeholder_counts(document)
+    _final_checklist(ctx, counts)
+    left = sum(counts.values())
+    dashes_left = count_dashes(document)
+    found = [f"{n} {kind if kind != 'other' else 'other bracketed notes'}" for kind, n in counts.items() if n]
+    checks = [
+        _check("Formatting check", True, "the formatting pass ran on the final version", "done"),
+        recheck,
+        _check("Placeholder sweep", not left, f"{', '.join(found)}, for {ctx.pursuit['owner']}" if left else "none left",
+               f"{left} left" if left else "none left"),
+        _check("AI slop check, final pass", bool(slop["ready"]) if slop["scan_id"] else None,
+               f"{verdict}. " + ("Dash check passed: no en or em dashes" if not dashes_left else f"Dash check: {dashes_left} left"),
+               ("ready" if slop["ready"] else "not ready") if slop["scan_id"] else "not run"),
+        _check("Submission package check", None, "Runs once Drive is set up: file format, names, size limits, markings, PDF "
+               "fonts and page count", "not run"),
+        checklist_check(lq.checklist(ctx.pursuit["id"])),
+        _check("Final version saved", True, "draft_final.md and its Word file; the numbered drafts are kept", "saved"),
+    ]
+    lines = [f"AI slop check: {verdict}", placeholder_line(counts)]
     if applied or missed:
         lines.insert(0, f"{applied} {'change' if applied == 1 else 'changes'} applied in Draft v3"
                         + (f"; {missed} no longer matched the draft" if missed else ""))
     if dashes:
         lines.append(f"{dashes} {'dash' if dashes == 1 else 'dashes'} replaced")
+    passed = sum(1 for c in checks if c["ok"])
+    lines.insert(0, f"{passed} of {len(checks)} final checks passed")
     return StepResult(summary=bullets(lines), files=files,
                       content={"document": document, "verdict": verdict, "ready": bool(slop["ready"]), "band": slop["band"],
                                "open_placeholders": slop["placeholders"], "person_writes": person_writes, "dashes_fixed": dashes,
-                               "changes_applied": applied, "changes_missed": missed, "question": QUESTIONS["final"]})
+                               "changes_applied": applied, "changes_missed": missed, "checks": checks,
+                               "placeholders": placeholder_list(document), "question": QUESTIONS["final"]})
 
 
 # --------------------------------------------------------------------------------- Submit
-
-def _check(name: str, ok: bool | None, detail: str) -> dict[str, Any]:
-    return {"check": name, "ok": ok, "detail": detail}
-
 
 def _gate_checks(ctx: StepContext, final_text: str) -> list[dict[str, Any]]:
     """What the skill confirms before the owner submits, each passing, failing, or not known yet."""

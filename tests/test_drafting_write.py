@@ -42,7 +42,8 @@ Email the PDF to the contracting officer.
 {FENCE}"""
 REPLIES = {"building outline": OUTLINE, "drafting response": DRAFT, "compliance check": COMPLIANCE,
            "building checklist": "# Checklist\n- [ ] rates", "formatting document": FINAL,
-           "framing the opening": "PLACE 1:\n- the customer's problem\n- our discriminator", "submission packet": PACKET}
+           "framing the opening": "PLACE 1:\n- the customer's problem\n- our discriminator", "submission packet": PACKET,
+           "final compliance re-check": "## 1. Keyword Verification\n- ❌ edge AI paraphrased\n- ⚠️ check CDIF"}
 
 
 def review_reply(n: int) -> str:
@@ -200,7 +201,8 @@ def test_final_checks_polish_hold_the_opening_fix_dashes_and_scan(ledger_db: str
     assert (ctx.work_dir / "checklist.md").exists() and (ctx.work_dir / "slop_report.md").exists()
     assert result.content["verdict"] == "Not ready: 1 PERSON WRITES; band clean (provisional)"
     assert (result.content["ready"], result.content["dashes_fixed"], result.content["person_writes"]) == (False, 1, 1)
-    assert [f["name"] for f in result.files] == ["Final version", "Submission readiness checklist", "AI slop check report"]
+    assert [f["name"] for f in result.files] == ["Final version", "Submission readiness checklist", "AI slop check report",
+                                                 "Final compliance re-check"]
     assert "written by AI" not in json.dumps(result.content)
 
 
@@ -286,3 +288,63 @@ def test_drafting_and_review_prompts_keep_open_items_in_the_three_counted_forms(
     assert len(asked) == 5
     for label, prompt in asked.items():
         assert write.PLACEHOLDER_RULE in prompt.user, label
+
+
+def test_final_checks_report_seven_checks_in_words(ledger_db: str, tmp_path: Path) -> None:
+    model = Model()
+    ctx = _context(tmp_path, model, "final", {**EARLIER, "outline.md": "# Outline", "draft_v3.md": "# Edge AI white paper v3"},
+                   target_dates={"submit_by": "2026-11-30"})
+    lq.save_checklist(ctx.pursuit["id"], [
+        {"part": "documents", "text": "White paper PDF", "done": True},
+        {"part": "inputs", "text": "Bios", "owner": "Shaun Jones", "due_date": "2026-11-29", "done": False}], "requirements")
+    result = write.final(ctx)
+    assert [(c["check"], c["result"], c["ok"]) for c in result.content["checks"]] == [
+        ("Formatting check", "done", True),
+        ("Final compliance re-check", "1 to fix", False),
+        ("Placeholder sweep", "1 left", False),
+        ("AI slop check, final pass", "not ready", False),
+        ("Submission package check", "not run", None),
+        ("Checklist updated", "updated", True),
+        ("Final version saved", "saved", True),
+    ]
+    detail = {c["check"]: c["detail"] for c in result.content["checks"]}
+    assert detail["Final compliance re-check"] == "1 to fix, 1 to check; the report is final_compliance.md"
+    assert detail["Placeholder sweep"] == "1 PERSON WRITES, for David Wood"
+    assert detail["AI slop check, final pass"] == ("Not ready: 1 PERSON WRITES; band clean (provisional). "
+                                                   "Dash check passed: no en or em dashes")
+    assert detail["Submission package check"].startswith("Runs once Drive is set up")
+    assert detail["Checklist updated"] == "1 of 3 done; every open item has an owner and a date"
+    assert detail["Final version saved"] == "draft_final.md and its Word file; the numbered drafts are kept"
+    final = (ctx.work_dir / "draft_final.md").read_text(encoding="utf-8").splitlines()
+    line = next(n for n, text in enumerate(final, start=1) if "[PERSON WRITES" in text)
+    [placeholder] = result.content["placeholders"]
+    assert (placeholder["kind"], placeholder["line"], placeholder["section"]) == ("PERSON WRITES", line, "Edge AI white paper")
+    assert placeholder["text"].startswith("[PERSON WRITES")
+    # The re-check reads the final version, asks for its report only, and leaves the final version as it is.
+    recheck = model.prompt("final compliance re-check")
+    assert final[line - 1][:60] in recheck.user and "Give only the report" in recheck.user
+    assert (ctx.work_dir / "final_compliance.md").read_text(encoding="utf-8").startswith("## 1. Keyword Verification")
+    assert "Final compliance re-check" in [f["name"] for f in result.files]
+    # What is left to fill joins the checklist for the owner, due by the internal submit-by date.
+    assert [(i["part"], i["text"], i["owner"], i["due_date"]) for i in lq.checklist(ctx.pursuit["id"]) if i["origin"] == "final"] == [
+        ("inputs", "Write the place marked PERSON WRITES in the final version, in your own words", "David Wood", "2026-11-30")]
+
+
+def test_a_failed_compliance_re_check_says_so_and_the_other_checks_stand(ledger_db: str, tmp_path: Path) -> None:
+    ctx = _context(tmp_path, Model(fail={"final compliance re-check"}), "final",
+                   {**EARLIER, "outline.md": "# Outline", "draft_v3.md": "# Edge AI white paper v3"})
+    result = write.final(ctx)
+    recheck = next(c for c in result.content["checks"] if c["check"] == "Final compliance re-check")
+    assert (recheck["result"], recheck["ok"]) == ("not run", None)
+    assert recheck["detail"] == "did not run: final compliance re-check: the model refused this request"
+    assert len(result.content["checks"]) == 7
+
+
+def test_the_checklist_check_names_open_items_without_an_owner_or_a_date() -> None:
+    def item(done: bool, owner: str | None = "David Wood", due: str | None = "2026-11-30") -> dict:
+        return {"done": 1 if done else 0, "owner": owner, "due_date": due}
+
+    assert write.checklist_check([]) == {"check": "Checklist updated", "ok": None, "result": "not run", "detail": "no checklist yet"}
+    assert write.checklist_check([item(True), item(False)])["detail"] == "1 of 2 done; every open item has an owner and a date"
+    missing = write.checklist_check([item(True, None, None), item(False, None), item(False, due=None), item(False)])
+    assert (missing["ok"], missing["detail"]) == (False, "1 of 4 done; 2 open items have no owner or no date")
