@@ -43,7 +43,7 @@ export async function decide(formData: FormData): Promise<void> {
   const keepCallDecision = formData.get("keep") === "1";
 
   const viewer = await currentViewer();
-  if (!viewer) backTo(returnTo, "error", "Choose who you are (top right) before deciding.");
+  if (!viewer) backTo(returnTo, "error", "Log in (top right) before deciding.");
 
   let result: DecideResult;
   try {
@@ -75,7 +75,7 @@ export async function decideRequestAction(formData: FormData): Promise<void> {
   if (!Number.isInteger(id) || id <= 0 || !isRequestChoice(choice)) backTo(returnTo, "error", "Choose Approve or Reject first.");
 
   const viewer = await currentViewer();
-  if (!viewer) backTo(returnTo, "error", "Choose who you are (top right) before deciding.");
+  if (!viewer) backTo(returnTo, "error", "Log in (top right) before deciding.");
 
   let result: DecideRequestResult;
   try {
@@ -91,7 +91,7 @@ export async function decideRequestAction(formData: FormData): Promise<void> {
   backTo(returnTo, "error", result.reason);
 }
 
-/** The "Deciding as" picker, used when DASHBOARD_USERS lists more than one person. */
+/** The account menu's Log in and Switch user lists, when DASHBOARD_USERS names more than one person. */
 export async function setViewer(formData: FormData): Promise<void> {
   const name = String(formData.get("viewer") ?? "").trim();
   const store = await cookies();
@@ -103,20 +103,24 @@ export async function setViewer(formData: FormData): Promise<void> {
   revalidatePath("/", "layout");
 }
 
-/** The picker's Clear User Selection button: nobody is deciding until a name is chosen again. */
+/**
+ * The account menu's Log out (V2): nobody is deciding until a name is chosen again. Until Google
+ * sign-in it returns to Home with the sign-out notice.
+ */
 export async function clearViewer(): Promise<void> {
   (await cookies()).delete(VIEWER_COOKIE);
   revalidatePath("/", "layout");
+  backTo("/", "notice", "You are logged out of BD Team.");
 }
 
-/** The Settings dialog's Save: which columns each table shows, kept for this browser (PRO-555). */
+/** Table settings' Save: which columns each table shows, kept for this browser (PRO-555). */
 export async function saveColumns(formData: FormData): Promise<void> {
   const hidden = hiddenFromForm(new Set(formData.keys()));
   (await cookies()).set(COLUMNS_COOKIE, JSON.stringify(hidden), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
   revalidatePath("/", "layout");
 }
 
-/** The Settings dialog's Reset to defaults. */
+/** Table settings' Reset to defaults. */
 export async function resetColumns(): Promise<void> {
   (await cookies()).delete(COLUMNS_COOKIE);
   revalidatePath("/", "layout");

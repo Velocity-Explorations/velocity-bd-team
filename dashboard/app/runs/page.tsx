@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AutomationCards } from "@/components/AutomationCards";
 import { Shell } from "@/components/Shell";
 import { Badge, toneOf } from "@/components/bits";
 import { formatAgo, formatDuration, formatTime, parseStageCounts } from "@/lib/format";
@@ -51,13 +52,9 @@ export default async function RunsPage() {
   const latest = runs[0];
 
   return (
-    <Shell current="runs">
-      <div className="page-head">
-        <div>
-          <h1>Runs</h1>
-          <p className="muted">Scan history from the runs table, newest first.</p>
-        </div>
-      </div>
+    <Shell section="automation">
+      <h1 className="sr-only">Scans</h1>
+      <AutomationCards current="runs" />
 
       {latest ? (
         <section className={`latest edge-${isStale(latest, now) ? "warn" : toneOf(latest.status)}`} aria-label="Most recent run">

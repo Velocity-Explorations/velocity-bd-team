@@ -161,6 +161,189 @@ main {
   padding: 16px 24px 32px;
 }
 
+/* Read by screen readers, not shown: each page's title, since the pressed view card names it. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.brand img {
+  display: block;
+  height: 16px;
+  width: auto;
+}
+
+.topbar nav a svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+
+/* ------------------------------------------------------------------ account menu */
+
+/* The account button: initials, the name and Deciding; the accent line while its menu is open. */
+details.account {
+  margin-left: auto;
+}
+
+.account-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 8px 0 5px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-card);
+  transition: border-color var(--transition), background-color var(--transition);
+}
+
+.account-button:hover {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+details.account[open] > .account-button {
+  border-color: var(--accent);
+}
+
+.account-button svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
+}
+
+.initials {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--line);
+  border-radius: var(--radius-card);
+  color: var(--ink);
+  font: 700 12px/1 var(--font-label);
+}
+
+.initials.big {
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+}
+
+.initials.small {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+}
+
+.account-who {
+  display: grid;
+  line-height: 1.2;
+}
+
+.account-name {
+  font: 600 13px/1.2 var(--font-body);
+  color: var(--ink);
+}
+
+.account-role {
+  font: 400 11px/1.2 var(--font-label);
+  color: var(--ink-3);
+}
+
+.account-role.cannot {
+  color: var(--conflict);
+}
+
+details.account > summary.btn {
+  height: var(--control-height);
+}
+
+details.account .menu-body {
+  left: auto;
+  right: 0;
+  width: 260px;
+}
+
+.account-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 10px;
+}
+
+.account-head strong {
+  display: block;
+  font: 600 14px/1.3 var(--font-body);
+}
+
+.account-head .muted {
+  display: block;
+  font: 12px/1.35 var(--font-body);
+}
+
+.account-head + .menu-group {
+  margin-top: 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-subtle);
+}
+
+/* A menu item that acts (Table settings, a name, Log out): 28px, full width, like a link item. */
+.menu-body button.menu-item {
+  justify-content: flex-start;
+  width: 100%;
+  height: var(--menu-item-height);
+  padding: 0 8px;
+  background: transparent;
+  border-color: transparent;
+  border-radius: var(--radius-chip);
+  font: var(--type-small);
+}
+
+.menu-body button.menu-item:hover {
+  background: var(--surface-raised);
+  border-color: transparent;
+}
+
+.menu-body button.menu-item:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ------------------------------------------------------------------ view cards row */
+
+.view-cards {
+  margin: 0 0 16px;
+}
+
+.vt-card__label svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
+}
+
+/* A plain line under the cards, with its count at the right (Automation's pages). */
+.lead-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 0 0 12px;
+}
+
+.lead-line p {
+  margin: 0;
+  max-width: 60rem;
+}
+
 /* ------------------------------------------------------------------ buttons */
 
 button,
@@ -571,8 +754,14 @@ dialog.settings .lead {
 }
 
 .filter-bar .reset {
-  margin-left: auto;
   font: var(--type-small);
+}
+
+/* The count line, right-aligned, then Table settings at the end. */
+.bar-count {
+  margin: 0 0 0 auto;
+  font: 400 12px/1.3 var(--font-label);
+  color: var(--ink-3);
 }
 
 /* A menu that opens 4px below its trigger: the bar's Portals and Tag, and each header's filter. */
@@ -1003,7 +1192,8 @@ td.call {
   font: var(--type-row-title);
 }
 
-td.call > a {
+td.call > a,
+.call-with-logo > div > a {
   text-decoration: none;
 }
 
@@ -1318,6 +1508,114 @@ ul.votes {
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   font: var(--type-code);
+}
+
+/* ------------------------------------------------------------------ Home */
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 24px 0 8px;
+}
+
+.section-head h2,
+.section-head p {
+  margin: 0;
+}
+
+.section-head p {
+  font: var(--type-small);
+}
+
+.top-ten table {
+  table-layout: fixed;
+}
+
+.top-ten th.rank {
+  width: 32px;
+}
+
+.top-ten th:nth-child(3) {
+  width: 170px;
+}
+
+.top-ten th:nth-child(4),
+.top-ten th:nth-child(5) {
+  width: 76px;
+}
+
+.top-ten th:nth-child(6) {
+  width: 104px;
+}
+
+.top-ten td.call {
+  max-width: none;
+}
+
+.call-with-logo {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* A white 40px tile for the portal's logo, or its initials. */
+.logo-tile {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  background: #FFFFFF;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.logo-tile img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.logo-tile.initials {
+  color: var(--ground);
+  font: 700 12px/1 var(--font-label);
+}
+
+/* Up to six lines; the whole text on hover and keyboard focus. */
+.clamp {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+}
+
+@media (max-width: 1279px) {
+  .top-ten .wide {
+    display: none;
+  }
+}
+
+.status-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 16px 0 6px;
+  font: var(--type-small);
+  color: var(--ink-4);
+}
+
+.status-line a,
+.brief-link a {
+  color: var(--ink-2);
+}
+
+.brief-link {
+  margin: 0;
+  font: var(--type-small);
 }
 
 /* ---------------------------------------------------------------- requests */

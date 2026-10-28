@@ -14,7 +14,7 @@ import pytest
 URL = os.environ.get("DASHBOARD_TEST_URL", "").rstrip("/")
 pytestmark = pytest.mark.skipif(not URL, reason="set DASHBOARD_TEST_URL to a running dashboard")
 
-PAGES = ["/", "/calls", "/brief", "/judges", "/requests", "/runs", "/proposals"]
+PAGES = ["/", "/review", "/calls", "/brief", "/judges", "/requests", "/runs", "/proposals"]
 WIDTHS = [1024, 1280, 1440, 1920, 2560]
 MARGIN = 24
 

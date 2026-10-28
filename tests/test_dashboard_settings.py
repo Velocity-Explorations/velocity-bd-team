@@ -1,4 +1,4 @@
-"""The Settings dialog chooses which columns the review queue shows, for this browser (PRO-555).
+"""Table settings chooses which columns the review queue shows, for this browser (PRO-555, PRO-570).
 
 Loads the dashboard in headless Chromium and only sets or clears the settings cookie, so it never
 writes to the ledger. Name a serving dashboard in DASHBOARD_TEST_URL; without it the test is skipped.
@@ -31,17 +31,17 @@ def test_settings_hide_a_column_and_reset_restores_the_defaults() -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page: Any = browser.new_page(viewport={"width": 1440, "height": 900})
-        page.goto(URL + "/", wait_until="load", timeout=120_000)
+        page.goto(URL + "/review", wait_until="load", timeout=120_000)
         if page.locator("table").count() == 0:
             browser.close()
             pytest.skip("the review queue is empty, so it has no columns to check")
         page.wait_for_timeout(1000)
         first = headers(page)
-        page.get_by_role("button", name="Settings").click()
+        page.locator(".filter-bar").get_by_role("button", name="Table settings").click()
         page.locator("dialog.settings").get_by_label("AI reason").uncheck()
         page.locator("dialog.settings").get_by_role("button", name="Save").click()
         after_save = reloaded(page)
-        page.get_by_role("button", name="Settings").click()
+        page.locator(".filter-bar").get_by_role("button", name="Table settings").click()
         page.locator("dialog.settings").get_by_role("button", name="Reset to defaults").click()
         after_reset = reloaded(page)
         browser.close()

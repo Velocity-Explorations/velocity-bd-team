@@ -31,15 +31,31 @@ The dashboard is dark only and wears the BD Team theme from Claude Design's hand
 
 ## Pages
 
+The top bar holds the Velocity mark and BD Team (a link to Home), four sections with their icons,
+and the account menu (PRO-570). The open section is marked, and each section shows a count chip
+labelled with what it counts:
+- **Calls:** calls waiting for you.
+- **Proposals:** pursued calls with no draft, plus workspace steps ready for you.
+- **Automation:** requests waiting.
+
+Each section opens on a row of view cards in place of a page title. The open view's card is marked,
+and switching cards keeps the portal, tag and open or closed filters while dropping the sort and the
+column filters. The account menu shows who is deciding.
+- **Its items:** Table settings (on Calls), Switch user (the other people in DASHBOARD_USERS, until
+  Google sign-in) and Log out.
+- **Log out** clears the name and returns to Home with "You are logged out of BD Team."
+- **With nobody chosen,** the bar shows Log in, which lists the people to choose from.
+
 | Path | What it shows |
 |---|---|
-| `/` | **Review queue.** Calls with ai_verdict yes or maybe, still kept by the keyword filter, that you have not decided yet (with DASHBOARD_QUEUE=shared, that nobody has decided), newest first: how Claude and Grok each judged it (flagged when they disagree, in red when one said yes and the other no, Grok's reason behind a toggle), title linked to the portal, due date, match tier, Claude's reason, first seen, and four buttons (Pursue, Not relevant, Submitted, Dismiss) with an optional note. While everyone decides every call, each row also shows the decisions others have made on it. Filters in the bar above the table (PRO-558): portals (tick any in the Portals menu; none ticked shows every portal; the menu lists every portal that has completed a scan, with its number of calls, greyed at 0, PRO-563), tag, and open or closed (closed means a portal adapter flagged the call as closed). Each column header sorts by its column, and a second click reverses it; Claude / Grok's header filters the verdict and whether the judges agree or disagree (under disagree, calls where one said yes and the other no come first), and Tier's filters the tier. Closing soonest puts upcoming deadlines first and past ones last. Counts at the top: waiting, yes, maybe, new this week, and how often Claude and Grok agree. |
-| `/brief` | **Monday brief.** The week as the Monday 9:00 job posted it to Slack, from the briefs table: a Top 10 across portals (open calls nobody had decided, ranked yes before maybe, then the nearest deadline, until the fit score replaces that order), then one bulletin board per portal with its new calls by verdict, the calls waiting, top picks, pursued calls closing within 14 days, the week's decisions and the scraper line. Every listed call also shows its decision as of now. Earlier weeks are linked at the top. Before migration 005 it says to apply it. |
-| `/calls` | **All calls**, newest first, up to 200 at a time. The bar above the table has title search, portals, tag and open or closed; the headers sort, and Filter's, Claude / Grok's and Decision's headers filter filter_result, ai_verdict (or not reviewed) with the judges agreeing or not, and human_status (or undecided). Shows the filter tier and filter_reason for rejected rows, how Claude and Grok each judged it, each reason behind a toggle and a flag when they disagree, who decided and when, and every note. When more than one person has decided a call, each person's own decision is listed, flagged "people disagree" when one said yes and another no. Each row has a "decide", "change" or "add yours" control: "change" moves your decision, for example from Pursue to Submitted, or adds a note; "add yours" appears on a call someone else decided, so your decision is kept beside theirs. |
-| `/judges` | **Judge scoreboard.** How Claude and Grok compare with your decisions, counting only verdicts given before anyone decided the call, because decided calls become examples in the judges' prompt. Pursue and submitted count as yes, not relevant and dismissed as no. Per judge: how many it matched, its misses (a no on a call the team pursued), false alarms (a yes on a call the team passed on) and maybes. Per person: calls decided and how often each judge matched them. Between people: how often two people agree on the calls both decided. Last, the pursued calls a judge said no to. Before migration 004 it says to apply it. |
-| `/requests` | **Change requests** from the portal assistant (docs/ASSISTANT.md, "Approvals"). Requests waiting for approval come first, oldest first, each with who asked, why, and the preview of what approving would do, plus Approve and Reject buttons and an optional note. Below them, the last 50 decided requests with their status, who decided, and the result, or what an approved request is waiting for. The Requests link in the top bar shows how many are waiting. |
-| `/runs` | **Scan history.** The most recent run sits at the top with its status, start time, duration, stage counts, error and log. Below it, the last 100 runs. A run still marked running two hours after it started is flagged as having no finish recorded. |
-| `/proposals` | **Past submissions** from the proposals table, with win rate by portal. Shows an empty state until the Proposal Library plan fills the table. |
+| `/` | **Home** (section Home). Five link cards: Needs review (yes and maybe), Due soon (closing within 14 days), Agent update requests, Proposals to draft (pursued, open, no draft yet), and Submitted and waiting (marked Submitted with no result yet). Then the Top 10 from the newest Monday brief, or the live ranking before the first brief, with each call's logo, deadline and days left, both verdicts, its decision now, its description and Claude's reason (the last two hidden below 1280px). Under the table, a status line (requests waiting, the last scan, how often Claude and Grok agree) and a link to the briefs. Home records nothing. |
+| `/review` | **Needs review** (section Calls; it was `/` until PRO-570). Calls with ai_verdict yes or maybe, still kept by the keyword filter, that you have not decided yet (with DASHBOARD_QUEUE=shared, that nobody has decided), newest first: how Claude and Grok each judged it (flagged when they disagree, in red when one said yes and the other no, Grok's reason behind a toggle), title linked to the portal, due date, match tier, Claude's reason, first seen, and four buttons (Pursue, Not relevant, Submitted, Dismiss) with an optional note. While everyone decides every call, each row also shows the decisions others have made on it. Filters in the bar above the table (PRO-558): portals (tick any in the Portals menu; none ticked shows every portal; the menu lists every portal that has completed a scan, with its number of calls, greyed at 0, PRO-563), tag, and open or closed (closed means a portal adapter flagged the call as closed). Each column header sorts by its column, and a second click reverses it; Claude / Grok's header filters the verdict and whether the judges agree or disagree (under disagree, calls where one said yes and the other no come first), and Tier's filters the tier. Closing soonest puts upcoming deadlines first and past ones last. The view cards above it: Needs review, Due soon (`/review?view=due-soon`: the same calls closing within 14 days, soonest first) and All calls, each counting under the bar's filters; the count line at the bar's right says how many calls show. |
+| `/brief` | **Monday brief** (section Home, linked from Home). The week as the Monday 9:00 job posted it to Slack, from the briefs table: a Top 10 across portals (open calls nobody had decided, ranked yes before maybe, then the nearest deadline, until the fit score replaces that order), then one bulletin board per portal with its new calls by verdict, the calls waiting, top picks, pursued calls closing within 14 days, the week's decisions and the scraper line. Every listed call also shows its decision as of now. Earlier weeks are linked at the top. Before migration 005 it says to apply it. |
+| `/calls` | **All calls** (section Calls), newest first, up to 200 at a time, with Showing N of M at the bar's right. The bar above the table has title search, portals, tag and open or closed; the headers sort, and Filter's, Claude / Grok's and Decision's headers filter filter_result, ai_verdict (or not reviewed) with the judges agreeing or not, and human_status (or undecided). Shows the filter tier and filter_reason for rejected rows, how Claude and Grok each judged it, each reason behind a toggle and a flag when they disagree, who decided and when, and every note. When more than one person has decided a call, each person's own decision is listed, flagged "people disagree" when one said yes and another no. Each row has a "decide", "change" or "add yours" control: "change" moves your decision, for example from Pursue to Submitted, or adds a note; "add yours" appears on a call someone else decided, so your decision is kept beside theirs. |
+| `/judges` | **Judge scoreboard** (section Automation, card Judges agree). How Claude and Grok compare with your decisions, counting only verdicts given before anyone decided the call, because decided calls become examples in the judges' prompt. Pursue and submitted count as yes, not relevant and dismissed as no. Per judge: how many it matched, its misses (a no on a call the team pursued), false alarms (a yes on a call the team passed on) and maybes. Per person: calls decided and how often each judge matched them. Between people: how often two people agree on the calls both decided. Last, the pursued calls a judge said no to. Before migration 004 it says to apply it. |
+| `/requests` | **Agent update requests** (section Automation, where it opens): change requests from the portal assistant (docs/ASSISTANT.md, "Approvals"). Requests waiting for approval come first, oldest first, each with who asked, why, and the preview of what approving would do, plus Approve and Reject buttons and an optional note. Below them, the last 50 decided requests with their status, who decided, and the result, or what an approved request is waiting for. Automation's chip in the top bar shows how many are waiting. |
+| `/runs` | **Scans** (section Automation). The most recent run sits at the top with its status, start time, duration, stage counts, error and log. Below it, the last 100 runs. A run still marked running two hours after it started is flagged as having no finish recorded. |
+| `/proposals` | **Past submissions** (section Proposals; its views arrive with phase 4 of the redesign plan) from the proposals table, with win rate by portal. Shows an empty state until the Proposal Library plan fills the table. |
 
 The queue and the proposals tiles use the "Triage backlog" and "Win rate by portal" queries
 from [LEDGER_SCHEMA.md](LEDGER_SCHEMA.md); the "new this week" count uses its "New calls this
@@ -97,8 +113,8 @@ header menus apply at once; the Portals menu applies when it closes (`components
 also closes an open menu on a click outside it or Escape). `tests/test_dashboard_filters.py`
 checks the bar and the headers against a running dashboard, the same way; it only reads.
 
-The Settings button in the top bar opens a dialog where each person turns the review queue's and
-All calls' columns on or off; Call and Decide (Decision on All calls) always show. The choice is
+Table settings, at the right of the Calls filter bar and in the account menu on Calls, opens a
+dialog where each person turns Needs review's and All calls' columns on or off; Call and Decide (Decision on All calls) always show. The choice is
 kept in a cookie for that browser, and Reset to defaults clears it. By default Tier, the keyword
 filter's match strength, is hidden (PRO-555). `tests/test_dashboard_settings.py` checks the dialog
 against a running dashboard, the same way.
@@ -149,13 +165,13 @@ shapes the next review.
 There is no login yet. Decisions are attributed by one of two means:
 
 1. **Allowlist** (default). DASHBOARD_USERS lists the people who may decide. With one name,
-   that person is assumed; with several, choosing a name in the "Deciding as" picker in the
-   top bar sets a cookie at once, and its Clear User Selection button removes it (PRO-553).
+   that person is assumed; with several, choosing a name in the account menu (Log in, or
+   Switch user) sets a cookie at once, and Log out removes it (PRO-553, PRO-570).
    The cookie belongs to the host name, not the port, so two dashboards on one machine share it
    unless they are opened under different names (localhost and 127.0.0.1). Anyone who can reach
    the dashboard can pick any listed name, so keep it on the local machine or behind an access
-   proxy. `tests/test_dashboard_viewer.py` checks the picker against a running dashboard, the
-   same way as the layout test.
+   proxy. `tests/test_dashboard_viewer.py` checks the account menu against a running dashboard,
+   the same way as the layout test.
 2. **Header**. With DASHBOARD_USER_HEADER set, the viewer is taken from that request header
    only, as set by an access proxy, and must be on the allowlist when there is one.
 

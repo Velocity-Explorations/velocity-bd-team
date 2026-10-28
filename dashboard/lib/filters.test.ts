@@ -86,3 +86,13 @@ test("the SQL closed pattern agrees with isClosed on the ledger's JSON", () => {
     assert.equal(isClosed(extra), false, extra);
   }
 });
+
+test("a view with its own default sort leaves that one out of links and writes the usual default out (PRO-570)", () => {
+  const dueFirst = { key: "due", dir: "asc" } as const;
+  assert.deepEqual(pickSort(undefined, undefined, undefined, dueFirst), dueFirst);
+  assert.deepEqual(pickSort("seen", undefined, undefined, dueFirst), { key: "seen", dir: "desc" });
+  assert.deepEqual(sortParams(dueFirst, dueFirst), { sort: "", dir: "" });
+  assert.deepEqual(sortParams({ key: "seen", dir: "desc" }, dueFirst), { sort: "seen", dir: "" });
+  assert.equal(sortLink("/review", { view: "due-soon" }, dueFirst, "seen", dueFirst).href, "/review?view=due-soon&sort=seen");
+  assert.equal(sortLink("/review", { view: "due-soon" }, { key: "seen", dir: "desc" }, "due", dueFirst).href, "/review?view=due-soon");
+});

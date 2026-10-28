@@ -1,243 +1,187 @@
 import type { Metadata } from "next";
-import { decide } from "./actions";
-import { FilterBar } from "@/components/FilterBar";
-import { HeaderCell } from "@/components/HeaderCell";
-import { JudgeVerdicts } from "@/components/Judges";
+import Link from "next/link";
+import { PortalLogo } from "@/components/PortalLogo";
 import { Shell } from "@/components/Shell";
-import { Details, Flash, TitleLink } from "@/components/bits";
-import { callDetails, deadlineNote, noDeadlineLabel } from "@/lib/details";
-import { choiceLinks, filterHref, JUDGE_CHOICES, pickMany, pickSort, pickState, sortLink, sortParams, type Params } from "@/lib/filters";
-import { formatDue, formatTime } from "@/lib/format";
-import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
+import { ViewCards } from "@/components/ViewCards";
+import { Badge, Flash, TitleLink } from "@/components/bits";
+import { parseTop, weekLabel } from "@/lib/brief";
+import { formatAgo, formatDue, formatTime } from "@/lib/format";
+import { dayMonth, daysLeftText, kindsLine, topTenOrder } from "@/lib/home";
+import { verdictsFor } from "@/lib/judges";
 import { aliasesFor, displayPerson } from "@/lib/people";
-import { decisionsOn, judgeAgreement, latestJudgments, newThisWeek, portals, reviewQueue, tagOptions, tagsOn } from "@/lib/queries";
-import { tagsByCall, withoutTags } from "@/lib/tags";
-import { peopleSplit, votesByCall } from "@/lib/scoreboard";
-import { shows } from "@/lib/columns";
-import { displayTimeZone, hiddenColumns, queueMode } from "@/lib/settings";
-import { firstParam, isClosed, votedHref } from "@/lib/text";
-import { DECISIONS, isDecision, pickAllowed, STATUS_LABELS } from "@/lib/values";
+import {
+  briefRows,
+  briefWeeks,
+  countSubmittedWaiting,
+  countToDraft,
+  judgeAgreement,
+  lastCompletedRun,
+  latestJudgments,
+  liveTopTen,
+  listRuns,
+  queueCounts,
+  topTenRows,
+  waitingRequests,
+} from "@/lib/queries";
+import { displayTimeZone, queueMode } from "@/lib/settings";
+import { firstParam } from "@/lib/text";
+import { DUE_SOON_DAYS, type ViewCard } from "@/lib/views";
 import { allowlist, currentViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 // The title template in layout.tsx only applies below the root segment, so this one is spelled out.
-export const metadata: Metadata = { title: "Review queue | Velocity BD" };
+export const metadata: Metadata = { title: "Home | BD Team" };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-const VERDICT_CHOICES = [
-  { value: "", label: "Yes and maybe" },
-  { value: "yes", label: "Yes" },
-  { value: "maybe", label: "Maybe" },
-];
-const TIER_CHOICES = [
-  { value: "", label: "Any" },
-  { value: "tight", label: "Tight" },
-  { value: "broad", label: "Broad" },
-];
+/** This week's Top 10 from the newest Monday brief, or the live ranking before the first brief (H2). */
+async function topTen(): Promise<{ ids: string[]; source: string }> {
+  const weeks = await briefWeeks();
+  if (weeks && weeks.length) {
+    const rows = await briefRows(weeks[0]);
+    const top = parseTop(rows.find((r) => r.portal === null)?.body);
+    if (top) return { ids: top.top.map((c) => c.id), source: `From the Monday brief, ${weekLabel(weeks[0])}, with each call's decision as of now.` };
+  }
+  return { ids: await liveTopTen(), source: "No Monday brief yet, so this is the live ranking: yes before maybe, then the nearest deadline." };
+}
 
-export default async function ReviewQueuePage({ searchParams }: { searchParams: SearchParams }) {
+/**
+ * Home (H1 to H5, PRO-570): five link cards, the Top 10, a status line and the briefs. It reads the
+ * ledger live and records nothing.
+ */
+export default async function HomePage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  const voted = firstParam(sp.voted, 300);   // the call just voted on, for the notice's link
-  const [portalList, tagChoices] = await Promise.all([portals(), tagOptions()]);
-  const filters = {
-    portals: pickMany(sp.portal, portalList.map((p) => p.name)),
-    state: pickState(sp.state, sp.open),
-    sort: pickSort(sp.sort, sp.dir, ["seen", "due", "title", "verdict", "tier"]),
-    judges: pickJudgeFilter(sp.judges),
-    verdict: pickAllowed(sp.verdict, ["yes", "maybe"] as const),
-    tier: pickAllowed(sp.tier, ["tight", "broad"] as const),
-    tag: pickAllowed(sp.tag, tagChoices.map((t) => t.name)),
-  };
-  // The view as link params: every bar control, header and decision keeps the rest of it.
-  const params: Params = {
-    portal: filters.portals,
-    state: filters.state,
-    tag: filters.tag,
-    judges: filters.judges,
-    verdict: filters.verdict,
-    tier: filters.tier,
-    ...sortParams(filters.sort),
-  };
-
-  // While everyone decides every call, the queue is the viewer's own: the calls they have not decided.
   const users = allowlist();
   const viewer = await currentViewer();
   const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
-  const [{ rows, perPerson }, weekCount, agreement] = await Promise.all([
-    reviewQueue(filters, waitingFor),
-    newThisWeek(),
+  const tz = displayTimeZone();
+  const [queue, requests, toDraft, submitted, top, latest, lastRun, agreement] = await Promise.all([
+    queueCounts({ portals: [], state: "", tag: "" }, waitingFor),
+    waitingRequests(),
+    countToDraft(),
+    countSubmittedWaiting(),
+    topTen(),
+    listRuns(1),
+    lastCompletedRun(),
     judgeAgreement(),
   ]);
-  const ids = rows.map((r) => r.id);
-  const [judged, decisions, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(perPerson ? ids : []), tagsOn(ids)]);
-  const tagsFor = tagsByCall(tagRows);
-  const votes = votesByCall(decisions, (by) => displayPerson(by, users));
-  const tz = displayTimeZone();
-  const show = shows(await hiddenColumns(), "queue");   // the columns chosen in Settings
-  const returnTo = filterHref("/", params);
-  const yesCount = rows.filter((r) => r.ai_verdict === "yes").length;
-  const filtered = Object.values(params).some((value) => value.length > 0);
+  const rows = await topTenRows(top.ids);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const order = topTenOrder(top.ids, new Set(byId.keys()));
+  const judged = await latestJudgments(order);
+  const run = latest[0];
+
+  const cards: ViewCard[] = [
+    {
+      key: "needs-review",
+      label: "Needs review",
+      count: queue.waiting,
+      description: `${queue.yes} yes, ${queue.waiting - queue.yes} maybe${waitingFor ? ", waiting for you" : ""}`,
+      href: "/review",
+      current: false,
+      needsYou: true,
+    },
+    {
+      key: "due-soon",
+      label: "Due soon",
+      count: queue.dueSoon,
+      description: `closing by ${dayMonth(new Date(Date.now() + DUE_SOON_DAYS * 24 * 3600 * 1000), tz)}`,
+      href: "/review?view=due-soon",
+      current: false,
+      needsYou: false,
+    },
+    {
+      key: "requests",
+      label: "Agent update requests",
+      count: requests.length,
+      description: requests.length ? kindsLine(requests.map((r) => r.kind)) : "nothing waiting",
+      href: "/requests",
+      current: false,
+      needsYou: false,
+    },
+    { key: "to-draft", label: "Proposals to draft", count: toDraft, description: "pursued, open, no draft yet", href: "/proposals", current: false, needsYou: false },
+    { key: "submitted", label: "Submitted and waiting", count: submitted, description: "waiting on a result", href: "/proposals", current: false, needsYou: false },
+  ];
 
   return (
-    <Shell current="queue">
-      <div className="page-head">
-        <div>
-          <h1>Review queue</h1>
-          <p className="muted">
-            {perPerson
-              ? "Calls the reviewer rated yes or maybe that you have not decided yet. While the judges are being trained, everyone decides every call: the first decision becomes the call's decision, and later ones are kept beside it."
-              : "Calls the reviewer rated yes or maybe that nobody has decided on yet."}
-          </p>
+    <Shell section="home">
+      <h1 className="sr-only">Home</h1>
+      <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} />
+      <ViewCards label="Where to go next" cards={cards} opens />
+
+      <section className="top-ten" aria-labelledby="top-ten-title">
+        <div className="section-head">
+          <h2 id="top-ten-title">Top 10</h2>
+          <p className="muted">{top.source}</p>
         </div>
-        <dl className="stats">
-          <div>
-            <dt>{perPerson ? "Waiting for you" : "Waiting"}</dt>
-            <dd>{rows.length}</dd>
-          </div>
-          <div>
-            <dt>Yes</dt>
-            <dd>{yesCount}</dd>
-          </div>
-          <div>
-            <dt>Maybe</dt>
-            <dd>{rows.length - yesCount}</dd>
-          </div>
-          <div>
-            <dt>New this week</dt>
-            <dd>{weekCount}</dd>
-          </div>
-          {agreement && agreement.both ? (
-            <div title={agreementText(agreement.both, agreement.agree)}>
-              <dt>Judges agree</dt>
-              <dd>{Math.round((100 * agreement.agree) / agreement.both)}%</dd>
-            </div>
-          ) : null}
-        </dl>
-      </div>
-
-      <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} link={voted ? { href: votedHref(voted), label: "See everyone's votes on All calls" } : null} />
-
-      <FilterBar
-        action="/"
-        params={params}
-        portals={portalList}
-        selected={filters.portals}
-        tags={tagChoices}
-        tag={filters.tag}
-        state={filters.state}
-        filtered={filtered}
-      />
-
-      <section>
-        {rows.length === 0 ? (
+        {order.length === 0 ? (
           <div className="empty">
-            <p className="title">
-              {filtered ? "No calls match these filters." : perPerson ? "Nothing waiting for you." : "Nothing waiting for a decision."}
-            </p>
-            <p className="muted">
-              New yes and maybe calls land here after each scan.{" "}
-              {perPerson
-                ? "A call leaves your list when you decide it and stays on everyone else's until they do."
-                : "Deciding takes a call off this list."}{" "}
-              Change a call&apos;s decision on All calls.
-            </p>
+            <p className="title">Nothing to rank yet.</p>
+            <p className="muted">The Top 10 lists open yes and maybe calls nobody has decided. New ones arrive with each scan.</p>
           </div>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  {show("judges") ? (
-                    <HeaderCell
-                      label="Claude / Grok"
-                      sort={sortLink("/", params, filters.sort, "verdict")}
-                      menu={{
-                        active: Boolean(filters.verdict || filters.judges),
-                        groups: [
-                          { title: "Claude's verdict", items: choiceLinks("/", params, "verdict", VERDICT_CHOICES, filters.verdict) },
-                          { title: "Judges", items: choiceLinks("/", params, "judges", JUDGE_CHOICES, filters.judges) },
-                        ],
-                      }}
-                    />
-                  ) : null}
-                  <HeaderCell label="Call" sort={sortLink("/", params, filters.sort, "title")} />
-                  {show("due") ? <HeaderCell label="Due" sort={sortLink("/", params, filters.sort, "due")} /> : null}
-                  {show("tier") ? (
-                    <HeaderCell
-                      label="Tier"
-                      sort={sortLink("/", params, filters.sort, "tier")}
-                      menu={{ active: Boolean(filters.tier), groups: [{ items: choiceLinks("/", params, "tier", TIER_CHOICES, filters.tier) }] }}
-                    />
-                  ) : null}
-                  {show("reason") ? <HeaderCell label="AI reason" /> : null}
-                  {show("seen") ? <HeaderCell label="First seen" sort={sortLink("/", params, filters.sort, "seen")} /> : null}
-                  {perPerson && show("votes") ? <HeaderCell label="Decided so far" /> : null}
-                  <HeaderCell label="Decide" />
+                  <th className="rank">#</th>
+                  <th>Call</th>
+                  <th>Deadline</th>
+                  <th>Claude</th>
+                  <th>Grok</th>
+                  <th>Decision now</th>
+                  <th className="wide">Description</th>
+                  <th className="wide">Claude&apos;s reason</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => {
-                  const label = r.title || r.id;
-                  const callVotes = votes.get(r.id) ?? [];
-                  const badges = show("tags") ? (tagsFor.get(r.id) ?? []) : [];
+                {order.map((id, i) => {
+                  const call = byId.get(id)!;
+                  const verdicts = verdictsFor(judged.get(id), call.ai_verdict, call.ai_reasoning);
+                  const description = (call.description ?? "").trim();
                   return (
-                    <tr key={r.id} data-call-id={r.id}>
-                      {show("judges") ? (
-                        <td>
-                          <JudgeVerdicts verdicts={verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning)} reasonsFor={["grok"]} />
-                        </td>
-                      ) : null}
+                    <tr key={id}>
+                      <td className="rank num">{i + 1}</td>
                       <td className="call">
-                        <TitleLink title={r.title} url={r.url} fallback={r.id} />
-                        <div className="meta">
-                          <span>{r.portal}</span>
-                          <Details items={withoutTags(callDetails(r), badges)} />
-                          {isClosed(r.extra) ? <span className="badge tone-grey">closed</span> : null}
+                        <div className="call-with-logo">
+                          <PortalLogo portal={call.portal} />
+                          <div>
+                            <TitleLink title={call.title} url={call.url} fallback={call.id} />
+                            <div className="meta">{call.portal}</div>
+                          </div>
                         </div>
-                        {badges.length ? (
-                          <div className="meta tags">
-                            <Details items={badges} />
-                          </div>
-                        ) : null}
                       </td>
-                      {show("due") ? (
-                        <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz) || <span className="muted">{noDeadlineLabel(r.extra)}</span>}</td>
-                      ) : null}
-                      {show("tier") ? <td>{r.match_tier ?? ""}</td> : null}
-                      {show("reason") ? <td className="reason">{r.ai_reasoning ?? ""}</td> : null}
-                      {show("seen") ? <td className="when">{formatTime(r.first_seen_at, tz)}</td> : null}
-                      {perPerson && show("votes") ? (
-                        <td>
-                          {callVotes.length ? (
-                            <ul className="notes votes">
-                              {callVotes.map((v) => (
-                                <li key={v.person}>
-                                  {v.person}: {isDecision(v.status) ? STATUS_LABELS[v.status] : v.status}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <span className="muted">nobody yet</span>
-                          )}
-                          {peopleSplit(callVotes) ? <span className="badge tone-warn">people disagree</span> : null}
-                        </td>
-                      ) : null}
-                      <td className="decide">
-                        <form action={decide}>
-                          <input type="hidden" name="id" value={r.id} />
-                          <input type="hidden" name="expected" value={isDecision(r.human_status) ? r.human_status : ""} />
-                          {perPerson ? <input type="hidden" name="keep" value="1" /> : null}
-                          <input type="hidden" name="return_to" value={returnTo} />
-                          <input type="text" name="note" maxLength={2000} placeholder="Note (optional)" aria-label={`Note on ${label}`} />
-                          <div className="buttons">
-                            {DECISIONS.map((d) => (
-                              <button key={d.value} type="submit" name="status" value={d.value} className={`btn-${d.value}`} title={`${d.label}: ${label}`}>
-                                {d.label}
-                              </button>
-                            ))}
-                          </div>
-                        </form>
+                      <td className="when">
+                        {formatDue(call.due_date, tz) || <span className="muted">no deadline</span>}
+                        {call.days_left !== null ? <div className="meta">{daysLeftText(call.days_left)}</div> : null}
+                      </td>
+                      <td>
+                        <Badge value={verdicts.claude?.verdict} empty="not reviewed" />
+                      </td>
+                      <td>
+                        <Badge value={verdicts.grok?.verdict} empty="not yet" />
+                      </td>
+                      <td>
+                        {call.human_status ? (
+                          <>
+                            <Badge value={call.human_status} />
+                            <div className="meta">{displayPerson(call.human_by, users)}</div>
+                          </>
+                        ) : (
+                          <span className="muted">undecided</span>
+                        )}
+                      </td>
+                      <td className="wide reason">
+                        {description ? (
+                          <p className="clamp" title={description.slice(0, 1000)} tabIndex={0}>
+                            {description.slice(0, 600)}
+                          </p>
+                        ) : (
+                          <span className="muted">No description in the ledger</span>
+                        )}
+                      </td>
+                      <td className="wide reason">
+                        <p className="clamp">{call.ai_reasoning ?? ""}</p>
                       </td>
                     </tr>
                   );
@@ -247,6 +191,28 @@ export default async function ReviewQueuePage({ searchParams }: { searchParams: 
           </div>
         )}
       </section>
+
+      <p className="status-line">
+        <Link href="/requests">
+          {requests.length} {requests.length === 1 ? "request" : "requests"} waiting
+        </Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/runs">
+          {run
+            ? `Last scan ${run.status === "completed" ? "completed" : run.status.replace("_", " ")}, ${formatTime(run.started_at, tz)} (${formatAgo(run.started_at)})`
+            : "No scan yet"}
+          {run && run.status !== "completed" && lastRun ? `; last completed ${formatTime(lastRun.finished_at ?? lastRun.started_at, tz)}` : ""}
+        </Link>
+        <span aria-hidden="true">·</span>
+        <Link href="/judges">
+          {agreement && agreement.both
+            ? `Claude and Grok agree on ${Math.round((100 * agreement.agree) / agreement.both)}% of the calls both judged`
+            : "Claude and Grok have not both judged a call yet"}
+        </Link>
+      </p>
+      <p className="brief-link">
+        <Link href="/brief">This week&apos;s brief and past weekly briefs</Link>
+      </p>
     </Shell>
   );
 }

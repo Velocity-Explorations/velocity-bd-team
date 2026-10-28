@@ -4,7 +4,7 @@ import "./theme.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Velocity BD", template: "%s | Velocity BD" },
+  title: { default: "BD Team", template: "%s | BD Team" },
   description: "Opportunity triage for Velocity Explorations, read straight from the ledger.",
 };
 
