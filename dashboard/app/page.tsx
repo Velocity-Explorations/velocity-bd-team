@@ -8,13 +8,13 @@ import { Flash } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
 import { formatAgo, formatTime } from "@/lib/format";
 import { dayMonth, kindsLine } from "@/lib/home";
+import { sortIntoViews } from "@/lib/proposals";
 import { aliasesFor, displayPerson } from "@/lib/people";
 import {
-  countSubmittedWaiting,
-  countToDraft,
   judgeAgreement,
   lastCompletedRun,
   listRuns,
+  proposalCalls,
   queueCounts,
   topTenIds,
   waitingRequests,
@@ -51,11 +51,10 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
   const tz = await timeZone();
   const label = await labeler();
-  const [queue, requests, toDraft, submitted, top, latest, lastRun, agreement] = await Promise.all([
+  const [queue, requests, proposals, top, latest, lastRun, agreement] = await Promise.all([
     queueCounts({ portals: [], state: "", tag: "" }, waitingFor),
     waitingRequests(),
-    countToDraft(),
-    countSubmittedWaiting(),
+    proposalCalls({ portals: [], state: "", tag: "" }).then(sortIntoViews),
     topTenIds(),
     listRuns(1),
     lastCompletedRun(),
@@ -91,8 +90,8 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       current: false,
       needsYou: false,
     },
-    { key: "to-draft", label: "Proposals to draft", count: toDraft, description: "pursued, open, no draft yet", href: "/proposals", current: false, needsYou: false },
-    { key: "submitted", label: "Submitted and waiting", count: submitted, description: "waiting on a result", href: "/proposals", current: false, needsYou: false },
+    { key: "to-draft", label: "Proposals to draft", count: proposals["to-draft"].length, description: "pursued, open, no draft yet", href: "/proposals", current: false, needsYou: false },
+    { key: "submitted", label: "Submitted and waiting", count: proposals.submitted.length, description: "waiting on a result", href: "/proposals/submitted", current: false, needsYou: false },
   ];
 
   return (

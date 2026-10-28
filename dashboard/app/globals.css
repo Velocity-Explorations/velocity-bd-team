@@ -2074,6 +2074,34 @@ a.content-card__label:hover {
   margin: 0;
 }
 
+/* ------------------------------------------------------------------ Proposals */
+
+/* Results' win rates: all portals first, then each portal with a decided result. */
+.win-rates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 28px;
+  margin: 0 0 12px;
+  font: var(--type-small);
+}
+
+.win-rates strong {
+  font: var(--type-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin-right: 6px;
+}
+
+td.draft-cell {
+  min-width: 11rem;
+}
+
+td.draft-cell .btn {
+  height: var(--control-height-small);
+  font-size: 12.5px;
+}
+
 /* ------------------------------------------------------------------ Profile settings */
 
 .lead-text {

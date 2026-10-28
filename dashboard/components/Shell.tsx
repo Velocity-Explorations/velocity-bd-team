@@ -10,7 +10,8 @@ import { defaultFilters, initialsOf, labeler, me } from "@/lib/me";
 import { countLabel, SECTIONS, type Section } from "@/lib/nav";
 import { callsHref } from "@/lib/profile";
 import { aliasesFor } from "@/lib/people";
-import { countStepsReadyFor, countToDraft, countWaitingRequests, queueCounts } from "@/lib/queries";
+import { sortIntoViews } from "@/lib/proposals";
+import { countStepsReadyFor, countWaitingRequests, proposalCalls, queueCounts } from "@/lib/queries";
 import { hiddenColumns, queueMode } from "@/lib/settings";
 import { allowlist, iapAudience, viewerHeader } from "@/lib/viewer";
 
@@ -22,7 +23,7 @@ async function sectionCounts(viewer: string | null): Promise<Record<Exclude<Sect
   const names = viewer ? aliasesFor(viewer, users) : [];
   const [queue, toDraft, ready, requests] = await Promise.all([
     queueCounts({ portals: [], state: "", tag: "" }, queueMode() === "each" && viewer ? names : null),
-    countToDraft(),
+    proposalCalls({ portals: [], state: "", tag: "" }).then((rows) => sortIntoViews(rows)["to-draft"].length),
     countStepsReadyFor(names),
     countWaitingRequests(),
   ]);

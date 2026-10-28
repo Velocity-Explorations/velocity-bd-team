@@ -12,6 +12,7 @@ import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
 import type { ProfileFields } from "./profile";
+import type { ProposalCall } from "./proposals";
 import { DESCRIPTION_READ } from "./description";
 import { STALE_MS } from "./runs";
 import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
@@ -219,28 +220,6 @@ export async function countAmong(ids: string[], f: BarFilters): Promise<number> 
 export async function countCalls(f: BarFilters): Promise<number> {
   const db = sql();
   const [row] = await db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls WHERE TRUE ${panelWhere(db, barOnly(f))}`;
-  return row?.n ?? 0;
-}
-
-/** Pursued calls still open with no pursuit yet: Proposals to draft (P2). */
-export async function countToDraft(): Promise<number> {
-  const db = sql();
-  const pursuits = await hasTable(db, "pursuits");
-  const [row] = await db<{ n: number }[]>`
-    SELECT COUNT(*)::int AS n FROM calls
-    WHERE human_status = 'pursue' AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
-      ${pursuits ? db`AND NOT EXISTS (SELECT 1 FROM pursuits AS p WHERE p.call_id = calls.id)` : db``}`;
-  return row?.n ?? 0;
-}
-
-/** Calls marked Submitted with no result recorded yet: Submitted and waiting (P4). */
-export async function countSubmittedWaiting(): Promise<number> {
-  const db = sql();
-  const pursuits = await hasTable(db, "pursuits");
-  const [row] = await db<{ n: number }[]>`
-    SELECT COUNT(*)::int AS n FROM calls
-    WHERE human_status = 'submitted'
-      ${pursuits ? db`AND NOT EXISTS (SELECT 1 FROM pursuits AS p WHERE p.call_id = calls.id AND p.result IS NOT NULL)` : db``}`;
   return row?.n ?? 0;
 }
 
@@ -800,12 +779,15 @@ export type ProposalRow = {
   drive_link: string | null;
 };
 
-export async function listProposals(): Promise<ProposalRow[]> {
-  const rows = await sql()<ProposalRow[]>`
+/** The Proposal Register's submissions, newest first, optionally from some portals only. */
+export async function listProposals(portals: string[] = [], dir: "asc" | "desc" = "desc"): Promise<ProposalRow[]> {
+  const db = sql();
+  const rows = await db<ProposalRow[]>`
     SELECT submission_id, title, portal, agency, type, submitted_date, outcome, strength_rating,
            use_as_exemplar, drive_link
     FROM proposals
-    ORDER BY submitted_date DESC NULLS LAST, submission_id`;
+    ${portals.length ? db`WHERE portal IN ${db(portals)}` : db``}
+    ORDER BY submitted_date ${dir === "asc" ? db`ASC` : db`DESC`} NULLS LAST, submission_id`;
   return [...rows];
 }
 
@@ -825,6 +807,44 @@ export async function winRateByPortal(): Promise<WinRate[]> {
       GROUP BY portal
     ) AS rates
     ORDER BY decided DESC, portal`;
+  return [...rows];
+}
+
+// ------------------------------------------------------------------------------ pursuits
+
+/**
+ * Every pursued, drafting or submitted call under the bar's filters, with its pursuit if it has one
+ * and the state of the pursuit's current step (PRO-575). lib/proposals.ts sorts them into the views.
+ * The result is expected 90 days after the deadline unless Discovery found a date.
+ */
+export async function proposalCalls(f: BarFilters): Promise<ProposalCall[]> {
+  const db = sql();
+  if (!(await hasTable(db, "pursuits"))) {
+    const rows = await db<ProposalCall[]>`
+      SELECT calls.id, portal, title, url, type, department, naics_code, set_aside, due_date,
+             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, to_char(${dueDate(db)} + 90, 'YYYY-MM-DD') AS default_result_by,
+             extra, ai_verdict, ai_reasoning, human_status, human_by, human_at,
+             NULL::int AS pursuit_id, NULL AS owner, NULL AS pursuit_state, NULL AS current_step, NULL AS step_state,
+             NULL AS drive_folder_id, NULL AS submitted_at, NULL AS submitted_by, NULL AS confirmation_number,
+             NULL AS result_expected_by, NULL AS result_expected_source, NULL AS result, NULL AS result_at
+      FROM calls
+      WHERE human_status IN ('pursue', 'submitted') ${panelWhere(db, barOnly(f))}`;
+    return [...rows];
+  }
+  const rows = await db<ProposalCall[]>`
+    SELECT calls.id, calls.portal, calls.title, calls.url, calls.type, calls.department, calls.naics_code, calls.set_aside,
+           calls.due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left,
+           to_char(${dueDate(db)} + 90, 'YYYY-MM-DD') AS default_result_by,
+           calls.extra, calls.ai_verdict, calls.ai_reasoning, calls.human_status, calls.human_by, calls.human_at,
+           p.id AS pursuit_id, p.owner, p.state AS pursuit_state, p.current_step, s.state AS step_state, p.drive_folder_id,
+           p.submitted_at, p.submitted_by, p.confirmation_number, p.result_expected_by, p.result_expected_source,
+           p.result, p.result_at
+    FROM calls
+    LEFT JOIN pursuits AS p ON p.call_id = calls.id
+    LEFT JOIN pursuit_steps AS s
+      ON s.id = (SELECT MAX(x.id) FROM pursuit_steps AS x WHERE x.pursuit_id = p.id AND x.step = p.current_step)
+    WHERE (calls.human_status IN ('pursue', 'submitted') OR p.id IS NOT NULL)
+      ${panelWhere(db, barOnly(f))}`;
   return [...rows];
 }
 
