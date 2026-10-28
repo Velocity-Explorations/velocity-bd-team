@@ -392,13 +392,14 @@ Added by `008_pursuits.sql`.
 | before_text | TEXT | the text now | same |
 | after_text | TEXT | the suggestion | same |
 | reason | TEXT | why | same |
-| state | TEXT, not null, default `proposed` | `proposed`, `accepted`, `rejected`, `edited` | the owner, guarded on `state = 'proposed'` (`decide_change`); with key gates only, the worker accepts every open change as `worker (key gates only)` (`accept_open_changes`) |
+| state | TEXT, not null, default `proposed` | `proposed`, `accepted`, `rejected`, `edited` | the owner on the dashboard (Accept, Reject, Edit, Accept all), guarded on `state = 'proposed'` and the Reviews attempt still `ready`; Undo sets a decided change back to `proposed` while Reviews is ready, guarded on the decision the page showed; `decide_change` in Python; with key gates only, the worker accepts every open change as `worker (key gates only)` (`accept_open_changes`) |
 | edited_text | TEXT | the owner's own wording, when they edit the suggestion | same |
 | decided_by | TEXT | | same |
 | decided_at | TEXT timestamp | | same |
 | created_at | TEXT timestamp, not null | | the worker |
 
-Index: `(step_id, id)`. The draft is approved once every change on it is decided; Final checks puts
+Index: `(step_id, id)`. The draft is approved once every change on it is decided (the dashboard's
+Approve refuses while one is `proposed`); Final checks puts
 the accepted and edited changes into Draft v3, in order, each where its `before_text` still matches
 (PRO-565, phase 8a). A reviewer's change is kept only when its `before_text` is in the draft it
 reviewed.
@@ -485,7 +486,7 @@ draft. Added by `008_pursuits.sql`.
 | confidence | TEXT | the band's confidence; low below 300 words | same |
 | points | REAL | the band's points | same |
 | provisional | INTEGER, not null, default 1 | 1 until the bands are calibrated on 20 or more past Velocity proposals | same |
-| ready | INTEGER, not null, default 0 | 1 when no placeholder is open and the band is clean or light (PW21) | same |
+| ready | INTEGER, not null, default 0 | 1 when no placeholder is open and the band is clean or light; below 150 words, when no placeholder is open (PW21) | same |
 | verdict | TEXT, not null | the one line from `drafting/slop_gate.py`, for example `Not ready: 1 PERSON WRITES; band light (provisional)` | same |
 | fixed_count | INTEGER, not null, default 0 | the fixes the worker made before this scan | same |
 | result_json | TEXT JSON, not null | the scanner's JSON report as it returned it | same |
@@ -517,7 +518,7 @@ Added by `008_pursuits.sql`.
 | Column | Type | Values | Written by |
 |---|---|---|---|
 | id | INTEGER, primary key, auto-increment | | database |
-| kind | TEXT, not null | `drive_refresh` or `slop_scan`; free text the worker checks | the dashboard, `run.py` |
+| kind | TEXT, not null | `drive_refresh` or `slop_scan`; free text the worker checks | the dashboard (Check again queues `slop_scan`, one queued or working per pursuit), `run.py` |
 | pursuit_id | INTEGER | `pursuits.id`, for a job about one pursuit | same |
 | payload | TEXT JSON | what the job needs beyond its kind | same |
 | state | TEXT, not null, default `queued` | `queued`, `working`, `done`, `failed` | the worker, each change guarded on the state before it |

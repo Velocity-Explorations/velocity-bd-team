@@ -3127,3 +3127,443 @@ dialog.start-draft {
   width: 13px;
   height: 13px;
 }
+
+/* ------------------------------------------------------------------ Reviews, change by change (PW12, PW25) */
+
+.ws-reviewers {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-reviewers > li {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) minmax(8rem, 14rem) auto 6.5rem;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.ws-reviewer {
+  display: grid;
+  gap: 3px;
+}
+
+.ws-reviewer-count {
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+.ws-reviewer-link {
+  font: var(--type-small);
+  white-space: nowrap;
+}
+
+.ws-reviewers .badge {
+  justify-self: end;
+}
+
+.ws-ratings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 4px;
+  font: var(--type-detail);
+  color: var(--ink-2);
+}
+
+.ws-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ws-changes-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ws-changes-head h3 {
+  margin: 0;
+}
+
+.ws-changes-head form {
+  margin: 0;
+}
+
+.ws-change-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-change {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-subtle);
+  scroll-margin-top: 16px;
+}
+
+.ws-change-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ws-change-section {
+  font: var(--type-row-title);
+}
+
+.ws-change-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.ws-change-text {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.ws-change-text > div {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 10px;
+}
+
+.ws-change-text dt {
+  padding-top: 2px;
+}
+
+.ws-change-text dd {
+  margin: 0;
+  font: var(--type-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ws-change-now {
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+.ws-change.rejected .ws-change-now {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.ws-change.rejected .ws-change-after {
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+.ws-change-after {
+  font-weight: 600;
+}
+
+.ws-change-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 22rem;
+}
+
+.ws-change-acts form {
+  margin: 0;
+}
+
+.ws-change-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.ws-change-acts .ws-more[open] {
+  flex-basis: 100%;
+}
+
+.ws-change-acts .meta {
+  text-align: right;
+}
+
+.ws-waiting {
+  color: var(--caution);
+}
+
+button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* ------------------------------------------------------------------ the AI slop check's result (PW20 to PW23) */
+
+.ws-subcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: var(--type-small);
+  color: var(--ink-3);
+}
+
+.ws-subcrumb a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ws-subcrumb svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ws-verdict-box {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--tone-wash);
+  border: 1px solid var(--tone-line);
+  border-radius: var(--radius-card);
+}
+
+.ws-verdict-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font: var(--type-section);
+}
+
+.ws-verdict-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin: 0;
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+.ws-verdict-box .hint {
+  margin: 0;
+}
+
+.ws-fixed {
+  margin: 0;
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+.ws-slop {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.ws-slop.with-text {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+}
+
+.ws-slop-list {
+  display: grid;
+  gap: 14px;
+}
+
+.ws-slop-part {
+  padding: 12px 14px;
+  background: var(--field);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-card);
+}
+
+.ws-slop-part h3 {
+  margin: 0 0 6px;
+}
+
+.ws-slop-part .hint {
+  margin: 0 0 6px;
+}
+
+.ws-kind {
+  margin: 8px 0 2px;
+  font: var(--type-small);
+}
+
+.ws-spots,
+.ws-hot,
+.ws-families {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-spots li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 4px 0;
+  font: var(--type-small);
+  scroll-margin-top: 16px;
+}
+
+.ws-family .ws-spots li {
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+}
+
+.ws-spots a,
+.ws-hot a {
+  font: var(--type-code);
+  white-space: nowrap;
+}
+
+.ws-match {
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
+}
+
+.ws-hot li {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-subtle);
+  scroll-margin-top: 16px;
+}
+
+.ws-hot li > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.ws-family {
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.ws-family-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.ws-family-count {
+  margin-left: auto;
+  font: var(--type-detail);
+  color: var(--ink-2);
+}
+
+.ws-fix {
+  margin: 0;
+  font: var(--type-small);
+}
+
+.ws-fix .field-label {
+  margin-right: 6px;
+}
+
+.ws-quiet {
+  margin: 8px 0 0;
+  font: var(--type-small);
+  color: var(--ink-3);
+}
+
+.ws-slop-text {
+  position: sticky;
+  top: 16px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.ws-slop-text .hint {
+  margin: 0 0 8px;
+}
+
+.ws-text-lines {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--type-small);
+}
+
+.ws-text-lines li {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 8px;
+  min-height: 1.45em;
+  padding: 2px 4px;
+}
+
+.ws-text-lines li.hit {
+  background: var(--caution-wash);
+  outline: 1px solid var(--caution-line);
+}
+
+.ws-line-n {
+  font: var(--type-code);
+  color: var(--ink-4);
+  text-align: right;
+}
+
+.ws-line-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ws-line-note {
+  display: block;
+  font: var(--type-detail);
+  color: var(--caution);
+}
+
+@media (max-width: 1100px) {
+  .ws-reviewers > li {
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  }
+
+  .ws-reviewer-count,
+  .ws-reviewer-link {
+    grid-column: 2 / -1;
+  }
+
+  .ws-reviewers > li > .badge {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  .ws-change-body,
+  .ws-slop.with-text {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ws-change-acts {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .ws-slop-text {
+    position: static;
+  }
+}

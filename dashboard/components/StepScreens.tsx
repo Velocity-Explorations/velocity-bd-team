@@ -1,17 +1,32 @@
-import { Check, Pencil, X } from "lucide-react";
+import { Check, CheckCheck, Pencil, Undo2, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { changeBuildsOnAction, setDirectionAction, tickChecklistAction } from "@/app/actions";
+import {
+  acceptAllAction,
+  changeBuildsOnAction,
+  decideChangeAction,
+  setDirectionAction,
+  tickChecklistAction,
+  undoChangeAction,
+} from "@/app/actions";
 import { formatDue, formatTime } from "@/lib/format";
 import type { ChecklistRow, PursuitRow, WorkspaceCall } from "@/lib/queries";
+import { slopHref, type ScanRow } from "@/lib/slop";
 import {
+  changeCounts,
+  changeTone,
+  changeWord,
   DISCOVERY_TASKS,
   fitTone,
   parseJson,
+  ratingTone,
   RECOMMENDATIONS,
   REQUIREMENT_ROWS,
+  reviewLine,
+  REVIEWERS,
   tagTone,
   taskLine,
   taskWord,
+  type ChangeRow,
   type StepRow,
 } from "@/lib/workspace";
 
@@ -390,8 +405,14 @@ export function OutlineView({ call, pursuit, content, row, canDecide, canContrib
   );
 }
 
+/** The AI slop check's verdict on the draft a step saved, linked to the newest result (PW12, PW20). */
+function slopRow(step: string, content: Content): [string, ReactNode][] {
+  const verdict = text(content.slop);
+  return verdict ? [["AI slop check", <>{verdict} <a href={slopHref(step)}>See the latest result</a></>]] : [];
+}
+
 /** Steps 6 and 7: the draft's size and what is left to fill, and what the compliance check corrected. */
-export function DraftView({ content }: { content: Content }) {
+export function DraftView({ step, content }: { step: string; content: Content }) {
   const counts = (content.placeholders ?? {}) as Record<string, number>;
   const open = Object.entries(counts).filter(([, n]) => n);
   return (
@@ -399,18 +420,209 @@ export function DraftView({ content }: { content: Content }) {
       <Rows rows={[
         ["Words", typeof content.words === "number" ? content.words.toLocaleString("en-US") : "not counted"],
         ["To fill", open.length ? open.map(([kind, n]) => `${n} ${kind === "other" ? "other bracketed notes" : kind}`).join(", ") : "nothing"],
+        ...slopRow(step, content),
       ]} />
     </section>
   );
 }
 
-export function ComplianceView({ content }: { content: Content }) {
+export function ComplianceView({ step, content }: { step: string; content: Content }) {
   return (
     <section className="ws-screen" aria-label="Compliance">
       <Rows rows={[
         ["Corrected", typeof content.corrections === "number" ? `${content.corrections} in Draft v2` : "none reported"],
         ["To check", typeof content.warnings === "number" ? `${content.warnings} warnings` : "none reported"],
+        ...slopRow(step, content),
       ]} />
+    </section>
+  );
+}
+
+type Rating = { criterion: string; rating: string; strengths?: string; weaknesses?: string };
+type Pass = { pass?: number; code?: string; status?: string; error?: string; ratings?: Rating[] };
+
+/** One reviewer's change (PW12): the section, the text now, the suggestion and why, with Accept, Reject and Edit. */
+function ChangeItem({ callId, row, change, decidable, label, tz }: {
+  callId: string;
+  row: StepRow;
+  change: ChangeRow;
+  decidable: boolean;
+  label: Label;
+  tz: string;
+}) {
+  const hidden = (
+    <>
+      <input type="hidden" name="call_id" value={callId} />
+      <input type="hidden" name="step" value={row.step} />
+      <input type="hidden" name="change_id" value={change.id} />
+    </>
+  );
+  const who = change.decided_by === "worker (key gates only)" ? "the worker (key gates only)" : label(change.decided_by ?? "");
+  return (
+    <li id={`change-${change.id}`} className={`ws-change ${change.state}`}>
+      <div className="ws-change-head">
+        <span className="ws-change-section">{change.section || "The draft"}</span>
+        <span className={`badge tone-${changeTone(change.state)}`}>{changeWord(change.state)}</span>
+      </div>
+      <div className="ws-change-body">
+        <dl className="ws-change-text">
+          <div>
+            <dt className="field-label">Now</dt>
+            <dd className="ws-change-now">{change.before_text}</dd>
+          </div>
+          <div>
+            <dt className="field-label">{change.state === "edited" ? "Your version" : "Suggested"}</dt>
+            <dd className="ws-change-after">{change.state === "edited" ? change.edited_text : change.after_text}</dd>
+          </div>
+          {change.reason ? (
+            <div>
+              <dt className="field-label">Why</dt>
+              <dd className="meta">{change.reason}</dd>
+            </div>
+          ) : null}
+        </dl>
+        <div className="ws-change-acts">
+          {change.state === "proposed" ? (
+            decidable ? (
+              <>
+                <form action={decideChangeAction} className="ws-change-buttons">
+                  {hidden}
+                  <button type="submit" name="decision" value="accepted" className="btn fn-approve"><Check aria-hidden="true" />Accept</button>
+                  <button type="submit" name="decision" value="rejected" className="btn"><X aria-hidden="true" />Reject</button>
+                </form>
+                <details className="ws-more">
+                  <summary className="btn"><Pencil aria-hidden="true" />Edit</summary>
+                  <form action={decideChangeAction} className="ws-more-form">
+                    {hidden}
+                    <input type="hidden" name="decision" value="edited" />
+                    <label className="field">
+                      <span className="field-label">Your version</span>
+                      <textarea name="edited_text" rows={4} maxLength={8000} defaultValue={change.after_text ?? ""} required />
+                    </label>
+                    <button type="submit" className="btn fn-approve">Save your version</button>
+                  </form>
+                </details>
+              </>
+            ) : null
+          ) : (
+            <>
+              <span className="meta">
+                {changeWord(change.state)[0].toUpperCase() + changeWord(change.state).slice(1)} by {who}
+                {change.decided_at ? `, ${formatTime(change.decided_at, tz)}` : ""}
+              </span>
+              {decidable ? (
+                <form action={undoChangeAction}>
+                  {hidden}
+                  <input type="hidden" name="expected" value={change.state} />
+                  <button type="submit" className="btn-text"><Undo2 aria-hidden="true" />Undo</button>
+                </form>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * Step 8 (PW12, PW25): the AI slop check, then the three reviewers in turn, the evaluators with their ratings in
+ * words, and every change they suggest, decided here by the owner while the step is ready.
+ */
+export function ReviewsView({ callId, row, content, changes, scan, decidable, label, tz }: {
+  callId: string;
+  row: StepRow;
+  content: Content;
+  changes: ChangeRow[];
+  scan: ScanRow | null;
+  decidable: boolean;
+  label: Label;
+  tz: string;
+}) {
+  const passes = Array.isArray(content.passes) ? (content.passes as Pass[]) : [];
+  return (
+    <section className="ws-screen" aria-label="Reviews">
+      <ol className="ws-reviewers">
+        <li>
+          <span className="ws-step-num">1</span>
+          <span className="ws-reviewer">
+            <strong>AI slop check</strong>
+            <span className="meta">Runs on its own on every new draft and fixes what it can; no approval needed.</span>
+          </span>
+          <span className="ws-reviewer-count">{scan ? scan.verdict : "No scan saved yet"}</span>
+          <a className="ws-reviewer-link" href={slopHref(row.step)}>See the result</a>
+          <span className="badge tone-grey">automatic</span>
+        </li>
+        {REVIEWERS.map((reviewer, i) => {
+          const pass = passes.find((p) => p.code === reviewer.code) ?? passes.find((p) => !p.code && p.pass === i + 1);
+          const mine = changes.filter((c) => c.reviewer === reviewer.code);
+          const counts = changeCounts(mine);
+          const ratings = Array.isArray(pass?.ratings) ? pass.ratings.filter((r) => r && r.criterion && r.rating) : [];
+          const failed = pass?.status === "failed";
+          const [word, tone] = failed ? ["failed", "conflict"] : !pass ? ["not run", "grey"] : counts.proposed ? ["to decide", "warn"]
+            : counts.total ? ["decided", "good"] : ["no changes", "grey"];
+          return (
+            <li key={reviewer.code}>
+              <span className="ws-step-num">{i + 2}</span>
+              <span className="ws-reviewer">
+                <strong>{reviewer.name}</strong>
+                <span className="meta">{reviewer.note}</span>
+                {ratings.length ? (
+                  <span className="ws-ratings">
+                    {ratings.map((r) => (
+                      <span key={r.criterion} className="ws-rating">
+                        {r.criterion} <span className={`badge tone-${ratingTone(r.rating)}`}>{r.rating}</span>
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+                {ratings.some((r) => r.strengths || r.weaknesses) ? (
+                  <details className="ws-more">
+                    <summary className="btn-text">Strengths and weaknesses</summary>
+                    <Rows rows={ratings.map((r) => [r.criterion, (
+                      <>
+                        {r.strengths ? <p><strong>Strengths.</strong> {r.strengths}</p> : null}
+                        {r.weaknesses ? <p><strong>Weaknesses.</strong> {r.weaknesses}</p> : null}
+                      </>
+                    )])} />
+                  </details>
+                ) : null}
+              </span>
+              <span className="ws-reviewer-count">{failed ? `Failed: ${pass?.error ?? "no reason was recorded"}` : pass ? reviewLine(counts) : ""}</span>
+              {mine.length ? <a className="ws-reviewer-link" href={`#changes-${reviewer.code}`}>See the changes</a> : <span />}
+              <span className={`badge tone-${tone}`}>{word}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {REVIEWERS.map((reviewer) => {
+        const mine = changes.filter((c) => c.reviewer === reviewer.code);
+        if (!mine.length) return null;
+        const counts = changeCounts(mine);
+        return (
+          <div key={reviewer.code} id={`changes-${reviewer.code}`} className="ws-subsection ws-changes">
+            <div className="ws-changes-head">
+              <h3 className="field-label">
+                Suggested changes, {reviewer.name}, {counts.proposed ? `${counts.proposed} to decide` : "all decided"}
+              </h3>
+              {decidable && counts.proposed ? (
+                <form action={acceptAllAction}>
+                  <input type="hidden" name="call_id" value={callId} />
+                  <input type="hidden" name="step" value={row.step} />
+                  <input type="hidden" name="step_id" value={row.id} />
+                  <input type="hidden" name="reviewer" value={reviewer.code} />
+                  <button type="submit" className="btn fn-approve"><CheckCheck aria-hidden="true" />Accept all</button>
+                </form>
+              ) : null}
+            </div>
+            <ol className="ws-change-list">
+              {mine.map((change) => (
+                <ChangeItem key={change.id} callId={callId} row={row} change={change} decidable={decidable} label={label} tz={tz} />
+              ))}
+            </ol>
+          </div>
+        );
+      })}
     </section>
   );
 }

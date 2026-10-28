@@ -26,6 +26,7 @@ SCANNER_ENV = "AI_SLOP_SCAN"
 DEFAULT_SCANNER = Path.home() / ".claude" / "skills" / "ai-slop-detection" / "scripts" / "slop_scan.py"
 SCAN_TIMEOUT_S = 120
 READY_BANDS = ("clean", "light")
+NO_BAND = "unscored"   # the scanner's band under 150 words: findings are listed without one (PW21)
 OPEN_FAMILY = "prop_open_item"
 PLACEHOLDER_KINDS = [("PERSON WRITES", re.compile(r"^\[PERSON\s+WRITES", re.I)),
                      ("NEEDS INPUT", re.compile(r"^\[NEEDS?\s+INPUT", re.I)),
@@ -47,7 +48,7 @@ class Gate:
 
     @property
     def ready(self) -> bool:
-        return not any(self.placeholders.values()) and self.band in READY_BANDS
+        return not any(self.placeholders.values()) and (self.band in READY_BANDS or self.band == NO_BAND)
 
 
 def scanner_path() -> Path:
@@ -107,8 +108,9 @@ def summarize(report: Mapping[str, Any]) -> Gate:
 
 
 def verdict(gate: Gate) -> str:
-    """"Ready: band light", or "Not ready: 1 PERSON WRITES, 37 NEEDS INPUT; band clean (provisional)"."""
-    band = f"band {gate.band}" + ("" if gate.calibrated else " (provisional)")
+    """"Ready: band light", or "Not ready: 1 PERSON WRITES, 37 NEEDS INPUT; band clean (provisional)". Under 150 words,
+    "no band", and only the placeholders decide."""
+    band = "no band" if gate.band == NO_BAND else f"band {gate.band}" + ("" if gate.calibrated else " (provisional)")
     if gate.ready:
         return f"Ready: {band}"
     open_items = ", ".join(f"{n} {kind}" for kind, n in gate.placeholders.items() if n)

@@ -207,7 +207,12 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     `slop_scans`. Reviews runs three reviewers (two evaluators who rate each criterion in words,
     then Velocity's leadership) who propose changes, one per `step_changes` row. Final checks puts
     the accepted and edited changes into Draft v3. With key gates only the worker accepts the
-    changes itself. Check again jobs run when no step is waiting. Deciding the changes on the page,
-    and the scan's result page, follow in 8b.
+    changes itself. Check again jobs run when no step is waiting.
+  - Phase 8b (Reviews and the AI slop check on the dashboard): Reviews lists the slop check, the
+    three reviewers with the evaluators' ratings, and each change with Accept, Reject, Edit, Undo
+    and Accept all; Approve waits until every change is decided. The result page shows the verdict,
+    open placeholders, paragraphs to revise first, findings by family with their fixes, proposal
+    faults apart, the scanned text at a line, and Check again. Under 150 words a draft has no band
+    and only its placeholders decide Ready.
 
 ## Known breakages

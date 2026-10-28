@@ -155,7 +155,9 @@ reviewers' changes the owner accepted, put in at the start of Final checks) and 
 tracking parameters from links, then runs the scanner from `AI_SLOP_SCAN`, or from the skill's default
 place in your profile, and keeps the result in the ledger (`slop_scans`); without the scanner the step
 says the check did not run. Check again on the dashboard queues a scan of the newest draft, which the
-worker runs when no step is waiting. The worker
+worker runs when no step is waiting. The result page (See the result in Reviews) shows the newest scan
+and the text as scanned; to clear a placeholder, edit the newest draft in the pursuit's folder, then
+choose Check again. The worker
 cannot open portal pages or download attachments yet, so its steps work from what the scanner saved and
 list what the owner should fetch. Login-gated text (Vulcan SOF, NSTXL member pages) goes to the Anthropic
 API and these local files, by David's decision of 27 Oct, and never into the repo. The log is

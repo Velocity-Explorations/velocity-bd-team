@@ -17,7 +17,20 @@ import { startRefusal, workerReadiness, type ProposalCall } from "./proposals";
 import { DESCRIPTION_READ } from "./description";
 import { STALE_MS } from "./runs";
 import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
-import { NO_GO_STEPS, parseJson, stateWord, stepInfo, STEPS, type StepRow } from "./workspace";
+import type { ScanJob, ScanRow } from "./slop";
+import {
+  changeCounts,
+  decidedLine,
+  NO_GO_STEPS,
+  openChangesReason,
+  parseJson,
+  REVIEWERS,
+  stateWord,
+  stepInfo,
+  STEPS,
+  type ChangeRow,
+  type StepRow,
+} from "./workspace";
 
 // ------------------------------------------------------------------------------ calls
 
@@ -1033,25 +1046,47 @@ export type WorkspaceCall = {
   human_status: string | null;
 };
 
-export type Workspace = { call: WorkspaceCall; pursuit: PursuitRow | null; steps: StepRow[]; events: EventRow[]; checklist: ChecklistRow[] };
+export type Workspace = {
+  call: WorkspaceCall;
+  pursuit: PursuitRow | null;
+  steps: StepRow[];
+  events: EventRow[];
+  checklist: ChecklistRow[];
+  changes: ChangeRow[];
+  scan: ScanRow | null;
+  job: ScanJob | null;
+};
 
-/** A call, its pursuit, every attempt at every step, the history newest first, and the checklist (PW1). */
+/**
+ * A call, its pursuit, every attempt at every step, the history newest first, the checklist (PW1), the reviewers'
+ * changes (PW12), the newest AI slop check of its drafts (PW20) and the newest Check again (PW22).
+ */
 export async function workspace(callId: string): Promise<Workspace | null> {
   const db = sql();
   const [call] = await db<WorkspaceCall[]>`
     SELECT id, portal, title, url, type, department, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, human_status
     FROM calls WHERE id = ${callId}`;
   if (!call) return null;
-  const empty: Workspace = { call, pursuit: null, steps: [], events: [], checklist: [] };
+  const empty: Workspace = { call, pursuit: null, steps: [], events: [], checklist: [], changes: [], scan: null, job: null };
   if (!(await hasTable(db, "pursuits"))) return empty;
   const [pursuit] = await db<PursuitRow[]>`SELECT * FROM pursuits WHERE call_id = ${callId}`;
   if (!pursuit) return empty;
-  const [steps, events, checklist] = await Promise.all([
+  const [steps, events, checklist, changes, scans, jobs] = await Promise.all([
     db<StepRow[]>`SELECT * FROM pursuit_steps WHERE pursuit_id = ${pursuit.id} ORDER BY id`,
     db<EventRow[]>`SELECT id, step_id, at, who, kind, text FROM pursuit_events WHERE pursuit_id = ${pursuit.id} ORDER BY id DESC`,
     db<ChecklistRow[]>`SELECT * FROM checklist_items WHERE pursuit_id = ${pursuit.id} ORDER BY position, id`,
+    db<ChangeRow[]>`
+      SELECT c.* FROM step_changes c JOIN pursuit_steps s ON s.id = c.step_id
+      WHERE s.pursuit_id = ${pursuit.id} ORDER BY c.id`,
+    db<ScanRow[]>`SELECT * FROM slop_scans WHERE pursuit_id = ${pursuit.id} ORDER BY id DESC LIMIT 1`,
+    db<ScanJob[]>`
+      SELECT id, state, requested_by, requested_at, started_at, finished_at, result FROM worker_jobs
+      WHERE pursuit_id = ${pursuit.id} AND kind = 'slop_scan' ORDER BY id DESC LIMIT 1`,
   ]);
-  return { call, pursuit, steps: [...steps], events: [...events], checklist: [...checklist] };
+  return {
+    call, pursuit, steps: [...steps], events: [...events], checklist: [...checklist], changes: [...changes],
+    scan: scans[0] ?? null, job: jobs[0] ?? null,
+  };
 }
 
 export type WorkspaceResult = { ok: true; notice: string } | { ok: false; reason: string };
@@ -1114,6 +1149,13 @@ export async function approveStep(input: {
     if (chosen === "go_with_conditions" && conditions.length === 0) {
       return { ok: false, reason: "Go with conditions needs at least one condition, one per line." };
     }
+    let decided = "";
+    if (r.step === "reviews") {
+      const counts = changeCounts(await tx<{ state: string }[]>`SELECT state FROM step_changes WHERE step_id = ${r.id} FOR UPDATE`);
+      const open = openChangesReason(counts.proposed);
+      if (open) return { ok: false, reason: open };
+      decided = decidedLine(counts);
+    }
     const now = isoNow();
     const note = (input.note ?? "").trim();
     const done = await tx`
@@ -1142,10 +1184,11 @@ export async function approveStep(input: {
           VALUES (${r.pursuit_id}, 'inputs', ${position++}, ${condition}, 'Go with conditions', ${input.by}, NULL, 'condition', 0, ${now}, ${now})`;
       }
     }
-    const text = chosen === "approved" ? withNote(`${stepName(r)} approved`, note)
+    const text = chosen === "approved" ? withNote(`${stepName(r)} approved${decided ? `: ${decided}` : ""}`, note)
       : chosen === "go" ? withNote("Go", note) : `Go with conditions: ${conditions.join("; ")}`;
     await addEvent(tx, r.pursuit_id, input.by, chosen, text, r.id, now);
     const next = stepInfo(following)?.label ?? following;
+    if (decided) return { ok: true, notice: `Approved with ${decided}. ${next} is queued for the worker.` };
     return { ok: true, notice: chosen === "approved" ? `Approved. ${next} is queued for the worker.`
       : `${chosen === "go" ? "Go" : "Go with conditions"} recorded. ${next} is queued for the worker.` };
   });
@@ -1331,5 +1374,94 @@ export async function setCollaborators(input: { pursuitId: number; by: string; n
     const text = names.length ? `Working with: ${names.join(", ")}` : "Working alone";
     await addEvent(tx, pursuit.id, input.by, "collaborators", text, null, now);
     return { ok: true, notice: text };
+  });
+}
+
+// ----------------------------------------------------------------- Reviews and the AI slop check (phase 8b)
+
+const DECISIONS = ["accepted", "rejected", "edited"] as const;
+export type ChangeDecision = (typeof DECISIONS)[number];
+
+export function isChangeDecision(value: string): value is ChangeDecision {
+  return (DECISIONS as readonly string[]).includes(value);
+}
+
+function reviewerName(code: string): string {
+  return REVIEWERS.find((r) => r.code === code)?.name ?? code;
+}
+
+const CHANGE_STALE = "That change was decided already, or the reviews have moved on. Nothing saved; reload to see it.";
+
+/**
+ * Accept, reject or edit one reviewer's change (PW12), guarded on it still being proposed, its Reviews attempt
+ * still ready and the pursuit still worked. Final checks puts the accepted and edited changes into Draft v3.
+ */
+export async function decideChange(input: {
+  pursuitId: number;
+  changeId: number;
+  by: string;
+  decision: ChangeDecision;
+  editedText?: string;
+}): Promise<WorkspaceResult> {
+  const edited = (input.editedText ?? "").trim();
+  if (input.decision === "edited" && !edited) return { ok: false, reason: "Write your version of the change first, or accept it as it is." };
+  const now = isoNow();
+  const [row] = await sql()<{ section: string | null }[]>`
+    UPDATE step_changes SET state = ${input.decision}, edited_text = ${input.decision === "edited" ? edited : null},
+           decided_by = ${input.by}, decided_at = ${now}
+    WHERE id = ${input.changeId} AND state = 'proposed'
+      AND step_id IN (SELECT s.id FROM pursuit_steps s JOIN pursuits p ON p.id = s.pursuit_id
+                      WHERE s.pursuit_id = ${input.pursuitId} AND s.step = 'reviews' AND s.state = 'ready' AND p.state = 'working')
+    RETURNING section`;
+  if (!row) return { ok: false, reason: CHANGE_STALE };
+  const where = row.section ? ` to ${row.section}` : "";
+  return { ok: true, notice: `${input.decision === "accepted" ? "Accepted" : input.decision === "rejected" ? "Rejected" : "Edited"} the change${where}.` };
+}
+
+/** Undo a decision while Reviews is still ready (PW12): the change is proposed again. Guarded on the decision shown. */
+export async function undoChange(input: { pursuitId: number; changeId: number; expected: string }): Promise<WorkspaceResult> {
+  if (!isChangeDecision(input.expected)) return { ok: false, reason: CHANGE_STALE };
+  const [row] = await sql()<{ section: string | null }[]>`
+    UPDATE step_changes SET state = 'proposed', edited_text = NULL, decided_by = NULL, decided_at = NULL
+    WHERE id = ${input.changeId} AND state = ${input.expected}
+      AND step_id IN (SELECT s.id FROM pursuit_steps s JOIN pursuits p ON p.id = s.pursuit_id
+                      WHERE s.pursuit_id = ${input.pursuitId} AND s.step = 'reviews' AND s.state = 'ready' AND p.state = 'working')
+    RETURNING section`;
+  if (!row) return { ok: false, reason: CHANGE_STALE };
+  return { ok: true, notice: `The change${row.section ? ` to ${row.section}` : ""} is back to decide.` };
+}
+
+/** Accept all of one reviewer's changes still to decide (PW12). */
+export async function acceptAllChanges(input: { pursuitId: number; stepId: number; reviewer: string; by: string }): Promise<WorkspaceResult> {
+  const now = isoNow();
+  const rows = await sql()`
+    UPDATE step_changes SET state = 'accepted', decided_by = ${input.by}, decided_at = ${now}
+    WHERE step_id = ${input.stepId} AND reviewer = ${input.reviewer} AND state = 'proposed'
+      AND step_id IN (SELECT s.id FROM pursuit_steps s JOIN pursuits p ON p.id = s.pursuit_id
+                      WHERE s.pursuit_id = ${input.pursuitId} AND s.step = 'reviews' AND s.state = 'ready' AND p.state = 'working')
+    RETURNING id`;
+  const who = reviewerName(input.reviewer);
+  if (!rows.length) return { ok: false, reason: `${who}: nothing is left to decide. Reload to see the changes.` };
+  return { ok: true, notice: `${who}: accepted ${rows.length} ${rows.length === 1 ? "change" : "changes"}.` };
+}
+
+/**
+ * Check again (PW22): a scan of the newest draft, queued for the worker, which runs it when no step is waiting.
+ * One at a time per pursuit; the page keeps the last result until the new one is saved.
+ */
+export async function checkAgain(input: { pursuitId: number; by: string }): Promise<WorkspaceResult> {
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const [pursuit] = await tx<{ state: string }[]>`SELECT state FROM pursuits WHERE id = ${input.pursuitId} FOR UPDATE`;
+    if (pursuit?.state !== "working") return { ok: false, reason: "This draft is no longer being worked." };
+    const [waiting] = await tx`
+      SELECT 1 FROM worker_jobs WHERE pursuit_id = ${input.pursuitId} AND kind = 'slop_scan' AND state IN ('queued', 'working')`;
+    if (waiting) return { ok: false, reason: "Check again is already waiting for the worker." };
+    const now = isoNow();
+    await tx`
+      INSERT INTO worker_jobs (kind, pursuit_id, payload, state, requested_by, requested_at, updated_at)
+      VALUES ('slop_scan', ${input.pursuitId}, NULL, 'queued', ${input.by}, ${now}, ${now})`;
+    await addEvent(tx, input.pursuitId, input.by, "check_again", "Asked for the AI slop check again", null, now);
+    return { ok: true, notice: "Check again is queued. The worker scans the newest draft when no step is waiting." };
   });
 }
