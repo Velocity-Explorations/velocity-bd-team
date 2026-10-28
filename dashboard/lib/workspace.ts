@@ -57,7 +57,7 @@ export const STEPS: { name: string; label: string; number: number | null; stage:
   { name: "compliance", label: "Compliance check", number: 7, stage: "draft",
     purpose: "A mechanical check of the draft against the call's own words: keywords, functions, thresholds, phase scope and references." },
   { name: "reviews", label: "Reviews", number: 8, stage: "review",
-    purpose: "Reviewers read the draft as evaluators and as Velocity's leadership, and the draft is revised before the final checks." },
+    purpose: "The AI slop check runs on every new draft on its own. Then three reviewers read the draft in turn and suggest changes; you accept, reject or edit each, and Final checks puts the ones you keep into Draft v3." },
   { name: "final", label: "Final checks", number: 9, stage: "finalize",
     purpose: "The last checks before submitting: formatting, placeholders, the AI slop check and the checklist." },
   { name: "submit", label: "Submit", number: null, stage: "submit",
@@ -251,4 +251,72 @@ export function approveLabel(step: string): string {
 /** Approving the Outline locks the direction and the past work (PW8, PW11): any approved attempt locks them. */
 export function locked(rows: StepRow[]): boolean {
   return rows.some((r) => r.step === "outline" && r.state === "approved");
+}
+
+// ------------------------------------------------------------------- Reviews, change by change (phase 8b)
+
+/** One reviewer's proposed change, as step_changes holds it (migration 008). */
+export type ChangeRow = {
+  id: number;
+  step_id: number;
+  reviewer: string;
+  section: string | null;
+  before_text: string | null;
+  after_text: string | null;
+  reason: string | null;
+  state: string;
+  edited_text: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  created_at: string;
+};
+
+/** The three reviewers in turn (PW12), by the code the worker stores; the evaluators rate the criteria (PW25). */
+export const REVIEWERS: { code: string; name: string; note: string; rates: boolean }[] = [
+  { code: "evaluator_1", name: "External evaluator", note: "Reads it as the agency's evaluator would, against the evaluation criteria.", rates: true },
+  { code: "evaluator_2", name: "Second evaluator", note: "A second, independent read against the same criteria.", rates: true },
+  { code: "leadership", name: "Velocity leadership", rates: false,
+    note: "Overpromises, missed strengths, strategic fit, voice and resources; it does not rate the criteria." },
+];
+
+/** An evaluator's rating in words (PW25): Outstanding and Good in green, Marginal amber, Unacceptable red, the rest grey. */
+export function ratingTone(rating: string): "good" | "warn" | "conflict" | "grey" {
+  const word = rating.trim().toLowerCase().split(/[\s,;:(]/)[0];
+  if (word === "outstanding" || word === "good") return "good";
+  if (word === "marginal") return "warn";
+  if (word === "unacceptable") return "conflict";
+  return "grey";
+}
+
+export type ChangeCounts = { total: number; proposed: number; accepted: number; edited: number; rejected: number };
+
+export function changeCounts(changes: { state: string }[]): ChangeCounts {
+  const count = (state: string) => changes.filter((c) => c.state === state).length;
+  return { total: changes.length, proposed: count("proposed"), accepted: count("accepted"), edited: count("edited"), rejected: count("rejected") };
+}
+
+/** Why Reviews cannot be approved yet (PW12): a change still to decide. */
+export function openChangesReason(proposed: number): string | null {
+  return proposed ? `Decide every change first: ${proposed} still to decide.` : null;
+}
+
+/** A reviewer's row: "14 changes, 3 to decide", or "14 changes, 13 kept" once decided. */
+export function reviewLine(c: ChangeCounts): string {
+  if (!c.total) return "No changes";
+  const head = `${c.total} ${c.total === 1 ? "change" : "changes"}`;
+  return c.proposed ? `${head}, ${c.proposed} to decide` : `${head}, ${c.accepted + c.edited} kept`;
+}
+
+/** What the owner decided, for the history when Reviews is approved: "30 accepted, 3 edited, 2 rejected". */
+export function decidedLine(c: ChangeCounts): string {
+  const parts = (["accepted", "edited", "rejected"] as const).filter((state) => c[state]).map((state) => `${c[state]} ${state}`);
+  return parts.length ? parts.join(", ") : "no changes";
+}
+
+export function changeWord(state: string): string {
+  return state === "proposed" ? "to decide" : state;
+}
+
+export function changeTone(state: string): "good" | "warn" | "grey" {
+  return state === "proposed" ? "warn" : state === "rejected" ? "grey" : "good";
 }

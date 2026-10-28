@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import {
   actionsFor,
   approveLabel,
+  changeCounts,
+  changeTone,
+  changeWord,
   checklistProgress,
+  decidedLine,
   DISCOVERY_TASKS,
   fitTone,
   latestSteps,
@@ -11,9 +15,13 @@ import {
   money,
   openStep,
   parseJson,
+  openChangesReason,
   permissions,
+  ratingTone,
   RECOMMENDATIONS,
   REQUIREMENT_ROWS,
+  reviewLine,
+  REVIEWERS,
   stageStates,
   stateTone,
   stateWord,
@@ -22,6 +30,7 @@ import {
   tagTone,
   taskLine,
   taskWord,
+  type ChangeRow,
   type StepRow,
 } from "./workspace.ts";
 
@@ -127,4 +136,40 @@ test("approving the Outline locks the direction and the past work (PW8, PW11)", 
   assert.equal(locked([row("outline", { state: "approved" })]), true);
   assert.equal(locked([row("outline", { id: 1, state: "approved" }), row("outline", { id: 2, attempt: 2, state: "queued" })]), true);
   assert.equal(locked([row("alignment")]), false);
+});
+
+function change(state: string, over: Partial<ChangeRow> = {}): ChangeRow {
+  return {
+    id: 1, step_id: 9, reviewer: "evaluator_1", section: "1. Technical approach", before_text: "now", after_text: "then",
+    reason: "Clearer", state, edited_text: null, decided_by: null, decided_at: null, created_at: "2026-10-28T15:00:00Z", ...over,
+  };
+}
+
+test("the three reviewers in order: two evaluators who rate the criteria, then leadership, who does not (PW12, PW25)", () => {
+  assert.deepEqual(REVIEWERS.map((r) => [r.code, r.name, r.rates]), [
+    ["evaluator_1", "External evaluator", true], ["evaluator_2", "Second evaluator", true], ["leadership", "Velocity leadership", false]]);
+});
+
+test("ratings in words read in tones; a scale of the call's own stays grey (PW25)", () => {
+  assert.deepEqual(["Outstanding", "Good", "Acceptable", "Marginal", "Unacceptable", "good", "Satisfactory", ""].map(ratingTone),
+    ["good", "good", "grey", "warn", "conflict", "good", "grey", "grey"]);
+});
+
+test("changes are counted by decision, and Reviews waits until every change is decided (PW12)", () => {
+  const counts = changeCounts([change("proposed"), change("accepted"), change("edited"), change("rejected"), change("proposed")]);
+  assert.deepEqual(counts, { total: 5, proposed: 2, accepted: 1, edited: 1, rejected: 1 });
+  assert.equal(openChangesReason(counts.proposed), "Decide every change first: 2 still to decide.");
+  assert.equal(openChangesReason(1), "Decide every change first: 1 still to decide.");
+  assert.equal(openChangesReason(0), null);
+  assert.equal(reviewLine(counts), "5 changes, 2 to decide");
+  assert.equal(reviewLine(changeCounts([change("accepted"), change("edited"), change("rejected")])), "3 changes, 2 kept");
+  assert.equal(reviewLine(changeCounts([change("accepted")])), "1 change, 1 kept");
+  assert.equal(reviewLine(changeCounts([])), "No changes");
+  assert.equal(decidedLine(changeCounts([change("accepted"), change("accepted"), change("rejected")])), "2 accepted, 1 rejected");
+  assert.equal(decidedLine(changeCounts([])), "no changes");
+});
+
+test("each change's state in words and tones", () => {
+  assert.deepEqual(["proposed", "accepted", "edited", "rejected"].map(changeWord), ["to decide", "accepted", "edited", "rejected"]);
+  assert.deepEqual(["proposed", "accepted", "edited", "rejected"].map(changeTone), ["warn", "good", "good", "grey"]);
 });

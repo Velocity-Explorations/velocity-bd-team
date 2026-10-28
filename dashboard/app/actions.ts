@@ -8,13 +8,17 @@ import { aliasesFor } from "@/lib/people";
 import { profileFromForm } from "@/lib/profile";
 import { FORMATS } from "@/lib/proposals";
 import {
+  acceptAllChanges,
   addMaterial,
   approveStep,
   askChanges,
   changeBuildsOn,
+  checkAgain,
+  decideChange,
   decideCall,
   decideRequest,
   deleteProfile,
+  isChangeDecision,
   noGoStep,
   portals,
   raiseCap,
@@ -25,6 +29,7 @@ import {
   startPursuit,
   tagOptions,
   tickChecklist,
+  undoChange,
   workspace,
   type DecideRequestResult,
   type DecideResult,
@@ -38,15 +43,16 @@ import { allowlist, currentViewer, VIEWER_COOKIE } from "@/lib/viewer";
 import { parseJson, permissions } from "@/lib/workspace";
 
 const MAX_NOTE_CHARS = 2000;
+const MAX_CHANGE_CHARS = 8000;
 
-function backTo(returnTo: string, key: "notice" | "error", message: string, voted?: string): never {
+function backTo(returnTo: string, key: "notice" | "error", message: string, voted?: string, anchor?: string): never {
   const url = new URL(returnTo, "http://dashboard.local");
   url.searchParams.delete("notice");
   url.searchParams.delete("error");
   url.searchParams.delete("voted");
   url.searchParams.set(key, message);
   if (voted) url.searchParams.set("voted", voted);   // the queue links the notice to the call on All calls
-  redirect(`${url.pathname}${url.search}`);
+  redirect(`${url.pathname}${url.search}${anchor ? `#${anchor}` : ""}`);
 }
 
 /**
@@ -219,8 +225,12 @@ export async function startDraftAction(formData: FormData): Promise<void> {
 
 // ----------------------------------------------------------------- the proposal workspace
 
-function workspaceHref(callId: string, step: string): string {
-  return `/proposals/${encodeURIComponent(callId)}${step ? `?step=${encodeURIComponent(step)}` : ""}`;
+function workspaceHref(callId: string, step: string, view = ""): string {
+  const query = new URLSearchParams();
+  if (step) query.set("step", step);
+  if (view) query.set("view", view);
+  const search = query.toString();
+  return `/proposals/${encodeURIComponent(callId)}${search ? `?${search}` : ""}`;
 }
 
 /**
@@ -230,7 +240,7 @@ function workspaceHref(callId: string, step: string): string {
  */
 async function workspaceActor(formData: FormData, need: "decide" | "contribute") {
   const callId = String(formData.get("call_id") ?? "");
-  const back = workspaceHref(callId, String(formData.get("step") ?? ""));
+  const back = workspaceHref(callId, String(formData.get("step") ?? ""), formData.get("view") === "slop" ? "slop" : "");
   const viewer = await currentViewer();
   if (!viewer) backTo(back, "error", "Log in (top right) first.");
   const found = callId ? await workspace(callId) : null;
@@ -244,8 +254,8 @@ async function workspaceActor(formData: FormData, need: "decide" | "contribute")
   return { viewer, back, found, pursuit };
 }
 
-/** Run a workspace write and return to the step with what happened. */
-async function workspaceWrite(back: string, write: () => Promise<WorkspaceResult>): Promise<never> {
+/** Run a workspace write and return to the step with what happened; on success, to the anchor when one is given. */
+async function workspaceWrite(back: string, write: () => Promise<WorkspaceResult>, anchor?: string): Promise<never> {
   let result: WorkspaceResult;
   try {
     result = await write();
@@ -254,7 +264,7 @@ async function workspaceWrite(back: string, write: () => Promise<WorkspaceResult
     backTo(back, "error", `Could not save: ${detail}`);
   }
   revalidatePath("/", "layout");
-  if (result.ok) backTo(back, "notice", result.notice);
+  if (result.ok) backTo(back, "notice", result.notice, undefined, anchor);
   backTo(back, "error", result.reason);
 }
 
@@ -365,4 +375,37 @@ export async function tickChecklistAction(formData: FormData): Promise<void> {
     itemId: Number(formData.get("item_id")), by: viewer, done: formData.get("done") === "1",
     expectedDone: formData.get("expected_done") === "1",
   }));
+}
+
+/** Accept, reject or edit one of the reviewers' changes (PW12): the owner decides each, back at the change. */
+export async function decideChangeAction(formData: FormData): Promise<void> {
+  const { viewer, back, pursuit } = await workspaceActor(formData, "decide");
+  const changeId = Number(formData.get("change_id"));
+  const decision = String(formData.get("decision") ?? "");
+  if (!Number.isInteger(changeId) || !isChangeDecision(decision)) backTo(back, "error", "Choose Accept, Reject or Edit for the change.");
+  const editedText = String(formData.get("edited_text") ?? "").slice(0, MAX_CHANGE_CHARS);
+  await workspaceWrite(back, () => decideChange({ pursuitId: pursuit.id, changeId, by: viewer, decision, editedText }), `change-${changeId}`);
+}
+
+/** Undo a change's decision while Reviews is still ready (PW12). */
+export async function undoChangeAction(formData: FormData): Promise<void> {
+  const { back, pursuit } = await workspaceActor(formData, "decide");
+  const changeId = Number(formData.get("change_id"));
+  if (!Number.isInteger(changeId)) backTo(back, "error", "That change is no longer listed. Reload to see the changes.");
+  const expected = String(formData.get("expected") ?? "");
+  await workspaceWrite(back, () => undoChange({ pursuitId: pursuit.id, changeId, expected }), `change-${changeId}`);
+}
+
+/** Accept all of one reviewer's changes still to decide (PW12). */
+export async function acceptAllAction(formData: FormData): Promise<void> {
+  const { viewer, back, pursuit } = await workspaceActor(formData, "decide");
+  const reviewer = String(formData.get("reviewer") ?? "");
+  const stepId = Number(formData.get("step_id"));
+  await workspaceWrite(back, () => acceptAllChanges({ pursuitId: pursuit.id, stepId, reviewer, by: viewer }), `changes-${reviewer}`);
+}
+
+/** Check again (PW22): the owner or anyone working with them queues a scan of the newest draft for the worker. */
+export async function checkAgainAction(formData: FormData): Promise<void> {
+  const { viewer, back, pursuit } = await workspaceActor(formData, "contribute");
+  await workspaceWrite(back, () => checkAgain({ pursuitId: pursuit.id, by: viewer }));
 }

@@ -46,6 +46,13 @@ def test_a_draft_is_ready_with_nothing_open_and_a_clean_or_light_band() -> None:
     assert slop_gate.verdict(revise) == "Not ready: band revise (provisional)"
 
 
+def test_under_150_words_there_is_no_band_and_only_the_placeholders_decide() -> None:
+    short = slop_gate.summarize(report(band="unscored", placeholders=("[NEEDS INPUT: rates]",)))
+    assert not short.ready and slop_gate.verdict(short) == "Not ready: 1 NEEDS INPUT; no band"
+    clean = slop_gate.summarize(report(band="unscored"))
+    assert clean.ready and slop_gate.verdict(clean) == "Ready: no band"
+
+
 def test_the_report_lists_what_to_fix_first() -> None:
     text = slop_gate.render_report(slop_gate.summarize(SAMPLE), Path("data") / "drafting" / "x" / "draft_final.md")
     assert text.startswith("# Slop check\n\nNot ready: 1 PERSON WRITES")

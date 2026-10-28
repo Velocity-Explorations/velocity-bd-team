@@ -19,16 +19,20 @@ import {
   GateBrief,
   OutlineView,
   RequirementsView,
+  ReviewsView,
   SummaryView,
 } from "@/components/StepScreens";
 import { formatDue, formatTime } from "@/lib/format";
 import type { ChecklistRow, EventRow, PursuitRow, WorkspaceCall } from "@/lib/queries";
+import type { ScanRow } from "@/lib/slop";
 import {
   actionsFor,
   approveLabel,
+  changeCounts,
   checklistProgress,
   locked,
   money,
+  openChangesReason,
   parseJson,
   stageStates,
   STAGES,
@@ -37,6 +41,7 @@ import {
   stepInfo,
   STEPS,
   stepTitle,
+  type ChangeRow,
   type StepRow,
 } from "@/lib/workspace";
 
@@ -309,13 +314,15 @@ function StateNotice({ callId, pursuit, row, can, worker, tz, label }: {
   }
 }
 
-/** A step's own screen (PW6 to PW11), drawn from what the worker saved. */
-function StepScreen({ call, pursuit, row, steps, checklist, content, can, label, tz }: {
+/** A step's own screen (PW6 to PW12), drawn from what the worker saved. */
+function StepScreen({ call, pursuit, row, steps, checklist, changes, scan, content, can, label, tz }: {
   call: WorkspaceCall;
   pursuit: PursuitRow;
   row: StepRow;
   steps: StepRow[];
   checklist: ChecklistRow[];
+  changes: ChangeRow[];
+  scan: ScanRow | null;
   content: Record<string, unknown>;
   can: Can;
   label: Label;
@@ -337,21 +344,26 @@ function StepScreen({ call, pursuit, row, steps, checklist, content, can, label,
       return <OutlineView call={call} pursuit={pursuit} content={content} row={row} canDecide={can.decide}
         canContribute={can.contribute} isLocked={locked(steps)} />;
     case "draft":
-      return <DraftView content={content} />;
+      return <DraftView step={row.step} content={content} />;
     case "compliance":
-      return <ComplianceView content={content} />;
+      return <ComplianceView step={row.step} content={content} />;
+    case "reviews":
+      return <ReviewsView callId={call.id} row={row} content={content} changes={changes} scan={scan}
+        decidable={can.decide && row.state === "ready" && pursuit.state === "working"} label={label} tz={tz} />;
     default:
       return null;
   }
 }
 
 /** The open step's card (PW4): what it is for, its state, the files saved, what Claude prepared, and Your call. */
-export function StepCard({ call, pursuit, row, steps, checklist, can, worker, label, tz }: {
+export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, can, worker, label, tz }: {
   call: WorkspaceCall;
   pursuit: PursuitRow;
   row: StepRow;
   steps: StepRow[];
   checklist: ChecklistRow[];
+  changes: ChangeRow[];
+  scan: ScanRow | null;
   can: Can;
   worker: { readiness: string; seenAt: string | null };
   label: Label;
@@ -367,6 +379,9 @@ export function StepCard({ call, pursuit, row, steps, checklist, can, worker, la
   const question = typeof content.question === "string" ? content.question : "Approve it to continue, or ask for changes.";
   const acts = actionsFor(row, { pursuitState: pursuit.state, decide: can.decide });
   const working = pursuit.state === "working";
+  const mine = changes.filter((c) => c.step_id === row.id);
+  // Reviews is approved once every change is decided (PW12).
+  const waiting = row.step === "reviews" ? openChangesReason(changeCounts(mine).proposed) : null;
   return (
     <section className="ws-card" aria-labelledby="ws-step-title">
       <div className="ws-band">
@@ -400,8 +415,8 @@ export function StepCard({ call, pursuit, row, steps, checklist, can, worker, la
           </ul>
         ) : null}
         {shown ? (
-          <StepScreen call={call} pursuit={pursuit} row={row} steps={steps} checklist={checklist} content={content} can={can}
-            label={label} tz={tz} />
+          <StepScreen call={call} pursuit={pursuit} row={row} steps={steps} checklist={checklist} changes={mine} scan={scan}
+            content={content} can={can} label={label} tz={tz} />
         ) : null}
         {points.length ? (
           <section className="ws-points" aria-label="What Claude prepared">
@@ -429,12 +444,21 @@ export function StepCard({ call, pursuit, row, steps, checklist, can, worker, la
             <p className="ws-call-label">Your call</p>
             <p className="ws-question">{question}</p>
             {!can.decide ? <p className="hint">Waiting on {label(pursuit.owner)}, the owner, to decide this step.</p> : null}
+            {can.decide && waiting ? <p className="hint ws-waiting">{waiting}</p> : null}
+            {row.step === "reviews" ? (
+              <p className="hint">
+                Approving queues Final checks, which puts the changes you accepted or edited into Draft v3; the AI slop check
+                then runs on the final version on its own.
+              </p>
+            ) : null}
             <div className="ws-actions">
               {acts.approve ? (
                 <form action={approveStepAction} className={row.step === "alignment" ? "ws-approve-direction" : undefined}>
                   <Fields callId={call.id} row={row} />
                   {row.step === "alignment" ? <DirectionChoice content={content} /> : null}
-                  <button type="submit" className="btn-primary fn-approve"><Check aria-hidden="true" />{approveLabel(row.step)}</button>
+                  <button type="submit" className="btn-primary fn-approve" disabled={Boolean(waiting)}>
+                    <Check aria-hidden="true" />{approveLabel(row.step)}
+                  </button>
                 </form>
               ) : null}
               {acts.gate ? (

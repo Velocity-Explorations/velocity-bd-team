@@ -140,6 +140,8 @@ def seed() -> dict[str, int]:
         {"part": "inputs", "text": "Key personnel bios", "owner": "Shaun Jones", "due_date": "2027-01-05", "done": False},
     ], "requirements")
     _call("ws-undrafted", "Workspace with no draft")
+    for key in ("rev-view", "rev-decide", "rev-stale", "rev-check"):   # before seed_screens, which leaves a step queued
+        found[key] = _reviews(key)
     seed_screens(found)
     return found
 
@@ -191,8 +193,99 @@ def seed_screens(found: dict[str, int]) -> None:
     found["draft"] = _pursuit("ws-draft", "Workspace draft")
     _through(found["draft"], "draft")
     _saved(found["draft"], "draft", content={"words": 3240, "placeholders": {"PERSON WRITES": 1, "NEEDS INPUT": 60,
-                                                                            "NEEDS EVIDENCE": 0, "other": 0}})
+                                                                            "NEEDS EVIDENCE": 0, "other": 0},
+                                             "slop": "Not ready: 1 PERSON WRITES, 60 NEEDS INPUT; band clean (provisional)"})
     found["people"] = _pursuit("ws-people", "Workspace people")
+
+
+# A made-up scan in the scanner's JSON shape: the family names, fixes and matched words are examples, not the scanner's own.
+SCAN_TEXT = "\n".join([
+    "# White paper", "Sure thing, here it is.", "[PERSON WRITES: the opening]", "This is not just X; a, b and c.", "",
+    "## 2. Technical approach", "We use wordtwo and wordthree.", "The partner is [NEEDS INPUT: the partner's name].",
+    "It not only this but also that, with wordone.", "## 3. Work plan", "Then d, e and f.",
+    "The objective of this topic is to develop it.", "Hours: [NEEDS INPUT: hours per task]"])
+
+
+def _family(label: str, tier: str, hits: int, points: float, fix: str) -> dict[str, Any]:
+    return {"label": label, "tier": tier, "hits": hits, "distinct": hits, "per_1k": hits * 0.5, "fired": points > 0,
+            "points": points, "fix": fix}
+
+
+def _finding(family: str, tier: str, line: int, column: int, match: str, exempt: str = "") -> dict[str, Any]:
+    return {"rule": "example", "family": family, "tier": tier, "line": line, "column": column, "match": match, "text": match,
+            "weight": 1, "term": False, "exempt": exempt, "paragraph": 1, "start": 0, "end": 1}
+
+
+SCAN_REPORT = {
+    "source": "draft_v2.md", "profile": "proposal", "channel": "document", "words": 2140, "sentences": 150, "band": "light",
+    "confidence": "full", "points": 9, "discourse_fired": 2, "residue_label": "tool residue", "percentile": None,
+    "thresholds": {"light": 2, "revise": 4, "heavy": 7, "calibrated": False, "n": 0},
+    "families": {
+        "contrast": _family("contrast frames", "discourse", 2, 3, "Say what the thing does."),
+        "greet": _family("chatbot greetings (example)", "discourse", 1, 0, "Start with the answer."),
+        "lex_a": _family("GPT era words (example)", "lexicon", 1, 1, "Use the plain word."),
+        "lex_b": _family("Claude era words (example)", "lexicon", 1, 1, "Use the plain word."),
+        "triads": _family("lists of three", "surface", 2, 0.5, "Keep the two that carry information."),
+        "residue": _family("tool residue", "residue", 0, 0, "Delete it."),
+        "sourcing": _family("chatbot link tags (example)", "sourcing", 0, 0, "Strip it."),
+        "house": _family("house rules (example CLAUDE.md)", "house", 0, 0, "Rewrite it."),
+        "prop_overlap": _family("sentence copied from the solicitation", "proposal", 1, 0, "Answer it in your own words."),
+        "prop_open_item": _family("open placeholders", "proposal", 3, 0, "Fill it in."),
+    },
+    "findings": [
+        _finding("greet", "discourse", 2, 1, "Sure thing"),
+        _finding("prop_open_item", "proposal", 3, 1, "[PERSON WRITES: the opening]"),
+        _finding("contrast", "discourse", 4, 1, "This is not just X"),
+        _finding("triads", "surface", 4, 21, "a, b and c"),
+        _finding("lex_b", "lexicon", 7, 8, "wordtwo"),
+        _finding("lex_b", "lexicon", 7, 20, "wordthree", "the solicitation uses this term"),
+        _finding("prop_open_item", "proposal", 8, 16, "[NEEDS INPUT: the partner's name]"),
+        _finding("contrast", "discourse", 9, 4, "not only this but also that"),
+        _finding("lex_a", "lexicon", 9, 40, "wordone"),
+        _finding("triads", "surface", 11, 6, "d, e and f"),
+        _finding("prop_overlap", "proposal", 12, 1, "The objective of this topic"),
+        _finding("prop_open_item", "proposal", 13, 8, "[NEEDS INPUT: hours per task]"),
+    ],
+    "hot_paragraphs": [{"lines": [8, 11], "findings": 3, "families": ["contrast frames", "GPT era words (example)"]}],
+}
+VERDICT = "Not ready: 1 PERSON WRITES, 2 NEEDS INPUT; band light (provisional)"
+PASSES = [
+    {"pass": 1, "code": "evaluator_1", "reviewer": "External evaluator", "status": "done", "changes": 2, "dropped": 0, "points": [],
+     "ratings": [{"criterion": "Technical merit", "rating": "Good", "strengths": "A clear plan", "weaknesses": "No baseline"},
+                 {"criterion": "Key people", "rating": "Marginal", "strengths": "", "weaknesses": "Two bios missing"}]},
+    {"pass": 2, "code": "evaluator_2", "reviewer": "Second independent evaluator", "status": "done", "changes": 1, "dropped": 0,
+     "points": [], "ratings": [{"criterion": "Technical merit", "rating": "Acceptable", "strengths": "", "weaknesses": ""}]},
+    {"pass": 3, "code": "leadership", "reviewer": "Velocity leadership", "status": "done", "changes": 1, "dropped": 0, "points": [],
+     "ratings": []},
+]
+
+
+def _reviews(key: str) -> int:
+    """A pursuit at Reviews: the three reviewers' changes to decide, and the scan of Draft v2 (PW12, PW20)."""
+    pursuit_id = _pursuit(f"ws-{key}", f"Workspace {key}")
+    _through(pursuit_id, "reviews")
+    row = lq.claim_next_step()
+    assert row is not None and row["step"] == "reviews", row
+    lq.add_step_changes(row["id"], "evaluator_1", [
+        {"section": "1. Technical approach", "before": "We use wordtwo.", "after": "We use the C2 prototype.", "reason": "Name the system"},
+        {"section": "2. Plan", "before": "The partner helps.", "after": "The partner leads tasks 3 and 4.", "reason": "Show the split"}])
+    lq.add_step_changes(row["id"], "evaluator_2", [
+        {"section": "3. Costs", "before": "Costs are low.", "after": "Costs are $150,000.", "reason": "Give the number"}])
+    lq.add_step_changes(row["id"], "leadership", [
+        {"section": "4. Transition", "before": "We will try.", "after": "We will deliver the Phase II plan.", "reason": "Commit"}])
+    assert lq.finish_step(row["id"], summary="- External evaluator: 2 changes proposed", cost_usd=0.4,
+                          files=[{"name": "Review 1, External evaluator", "local": f"pursuit-{pursuit_id}/review_1.md"}],
+                          content={"document": "# Review 1", "passes": PASSES, "changes": 4,
+                                   "question": "Here is what the reviews found, as changes to decide. Accept, reject or edit "
+                                               "each, then approve the draft."})
+    lq.save_slop_scan(pursuit_id, None, "draft_v2.md", SCAN_REPORT, verdict=VERDICT, ready=False, fixed_count=7, text=SCAN_TEXT)
+    return pursuit_id
+
+
+def changes_of(pursuit_id: int) -> list[tuple[str, str, str | None, str | None]]:
+    with ledger():
+        step = next(s for s in lq.pursuit_steps(pursuit_id) if s["step"] == "reviews")
+        return [(c["section"], c["state"], c["decided_by"], c["edited_text"]) for c in lq.step_changes(step["id"])]
 
 
 @pytest.fixture(scope="module")
@@ -534,6 +627,8 @@ def test_the_first_draft_shows_its_size_and_what_is_left_to_fill(page: Any, site
     open_workspace(page, "ws-draft")
     rows = page.locator(".ws-card .ws-rows").inner_text()
     assert "3,240" in rows and "1 PERSON WRITES, 60 NEEDS INPUT" in rows
+    assert "Not ready: 1 PERSON WRITES, 60 NEEDS INPUT; band clean (provisional)" in rows
+    assert page.locator(".ws-card .ws-rows a", has_text="See the latest result").get_attribute("href") == "?step=draft&view=slop"
 
 
 def test_the_owner_changes_who_works_with_them(page: Any, site: dict[str, int]) -> None:
@@ -545,3 +640,182 @@ def test_the_owner_changes_who_works_with_them(page: Any, site: dict[str, int]) 
     act(page, panel.get_by_role("button", name="Save who works on it"))
     with ledger():
         assert json.loads(lq.get_pursuit(site["people"])["collaborators"]) == ["Shaun Jones", "Lisa Hall"]
+
+
+# ------------------------------------------------------------------------------ Reviews and the AI slop check (phase 8b)
+
+def test_reviews_lists_the_check_the_reviewers_their_ratings_and_each_change(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-rev-view", "reviews")
+    card = page.locator(".ws-card")
+    assert "STEP 8 OF 9 · REVIEWS" in card.locator(".ws-band").inner_text().upper()
+    rows = card.locator(".ws-reviewers > li")
+    assert rows.count() == 4
+    first = rows.nth(0).inner_text()
+    assert "AI slop check" in first and VERDICT in first and "automatic" in first
+    external = rows.nth(1).inner_text()
+    for expected in ("External evaluator", "Technical merit", "Good", "Key people", "Marginal", "2 changes, 2 to decide", "to decide"):
+        assert expected in external, expected
+    assert "Second evaluator" in rows.nth(2).inner_text() and "Acceptable" in rows.nth(2).inner_text()
+    assert "does not rate the criteria" in rows.nth(3).inner_text()
+    rows.nth(1).locator("summary", has_text="Strengths and weaknesses").click()
+    assert "Two bios missing" in rows.nth(1).inner_text()
+    change = card.locator("#changes-evaluator_1 .ws-change").first
+    text = change.inner_text()
+    for expected in ("1. Technical approach", "We use wordtwo.", "We use the C2 prototype.", "Name the system"):
+        assert expected in text, expected
+    for name in ("Accept", "Reject"):
+        assert change.get_by_role("button", name=name, exact=True).count() == 1
+    assert change.locator("summary", has_text="Edit").count() == 1
+    # Approval waits until every change is decided (PW12).
+    assert card.get_by_role("button", name="Approve and continue").is_disabled()
+    assert "Decide every change first: 4 still to decide." in card.locator(".ws-call").inner_text()
+
+
+def test_people_working_with_the_owner_see_the_changes_but_do_not_decide_them(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "Shaun Jones")
+    open_workspace(page, "ws-rev-view", "reviews")
+    card = page.locator(".ws-card")
+    assert card.locator(".ws-change").count() == 4
+    assert card.get_by_role("button", name="Accept", exact=True).count() == 0
+    assert card.get_by_role("button", name="Accept all").count() == 0
+    assert "Waiting on David Wood, the owner" in card.inner_text()
+
+
+def test_the_owner_accepts_rejects_and_edits_each_change_then_approves(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-rev-decide", "reviews")
+    changes = page.locator(".ws-card .ws-change")
+    act(page, changes.nth(0).get_by_role("button", name="Accept", exact=True))
+    assert "Accepted the change to 1. Technical approach." in notice(page)
+    assert re.search(r"#change-\d+$", page.url)
+    open_workspace(page, "ws-rev-decide", "reviews")   # a clean address, so act() waits for the next notice
+    act(page, page.locator(".ws-card .ws-change").nth(1).get_by_role("button", name="Reject", exact=True))
+    assert "Rejected the change to 2. Plan." in notice(page)
+    open_workspace(page, "ws-rev-decide", "reviews")   # a clean address, so act() waits for the next notice
+    act(page, page.locator(".ws-card .ws-change").nth(1).get_by_role("button", name="Undo"))
+    assert "The change to 2. Plan is back to decide." in notice(page)
+    open_workspace(page, "ws-rev-decide", "reviews")   # a clean address, so act() waits for the next notice
+    act(page, page.locator(".ws-card .ws-change").nth(1).get_by_role("button", name="Reject", exact=True))
+    open_workspace(page, "ws-rev-decide", "reviews")   # a clean address, so act() waits for the next notice
+    third = page.locator(".ws-card .ws-change").nth(2)
+    third.locator("summary", has_text="Edit").click()
+    third.locator("textarea[name=edited_text]").fill("Costs are $150,000 over nine months.")
+    act(page, third.get_by_role("button", name="Save your version"))
+    assert "Edited the change to 3. Costs." in notice(page)
+    open_workspace(page, "ws-rev-decide", "reviews")   # a clean address, so act() waits for the next notice
+    act(page, page.locator("#changes-leadership").get_by_role("button", name="Accept all"))
+    assert "Velocity leadership: accepted 1 change." in notice(page)
+    assert changes_of(site["rev-decide"]) == [
+        ("1. Technical approach", "accepted", "David Wood", None), ("2. Plan", "rejected", "David Wood", None),
+        ("3. Costs", "edited", "David Wood", "Costs are $150,000 over nine months."), ("4. Transition", "accepted", "David Wood", None)]
+    open_workspace(page, "ws-rev-decide", "reviews")   # a clean address, so act() waits for the next notice
+    card = page.locator(".ws-card")
+    assert "your version" in card.locator(".ws-change").nth(2).inner_text().lower()
+    assert "Accepted by David Wood" in card.locator(".ws-change").nth(0).inner_text()
+    act(page, card.get_by_role("button", name="Approve and continue"))
+    assert "Approved with 2 accepted, 1 edited, 1 rejected. Final checks is queued for the worker." in notice(page)
+    assert steps_of(site["rev-decide"])[-2:] == [("reviews", 1, "approved"), ("final", 1, "queued")]
+    page.get_by_role("button", name="Show history").click()
+    assert "Reviews approved: 2 accepted, 1 edited, 1 rejected" in page.locator("#ws-history").inner_text()
+
+
+def test_a_decision_from_a_page_left_open_saves_nothing(page: Any, site: dict[str, int]) -> None:
+    from ledger.db import q, tx
+
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-rev-stale", "reviews")
+    with ledger():
+        step = next(s for s in lq.pursuit_steps(site["rev-stale"]) if s["step"] == "reviews")
+        first, *others = lq.step_changes(step["id"])
+        assert lq.decide_change(first["id"], "David Wood", "rejected")
+    act(page, page.locator(".ws-card .ws-change").first.get_by_role("button", name="Accept", exact=True))
+    assert "That change was decided already" in page.locator(".notice").first.inner_text()
+    assert changes_of(site["rev-stale"])[0][1] == "rejected"
+    # The page saw every change decided, then one came back to decide elsewhere: Approve refuses (PW12).
+    with ledger():
+        for change in others:
+            assert lq.decide_change(change["id"], "David Wood", "accepted")
+    open_workspace(page, "ws-rev-stale", "reviews")
+    with ledger(), tx() as conn:
+        q(conn, "UPDATE step_changes SET state = 'proposed', decided_by = NULL, decided_at = NULL WHERE id = ?", (others[0]["id"],))
+    act(page, page.locator(".ws-card").get_by_role("button", name="Approve and continue"))
+    assert "Decide every change first: 1 still to decide." in page.locator(".notice").first.inner_text()
+    assert steps_of(site["rev-stale"])[-1] == ("reviews", 1, "ready")
+
+
+def test_the_slop_check_result_shows_the_verdict_what_is_open_and_what_to_fix(page: Any, site: dict[str, int]) -> None:
+    open_workspace(page, "ws-rev-view", "reviews")
+    page.locator(".ws-reviewers a", has_text="See the result").click()
+    page.wait_for_url(re.compile(r"view=slop"))
+    card = page.locator(".ws-card")
+    assert "STEP 8 OF 9 · REVIEWS · AI SLOP CHECK" in card.locator(".ws-band").inner_text().upper()
+    assert "not ready" in card.locator(".ws-band .badge").inner_text().lower()
+    box = card.locator(".ws-verdict-box").inner_text()
+    for expected in (VERDICT, "light", "9 points", "Confidence: normal, 2,140 words", "on Draft v2", "provisional until they are calibrated"):
+        assert expected in box, expected
+    assert "Fixed on its own before this scan: 7" in card.locator(".ws-fixed").inner_text()
+    placeholders = card.locator("[aria-label='Open placeholders']").inner_text()
+    assert "Open placeholders, 3".lower() in placeholders.lower()
+    assert "White paper. [PERSON WRITES: the opening]" in placeholders and "2. Technical approach. [NEEDS INPUT" in placeholders
+    hot = card.locator("[aria-label='Paragraphs to revise first']").inner_text()
+    assert "2. Technical approach" in hot and "3 findings: contrast frames, overused words" in hot and "Lines 8 to 11" in hot
+    families = card.locator("[aria-label='Findings by family'] .ws-family-head strong").all_inner_texts()
+    assert families == ["Contrast frames", "Overused words", "Lists of three", "Greetings"]
+    found = card.locator("[aria-label='Findings by family']").inner_text()
+    assert "Say what the thing does." in found and "Tool residue: none · Tracking parameters: none · House rules: none" in found
+    faults = card.locator("[aria-label='Proposal faults']").inner_text()
+    assert "Sentence copied from the solicitation" in faults and "These do not count toward the band." in faults
+    assert "1 finding was left out for that reason" in faults
+    # Patterns and fixes only (PW23): no model or chatbot named, and nothing about who wrote the text.
+    text = card.inner_text()
+    for banned in ("GPT era", "Claude era", "chatbot", "written by AI", "AI-generated", "probability", "likely AI"):
+        assert banned.lower() not in text.lower(), banned
+
+
+def test_a_line_link_opens_the_scanned_text_beside_the_list(page: Any, site: dict[str, int]) -> None:
+    page.goto(f"{WEB}/proposals/ws-rev-view?step=reviews&view=slop", wait_until="load", timeout=120_000)
+    card = page.locator(".ws-card")
+    card.locator("[aria-label='Open placeholders'] a", has_text="Line 8").click()
+    page.wait_for_url(re.compile(r"lines=8#p-8$"))
+    aside = page.locator(".ws-slop-text")
+    assert "draft v2, line 8" in aside.locator("h3").inner_text().lower()
+    hit = aside.locator("li.hit")
+    assert hit.count() == 1 and "The partner is [NEEDS INPUT: the partner's name]." in hit.inner_text()
+    assert "NEEDS INPUT, open" in hit.inner_text()
+    card.locator("[aria-label='Paragraphs to revise first'] a", has_text="Lines 8 to 11").click()
+    page.wait_for_url(re.compile(r"lines=8-11#h-1$"))
+    assert page.locator(".ws-slop-text li.hit").count() == 4
+    page.locator(".ws-slop-text a", has_text="Close").click()
+    page.wait_for_url(re.compile(r"view=slop$"))
+    assert page.locator(".ws-slop-text").count() == 0
+
+
+SLOP_CHECK = f"{WEB}/proposals/ws-rev-check?step=reviews&view=slop"
+
+
+def test_check_again_queues_a_scan_and_shows_its_state(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "Shaun Jones")   # working with the owner: Check again decides nothing
+    page.goto(SLOP_CHECK, wait_until="load", timeout=120_000)
+    with ledger():
+        queued = lq.queue_job("slop_scan", site["rev-check"], None, "David Wood")
+    act(page, page.locator(".ws-card").get_by_role("button", name="Check again"))
+    assert "Check again is already waiting for the worker." in page.locator(".notice").first.inner_text()
+    assert "queued" in page.locator(".ws-card .ws-notice.tone-info").inner_text()
+    assert page.locator(".ws-card").get_by_role("button", name="Check again").is_disabled()
+    with ledger():
+        job = lq.claim_next_job()
+        assert job is not None and job["id"] == queued
+    page.goto(SLOP_CHECK, wait_until="load", timeout=120_000)
+    assert "Checking the newest draft." in page.locator(".ws-card .ws-notice.tone-info").inner_text()
+    assert VERDICT in page.locator(".ws-verdict-box").inner_text()   # the last result stays shown (PW22)
+    with ledger():
+        assert lq.finish_job(queued, "failed", "There is no draft to check yet.")
+    page.goto(SLOP_CHECK, wait_until="load", timeout=120_000)
+    assert "The last Check again did not run: There is no draft to check yet." in page.locator(".ws-card").inner_text()
+    act(page, page.locator(".ws-card").get_by_role("button", name="Check again"))
+    assert "Check again is queued. The worker scans the newest draft when no step is waiting." in notice(page)
+    with ledger():
+        job = lq.claim_next_job()
+    assert job is not None and job["kind"] == "slop_scan" and job["pursuit_id"] == site["rev-check"]
+    assert job["requested_by"] == "Shaun Jones"

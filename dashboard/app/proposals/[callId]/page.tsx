@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/Shell";
+import { SlopResult } from "@/components/SlopResult";
 import { StageStrip, StepCard, StepList, WorkspaceHeader, WorkspacePanels } from "@/components/Workspace";
 import { Flash } from "@/components/bits";
 import { drafting, labeler, timeZone } from "@/lib/me";
@@ -23,7 +24,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 /**
  * The proposal workspace (PW1 to PW25, PRO-580): one pursuit followed step by step. The header, the stage
  * strip, the step list and the open step's card, with People, Checklist and Show history under the header.
- * `?step=` opens a step the pursuit has reached; a done step opens read only.
+ * `?step=` opens a step the pursuit has reached; a done step opens read only. `&view=slop` opens the AI slop
+ * check's result in the card (PW20), and `&lines=` the scanned text beside it at those lines.
  */
 export default async function WorkspacePage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const callId = decodeURIComponent((await params).callId);
@@ -60,9 +62,13 @@ export default async function WorkspacePage({ params, searchParams }: { params: 
       <StageStrip current={pursuit.current_step} pursuitState={pursuit.state} />
       <div className="ws-body">
         <StepList latest={latest} open={open} />
-        {row ? (
-          <StepCard call={call} pursuit={pursuit} row={row} steps={found.steps} checklist={found.checklist} can={can} worker={worker}
-            label={name} tz={tz} />
+        {row && firstParam(sp.view, 10) === "slop" ? (
+          <SlopResult call={call} pursuit={pursuit} row={row} scan={found.scan} job={found.job} canCheck={can.contribute}
+            hasDraft={found.steps.some((s) => s.step === "draft" && (s.state === "ready" || s.state === "approved"))}
+            linesParam={firstParam(sp.lines, 20) || undefined} tz={tz} />
+        ) : row ? (
+          <StepCard call={call} pursuit={pursuit} row={row} steps={found.steps} checklist={found.checklist} changes={found.changes}
+            scan={found.scan} can={can} worker={worker} label={name} tz={tz} />
         ) : (
           <p className="muted">Nothing has been queued for this pursuit yet.</p>
         )}
