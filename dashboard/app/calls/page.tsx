@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { CallCell, DescriptionCell, DueCell, VotesCell } from "@/components/CallCells";
 import { DecideCell } from "@/components/DecideCell";
 import { FilterBar } from "@/components/FilterBar";
@@ -31,7 +32,8 @@ import {
   type CallFilters,
 } from "@/lib/queries";
 import { votesByCall } from "@/lib/scoreboard";
-import { displayTimeZone, hiddenColumns, queueMode } from "@/lib/settings";
+import { defaultsRedirect, labeler, timeZone } from "@/lib/me";
+import { hiddenColumns, queueMode } from "@/lib/settings";
 import { tagsByCall } from "@/lib/tags";
 import { firstParam, parseNoteLine } from "@/lib/text";
 import { FILTER_RESULTS, HUMAN_STATUSES, pickAllowed, VERDICTS } from "@/lib/values";
@@ -59,6 +61,8 @@ const STATUS_CHOICES = [
  */
 export default async function CallsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
+  const withDefaults = await defaultsRedirect("/calls", sp);
+  if (withDefaults) redirect(withDefaults);
   const [portalList, tagChoices, top] = await Promise.all([portals(), tagOptions(), topTenIds()]);
   const filters: CallFilters = {
     portals: pickMany(sp.portal, portalList.map((p) => p.name)),
@@ -85,10 +89,11 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
   const ids = rows.map((r) => r.id);
   const [judged, decisions, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids)]);
   const tagsFor = tagsByCall(tagRows);
-  const tz = displayTimeZone();
+  const tz = await timeZone();
   const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Table settings
-  const nameOf = (by: string | null) => displayPerson(by, users);
-  const votes = votesByCall(decisions, nameOf);
+  const label = await labeler();
+  const nameOf = (by: string | null) => label(displayPerson(by, users));
+  const votes = votesByCall(decisions, (by) => displayPerson(by, users));   // by the name decisions are recorded under
   // The view as link params: every bar control, header and decision keeps the rest of it.
   const barParams: Params = { portal: filters.portals, state: filters.state, tag: filters.tag };
   const params: Params = {
@@ -257,7 +262,12 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                         </td>
                       ) : null}
                       {show("votes") ? (
-                        <VotesCell callId={r.id} verdicts={verdicts} votes={callVotes} notesBy={new Set(notes.map((n) => nameOf(n.by)).filter(Boolean))} />
+                        <VotesCell
+                          callId={r.id}
+                          verdicts={verdicts}
+                          votes={callVotes.map((v) => ({ ...v, person: label(v.person) }))}
+                          notesBy={new Set(notes.map((n) => nameOf(n.by)).filter(Boolean))}
+                        />
                       ) : null}
                       {show("description") ? <DescriptionCell portal={r.portal} description={r.description} extra={r.extra} /> : null}
                       {show("reason") ? <td className="reason wide">{r.ai_reasoning ?? ""}</td> : null}

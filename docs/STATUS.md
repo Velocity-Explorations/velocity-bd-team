@@ -169,5 +169,7 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   - Phase 3c, part 1 (PRO-573): Automation has its five views (Decided requests and Scan problems
     added, Scans with a Portals filter and a sortable Started column), and the past weekly briefs
     page has a breadcrumb home, the Top 10 table as on Home, and boards that link their portal's calls.
+  - Phase 3c, part 2 (PRO-574): Profile settings at /profile, kept in the profiles table: display name
+    and initials, where the dashboard opens, Calls' default filters, and time zone.
 
 ## Known breakages

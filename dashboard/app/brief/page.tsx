@@ -7,9 +7,9 @@ import { TopTenTable } from "@/components/TopTenTable";
 import { Badge, TitleLink } from "@/components/bits";
 import { boardHref, closesText, judgesSentence, parseBrief, parseTop, weekLabel, type BriefCall, type PortalBrief } from "@/lib/brief";
 import { formatTime } from "@/lib/format";
-import { displayPerson, type Person } from "@/lib/people";
+import { displayPerson } from "@/lib/people";
 import { briefRows, briefWeeks, currentDecisions, type CallDecision } from "@/lib/queries";
-import { displayTimeZone } from "@/lib/settings";
+import { labeler, timeZone } from "@/lib/me";
 import { firstParam } from "@/lib/text";
 import { isDecision, STATUS_LABELS } from "@/lib/values";
 import { allowlist } from "@/lib/viewer";
@@ -28,11 +28,11 @@ function plural(n: number, one: string, many: string): string {
 }
 
 /** The call's decision as of now: a badge and who made it, or "undecided". */
-function DecisionNow({ decision, users }: { decision: CallDecision | undefined; users: Person[] }) {
+function DecisionNow({ decision, nameOf }: { decision: CallDecision | undefined; nameOf: (by: string | null) => string }) {
   if (!decision?.status) return <span className="muted">undecided</span>;
   return (
     <span>
-      <Badge value={decision.status} /> <span className="muted">{displayPerson(decision.by, users)}</span>
+      <Badge value={decision.status} /> <span className="muted">{nameOf(decision.by)}</span>
     </span>
   );
 }
@@ -96,7 +96,9 @@ export default async function BriefPage({ searchParams }: { searchParams: Search
   const listed: BriefCall[] = boards.flatMap((b) => b.topPicks);
   const decisions = await currentDecisions([...new Set(listed.map((c) => c.id))]);
   const users = allowlist();
-  const tz = displayTimeZone();
+  const tz = await timeZone();
+  const label = await labeler();
+  const nameOf = (by: string | null) => label(displayPerson(by, users));
   const written = rows.at(-1)?.created_at ?? null;
   const judges = top ? judgesSentence(top.judges) : "";
   const others = weeks.filter((w) => w !== week).slice(0, 8);
@@ -132,7 +134,7 @@ export default async function BriefPage({ searchParams }: { searchParams: Search
           </p>
         </div>
         {top && top.top.length ? (
-          <TopTenTable ids={top.top.map((c) => c.id)} description={false} tz={tz} nameOf={(by) => displayPerson(by, users)} />
+          <TopTenTable ids={top.top.map((c) => c.id)} description={false} tz={tz} nameOf={nameOf} />
         ) : (
           <div className="empty">
             <p className="title">No Top 10 that week.</p>
@@ -169,7 +171,7 @@ export default async function BriefPage({ searchParams }: { searchParams: Search
                           {decisions.get(c.id)?.status ? (
                             <>
                               {" "}
-                              <DecisionNow decision={decisions.get(c.id)} users={users} />
+                              <DecisionNow decision={decisions.get(c.id)} nameOf={nameOf} />
                             </>
                           ) : null}
                           {c.reason ? <div className="muted">{c.reason}</div> : null}
@@ -198,7 +200,7 @@ export default async function BriefPage({ searchParams }: { searchParams: Search
                       {b.decided.map((c) => (
                         <li key={c.id}>
                           {statusLabel(c.status)}: <TitleLink title={c.title} url={c.url} fallback={c.id} />{" "}
-                          <span className="muted">({displayPerson(c.by, users)})</span>
+                          <span className="muted">({nameOf(c.by)})</span>
                         </li>
                       ))}
                     </ul>

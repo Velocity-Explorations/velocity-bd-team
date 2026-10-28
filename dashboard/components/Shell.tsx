@@ -6,11 +6,13 @@ import { MenuController } from "@/components/MenuController";
 import { TableController } from "@/components/TableController";
 import { TableSettings } from "@/components/TableSettings";
 import { TooltipController } from "@/components/TooltipController";
+import { defaultFilters, initialsOf, labeler, me } from "@/lib/me";
 import { countLabel, SECTIONS, type Section } from "@/lib/nav";
+import { callsHref } from "@/lib/profile";
 import { aliasesFor } from "@/lib/people";
 import { countStepsReadyFor, countToDraft, countWaitingRequests, queueCounts } from "@/lib/queries";
 import { hiddenColumns, queueMode } from "@/lib/settings";
-import { allowlist, currentViewer, iapAudience, viewerHeader } from "@/lib/viewer";
+import { allowlist, iapAudience, viewerHeader } from "@/lib/viewer";
 
 const ICONS: Record<Section, LucideIcon> = { home: House, calls: Inbox, proposals: FileText, automation: Workflow };
 
@@ -38,14 +40,21 @@ function viewerMode(): { mode: ViewerMode; why: string } {
 }
 
 /**
- * Every page's frame (PRO-570): the top bar with the brand, the four sections with their counts and
- * the account menu; then the page. On Calls, Table settings is offered in the account menu and the
- * filter bar.
+ * Every page's frame (PRO-570, PRO-574): the top bar with the brand, the four sections with their
+ * counts and the account menu; then the page. Calls opens with the viewer's default filters. On Calls,
+ * Table settings is offered in the account menu and the filter bar. Pages outside the sections
+ * (Profile settings) mark none.
  */
-export async function Shell({ section, children }: { section: Section; children: ReactNode }) {
-  const viewer = await currentViewer();
+export async function Shell({ section, children }: { section: Section | null; children: ReactNode }) {
+  const { viewer } = await me();
   const tableSettings = section === "calls";
-  const [counts, hidden] = await Promise.all([sectionCounts(viewer), tableSettings ? hiddenColumns() : null]);
+  const [counts, hidden, label, filters] = await Promise.all([
+    sectionCounts(viewer),
+    tableSettings ? hiddenColumns() : null,
+    labeler(),
+    defaultFilters(),
+  ]);
+  const people = await Promise.all(allowlist().map(async (p) => ({ name: p.name, label: label(p.name), initials: await initialsOf(p.name) })));
   const { mode, why } = viewerMode();
   return (
     <>
@@ -59,7 +68,12 @@ export async function Shell({ section, children }: { section: Section; children:
             const Icon = ICONS[key];
             const n = key === "home" ? 0 : counts[key];
             return (
-              <Link key={key} href={href} className={key === section ? "active" : undefined} aria-current={key === section ? "page" : undefined}>
+              <Link
+                key={key}
+                href={key === "calls" ? callsHref(filters) : href}
+                className={key === section ? "active" : undefined}
+                aria-current={key === section ? "page" : undefined}
+              >
                 <Icon aria-hidden="true" />
                 {label}
                 {key !== "home" && n ? (
@@ -71,7 +85,7 @@ export async function Shell({ section, children }: { section: Section; children:
             );
           })}
         </nav>
-        <AccountMenu viewer={viewer} names={allowlist().map((p) => p.name)} mode={mode} why={why} tableSettings={tableSettings} />
+        <AccountMenu viewer={viewer} people={people} mode={mode} why={why} tableSettings={tableSettings} />
       </header>
       <main>{children}</main>
       {hidden ? <TableSettings hidden={hidden} /> : null}
