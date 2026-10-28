@@ -182,7 +182,13 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     records each step's cost against the pursuit's $200 cap, approves steps itself with key gates
     only, reruns a step with the owner's note, stops when the pursuit is closed, and fails a step a
     stopped worker left. It runs the Qualify steps (Discovery to the Go or no-go brief) from the
-    opportunity-assessment skill; Outline onward follow in 5b. Files stay in data/drafting until
-    Drive. Not started yet: it starts once `scripts/install-schedule.ps1` is run again (RUNBOOK).
+    opportunity-assessment skill. Files stay in data/drafting until Drive. Not started yet: it
+    starts once `scripts/install-schedule.ps1` is run again (RUNBOOK).
+  - Phase 5b (PRO-578): the worker runs every step after Go too: Outline, First draft and
+    Compliance check from the reference pipeline's prompts with the proposal-drafting skill, Reviews
+    as the reference's four review passes until phase 8 brings changes to decide one by one, Final
+    checks (readiness checklist, formatting, the opening held for a person, the AI slop check), and
+    the Submit gate's checks and submission packet. Every file and card it saves has its dashes
+    replaced.
 
 ## Known breakages

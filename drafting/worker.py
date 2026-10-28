@@ -11,13 +11,14 @@ set up (P8). At start it fails any step a stopped worker left working, so the ow
 (PW15).
 
 Each step runs only while its pursuit is under its spending cap; otherwise it waits as "budget
-reached" (PW19). The step's work (drafting/qualify.py) asks the model through a meter that adds each
-call's cost (drafting/costs.py) to the step and stops the step once spending crosses the cap. Before
-each call, and every 30 seconds during one, the worker checks that the pursuit is still being worked
-and stops the step when the owner closed it. The work is saved ready, or failed with the reason;
-with key gates only, the worker approves it and queues the next step (PW5). Files stay under
-data/drafting/pursuits/pursuit-<id>/ until Drive (phase 6). The worker logs ids, states and costs,
-never a call's text or title.
+reached" (PW19). The step's work (drafting/qualify.py, drafting/write.py) asks the model through a
+meter that adds each call's cost (drafting/costs.py) to the step and stops the step once spending
+crosses the cap. Before each call, and every 30 seconds during one, the worker checks that the
+pursuit is still being worked and stops the step when the owner closed it. The work is saved ready,
+or failed with the reason; with key gates only, the worker approves it and queues the next step
+(PW5). Files stay under data/drafting/pursuits/pursuit-<id>/ until Drive (phase 6), and the card's
+text, like every file, has its dashes replaced. The worker logs ids, states and costs, never a
+call's text or title.
 """
 from __future__ import annotations
 
@@ -33,10 +34,10 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from drafting import costs, inputs, llm, qualify
+from drafting import costs, inputs, llm, qualify, write
 from drafting.pipeline import PHASE_TIMEOUT_S
 from drafting.prompts import Prompt
-from drafting.steps import StepContext, StepResult
+from drafting.steps import StepContext, StepResult, fix_dashes
 from ledger import queries as lq
 from ledger.db import release as release_connection
 
@@ -48,7 +49,7 @@ POLL_S = 20
 WATCH_S = 30
 BUDGET_REACHED = "budget reached"
 LEFT_WORKING = "The worker stopped while it worked on this step. Retry runs it again."
-RUNNERS: dict[str, Callable[[StepContext], StepResult]] = {**qualify.RUNNERS}
+RUNNERS: dict[str, Callable[[StepContext], StepResult]] = {**qualify.RUNNERS, **write.RUNNERS}
 
 log = logging.getLogger("drafting.worker")
 
@@ -166,6 +167,17 @@ def _previous(step: Mapping[str, Any]) -> dict[str, Any] | None:
                  if s["step"] == step["step"] and int(s["attempt"]) == int(step["attempt"]) - 1), None)
 
 
+def _undashed(value: Any) -> Any:
+    """A step's card text and content with the en and em dashes replaced, as its files are."""
+    if isinstance(value, str):
+        return fix_dashes(value)
+    if isinstance(value, list):
+        return [_undashed(v) for v in value]
+    if isinstance(value, dict):
+        return {key: _undashed(v) for key, v in value.items()}
+    return value
+
+
 def _why(exc: Exception) -> str:
     """Why a step failed, in words for the step's card (PW15)."""
     text = str(exc) if isinstance(exc, llm.PhaseError) else f"{type(exc).__name__}: {exc}"
@@ -219,8 +231,8 @@ def _run(step: dict[str, Any], pursuit: dict[str, Any], label: str, doing: str, 
         return
     finally:
         watcher.stop()
-    if not lq.finish_step(step["id"], summary=result.summary or None, files=result.files or None,
-                          content=result.content or None, cost_usd=meter.cost):
+    if not lq.finish_step(step["id"], summary=_undashed(result.summary) or None, files=result.files or None,
+                          content=_undashed(result.content) or None, cost_usd=meter.cost):
         lq.stop_step(step["id"], meter.cost)
         log.info("Step %s finished after its pursuit was closed; stopped", step["id"])
         return
