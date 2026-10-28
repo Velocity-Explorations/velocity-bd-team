@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>BD Team, log in</title>
+<script src="./image-slot.js"></script>
+<style>
+@font-face { font-family: 'Inter Tight'; src: url('fonts/InterTight-400.woff2') format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Inter Tight'; src: url('fonts/InterTight-600.woff2') format('woff2'); font-weight: 600; }
+@font-face { font-family: 'Inter Tight'; src: url('fonts/InterTight-700.woff2') format('woff2'); font-weight: 700; }
+@font-face { font-family: 'Chakra Petch'; src: url('fonts/ChakraPetch-500.woff2') format('woff2'); font-weight: 500; }
+@font-face { font-family: 'Chakra Petch'; src: url('fonts/ChakraPetch-600.woff2') format('woff2'); font-weight: 600; }
+@font-face { font-family: 'Chakra Petch'; src: url('fonts/ChakraPetch-700.woff2') format('woff2'); font-weight: 700; }
+html, body { margin: 0; background: #141414; }
+a { color: #F5F5F5; } a:hover { color: #FFCB03; }
+button:focus-visible, a:focus-visible { outline: 2px solid #FFCB03; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</helmet>
+<div style="position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 20px;box-sizing:border-box;overflow:hidden;background:radial-gradient(ellipse at 70% 20%,#3A3A3A 0%,#222222 45%,#121212 100%);color:#F5F5F5;font-family:'Inter Tight',Arial,sans-serif">
+  <div style="position:absolute;inset:0">
+    <image-slot id="bd-login-background" shape="rect" placeholder="Drop the slate background image here"></image-slot>
+  </div>
+  <div aria-hidden="true" style="position:absolute;inset:0;background:rgba(0,0,0,0.18);pointer-events:none"></div>
+
+  <main style="position:relative;width:100%;max-width:530px;pointer-events:none">
+    <section aria-labelledby="bd-login-title" style="width:100%;background:linear-gradient(135deg,#2C2C2C 0%,#262626 45%,#212121 100%);box-shadow:4px 6px 14px rgba(0,0,0,0.45);border-radius:6px;overflow:hidden;pointer-events:auto">
+      <div style="padding:76px 50px 56px;display:flex;flex-direction:column">
+        <h1 id="bd-login-title" style="margin:0 0 30px;display:flex;align-items:center;justify-content:center;gap:16px">
+          <img src="assets/velocity-mark-white.png" alt="" style="height:44px;width:auto;display:block">
+          <span style="font-family:'Inter Tight',sans-serif;font-size:46px;line-height:1;font-weight:700;letter-spacing:0.06em;text-transform:uppercase">BD Team</span>
+        </h1>
+
+        <sc-if value="{{ message }}">
+          <div role="{{ message.role }}" style="display:flex;align-items:flex-start;gap:10px;margin-bottom:22px;padding:12px 16px;background:{{ message.wash }};border:1px solid {{ message.line }};border-radius:4px;font-size:13.5px;line-height:1.45">
+            <span style="font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;padding-top:2px;white-space:nowrap;color:{{ message.fg }}">{{ message.word }}</span>
+            <span style="color:#F5F5F5">{{ message.text }}</span>
+          </div>
+        </sc-if>
+
+        <p style="margin:0;font-family:'Chakra Petch',sans-serif;font-size:13px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#F5F5F5">Sign in</p>
+        <p style="margin:10px 0 0;font-size:15px;line-height:1.5;color:#BEBEBE">Use your Velocity Google account.</p>
+
+        <button type="button" onClick="{{ onGoogle }}" disabled="{{ busy }}" style="margin-top:36px;height:60px;display:flex;align-items:center;justify-content:center;gap:12px;background:linear-gradient(90deg,#0066CC 0%,#00468A 100%);border:none;border-radius:4px;color:#FFFFFF;font-family:'Chakra Petch',sans-serif;font-size:17px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;transition:filter 120ms ease-out,box-shadow 120ms ease-out" style-hover="filter:brightness(1.15);box-shadow:0 6px 16px rgba(0,70,138,0.45)" style-active="filter:brightness(0.95);box-shadow:none">
+          <span aria-hidden="true" style="display:inline-block;width:18px;height:18px;background:#FFFFFF;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/log-in.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/log-in.svg') center / contain no-repeat"></span>{{ buttonLabel }}
+        </button>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px 16px;margin-top:52px">
+          <a href="https://accounts.google.com/signin/recovery" target="_blank" rel="noopener" style="font-family:'Chakra Petch',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;text-decoration:none;transition:color 120ms ease-out">Reset password</a>
+          <span style="font-family:'Chakra Petch',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#959595">Need access? Ask an admin</span>
+        </div>
+      </div>
+      <div aria-hidden="true" style="height:30px;background:linear-gradient(90deg,#F2C744 0%,#9FCF9A 24%,#3CCFD8 44%,#00C8FF 58%,#0A72D0 80%,#0B3FA8 100%)"></div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;message&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;signed out&quot;,&quot;timed out&quot;,&quot;not allowed&quot;,&quot;cancelled&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { busy: false, msg: null };
+  static TONE = { conflict: { fg: '#FFA59D', line: '#A45953', wash: '#36201E' }, info: { fg: '#7ECCFF', line: '#3977A8', wash: '#172836' } };
+  static MSG = {
+    'timed out': { role: 'alert', word: 'Refused', tone: 'conflict', text: 'Your login attempt timed out. Login will start from the beginning.' },
+    'not allowed': { role: 'alert', word: 'Refused', tone: 'conflict', text: 'This Google account cannot use BD Team yet. Ask an admin to add it.' },
+    'cancelled': { role: 'alert', word: 'Refused', tone: 'conflict', text: 'Google sign-in was cancelled. Sign in again to continue.' },
+    'signed out': { role: 'status', word: 'Done', tone: 'info', text: 'You are logged out of BD Team.' }
+  };
+  componentDidMount() {
+    try { const m = new URLSearchParams(window.location.search).get('m'); if (m) this.setState({ msg: m.replace(/-/g, ' ') }); } catch (e) {}
+  }
+  componentWillUnmount() { clearTimeout(this.t); }
+  renderVals() {
+    const S = this.state, preset = this.props.message ?? 'none';
+    const key = S.msg || (preset !== 'none' ? preset : null), M = key && Component.MSG[key];
+    return {
+      busy: S.busy,
+      buttonLabel: S.busy ? 'Signing in' : 'Sign in with Google',
+      message: M ? { ...M, ...Component.TONE[M.tone] } : null,
+      onGoogle: () => {
+        this.setState({ busy: true, msg: 'none' });
+        this.t = setTimeout(() => { window.location.href = 'Review Queue Prototype.dc.html#/?signin=1'; }, 900);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<header style="width:100%;background:#1E1E1E;border-bottom:2px solid #333333;font-family:'Inter Tight',Arial,sans-serif;box-sizing:border-box">
+  <div style="display:flex;align-items:center;column-gap:32px;padding:0 24px;height:56px">
+    <a href="#" style="display:flex;align-items:center;gap:10px;height:56px;text-decoration:none;color:#F5F5F5;flex:none;transition:background-color 120ms ease-out,border-color 120ms ease-out,color 120ms ease-out" style-hover="opacity:0.85;cursor:pointer">
+      <img src="assets/velocity-mark-white.png" alt="" style="height:16px;width:auto;display:block">
+      <span style="font-family:'Chakra Petch',sans-serif;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase">Velocity BD</span>
+    </a>
+    <nav aria-label="Sections" style="display:flex;align-items:stretch;gap:{{ navGap }};height:56px">
+      <sc-for list="{{ links }}" as="l" hint-placeholder-count="4">
+        <a href="#" aria-current="{{ l.current }}" style="display:flex;align-items:center;gap:7px;font-size:{{ navSize }};font-weight:{{ l.weight }};color:{{ l.color }};text-decoration:none;border-bottom:2px solid {{ l.rule }};margin-bottom:{{ l.ruleOffset }};white-space:nowrap;transition:background-color 120ms ease-out,border-color 120ms ease-out,color 120ms ease-out" style-hover="color:#FFCB03;cursor:pointer"><span aria-hidden="true" style="display:inline-block;width:15px;height:15px;flex:none;background:{{ l.iconColor }};-webkit-mask:url('{{ l.icon }}') center / contain no-repeat;mask:url('{{ l.icon }}') center / contain no-repeat"></span>{{ l.label }}<sc-if value="{{ l.count }}"><span aria-label="{{ l.countLabel }}" style="font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:700;line-height:16px;min-width:16px;padding:0 4px;text-align:center;background:#FFCB03;color:#1E1E1E;border-radius:3px">{{ l.count }}</span></sc-if></a>
+      </sc-for>
+    </nav>
+    <div style="margin-left:auto;display:flex;align-items:center;height:56px">
+      <sc-if value="{{ signedIn }}">
+        <button aria-haspopup="menu" aria-expanded="{{ menuExpanded }}" aria-label="Account: {{ viewer }}" style="display:flex;align-items:center;gap:10px;height:38px;padding:0 8px 0 4px;background:transparent;border:1px solid {{ menuBd }};border-radius:4px;color:#F5F5F5;font-family:'Inter Tight',sans-serif;font-size:13px;cursor:pointer;transition:background-color 120ms ease-out,border-color 120ms ease-out,color 120ms ease-out" style-hover="color:#FFCB03;cursor:pointer">
+          <span aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#434343;border-radius:4px;font-family:'Chakra Petch',sans-serif;font-size:12px;font-weight:700;color:#F5F5F5">{{ initials }}</span>
+          <span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.2"><span style="font-weight:600">{{ viewer }}</span><span style="font-family:'Chakra Petch',sans-serif;font-size:11px;color:#959595">Deciding</span></span>
+          <span aria-hidden="true" style="display:inline-block;width:14px;height:14px;background:#BEBEBE;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-down.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-down.svg') center / contain no-repeat"></span>
+        </button>
+      </sc-if>
+      <sc-if value="{{ signedOut }}">
+        <button aria-haspopup="menu" style="display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;background:#F5F5F5;border:none;border-radius:4px;color:#1E1E1E;font-family:'Inter Tight',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:background-color 120ms ease-out,border-color 120ms ease-out,color 120ms ease-out" style-hover="background:#D6D6D6;border-color:#D6D6D6;cursor:pointer" style-active="background:#BEBEBE;border-color:#BEBEBE"><span aria-hidden="true" style="width:14px;height:14px;background:#1E1E1E;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/log-in.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/log-in.svg') center / contain no-repeat"></span>Log in</button>
+      </sc-if>
+    </div>
+  </div>
+  <sc-if value="{{ hasTabs }}">
+    <nav aria-label="{{ tabsLabel }}" style="display:flex;align-items:stretch;gap:28px;padding:0 24px;height:44px;border-top:1px solid #2E2E2E">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <a href="#" aria-current="{{ t.current }}" style="display:flex;align-items:center;gap:7px;font-size:14px;font-weight:{{ t.weight }};color:{{ t.color }};text-decoration:none;border-bottom:2px solid {{ t.rule }};margin-bottom:-2px;white-space:nowrap;transition:background-color 120ms ease-out,border-color 120ms ease-out,color 120ms ease-out" style-hover="color:#FFCB03;cursor:pointer">{{ t.label }}<sc-if value="{{ t.count }}"><span aria-label="{{ t.countLabel }}" style="font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:700;line-height:16px;min-width:16px;padding:0 4px;text-align:center;background:{{ t.countBg }};color:{{ t.countFg }};border-radius:3px">{{ t.count }}</span></sc-if></a>
+      </sc-for>
+    </nav>
+  </sc-if>
+  <sc-if value="{{ crumb }}">
+    <nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:8px;padding:0 24px;height:44px;border-top:1px solid #2E2E2E;font-size:14px">
+      <a href="#" style="color:#BEBEBE;text-decoration:underline;text-decoration-color:#555555;text-underline-offset:3px;transition:background-color 120ms ease-out,border-color 120ms ease-out,color 120ms ease-out" style-hover="color:#FFCB03;text-decoration-color:#FFCB03;cursor:pointer">{{ crumb.parent }}</a>
+      <span aria-hidden="true" style="width:14px;height:14px;background:#757575;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-right.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-right.svg') center / contain no-repeat"></span>
+      <span aria-current="page" style="color:#F5F5F5;font-weight:600">{{ crumb.page }}</span>
+    </nav>
+  </sc-if>
+</header>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:104},&quot;active&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Home&quot;,&quot;To review&quot;,&quot;All&quot;,&quot;Pursuing&quot;,&quot;Submitted&quot;,&quot;Results&quot;,&quot;Requests&quot;,&quot;Scans&quot;,&quot;Judges&quot;,&quot;Past weekly briefs&quot;,&quot;Profile settings&quot;],&quot;default&quot;:&quot;To review&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;compact&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;viewer&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Analyst B&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;menuOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  static MAP = {
+    'Home': ['Home', null], 'Review queue': ['Calls', 'To review'], 'To review': ['Calls', 'To review'], 'All calls': ['Calls', 'All'], 'All': ['Calls', 'All'],
+    'Pursuing': ['Proposals', 'Pursuing'], 'Submitted': ['Proposals', 'Submitted'], 'Proposals': ['Proposals', 'Results'], 'Results': ['Proposals', 'Results'],
+    'Requests': ['Automation', 'Requests'], 'Runs': ['Automation', 'Scans'], 'Scans': ['Automation', 'Scans'], 'Judges': ['Automation', 'Judges'],
+    'Monday brief': [null, 'brief'], 'Past weekly briefs': [null, 'brief'], 'Profile settings': [null, 'profile'], 'None': [null, null]
+  };
+  static TABS = { Proposals: ['Pursuing', 'Submitted', 'Results'], Automation: ['Requests', 'Scans', 'Judges'] };
+  static ICONS = { Home: 'house', Calls: 'inbox', Proposals: 'file-text', Automation: 'workflow' };
+  renderVals() {
+    const [section, tab] = Component.MAP[this.props.active ?? 'Review queue'] || ['Calls', 'To review'];
+    const compact = !!this.props.compact;
+    const viewer = this.props.viewer ?? 'Analyst B';
+    const U = n => 'https://unpkg.com/lucide-static@0.460.0/icons/' + n + '.svg';
+    const tabs = section && Component.TABS[section] ? Component.TABS[section] : [];
+    return {
+      links: ['Home', 'Calls', 'Proposals', 'Automation'].map(n => {
+        const on = n === section;
+        return { label: n, current: on ? 'page' : undefined, color: on ? '#F5F5F5' : '#BEBEBE', weight: on ? 600 : 400, rule: on && !tabs.length ? '#FFCB03' : 'transparent', ruleOffset: '0', iconColor: on ? '#FFCB03' : '#BEBEBE', icon: U(Component.ICONS[n]), count: n === 'Automation' ? '2' : n === 'Proposals' ? '1' : (n === 'Calls' && viewer ? '28' : null), countLabel: n === 'Calls' ? '28 waiting for you' : n === 'Proposals' ? '1 proposal to draft' : '2 requests waiting' };
+      }),
+      hasTabs: tabs.length > 0, tabsLabel: section + ' pages',
+      tabs: tabs.map(t => { const on = t === tab; return { label: t, current: on ? 'page' : undefined, color: on ? '#F5F5F5' : '#BEBEBE', weight: on ? 600 : 400, rule: on ? '#FFCB03' : 'transparent', count: t === 'Requests' ? '2' : t === 'Pursuing' ? '1' : (t === 'To review' && viewer ? '28' : null), countLabel: t === 'Requests' ? '2 waiting' : t === 'Pursuing' ? '1 to draft' : '28 waiting for you', countBg: '#FFCB03', countFg: '#1E1E1E' }; }),
+      crumb: tab === 'brief' ? { parent: 'Home', page: 'Past weekly briefs' } : null,
+      signedIn: !!viewer, signedOut: !viewer, viewer, initials: viewer ? viewer.split(' ').map(w => w[0]).join('') : '',
+      menuExpanded: this.props.menuOpen ? 'true' : 'false', menuBd: this.props.menuOpen ? '#FFCB03' : 'transparent',
+      navGap: compact ? '22px' : '28px', navSize: compact ? '13.5px' : '14px'
+    };
+  }
+}
+</script>
+</body>
+</html>
