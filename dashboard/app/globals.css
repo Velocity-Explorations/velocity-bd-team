@@ -1929,6 +1929,151 @@ tr.row-link:focus-visible .row-arrow {
   font: var(--type-small);
 }
 
+/* ------------------------------------------------------------------ content cards, Scans, briefs */
+
+/* A content card: the label band (a link when it opens a page), then its body. */
+.content-card {
+  margin-bottom: 16px;
+  overflow: hidden;
+  background: var(--card-fill);
+  border: 2px solid var(--card-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+}
+
+.content-card__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--card-band-line);
+  color: var(--ink-2);
+  font: var(--type-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+a.content-card__label:hover {
+  color: var(--accent);
+}
+
+.content-card__label svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
+}
+
+.content-card__label a {
+  display: inline-flex;
+  color: var(--ink-3);
+}
+
+.content-card__body {
+  padding: 12px 14px 14px;
+}
+
+.content-card__body > :first-child {
+  margin-top: 0;
+}
+
+.content-card__body h3 {
+  margin: 12px 0 4px;
+  font: var(--type-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.content-card__body ol,
+.content-card__body ul {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.latest-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 0 0 6px;
+}
+
+.latest-line > strong {
+  font: var(--type-row-title);
+}
+
+.bar-lead {
+  margin: 0;
+  font: var(--type-small);
+}
+
+.portal-with-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-tile.small {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-chip);
+}
+
+.logo-tile.small img {
+  width: 18px;
+  height: 18px;
+}
+
+.logo-tile.initials.small {
+  font-size: 8px;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+.breadcrumb svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-4);
+}
+
+.breadcrumb [aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.brief-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.brief-head p {
+  margin: 0;
+  font: var(--type-small);
+}
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(24rem, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.board-grid .content-card {
+  margin: 0;
+}
+
 /* ---------------------------------------------------------------- requests */
 
 .request .request-summary {

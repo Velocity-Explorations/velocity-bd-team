@@ -1,25 +1,21 @@
 import type { Metadata } from "next";
-import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { PortalLogo } from "@/components/PortalLogo";
 import { Shell } from "@/components/Shell";
+import { TopTenTable } from "@/components/TopTenTable";
 import { ViewCards } from "@/components/ViewCards";
-import { Badge, Flash, TitleLink } from "@/components/bits";
+import { Flash } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
-import { formatAgo, formatDue, formatTime } from "@/lib/format";
-import { dayMonth, daysLeftText, kindsLine, topTenOrder } from "@/lib/home";
-import { verdictsFor } from "@/lib/judges";
+import { formatAgo, formatTime } from "@/lib/format";
+import { dayMonth, kindsLine } from "@/lib/home";
 import { aliasesFor, displayPerson } from "@/lib/people";
 import {
   countSubmittedWaiting,
   countToDraft,
   judgeAgreement,
   lastCompletedRun,
-  latestJudgments,
   listRuns,
   queueCounts,
   topTenIds,
-  topTenRows,
   waitingRequests,
 } from "@/lib/queries";
 import { displayTimeZone, queueMode } from "@/lib/settings";
@@ -60,10 +56,6 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     lastCompletedRun(),
     judgeAgreement(),
   ]);
-  const rows = await topTenRows(top.ids);
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  const order = topTenOrder(top.ids, new Set(byId.keys()));
-  const judged = await latestJudgments(order);
   const run = latest[0];
 
   const cards: ViewCard[] = [
@@ -109,94 +101,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
           <h2 id="top-ten-title">Top 10</h2>
           <p className="muted">{topSource(top.week)}</p>
         </div>
-        {order.length === 0 ? (
-          <div className="empty">
-            <p className="title">Nothing to rank yet.</p>
-            <p className="muted">The Top 10 lists open yes and maybe calls nobody has decided. New ones arrive with each scan.</p>
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th className="rank">#</th>
-                  <th>Call</th>
-                  <th>Deadline</th>
-                  <th>Claude</th>
-                  <th>Grok</th>
-                  <th>Decision now</th>
-                  <th className="wide">Description</th>
-                  <th className="wide">Claude&apos;s reason</th>
-                  <th className="row-arrow">
-                    <span className="sr-only">Open</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.map((id, i) => {
-                  const call = byId.get(id)!;
-                  const verdicts = verdictsFor(judged.get(id), call.ai_verdict, call.ai_reasoning);
-                  const description = (call.description ?? "").trim();
-                  return (
-                    <tr
-                      key={id}
-                      className="row-link"
-                      data-href={`/review?view=top10&focus=${encodeURIComponent(id)}`}
-                      tabIndex={0}
-                      aria-label={`${call.title || call.id}: open it in Calls, Top 10`}
-                    >
-                      <td className="rank num">{i + 1}</td>
-                      <td className="call">
-                        <div className="call-with-logo">
-                          <PortalLogo portal={call.portal} />
-                          <div>
-                            <TitleLink title={call.title} url={call.url} fallback={call.id} />
-                            <div className="meta">{call.portal}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="when">
-                        {formatDue(call.due_date, tz) || <span className="muted">no deadline</span>}
-                        {call.days_left !== null ? <div className="meta">{daysLeftText(call.days_left)}</div> : null}
-                      </td>
-                      <td>
-                        <Badge value={verdicts.claude?.verdict} empty="not reviewed" />
-                      </td>
-                      <td>
-                        <Badge value={verdicts.grok?.verdict} empty="not yet" />
-                      </td>
-                      <td>
-                        {call.human_status ? (
-                          <>
-                            <Badge value={call.human_status} />
-                            <div className="meta">{displayPerson(call.human_by, users)}</div>
-                          </>
-                        ) : (
-                          <span className="muted">undecided</span>
-                        )}
-                      </td>
-                      <td className="wide reason">
-                        {description ? (
-                          <p className="clamp" title={description.slice(0, 1000)} tabIndex={0}>
-                            {description.slice(0, 600)}
-                          </p>
-                        ) : (
-                          <span className="muted">No description in the ledger</span>
-                        )}
-                      </td>
-                      <td className="wide reason">
-                        <p className="clamp">{call.ai_reasoning ?? ""}</p>
-                      </td>
-                      <td className="row-arrow" aria-hidden="true">
-                        <ArrowRight />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TopTenTable ids={top.ids} description tz={tz} nameOf={(by) => displayPerson(by, users)} />
       </section>
 
       <p className="status-line">

@@ -52,11 +52,12 @@ export type HeaderMenu = {
  * column, and Table settings. The button carries the accent while one of the column's filters is set.
  * Links and GET forms only, so every view can be shared.
  */
-export function HeaderCell({ label, sort, menu, className }: {
+export function HeaderCell({ label, sort, menu, className, tableSettings = true }: {
   label: string;
   sort?: { href: string; active: boolean; dir: SortDir };
   menu?: HeaderMenu;
   className?: string;
+  tableSettings?: boolean;
 }) {
   return (
     <th className={className} aria-sort={sort?.active ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}>
@@ -69,6 +70,7 @@ export function HeaderCell({ label, sort, menu, className }: {
         ) : (
           <span>{label}</span>
         )}
+        {menu || tableSettings ? (
         <details className="menu">
           <summary className={menu?.active ? "th-filter active" : "th-filter"} aria-label={`Menu for ${label}`} title={`Sort, filter and more: ${label}`}>
             <ChevronDown aria-hidden="true" />
@@ -100,13 +102,16 @@ export function HeaderCell({ label, sort, menu, className }: {
                   </button>
                 </form>
               ) : null}
-              <button type="button" className="menu-item" data-opens="table-settings">
-                <Settings2 aria-hidden="true" />
-                Table settings
-              </button>
+              {tableSettings ? (
+                <button type="button" className="menu-item" data-opens="table-settings">
+                  <Settings2 aria-hidden="true" />
+                  Table settings
+                </button>
+              ) : null}
             </div>
           </div>
         </details>
+        ) : null}
       </span>
     </th>
   );

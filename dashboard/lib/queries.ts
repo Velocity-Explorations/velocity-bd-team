@@ -12,6 +12,7 @@ import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
 import { DESCRIPTION_READ } from "./description";
+import { STALE_MS } from "./runs";
 import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
 
 // ------------------------------------------------------------------------------ calls
@@ -662,6 +663,16 @@ export async function decidedRequests(limit = 50): Promise<RequestRow[]> {
   return [...rows];
 }
 
+/** How many requests have been decided, for the Decided requests card. */
+export async function countDecidedRequests(): Promise<number> {
+  try {
+    const [row] = await sql()<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM change_requests WHERE status <> 'proposed'`;
+    return row?.n ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** How many requests wait for a decision; null when the table is not there yet (migration 002 not applied). */
 export async function countWaitingRequests(): Promise<number | null> {
   try {
@@ -733,13 +744,39 @@ export async function countRuns(): Promise<number> {
   return row?.n ?? 0;
 }
 
-export async function listRuns(limit = 100): Promise<RunRow[]> {
-  const rows = await sql()<RunRow[]>`
+/** Scans' filters (PRO-573): portals (none means every one), Scan problems only, and the Started sort. */
+export type RunFilters = { portals?: string[]; problems?: boolean; dir?: "asc" | "desc" };
+
+/** Runs that failed, timed out, or still say running two hours after they started (lib/runs.ts). */
+function problemWhere(db: Db) {
+  const staleBefore = isoNow(new Date(Date.now() - STALE_MS));
+  return db`(status IN ('error', 'skipped_timeout') OR (status = 'running' AND finished_at IS NULL AND started_at < ${staleBefore}))`;
+}
+
+export async function listRuns(limit = 100, f: RunFilters = {}): Promise<RunRow[]> {
+  const db = sql();
+  const rows = await db<RunRow[]>`
     SELECT id, component, portal, started_at, finished_at, status, stage_counts, error, log_path, dry_run
     FROM runs
-    ORDER BY id DESC
+    WHERE TRUE
+      ${f.portals?.length ? db`AND portal IN ${db(f.portals)}` : db``}
+      ${f.problems ? db`AND ${problemWhere(db)}` : db``}
+    ORDER BY started_at ${f.dir === "asc" ? db`ASC` : db`DESC`}, id ${f.dir === "asc" ? db`ASC` : db`DESC`}
     LIMIT ${limit}`;
   return [...rows];
+}
+
+/** How many real scans failed, timed out or never finished, for the Scan problems card. */
+export async function countProblemRuns(): Promise<number> {
+  const db = sql();
+  const [row] = await db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM runs WHERE dry_run = 0 AND ${problemWhere(db)}`;
+  return row?.n ?? 0;
+}
+
+/** The portals that have runs, for Scans' Portals filter. */
+export async function runPortals(): Promise<string[]> {
+  const rows = await sql()<{ portal: string }[]>`SELECT DISTINCT portal FROM runs WHERE portal IS NOT NULL ORDER BY portal`;
+  return rows.map((r) => r.portal);
 }
 
 export async function runLogPath(id: number): Promise<string | null> {

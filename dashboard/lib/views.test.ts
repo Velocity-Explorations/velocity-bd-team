@@ -85,16 +85,24 @@ test("a column filter that matches no view leaves no card pressed (VC4)", () => 
   assert.equal(pressedCard("judges-disagree", { ...none, tier: "tight" }), null);
 });
 
-test("the automation cards link its pages and mark the open one", () => {
-  const row = automationCards({ current: "runs", waiting: 2, kinds: "a keyword change, a scan", runs: 26, lastRun: "last completed 2026-10-24 08:07 MDT", agree: { both: 62, agree: 48 } });
+test("Automation has five cards, each linking its view and marking the open one (PRO-573)", () => {
+  const row = automationCards({
+    current: "problems", waiting: 2, kinds: "a keyword change, a scan", decided: 3, runs: 26,
+    lastRun: "last completed 2026-10-24 08:07 MDT", problems: 4, agree: { both: 62, agree: 48 },
+  });
   assert.deepEqual(
     row.map((c) => [c.label, c.href, c.count, c.description, c.current, c.needsYou]),
     [
       ["Agent update requests", "/requests", 2, "a keyword change, a scan", false, true],
-      ["Scans", "/runs", 26, "last completed 2026-10-24 08:07 MDT", true, false],
+      ["Decided requests", "/requests?view=decided", 3, "the last 50, with their result", false, false],
+      ["Scans", "/runs", 26, "last completed 2026-10-24 08:07 MDT", false, false],
+      ["Scan problems", "/runs?view=problems", 4, "timeouts and errors", true, false],
       ["Judges agree", "/judges", "77%", "48 of 62 calls", false, false],
     ],
   );
-  const none = automationCards({ current: "judges", waiting: 0, kinds: "", runs: 0, lastRun: "", agree: null });
-  assert.deepEqual(none.map((c) => [c.count, c.description]), [[0, "nothing waiting"], [0, "no scans yet"], ["none", "no call judged by both yet"]]);
+  const none = automationCards({ current: "judges", waiting: 0, kinds: "", decided: 0, runs: 0, lastRun: "", problems: 0, agree: null });
+  assert.deepEqual(
+    none.map((c) => [c.count, c.description]),
+    [[0, "nothing waiting"], [0, "none decided yet"], [0, "no scans yet"], [0, "no timeouts or errors"], ["none", "no call judged by both yet"]],
+  );
 });

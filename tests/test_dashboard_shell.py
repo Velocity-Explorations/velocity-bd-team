@@ -28,7 +28,9 @@ SECTION_OF = {
     "/calls": "Calls",
     "/proposals": "Proposals",
     "/requests": "Automation",
+    "/requests?view=decided": "Automation",
     "/runs": "Automation",
+    "/runs?view=problems": "Automation",
     "/judges": "Automation",
 }
 CARD_PAGES = {
@@ -40,7 +42,9 @@ CARD_PAGES = {
     "/review?view=new": "New this week",
     "/calls": "All calls",
     "/requests": "Agent update requests",
+    "/requests?view=decided": "Decided requests",
     "/runs": "Scans",
+    "/runs?view=problems": "Scan problems",
     "/judges": "Judges agree",
 }
 COUNT_LABEL = re.compile(r"^\d+ (waiting for you|to draft or ready for you|requests? waiting)$")

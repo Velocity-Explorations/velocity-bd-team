@@ -142,3 +142,8 @@ export function judgesSentence(judges: JudgeLine[]): string {
   if (parts.length === 0) return "";
   return `Judges against your decisions, counting only verdicts given before you decided: ${parts.join("; ")}.`;
 }
+
+/** A portal's board label links to that portal's calls on All calls. */
+export function boardHref(portal: string): string {
+  return `/calls?${new URLSearchParams({ portal }).toString()}`;
+}
