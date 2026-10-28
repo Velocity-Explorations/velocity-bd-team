@@ -44,42 +44,49 @@ function WaitingCard({ req, tz }: { req: RequestRow; tz: string }) {
   );
 }
 
+/**
+ * Agent update requests and Decided requests (PRO-570, PRO-573): the requests waiting for approval,
+ * oldest first, or (`?view=decided`) the last 50 decided, newest first, with their result.
+ */
 export default async function RequestsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  const [waiting, decided] = await Promise.all([waitingRequests(), decidedRequests(50)]);
+  const view = firstParam(sp.view, 20) === "decided" ? "decided" : "requests";
+  const [waiting, decided] = await Promise.all([waitingRequests(), view === "decided" ? decidedRequests(50) : Promise.resolve([])]);
   const tz = displayTimeZone();
 
   return (
     <Shell section="automation">
-      <h1 className="sr-only">Agent update requests</h1>
-      <AutomationCards current="requests" />
+      <h1 className="sr-only">{view === "decided" ? "Decided requests" : "Agent update requests"}</h1>
+      <AutomationCards current={view} />
       <div className="lead-line">
         <p className="muted">
           Changes the portal assistant was asked to make. Nothing changes until someone approves a request here; the scan machine
           then carries it out {APPLY_WHEN}.
         </p>
         <p className="bar-count">
-          {waiting.length} {waiting.length === 1 ? "request" : "requests"} waiting
+          {view === "decided"
+            ? `${decided.length} decided, newest first`
+            : `${waiting.length} ${waiting.length === 1 ? "request" : "requests"} waiting`}
         </p>
       </div>
 
       <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} />
 
-      <h2>Waiting for approval</h2>
-      {waiting.length === 0 ? (
-        <div className="empty">
-          <p className="title">Nothing is waiting for approval.</p>
-          <p className="muted">
-            A request appears here when someone asks the assistant to change a portal&apos;s keywords, review a call
-            again, scan a portal now, start a draft or report a scraper fault.
-          </p>
-        </div>
-      ) : (
-        waiting.map((req) => <WaitingCard key={req.id} req={req} tz={tz} />)
-      )}
+      {view === "requests" ? (
+        waiting.length === 0 ? (
+          <div className="empty">
+            <p className="title">Nothing is waiting for approval.</p>
+            <p className="muted">
+              A request appears here when someone asks the assistant to change a portal&apos;s keywords, review a call again,
+              scan a portal now, start a draft or report a scraper fault. <a href="/requests?view=decided">See decided requests</a>.
+            </p>
+          </div>
+        ) : (
+          waiting.map((req) => <WaitingCard key={req.id} req={req} tz={tz} />)
+        )
+      ) : null}
 
-      <h2>Decided</h2>
-      {decided.length === 0 ? (
+      {view === "decided" ? (decided.length === 0 ? (
         <div className="empty">
           <p className="muted">No request has been decided yet.</p>
         </div>
@@ -134,7 +141,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Sea
             </tbody>
           </table>
         </div>
-      )}
+      )) : null}
     </Shell>
   );
 }

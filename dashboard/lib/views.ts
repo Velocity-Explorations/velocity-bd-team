@@ -4,7 +4,7 @@
 
 export type CallView = "needs-review" | "top10" | "due-soon" | "judges-agree" | "judges-disagree" | "new";
 export type CallCard = CallView | "all";
-export type AutomationPage = "requests" | "runs" | "judges";
+export type AutomationPage = "requests" | "decided" | "runs" | "problems" | "judges";
 
 /** One card: its band, number and line, where it goes, and whether it is the open view. */
 export type ViewCard = {
@@ -111,43 +111,32 @@ export function callViewCards(input: {
   }));
 }
 
-/** Automation's cards: Agent update requests (the count that needs the viewer), Scans, Judges agree. */
+/** Automation's cards (PRO-573): Agent update requests (the count that needs the viewer), Decided
+ *  requests, Scans, Scan problems, Judges agree. */
 export function automationCards(input: {
   current: AutomationPage;
   waiting: number;
   kinds: string;
+  decided: number;
   runs: number;
   lastRun: string;
+  problems: number;
   agree: { both: number; agree: number } | null;
 }): ViewCard[] {
   const { agree } = input;
+  const card = (key: AutomationPage, label: string, href: string, count: number | string, description: string, needsYou = false): ViewCard =>
+    ({ key, label, href, count, description, current: input.current === key, needsYou });
   return [
-    {
-      key: "requests",
-      label: "Agent update requests",
-      count: input.waiting,
-      description: input.waiting ? input.kinds : "nothing waiting",
-      href: "/requests",
-      current: input.current === "requests",
-      needsYou: true,
-    },
-    {
-      key: "runs",
-      label: "Scans",
-      count: input.runs,
-      description: input.runs ? input.lastRun : "no scans yet",
-      href: "/runs",
-      current: input.current === "runs",
-      needsYou: false,
-    },
-    {
-      key: "judges",
-      label: "Judges agree",
-      count: agree && agree.both ? `${Math.round((100 * agree.agree) / agree.both)}%` : "none",
-      description: agree && agree.both ? `${agree.agree} of ${agree.both} calls` : "no call judged by both yet",
-      href: "/judges",
-      current: input.current === "judges",
-      needsYou: false,
-    },
+    card("requests", "Agent update requests", "/requests", input.waiting, input.waiting ? input.kinds : "nothing waiting", true),
+    card("decided", "Decided requests", "/requests?view=decided", input.decided, input.decided ? "the last 50, with their result" : "none decided yet"),
+    card("runs", "Scans", "/runs", input.runs, input.runs ? input.lastRun : "no scans yet"),
+    card("problems", "Scan problems", "/runs?view=problems", input.problems, input.problems ? "timeouts and errors" : "no timeouts or errors"),
+    card(
+      "judges",
+      "Judges agree",
+      "/judges",
+      agree && agree.both ? `${Math.round((100 * agree.agree) / agree.both)}%` : "none",
+      agree && agree.both ? `${agree.agree} of ${agree.both} calls` : "no call judged by both yet",
+    ),
   ];
 }

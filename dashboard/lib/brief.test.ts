@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { closesText, judgesSentence, parseBrief, parseTop, weekLabel } from "./brief.ts";
+import { boardHref, closesText, judgesSentence, parseBrief, parseTop, weekLabel } from "./brief.ts";
 
 const portalBody = JSON.stringify({
   portal: "Vulcan SOF",
@@ -78,4 +78,9 @@ test("judgesSentence reads like the Slack summary's line", () => {
     "Judges against your decisions, counting only verdicts given before you decided: Claude matched 2 of 3 (0 misses, 1 false alarm); Grok matched 0 of 1 (1 miss, 0 false alarms).",
   );
   assert.equal(judgesSentence([]), "");
+});
+
+test("each portal's board links to that portal's calls (PRO-573)", () => {
+  assert.equal(boardHref("SAM.gov"), "/calls?portal=SAM.gov");
+  assert.equal(boardHref("SSC Front Door"), "/calls?portal=SSC+Front+Door");
 });

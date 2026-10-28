@@ -166,5 +166,8 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     the reasons and notes panels behind 20px note buttons, header menus with sorts in words,
     keyword search and Hide column, and the Top 10 focus from Home. All calls' Notes column is
     gone; notes open from the Votes cell.
+  - Phase 3c, part 1 (PRO-573): Automation has its five views (Decided requests and Scan problems
+    added, Scans with a Portals filter and a sortable Started column), and the past weekly briefs
+    page has a breadcrumb home, the Top 10 table as on Home, and boards that link their portal's calls.
 
 ## Known breakages
