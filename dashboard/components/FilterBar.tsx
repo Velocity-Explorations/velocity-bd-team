@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Settings2 } from "lucide-react";
 import { MenuLinks, type MenuGroup } from "@/components/HeaderCell";
 import { choiceLinks, filterHref, type CallState, type Params, type PortalOption } from "@/lib/filters";
 import { optionGroups, type TagOption } from "@/lib/tags";
@@ -26,7 +26,8 @@ function Kept({ params, except }: { params: Params; except: string }) {
 /**
  * The filters that span the whole table, in a row above it (PRO-558): title search on All calls,
  * portals, tag, and open or closed. Choices apply at once; the Portals menu applies when it closes
- * (MenuController), or with its Apply button. Column filters live in the column headers.
+ * (MenuController), or with its Apply button. Column filters live in the column headers. At the right,
+ * the count line and Table settings (PRO-570).
  */
 export function FilterBar(props: {
   action: string;
@@ -38,6 +39,8 @@ export function FilterBar(props: {
   state: CallState;
   search?: string;
   filtered: boolean;
+  clearHref?: string;
+  summary?: string;
 }) {
   const chosen = props.selected.length === 0 ? "All" : props.selected.length === 1 ? props.selected[0] : `${props.selected.length} chosen`;
   const tagGroups: MenuGroup[] = [
@@ -96,10 +99,15 @@ export function FilterBar(props: {
         ))}
       </nav>
       {props.filtered ? (
-        <a href={props.action} className="reset btn-text">
+        <a href={props.clearHref ?? props.action} className="reset btn-text">
           Clear filters
         </a>
       ) : null}
+      <p className="bar-count">{props.summary ?? ""}</p>
+      <button type="button" className="bar-settings" data-opens="table-settings">
+        <Settings2 aria-hidden="true" />
+        Table settings
+      </button>
     </div>
   );
 }

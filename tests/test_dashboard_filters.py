@@ -31,7 +31,7 @@ def go(page: Any, action: Any) -> None:
 
 
 def test_the_filters_sit_in_a_bar_above_the_table_not_a_side_panel(page: Any) -> None:
-    for path in ("/", "/calls"):
+    for path in ("/review", "/calls"):
         page.goto(URL + path, wait_until="load", timeout=120_000)
         assert page.locator("aside.panel").count() == 0
         bar = page.locator(".filter-bar")
@@ -57,7 +57,7 @@ def test_a_header_menu_filters_its_column_and_the_bar_keeps_that_filter(page: An
     assert "state=open" in page.url and "verdict=no" in page.url
 
 
-@pytest.mark.parametrize("path", ["/", "/calls"])
+@pytest.mark.parametrize("path", ["/review", "/calls"])
 def test_the_portals_menu_lists_every_scanned_portal_with_its_call_count(page: Any, path: str) -> None:
     """A portal that scanned but stored nothing still shows, greyed with 0 (PRO-563)."""
     page.goto(URL + path, wait_until="load", timeout=120_000)
@@ -73,7 +73,7 @@ def test_the_portals_menu_lists_every_scanned_portal_with_its_call_count(page: A
 
 
 def test_the_portals_menu_applies_when_it_closes(page: Any) -> None:
-    page.goto(URL + "/", wait_until="load", timeout=120_000)
+    page.goto(URL + "/review", wait_until="load", timeout=120_000)
     page.wait_for_timeout(800)   # the page's script has loaded
     menu = page.locator(".filter-bar details.menu", has_text="Portals")
     menu.locator("summary").click()

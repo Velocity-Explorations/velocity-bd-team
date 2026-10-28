@@ -37,7 +37,7 @@ function DecisionNow({ decision, users }: { decision: CallDecision | undefined; 
 
 function Empty({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <Shell current="brief">
+    <Shell section="home">
       <div className="page-head">
         <div>
           <h1>Monday brief</h1>
@@ -86,7 +86,7 @@ export default async function BriefPage({ searchParams }: { searchParams: Search
   const judges = top ? judgesSentence(top.judges) : "";
 
   return (
-    <Shell current="brief">
+    <Shell section="home">
       <div className="page-head">
         <div>
           <h1>Monday brief, {weekLabel(week)}</h1>

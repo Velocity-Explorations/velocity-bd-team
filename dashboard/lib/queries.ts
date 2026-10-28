@@ -10,6 +10,7 @@ import type { RequestChoice } from "./requests";
 import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
+import { DUE_SOON_DAYS, type CallView } from "./views";
 
 // ------------------------------------------------------------------------------ calls
 
@@ -102,13 +103,39 @@ async function hasTable(db: Db, name: string): Promise<boolean> {
 }
 
 /**
+ * The calls waiting for a decision: rated yes or maybe and kept by the keyword filter. Per person
+ * (`perPerson`, with the names one person's decisions are recorded under): the calls that person
+ * has not decided. Otherwise: the calls nobody has decided.
+ */
+function waitingWhere(db: Db, perPerson: boolean, waitingFor: string[] | null) {
+  return db`ai_verdict IN ('yes', 'maybe')
+      AND filter_result = 'kept'
+      AND ${perPerson
+        ? db`NOT EXISTS (SELECT 1 FROM decisions AS d WHERE d.call_id = calls.id AND d.decided_by IN ${db(waitingFor ?? [])})`
+        : db`human_status IS NULL`}`;
+}
+
+/** A deadline from today through the next DUE_SOON_DAYS days. */
+function dueSoon(db: Db) {
+  return db`${dueDate(db)} BETWEEN CURRENT_DATE AND CURRENT_DATE + ${DUE_SOON_DAYS}::int`;
+}
+
+/** The bar's filters alone (portals, tag, open or closed): what view card counts follow (VC2). */
+export type BarFilters = Pick<PanelFilters, "portals" | "state" | "tag">;
+
+function barOnly(f: BarFilters): PanelFilters {
+  return { portals: f.portals, state: f.state, tag: f.tag, judges: "", sort: { key: "seen", dir: "desc" } };
+}
+
+/**
  * The triage backlog, newest first unless sorted otherwise. With `waitingFor` (the names one
  * person's decisions are recorded under, while everyone decides every call): the calls that
  * person has not decided. Otherwise, and before migration 004: the calls nobody has decided,
  * the "Triage backlog" query in LEDGER_SCHEMA.md. A call a later keyword change dropped leaves it.
+ * The Due soon view keeps those closing within DUE_SOON_DAYS.
  */
 export async function reviewQueue(
-  f: PanelFilters & { verdict: string; tier: string },
+  f: PanelFilters & { verdict: string; tier: string; view?: CallView },
   waitingFor: string[] | null,
 ): Promise<{ rows: QueueRow[]; perPerson: boolean }> {
   const db = sql();
@@ -117,17 +144,110 @@ export async function reviewQueue(
     SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, due_date,
            match_tier, first_seen_at, extra, human_status
     FROM calls
-    WHERE ai_verdict IN ('yes', 'maybe')
-      AND ${perPerson
-        ? db`NOT EXISTS (SELECT 1 FROM decisions AS d WHERE d.call_id = calls.id AND d.decided_by IN ${db(waitingFor ?? [])})`
-        : db`human_status IS NULL`}
-      AND filter_result = 'kept'
+    WHERE ${waitingWhere(db, perPerson, waitingFor)}
+      ${f.view === "due-soon" ? db`AND ${dueSoon(db)}` : db``}
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
       ${f.tier ? db`AND match_tier = ${f.tier}` : db``}
       ${panelWhere(db, f)}
     ${panelOrder(db, f)}
     LIMIT 500`;
   return { rows: [...rows], perPerson };
+}
+
+/** Needs review's and Due soon's counts under the bar's filters; the column filters do not narrow them. */
+export async function queueCounts(f: BarFilters, waitingFor: string[] | null): Promise<{ waiting: number; dueSoon: number; yes: number }> {
+  const db = sql();
+  const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
+  const [row] = await db<{ waiting: number; due_soon: number; yes: number }[]>`
+    SELECT COUNT(*)::int AS waiting,
+           COUNT(*) FILTER (WHERE ${dueSoon(db)})::int AS due_soon,
+           COUNT(*) FILTER (WHERE ai_verdict = 'yes')::int AS yes
+    FROM calls
+    WHERE ${waitingWhere(db, perPerson, waitingFor)}
+      ${panelWhere(db, barOnly(f))}`;
+  return { waiting: row?.waiting ?? 0, dueSoon: row?.due_soon ?? 0, yes: row?.yes ?? 0 };
+}
+
+/** All calls' count under the bar's filters, for its card. */
+export async function countCalls(f: BarFilters): Promise<number> {
+  const db = sql();
+  const [row] = await db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls WHERE TRUE ${panelWhere(db, barOnly(f))}`;
+  return row?.n ?? 0;
+}
+
+/** Pursued calls still open with no pursuit yet: Proposals to draft (P2). */
+export async function countToDraft(): Promise<number> {
+  const db = sql();
+  const pursuits = await hasTable(db, "pursuits");
+  const [row] = await db<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n FROM calls
+    WHERE human_status = 'pursue' AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
+      ${pursuits ? db`AND NOT EXISTS (SELECT 1 FROM pursuits AS p WHERE p.call_id = calls.id)` : db``}`;
+  return row?.n ?? 0;
+}
+
+/** Calls marked Submitted with no result recorded yet: Submitted and waiting (P4). */
+export async function countSubmittedWaiting(): Promise<number> {
+  const db = sql();
+  const pursuits = await hasTable(db, "pursuits");
+  const [row] = await db<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n FROM calls
+    WHERE human_status = 'submitted'
+      ${pursuits ? db`AND NOT EXISTS (SELECT 1 FROM pursuits AS p WHERE p.call_id = calls.id AND p.result IS NOT NULL)` : db``}`;
+  return row?.n ?? 0;
+}
+
+/** Workspace steps ready for their owner, among these names (the viewer's), on pursuits being worked. */
+export async function countStepsReadyFor(names: string[]): Promise<number> {
+  if (names.length === 0) return 0;
+  const db = sql();
+  if (!(await hasTable(db, "pursuits"))) return 0;
+  const [row] = await db<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n
+    FROM pursuit_steps AS s JOIN pursuits AS p ON p.id = s.pursuit_id
+    WHERE s.state = 'ready' AND p.state = 'working' AND p.owner IN ${db(names)}`;
+  return row?.n ?? 0;
+}
+
+export type TopTenRow = {
+  id: string;
+  portal: string;
+  title: string | null;
+  url: string | null;
+  due_date: string | null;
+  days_left: number | null;
+  description: string | null;
+  ai_verdict: string | null;
+  ai_reasoning: string | null;
+  human_status: string | null;
+  human_by: string | null;
+};
+
+/** Home's Top 10 rows for these calls, as the ledger has them now; the caller keeps the order. */
+export async function topTenRows(ids: string[]): Promise<TopTenRow[]> {
+  if (ids.length === 0) return [];
+  const db = sql();
+  const rows = await db<TopTenRow[]>`
+    SELECT id, portal, title, url, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, description,
+           ai_verdict, ai_reasoning, human_status, human_by
+    FROM calls WHERE id IN ${db(ids)}`;
+  return [...rows];
+}
+
+/**
+ * The live ranking Home shows before the first Monday brief (H2): open calls nobody has decided,
+ * rated yes or maybe and kept, yes before maybe, then the nearest deadline, then the newest.
+ */
+export async function liveTopTen(): Promise<string[]> {
+  const db = sql();
+  const rows = await db<{ id: string }[]>`
+    SELECT id FROM calls
+    WHERE ${waitingWhere(db, false, null)}
+      AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
+      AND (${dueDate(db)} >= CURRENT_DATE OR ${dueDate(db)} IS NULL)
+    ORDER BY CASE ai_verdict WHEN 'yes' THEN 0 ELSE 1 END, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id
+    LIMIT 10`;
+  return rows.map((r) => r.id);
 }
 
 /** "New calls this week" from LEDGER_SCHEMA.md, as a count. */
@@ -538,6 +658,20 @@ export type RunRow = {
   log_path: string | null;
   dry_run: number;
 };
+
+/** The newest real scan that completed, for the Scans card and Home's status line. */
+export async function lastCompletedRun(): Promise<RunRow | null> {
+  const [row] = await sql()<RunRow[]>`
+    SELECT id, component, portal, started_at, finished_at, status, stage_counts, error, log_path, dry_run
+    FROM runs WHERE status = 'completed' AND dry_run = 0 ORDER BY id DESC LIMIT 1`;
+  return row ?? null;
+}
+
+/** How many real scans have run (dry runs left out), for the Scans card. */
+export async function countRuns(): Promise<number> {
+  const [row] = await sql()<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM runs WHERE dry_run = 0`;
+  return row?.n ?? 0;
+}
 
 export async function listRuns(limit = 100): Promise<RunRow[]> {
   const rows = await sql()<RunRow[]>`

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AutomationCards } from "@/components/AutomationCards";
 import { Shell } from "@/components/Shell";
 import { TitleLink } from "@/components/bits";
 import { agreementText, JUDGES } from "@/lib/judges";
@@ -28,17 +29,16 @@ export default async function JudgesPage() {
   const name = (by: string) => displayPerson(by, users);
 
   return (
-    <Shell current="judges">
-      <div className="page-head">
-        <div>
-          <h1>Judges</h1>
-          <p className="muted">
-            How Claude and Grok compare with your decisions. Pursue and submitted count as yes, not relevant and
-            dismissed as no. A verdict counts only if the judge gave it before anyone decided the call, because decided
-            calls become examples in the judges&apos; prompt.
-            {agreement && agreement.both ? ` ${agreementText(agreement.both, agreement.agree)}` : ""}
-          </p>
-        </div>
+    <Shell section="automation">
+      <h1 className="sr-only">Judges</h1>
+      <AutomationCards current="judges" />
+      <div className="lead-line">
+        <p className="muted">
+          How Claude and Grok compare with your decisions. Pursue and submitted count as yes, not relevant and dismissed as
+          no. A verdict counts only if the judge gave it before anyone decided the call, because decided calls become examples
+          in the judges&apos; prompt.
+          {agreement && agreement.both ? ` ${agreementText(agreement.both, agreement.agree)}` : ""}
+        </p>
       </div>
 
       {records === null || rows === null ? (

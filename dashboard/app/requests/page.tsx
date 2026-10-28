@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { decideRequestAction } from "@/app/actions";
+import { AutomationCards } from "@/components/AutomationCards";
 import { Shell } from "@/components/Shell";
 import { Badge, Flash } from "@/components/bits";
 import { formatTime } from "@/lib/format";
@@ -49,21 +50,17 @@ export default async function RequestsPage({ searchParams }: { searchParams: Sea
   const tz = displayTimeZone();
 
   return (
-    <Shell current="requests">
-      <div className="page-head">
-        <div>
-          <h1>Requests</h1>
-          <p className="muted">
-            Changes the portal assistant was asked to make. Nothing changes until someone approves a request here; the
-            scan machine then carries it out {APPLY_WHEN}.
-          </p>
-        </div>
-        <dl className="stats">
-          <div>
-            <dt>Waiting</dt>
-            <dd>{waiting.length}</dd>
-          </div>
-        </dl>
+    <Shell section="automation">
+      <h1 className="sr-only">Agent update requests</h1>
+      <AutomationCards current="requests" />
+      <div className="lead-line">
+        <p className="muted">
+          Changes the portal assistant was asked to make. Nothing changes until someone approves a request here; the scan machine
+          then carries it out {APPLY_WHEN}.
+        </p>
+        <p className="bar-count">
+          {waiting.length} {waiting.length === 1 ? "request" : "requests"} waiting
+        </p>
       </div>
 
       <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} />

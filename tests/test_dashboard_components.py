@@ -54,7 +54,7 @@ def test_a_menu_takes_focus_moves_with_arrows_and_hands_focus_back(page: Any) ->
 
 def test_the_settings_dialog_returns_focus_to_its_button(page: Any) -> None:
     open_calls(page)
-    button = page.get_by_role("button", name="Settings")
+    button = page.locator(".filter-bar").get_by_role("button", name="Table settings")
     button.click()
     dialog = page.locator("dialog.settings")
     assert dialog.evaluate("d => d.open")

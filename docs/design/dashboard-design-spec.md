@@ -322,7 +322,7 @@ Today's accessibility basics stay, and the dashboard's words follow David's writ
 | A5 | Badges never carry meaning by colour alone: the word (yes, members only, judges disagree) is always written. |
 | W1 | No en dash or em dash anywhere in the interface. Use a comma, a colon, parentheses, a plain hyphen, or the word to for ranges. |
 | W2 | Plain, specific labels in sentence case; decisions are verbs or states (Pursue, Not relevant, Submitted, Dismiss). No emoji as decoration. |
-| W3 | Messages say what happened and what to do next in one sentence, for example Choose who you are (top right) before deciding. |
+| W3 | Messages say what happened and what to do next in one sentence, for example Log in (top right) before deciding. |
 
 ## Build constraints
 

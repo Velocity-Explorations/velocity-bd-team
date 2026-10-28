@@ -12,7 +12,7 @@ export default async function ProposalsPage() {
   const decided = rates.reduce((sum, r) => sum + r.decided, 0);
 
   return (
-    <Shell current="proposals">
+    <Shell section="proposals">
       <div className="page-head">
         <div>
           <h1>Proposals</h1>

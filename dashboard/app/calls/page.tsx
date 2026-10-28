@@ -1,22 +1,25 @@
 import type { Metadata } from "next";
-import { decide } from "../actions";
+import { decide } from "@/app/actions";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
 import { JudgeVerdicts } from "@/components/Judges";
 import { Shell } from "@/components/Shell";
+import { ViewCards } from "@/components/ViewCards";
 import { Badge, Details, Flash, TitleLink } from "@/components/bits";
 import { callDetails, deadlineNote, noDeadlineLabel } from "@/lib/details";
-import { displayPerson } from "@/lib/people";
+import { aliasesFor, displayPerson } from "@/lib/people";
 import { choiceLinks, filterHref, JUDGE_CHOICES, pickMany, pickSort, pickState, sortLink, sortParams, type Params } from "@/lib/filters";
 import { formatDue, formatTime } from "@/lib/format";
-import { agreementText, pickJudgeFilter, verdictsFor } from "@/lib/judges";
-import { decisionsOn, judgeAgreement, latestJudgments, listCalls, portals, tagOptions, tagsOn, type CallFilters } from "@/lib/queries";
+import { dayMonth } from "@/lib/home";
+import { pickJudgeFilter, verdictsFor } from "@/lib/judges";
+import { decisionsOn, latestJudgments, listCalls, portals, queueCounts, tagOptions, tagsOn, type CallFilters } from "@/lib/queries";
 import { tagsByCall, withoutTags } from "@/lib/tags";
 import { peopleSplit, votesByCall } from "@/lib/scoreboard";
 import { shows } from "@/lib/columns";
-import { displayTimeZone, hiddenColumns } from "@/lib/settings";
+import { displayTimeZone, hiddenColumns, queueMode } from "@/lib/settings";
 import { firstParam, isClosed, parseNoteLine } from "@/lib/text";
 import { DECISIONS, FILTER_RESULTS, HUMAN_STATUSES, isDecision, pickAllowed, STATUS_LABELS, VERDICTS } from "@/lib/values";
+import { callViewCards, DUE_SOON_DAYS } from "@/lib/views";
 import { allowlist, currentViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -47,13 +50,15 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
     q: firstParam(sp.q, 120),
     tag: pickAllowed(sp.tag, tagChoices.map((t) => t.name)),
   };
-  const [{ rows, total }, agreement] = await Promise.all([listCalls(filters, LIMIT), judgeAgreement()]);
+  const viewer = await currentViewer();
+  const users = allowlist();
+  const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
+  const [{ rows, total }, counts] = await Promise.all([listCalls(filters, LIMIT), queueCounts(filters, waitingFor)]);
   const ids = rows.map((r) => r.id);
-  const [judged, decisions, viewer, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(ids), currentViewer(), tagsOn(ids)]);
+  const [judged, decisions, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids)]);
   const tagsFor = tagsByCall(tagRows);
   const tz = displayTimeZone();
-  const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Settings
-  const users = allowlist();
+  const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Table settings
   const votes = votesByCall(decisions, (by) => displayPerson(by, users));
   // The view as link params: every bar control, header and decision keeps the rest of it.
   const params: Params = {
@@ -71,20 +76,18 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
   const returnTo = filterHref("/calls", params);
 
   return (
-    <Shell current="calls">
-      <div className="page-head">
-        <div>
-          <h1>All calls</h1>
-          <p className="muted">
-            Every call the scanner has seen, including the ones the filter or the reviewer ruled out.{" "}
-            <span className="num">
-              Showing {rows.length} of {total}
-            </span>
-            {total > rows.length ? ". Narrow the filters to see the rest." : "."}
-            {agreement && agreement.both ? ` ${agreementText(agreement.both, agreement.agree)}` : ""}
-          </p>
-        </div>
-      </div>
+    <Shell section="calls">
+      <h1 className="sr-only">All calls</h1>
+      <ViewCards
+        label="Calls views"
+        cards={callViewCards({
+          current: "all",
+          params: { portal: filters.portals, state: filters.state, tag: filters.tag },
+          counts: { "needs-review": counts.waiting, "due-soon": counts.dueSoon, all: total },
+          perPerson: Boolean(waitingFor),
+          dueBy: dayMonth(new Date(Date.now() + DUE_SOON_DAYS * 24 * 3600 * 1000), tz),
+        })}
+      />
 
       <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} />
 
@@ -98,6 +101,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
         state={filters.state}
         search={filters.q}
         filtered={filtered}
+        summary={`Showing ${rows.length} of ${total}${total > rows.length ? ", narrow the filters to see the rest" : ""}`}
       />
 
       <section>

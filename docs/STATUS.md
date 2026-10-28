@@ -152,6 +152,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     it now matches every migration, and a test keeps it so.
   - Phase 2a (PRO-569): every page wears the dark BD Team theme from the handoff (tokens, fonts,
     Lucide icons, buttons, badges, tags, menus, notices, tooltips, tables, fields), with no change
-    in what the pages do. The top bar keeps its seven links until the shell and Home land together.
+    in what the pages do.
+  - Phases 2b and 3a (PRO-570): the top bar has four sections (Home, Calls, Proposals, Automation)
+    with count chips, and the account menu replaces the Deciding as picker. Home is at `/` (five
+    link cards, the Top 10, the status line). The queue moved to `/review`, with a Due soon view.
+    Each section opens on view cards in place of a title. Calls' other views, Automation's
+    Decided requests and Scan problems, and Profile settings come with phases 3b and 3c.
 
 ## Known breakages
