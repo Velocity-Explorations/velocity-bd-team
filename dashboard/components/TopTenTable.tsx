@@ -1,16 +1,17 @@
 import { ArrowRight } from "lucide-react";
+import { DraftBadge } from "@/components/DraftBadge";
 import { PortalLogo } from "@/components/PortalLogo";
 import { Badge, TitleLink } from "@/components/bits";
 import { formatDue } from "@/lib/format";
 import { daysLeftText, topTenOrder } from "@/lib/home";
 import { verdictsFor } from "@/lib/judges";
-import { latestJudgments, topTenRows } from "@/lib/queries";
+import { draftsFor, latestJudgments, topTenRows } from "@/lib/queries";
 
 /**
  * The Top 10 table Home and the past weekly briefs share (H2, PRO-570, PRO-573): rank, logo, title
  * and portal, the deadline and days left, both verdicts, the decision now, the description (Home
- * only) and Claude's reason, each as the ledger has them now. A row opens Calls, Top 10 with that
- * call focused.
+ * only) and Claude's reason, each as the ledger has them now; a call with a draft shows its badge
+ * (DB1). A row opens Calls, Top 10 with that call focused.
  */
 export async function TopTenTable({ ids, description, tz, nameOf }: {
   ids: string[];
@@ -21,7 +22,7 @@ export async function TopTenTable({ ids, description, tz, nameOf }: {
   const rows = await topTenRows(ids);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const order = topTenOrder(ids, new Set(byId.keys()));
-  const judged = await latestJudgments(order);
+  const [judged, drafts] = await Promise.all([latestJudgments(order), draftsFor(order)]);
   if (order.length === 0) {
     return (
       <div className="empty">
@@ -53,6 +54,7 @@ export async function TopTenTable({ ids, description, tz, nameOf }: {
             const call = byId.get(id)!;
             const verdicts = verdictsFor(judged.get(id), call.ai_verdict, call.ai_reasoning);
             const text = (call.description ?? "").trim();
+            const draft = drafts.get(id);
             return (
               <tr
                 key={id}
@@ -68,6 +70,7 @@ export async function TopTenTable({ ids, description, tz, nameOf }: {
                     <div>
                       <TitleLink title={call.title} url={call.url} fallback={call.id} />
                       <div className="meta">{call.portal}</div>
+                      {draft ? <DraftBadge draft={draft} nameOf={nameOf} /> : null}
                     </div>
                   </div>
                 </td>

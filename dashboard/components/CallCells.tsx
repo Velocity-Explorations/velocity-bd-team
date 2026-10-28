@@ -1,6 +1,7 @@
 // The cells Needs review and All calls share (PRO-571, PRO-572): the Call cell, Votes, Description and Due.
 
 import { MessageSquareText } from "lucide-react";
+import type { ReactNode } from "react";
 import { PortalLogo } from "@/components/PortalLogo";
 import { panelId } from "@/components/RowPanels";
 import { Badge, Details, TitleLink } from "@/components/bits";
@@ -18,15 +19,17 @@ type CallFields = Parameters<typeof callDetails>[0] & { id: string; portal: stri
 
 /**
  * The Call cell: the portal's logo tile, the title linked to the portal's page, the details line (the
- * portal, then the facts the portal gives, separated by dots), the badges line (with Top 10, #N for a
- * call in this week's Top 10), the tags line, and, below 1280px, Claude's reason folded under it.
+ * portal, then the facts the portal gives, separated by dots), the draft badge on its own line (DB1),
+ * the badges line (with Top 10, #N for a call in this week's Top 10), the tags line, and, below
+ * 1280px, Claude's reason folded under it.
  */
-export function CallCell({ row, tags, details, reason, topRank }: {
+export function CallCell({ row, tags, details, reason, topRank, draft }: {
   row: CallFields;
   tags: TagBadge[];
   details: boolean;
   reason: string | null;
   topRank?: number;
+  draft?: ReactNode;
 }) {
   const { facts, badges } = splitDetails<Detail>(withoutTags(callDetails(row), tags));
   const closed = isClosed(row.extra);
@@ -40,6 +43,7 @@ export function CallCell({ row, tags, details, reason, topRank }: {
             <span>{row.portal}</span>
             {details ? <Details items={facts} /> : null}
           </div>
+          {draft ?? null}
           {closed || badges.length || topRank ? (
             <div className="meta badges">
               {topRank ? <span className="badge tone-grey">Top 10, #{topRank}</span> : null}

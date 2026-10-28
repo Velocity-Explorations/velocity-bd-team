@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
 import { aliasesFor } from "@/lib/people";
 import { profileFromForm } from "@/lib/profile";
-import { decideCall, decideRequest, deleteProfile, portals, saveProfile, tagOptions, type DecideRequestResult, type DecideResult } from "@/lib/queries";
+import { FORMATS } from "@/lib/proposals";
+import { decideCall, decideRequest, deleteProfile, portals, saveProfile, startPursuit, tagOptions, type DecideRequestResult, type DecideResult, type StartResult } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
 import { decidedNotice, fromQueue, safeReturnTo } from "@/lib/text";
 import { isDecision, STATUS_LABELS } from "@/lib/values";
@@ -35,7 +36,9 @@ function backTo(returnTo: string, key: "notice" | "error", message: string, vote
 export async function decide(formData: FormData): Promise<void> {
   const returnTo = safeReturnTo(formData.get("return_to"));
   const id = String(formData.get("id") ?? "").trim();
-  const status = formData.get("status");
+  const asked = formData.get("status");
+  const thenDraft = asked === "pursue_draft";   // the Decide menu's Pursue and start the draft (Q9)
+  const status = thenDraft ? "pursue" : asked;
   const expectedField = String(formData.get("expected") ?? "");
   const note = String(formData.get("note") ?? "").slice(0, MAX_NOTE_CHARS);
   if (!id || !isDecision(status)) backTo(returnTo, "error", "Choose a decision first.");
@@ -58,6 +61,7 @@ export async function decide(formData: FormData): Promise<void> {
     const stays = result.callStatus && result.callStatus !== status ? ` The call stays ${STATUS_LABELS[result.callStatus]}.` : "";
     const queue = fromQueue(returnTo);
     const notice = decidedNotice(result.plan, STATUS_LABELS[status], result.title, stays, queue);
+    if (thenDraft && result.callStatus === "pursue") backTo(`/proposals?start=${encodeURIComponent(id)}`, "notice", `${notice} Start the draft below.`);
     backTo(returnTo, "notice", notice, queue && result.plan !== "note" ? result.title : undefined);
   }
   backTo(returnTo, "error", result.reason);
@@ -156,4 +160,35 @@ export async function resetProfileAction(): Promise<void> {
   await deleteProfile(viewer);
   revalidatePath("/", "layout");
   backTo("/profile", "notice", "Your profile is back to the defaults.");
+}
+
+/**
+ * Start the draft (P6, PRO-576): the viewer becomes the owner; the people working with them come from
+ * DASHBOARD_USERS. Refusals come back as the page's notice.
+ */
+export async function startDraftAction(formData: FormData): Promise<void> {
+  const returnTo = safeReturnTo(formData.get("return_to"), "/proposals");
+  const viewer = await currentViewer();
+  if (!viewer) backTo(returnTo, "error", "Log in (top right) before starting a draft.");
+  const callId = String(formData.get("call_id") ?? "").trim();
+  if (!callId) backTo(returnTo, "error", "Choose a call to draft first.");
+  const asked = String(formData.get("format") ?? "");
+  const names = allowlist().map((p) => p.name);
+  let result: StartResult;
+  try {
+    result = await startPursuit({
+      callId,
+      owner: viewer,
+      format: FORMATS.includes(asked) ? asked : FORMATS[0],
+      approvalMode: formData.get("approval_mode") === "key_gates" ? "key_gates" : "every_step",
+      direction: String(formData.get("direction") ?? "").slice(0, MAX_NOTE_CHARS),
+      collaborators: [...new Set(formData.getAll("with").map(String))].filter((name) => names.includes(name) && name !== viewer),
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
+    backTo(returnTo, "error", `Could not start the draft: ${detail}`);
+  }
+  revalidatePath("/", "layout");
+  if (result.ok) backTo("/proposals?view=drafting", "notice", `Started the draft for ${result.title}. Discovery is queued for the worker.`);
+  backTo(returnTo, "error", result.reason);
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CallCell, DescriptionCell, DueCell, VotesCell } from "@/components/CallCells";
 import { DecideCell } from "@/components/DecideCell";
+import { DraftBadge } from "@/components/DraftBadge";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
 import { NotesPanel, ReasonsPanel } from "@/components/RowPanels";
@@ -14,7 +15,7 @@ import { yourVote } from "@/lib/decide";
 import { callDetails, deadlineNote } from "@/lib/details";
 import { detailSources } from "@/lib/description";
 import { choiceLinks, filterHref, JUDGE_CHOICES, pickMany, pickSort, pickState, sortChoices, sortLink, sortParams, type Params, type Sort } from "@/lib/filters";
-import { formatTime } from "@/lib/format";
+import { formatDue, formatTime } from "@/lib/format";
 import { dayMonth } from "@/lib/home";
 import { pickJudgeFilter, verdictsFor, type JudgeFilter } from "@/lib/judges";
 import { aliasesFor, displayPerson } from "@/lib/people";
@@ -22,6 +23,7 @@ import {
   countAmong,
   countCalls,
   decisionsOn,
+  draftsFor,
   judgeAgreement,
   latestJudgments,
   portals,
@@ -32,7 +34,8 @@ import {
   topTenIds,
 } from "@/lib/queries";
 import { votesByCall } from "@/lib/scoreboard";
-import { defaultsRedirect, labeler, timeZone } from "@/lib/me";
+import { defaultsRedirect, drafting, labeler, timeZone } from "@/lib/me";
+import { draftBlock, draftFormat } from "@/lib/proposals";
 import { hiddenColumns, queueMode } from "@/lib/settings";
 import { tagsByCall } from "@/lib/tags";
 import { firstParam, parseNoteLine, votedHref } from "@/lib/text";
@@ -132,7 +135,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
     ? [...queue.rows].sort((a, b) => top.ids.indexOf(a.id) - top.ids.indexOf(b.id))
     : queue.rows;
   const ids = rows.map((r) => r.id);
-  const [judged, decisions, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids)]);
+  const [judged, decisions, tagRows, drafts, { readiness }] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids), draftsFor(ids), drafting()]);
   const tagsFor = tagsByCall(tagRows);
   const votes = votesByCall(decisions, (by) => displayPerson(by, users));   // by the name decisions are recorded under
   const label = await labeler();
@@ -271,6 +274,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
                   const verdicts = verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning);
                   const focused = r.id === focusId;
                   const rank = top.ids.indexOf(r.id);
+                  const draft = drafts.get(r.id);
                   return [
                     <tr
                       key={r.id}
@@ -285,6 +289,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
                         details={show("details")}
                         reason={show("reason") ? r.ai_reasoning : null}
                         topRank={rank >= 0 ? rank + 1 : undefined}
+                        draft={draft ? <DraftBadge draft={draft} nameOf={nameOf} /> : null}
                       />
                       {show("votes") ? (
                         <VotesCell
@@ -309,6 +314,9 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
                         keep={perPerson || Boolean(r.human_status)}
                         note={show("note")}
                         tz={tz}
+                        draft={draft}
+                        drafting={readiness !== "not set up"}
+                        start={{ portal: r.portal, due: formatDue(r.due_date, tz), format: draftFormat(r.type), block: draftBlock(r) }}
                       />
                     </tr>,
                     <ReasonsPanel

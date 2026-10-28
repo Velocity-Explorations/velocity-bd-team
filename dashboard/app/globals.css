@@ -2102,6 +2102,87 @@ td.draft-cell .btn {
   font-size: 12.5px;
 }
 
+/* ------------------------------------------------------------------ Start the draft (P6) */
+
+dialog.start-draft {
+  width: min(760px, calc(100vw - 48px));
+}
+
+.draft-groups {
+  display: grid;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.start-draft fieldset.field {
+  padding: 0;
+  border: 0;
+}
+
+.draft-groups > p {
+  margin: 0;
+}
+
+.start-draft .hint {
+  font: var(--type-small);
+  color: var(--ink-3);
+}
+
+.start-draft select {
+  width: 100%;
+  max-width: 360px;
+  height: var(--field-height);
+}
+
+.start-draft textarea {
+  width: 100%;
+}
+
+.draft-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 0;
+  font: var(--type-small);
+}
+
+.draft-folder {
+  margin: 0;
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+.draft-folder code {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* A call's draft badge on its own line under its details; it opens a menu (DB1 to DB3). */
+.draft-line {
+  margin-top: 4px;
+}
+
+.draft-badge > summary.badge {
+  cursor: pointer;
+}
+
+.draft-badge .menu-body {
+  display: grid;
+  gap: 2px;
+  min-width: 16rem;
+}
+
+/* Start the draft, or Open workspace with the step, under the Decide menu (Q17). */
+.draft-action {
+  margin-top: 6px;
+}
+
+.draft-action button,
+.draft-action .btn {
+  height: var(--control-height-small);
+  font-size: 12.5px;
+}
+
 /* ------------------------------------------------------------------ Profile settings */
 
 .lead-text {

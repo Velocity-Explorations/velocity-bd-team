@@ -90,7 +90,7 @@ def first_row(page: Any) -> Any:
     return page.locator("table.calls-table tbody tr[data-call-id]").first
 
 
-def test_the_decide_menu_lists_the_four_decisions_and_the_draft_waits(page: Any) -> None:
+def test_the_decide_menu_lists_the_four_decisions_and_the_draft_waits_for_the_worker(page: Any) -> None:
     open_page(page, "/review")
     if page.locator("table.calls-table").count() == 0:
         pytest.skip("nothing is waiting, so the queue has no table")
@@ -98,7 +98,8 @@ def test_the_decide_menu_lists_the_four_decisions_and_the_draft_waits(page: Any)
     menu.locator("summary").click()
     items = [t.strip() for t in menu.locator(".menu-body button").all_inner_texts()]
     assert items == ["Pursue", "Not relevant", "Submitted", "Dismiss", "Pursue and start the draft"]
-    assert menu.locator(".menu-body button", has_text="Pursue and start the draft").is_disabled()
+    waiting = "Drafting is not set up yet" in menu.locator(".menu-body .hint").inner_text()
+    assert menu.locator(".menu-body button", has_text="Pursue and start the draft").is_disabled() == waiting
     page.keyboard.press("Escape")   # closes the menu without deciding
     assert not menu.evaluate("m => m.open")
 
@@ -142,7 +143,7 @@ def test_hide_column_hides_it_until_table_settings_resets(page: Any) -> None:
     page.reload(wait_until="load")
     hidden = headers(page)
     page.locator(".filter-bar").get_by_role("button", name="Table settings").click()
-    page.locator("dialog.settings").get_by_role("button", name="Reset to defaults").click()
+    page.locator("dialog#table-settings").get_by_role("button", name="Reset to defaults").click()
     page.wait_for_timeout(2000)
     page.reload(wait_until="load")
     assert "Description" not in hidden

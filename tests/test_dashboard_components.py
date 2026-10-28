@@ -56,7 +56,7 @@ def test_the_settings_dialog_returns_focus_to_its_button(page: Any) -> None:
     open_calls(page)
     button = page.locator(".filter-bar").get_by_role("button", name="Table settings")
     button.click()
-    dialog = page.locator("dialog.settings")
+    dialog = page.locator("dialog#table-settings")
     assert dialog.evaluate("d => d.open")
     assert dialog.evaluate("d => d.contains(document.activeElement)")
     page.keyboard.press("Escape")

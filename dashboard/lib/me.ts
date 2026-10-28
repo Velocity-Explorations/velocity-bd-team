@@ -4,7 +4,8 @@ import { headers } from "next/headers";
 import { cache } from "react";
 import { initials } from "./nav";
 import { callsHref, isFreshArrival, isValidTimeZone, parseDefaultFilters, withDefaultFilters, type DefaultFilters } from "./profile";
-import { allProfiles, type ProfileRow } from "./queries";
+import { workerReadiness } from "./proposals";
+import { allProfiles, workerStatus, type ProfileRow } from "./queries";
 import { displayTimeZone } from "./settings";
 import { currentViewer } from "./viewer";
 
@@ -60,3 +61,9 @@ export async function defaultsRedirect(path: string, params: Record<string, stri
   if (!filters || !(await freshArrival())) return null;
   return withDefaultFilters(path, params, filters);
 }
+
+/** Whether drafting can start (P8), and when the worker was last seen, once per request. */
+export const drafting = cache(async (): Promise<{ readiness: "ready" | "offline" | "not set up"; seenAt: string | null }> => {
+  const worker = await workerStatus();
+  return { readiness: workerReadiness(worker, new Date()), seenAt: worker?.seen_at ?? null };
+});

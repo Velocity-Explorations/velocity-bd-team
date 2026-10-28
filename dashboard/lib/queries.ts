@@ -12,7 +12,7 @@ import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
 import type { ProfileFields } from "./profile";
-import type { ProposalCall } from "./proposals";
+import { startRefusal, workerReadiness, type ProposalCall } from "./proposals";
 import { DESCRIPTION_READ } from "./description";
 import { STALE_MS } from "./runs";
 import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
@@ -427,6 +427,7 @@ export async function decideCall(input: {
 }): Promise<DecideResult> {
   const db = sql();
   const history = await hasTable(db, "decisions");
+  const drafts = input.status === "submitted" && (await hasTable(db, "pursuits"));
   const mine = history ? await latestDecisionBy(db, input.id, input.aliases) : null;
   const now = isoNow();
   const line = noteLine(now, input.by, input.note) || null;
@@ -434,6 +435,11 @@ export async function decideCall(input: {
     const [call] = await tx<{ title: string | null; human_status: string | null; human_by: string | null }[]>`
       SELECT title, human_status, human_by FROM calls WHERE id = ${input.id} FOR UPDATE`;
     if (!call) return { ok: false, reason: "That call is no longer in the ledger." };
+    if (drafts) {
+      // A call whose draft is under way is marked submitted at its Submit gate, which records the confirmation (P7).
+      const [working] = await tx`SELECT 1 FROM pursuits WHERE call_id = ${input.id} AND state = 'working'`;
+      if (working) return { ok: false, reason: "This call has a draft under way: mark it submitted at the Submit gate in its workspace." };
+    }
     const current = isDecision(call.human_status) ? call.human_status : null;
     const keep = input.keepCallDecision && history;
     if (current !== input.expected && !keep) {
@@ -846,6 +852,89 @@ export async function proposalCalls(f: BarFilters): Promise<ProposalCall[]> {
     WHERE (calls.human_status IN ('pursue', 'submitted') OR p.id IS NOT NULL)
       ${panelWhere(db, barOnly(f))}`;
   return [...rows];
+}
+
+/** The worker's newest heartbeat (PRO-576), or null when it has never run or migration 008 is missing. */
+export async function workerStatus(): Promise<{ name: string; seen_at: string; state: string } | null> {
+  const db = sql();
+  if (!(await hasTable(db, "workers"))) return null;
+  const [row] = await db<{ name: string; seen_at: string; state: string }[]>`
+    SELECT name, seen_at, state FROM workers ORDER BY seen_at DESC LIMIT 1`;
+  return row ?? null;
+}
+
+/** A call's draft as its badge and the Decide cell show it (DB1 to DB3, Q17). */
+export type DraftInfo = {
+  call_id: string;
+  owner: string;
+  pursuit_state: string;
+  current_step: string | null;
+  step_state: string | null;
+  drive_folder_id: string | null;
+  submitted_at: string | null;
+  submitted_by: string | null;
+  result_expected_by: string | null;
+};
+
+/** The drafts of these calls, by call id; empty before migration 008. */
+export async function draftsFor(callIds: string[]): Promise<Map<string, DraftInfo>> {
+  const found = new Map<string, DraftInfo>();
+  if (callIds.length === 0) return found;
+  const db = sql();
+  if (!(await hasTable(db, "pursuits"))) return found;
+  const rows = await db<DraftInfo[]>`
+    SELECT p.call_id, p.owner, p.state AS pursuit_state, p.current_step, s.state AS step_state, p.drive_folder_id,
+           p.submitted_at, p.submitted_by, p.result_expected_by
+    FROM pursuits AS p
+    LEFT JOIN pursuit_steps AS s
+      ON s.id = (SELECT MAX(x.id) FROM pursuit_steps AS x WHERE x.pursuit_id = p.id AND x.step = p.current_step)
+    WHERE p.call_id IN ${db(callIds)}`;
+  for (const row of rows) found.set(row.call_id, row);
+  return found;
+}
+
+export type StartResult = { ok: true; title: string } | { ok: false; reason: string };
+
+/**
+ * Start the draft (P6, PRO-576): the pursuit, its Discovery step queued for the worker, and the first
+ * line of its history, in one transaction, as ledger/queries.py's start_pursuit writes them. Refused
+ * with the reason (startRefusal) for a second draft, a call marked Not relevant or not pursued, a
+ * closed call, one whose solicitation the worker cannot read, or before the worker has ever run.
+ */
+export async function startPursuit(input: {
+  callId: string;
+  owner: string;
+  format: string;
+  approvalMode: "every_step" | "key_gates";
+  direction: string;
+  collaborators: string[];
+}): Promise<StartResult> {
+  const db = sql();
+  if (!(await hasTable(db, "pursuits"))) return { ok: false, reason: "Drafting needs ledger migration 008." };
+  const readiness = workerReadiness(await workerStatus(), new Date());
+  const now = isoNow();
+  const mode = input.approvalMode === "key_gates" ? "key gates only" : "every step approved";
+  return db.begin(async (tx): Promise<StartResult> => {
+    const [call] = await tx<{ human_status: string | null; extra: string | null; title: string | null }[]>`
+      SELECT human_status, extra, title FROM calls WHERE id = ${input.callId} FOR UPDATE`;
+    if (!call) return { ok: false, reason: "That call is no longer in the ledger." };
+    const [held] = await tx<{ owner: string; created_at: string }[]>`SELECT owner, created_at FROM pursuits WHERE call_id = ${input.callId}`;
+    const refusal = startRefusal(call, held ?? null, readiness);
+    if (refusal) return { ok: false, reason: refusal };
+    const [pursuit] = await tx<{ id: number }[]>`
+      INSERT INTO pursuits (call_id, owner, collaborators, format, approval_mode, direction, current_step, state, created_at, updated_at)
+      VALUES (${input.callId}, ${input.owner}, ${input.collaborators.length ? JSON.stringify(input.collaborators) : null},
+              ${input.format}, ${input.approvalMode}, ${input.direction.trim() || null}, 'discovery', 'working', ${now}, ${now})
+      RETURNING id`;
+    const [step] = await tx<{ id: number }[]>`
+      INSERT INTO pursuit_steps (pursuit_id, step, attempt, state, requested_by, queued_at, updated_at)
+      VALUES (${pursuit.id}, 'discovery', 1, 'queued', ${input.owner}, ${now}, ${now})
+      RETURNING id`;
+    await tx`
+      INSERT INTO pursuit_events (pursuit_id, step_id, at, who, kind, text)
+      VALUES (${pursuit.id}, ${step.id}, ${now}, ${input.owner}, 'started', ${`Started the draft: ${input.format}, ${mode}`})`;
+    return { ok: true, title: call.title ?? input.callId };
+  });
 }
 
 // ------------------------------------------------------------------------------- profiles

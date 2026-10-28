@@ -3,6 +3,8 @@ import { decide } from "@/app/actions";
 import { Badge, toneOf } from "@/components/bits";
 import { decideLabel, dueLine, type VoteLike } from "@/lib/decide";
 import { formatTime } from "@/lib/format";
+import { stepLabel } from "@/lib/proposals";
+import type { DraftInfo } from "@/lib/queries";
 import { DECISIONS, isDecision, STATUS_LABELS } from "@/lib/values";
 
 /**
@@ -18,9 +20,10 @@ export type DecideMode = "waiting" | "mixed" | "all";
  * Add a note was opened. Pursue and start the draft waits for the proposal workspace (P8). Where the
  * view mixes calls you have and have not decided, the cell says which: needs your decision (with
  * when it is due, within 14 days) or You: and your decision. The button carries the accent border
- * on a call waiting for you, and reads Decide, Change or Add yours.
+ * on a call waiting for you, and reads Decide, Change or Add yours. A pursued call with no draft shows
+ * Start the draft; one with a draft, Open workspace with its current step (Q17, PRO-576).
  */
-export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, returnTo, keep, note, tz }: {
+export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, returnTo, keep, note, tz, draft, drafting, start }: {
   call: { id: string; title: string | null; human_status: string | null; human_at?: string | null; days_left: number | null };
   mode: DecideMode;
   viewer: string | null;
@@ -31,6 +34,9 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
   keep: boolean;
   note: boolean;
   tz: string;
+  draft?: DraftInfo | null;
+  drafting: boolean;
+  start: { portal: string; due: string; format: string; block: string | null };
 }) {
   const label = mode === "waiting" ? "Decide" : decideLabel({ yours, callStatus: call.human_status });
   const waitingForYou = mode === "waiting" || (Boolean(viewer) && eligible && !yours);
@@ -78,13 +84,45 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
                 {d.label}
               </button>
             ))}
-            <button type="button" className="menu-item tone-good" disabled>
-              <span className="sq" aria-hidden="true" />
-              Pursue and start the draft
-            </button>
-            <p className="hint">Choosing records it at once. Drafting is not set up yet, so Start the draft waits for it.</p>
+            {draft ? null : (
+              <button type="submit" name="status" value="pursue_draft" className="menu-item tone-good" disabled={!drafting || Boolean(start.block)}>
+                <span className="sq" aria-hidden="true" />
+                Pursue and start the draft
+              </button>
+            )}
+            <p className="hint">
+              {draft || (drafting && !start.block)
+                ? "Choosing records it at once."
+                : !drafting
+                  ? "Choosing records it at once. Drafting is not set up yet, so Start the draft waits for it."
+                  : `Choosing records it at once. Cannot draft: ${start.block}.`}
+            </p>
           </div>
         </details>
+        {draft ? (
+          <div className="draft-action">
+            <a className="btn" href={`/proposals/${encodeURIComponent(call.id)}`}>
+              Open workspace
+            </a>
+            <div className="meta">{stepLabel(draft.current_step)}</div>
+          </div>
+        ) : call.human_status === "pursue" && start.block ? (
+          <div className="draft-action meta">Cannot draft: {start.block}</div>
+        ) : call.human_status === "pursue" ? (
+          <div className="draft-action">
+            <button
+              type="button"
+              className="fn-approve"
+              data-start-draft={call.id}
+              data-title={call.title || call.id}
+              data-portal={start.portal}
+              data-due={start.due}
+              data-format={start.format}
+            >
+              Start the draft
+            </button>
+          </div>
+        ) : null}
         {note ? (
           <details className="add-note">
             <summary className="btn-text">Add a note</summary>
