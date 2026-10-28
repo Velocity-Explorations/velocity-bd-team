@@ -162,5 +162,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     logos, the dotted details line, Votes, Description, and days left. Below 1280px the AI reason
     folds under the call. The Decide menu, the reasons and notes panels, the header menus' search
     and Hide column, and the Top 10 focus from Home follow in part 2.
+  - Phase 3b, part 2 (PRO-572): the Decide menu with your status (needs your decision, or You:),
+    the reasons and notes panels behind 20px note buttons, header menus with sorts in words,
+    keyword search and Hide column, and the Top 10 focus from Home. All calls' Notes column is
+    gone; notes open from the Votes cell.
 
 ## Known breakages

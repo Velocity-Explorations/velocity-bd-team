@@ -1,13 +1,14 @@
-// The cells Needs review and All calls share (PRO-571): the Call cell, Votes, Description and Due.
+// The cells Needs review and All calls share (PRO-571, PRO-572): the Call cell, Votes, Description and Due.
 
-import { JudgeVerdicts } from "@/components/Judges";
+import { MessageSquareText } from "lucide-react";
 import { PortalLogo } from "@/components/PortalLogo";
-import { Details, TitleLink } from "@/components/bits";
+import { panelId } from "@/components/RowPanels";
+import { Badge, Details, TitleLink } from "@/components/bits";
 import { callDetails, deadlineNote, noDeadlineLabel, type Detail } from "@/lib/details";
 import { descriptionCell, splitDetails } from "@/lib/description";
 import { formatDue } from "@/lib/format";
 import { daysLeftText } from "@/lib/home";
-import type { Verdicts } from "@/lib/judges";
+import { JUDGES, judgesConflict, judgesDisagree, type Verdicts } from "@/lib/judges";
 import { peopleSplit, type Vote } from "@/lib/scoreboard";
 import { withoutTags, type TagBadge } from "@/lib/tags";
 import { isClosed } from "@/lib/text";
@@ -17,10 +18,16 @@ type CallFields = Parameters<typeof callDetails>[0] & { id: string; portal: stri
 
 /**
  * The Call cell: the portal's logo tile, the title linked to the portal's page, the details line (the
- * portal, then the facts the portal gives, separated by dots), the badges line, the tags line, and,
- * below 1280px, Claude's reason folded under it.
+ * portal, then the facts the portal gives, separated by dots), the badges line (with Top 10, #N for a
+ * call in this week's Top 10), the tags line, and, below 1280px, Claude's reason folded under it.
  */
-export function CallCell({ row, tags, details, reason }: { row: CallFields; tags: TagBadge[]; details: boolean; reason: string | null }) {
+export function CallCell({ row, tags, details, reason, topRank }: {
+  row: CallFields;
+  tags: TagBadge[];
+  details: boolean;
+  reason: string | null;
+  topRank?: number;
+}) {
   const { facts, badges } = splitDetails<Detail>(withoutTags(callDetails(row), tags));
   const closed = isClosed(row.extra);
   return (
@@ -33,8 +40,9 @@ export function CallCell({ row, tags, details, reason }: { row: CallFields; tags
             <span>{row.portal}</span>
             {details ? <Details items={facts} /> : null}
           </div>
-          {closed || badges.length ? (
+          {closed || badges.length || topRank ? (
             <div className="meta badges">
+              {topRank ? <span className="badge tone-grey">Top 10, #{topRank}</span> : null}
               {closed ? <span className="badge tone-grey">closed</span> : null}
               <Details items={badges} />
             </div>
@@ -51,15 +59,38 @@ export function CallCell({ row, tags, details, reason }: { row: CallFields; tags
   );
 }
 
+function NoteButton({ panel, label }: { panel: string; label: string }) {
+  return (
+    <button type="button" className="note-btn" data-panel={panel} aria-controls={panel} aria-expanded="false" title={label}>
+      <MessageSquareText aria-hidden="true" />
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
 /**
- * Votes: each judge's verdict (Grok's reason behind its toggle; Claude's is the AI reason column), then,
- * under a dashed rule, each person's latest vote, flagged when one said yes and another no. `votes` is
- * null where people's votes are not listed (the queue while one decision settles a call).
+ * Votes: each judge's verdict with a note button that opens the reasons panel, flagged when the
+ * judges disagree; then, under a dashed rule, each person's latest vote, with a note button when they
+ * left a note. `votes` is null where people's votes are not listed.
  */
-export function VotesCell({ verdicts, votes }: { verdicts: Verdicts; votes: Vote[] | null }) {
+export function VotesCell({ callId, verdicts, votes, notesBy }: { callId: string; verdicts: Verdicts; votes: Vote[] | null; notesBy: Set<string> }) {
+  const reasons = panelId("reasons", callId);
   return (
     <td className="votes-cell">
-      <JudgeVerdicts verdicts={verdicts} reasonsFor={["grok"]} />
+      <div className="judges">
+        {JUDGES.map(({ key, label }) => (
+          <div key={key} className="judge">
+            <span className="who">{label}</span>
+            <Badge value={verdicts[key]?.verdict} empty={key === "grok" ? "not yet" : "not reviewed"} />
+            {verdicts[key]?.reasoning ? <NoteButton panel={reasons} label={`${label}'s reason`} /> : null}
+          </div>
+        ))}
+        {judgesConflict(verdicts) ? (
+          <span className="badge tone-bad">judges: yes vs no</span>
+        ) : judgesDisagree(verdicts) ? (
+          <span className="badge tone-warn">judges disagree</span>
+        ) : null}
+      </div>
       {votes ? (
         <div className="people-votes">
           {votes.length ? (
@@ -67,6 +98,7 @@ export function VotesCell({ verdicts, votes }: { verdicts: Verdicts; votes: Vote
               {votes.map((v) => (
                 <li key={v.person}>
                   {v.person}: {isDecision(v.status) ? STATUS_LABELS[v.status] : v.status}
+                  {notesBy.has(v.person) ? <NoteButton panel={panelId("notes", callId)} label={`${v.person}'s notes`} /> : null}
                 </li>
               ))}
             </ul>

@@ -38,3 +38,9 @@ type Item = { text: string; tone?: string };
 export function splitDetails<T extends Item>(items: T[]): { facts: T[]; badges: T[] } {
   return { facts: items.filter((i) => !i.tone), badges: items.filter((i) => Boolean(i.tone)) };
 }
+
+/** Where a call's details come from, for its reasons panel: each detail with a source, then the deadline's. */
+export function detailSources(items: { text: string; title?: string }[], deadlineNote: string | null): { text: string; source: string }[] {
+  const found = items.filter((i) => i.title).map((i) => ({ text: i.text, source: i.title as string }));
+  return deadlineNote ? [...found, { text: "Deadline", source: deadlineNote }] : found;
+}

@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { AccountMenu, type ViewerMode } from "@/components/AccountMenu";
 import { MenuController } from "@/components/MenuController";
+import { TableController } from "@/components/TableController";
 import { TableSettings } from "@/components/TableSettings";
 import { TooltipController } from "@/components/TooltipController";
 import { countLabel, SECTIONS, type Section } from "@/lib/nav";
@@ -76,6 +77,7 @@ export async function Shell({ section, children }: { section: Section; children:
       {hidden ? <TableSettings hidden={hidden} /> : null}
       <MenuController />
       <TooltipController />
+      <TableController />
     </>
   );
 }

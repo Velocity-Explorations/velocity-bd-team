@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { choiceLinks, CLOSED_PATTERN, filterHref, nextSort, pickMany, pickSort, pickState, portalOptions, sortLink, sortParams } from "./filters.ts";
+import { choiceLinks, CLOSED_PATTERN, filterHref, nextSort, pickMany, pickSort, pickState, portalOptions, sortChoices, sortLink, sortParams } from "./filters.ts";
 import { isClosed } from "./text.ts";
 
 const PORTALS = ["SAM.gov", "Vulcan SOF"];
@@ -95,4 +95,18 @@ test("a view with its own default sort leaves that one out of links and writes t
   assert.deepEqual(sortParams({ key: "seen", dir: "desc" }, dueFirst), { sort: "seen", dir: "" });
   assert.equal(sortLink("/review", { view: "due-soon" }, dueFirst, "seen", dueFirst).href, "/review?view=due-soon&sort=seen");
   assert.equal(sortLink("/review", { view: "due-soon" }, { key: "seen", dir: "desc" }, "due", dueFirst).href, "/review?view=due-soon");
+});
+
+test("a header menu offers the column's two sorts in words, the one in force marked (PRO-572)", () => {
+  const items = sortChoices("/calls", { q: "space" }, { key: "title", dir: "asc" }, "title");
+  assert.deepEqual(items, [
+    { label: "Sort A to Z", href: "/calls?q=space&sort=title", active: true },
+    { label: "Sort Z to A", href: "/calls?q=space&sort=title&dir=desc", active: false },
+  ]);
+  const due = sortChoices("/review", { view: "due-soon" }, { key: "due", dir: "asc" }, "due", { key: "due", dir: "asc" });
+  assert.deepEqual(due.map((i) => [i.label, i.href, i.active]), [
+    ["Sort closing soonest first", "/review?view=due-soon", true],
+    ["Sort closing latest first", "/review?view=due-soon&sort=due&dir=desc", false],
+  ]);
+  assert.deepEqual(sortChoices("/review", {}, { key: "seen", dir: "desc" }, "seen").map((i) => i.label), ["Sort newest first", "Sort oldest first"]);
 });
