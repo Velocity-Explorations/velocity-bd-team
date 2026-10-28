@@ -146,7 +146,10 @@ A step the worker was working on when it stopped shows as failed ("The worker st
 this step") the next time the worker starts, and Retry runs it again.
 
 **Files and logs.** Until the Drive phase, each pursuit's documents are Markdown files in
-`data\drafting\pursuits\pursuit-<id>\`, and each step's key points show on the dashboard. The worker
+`data\drafting\pursuits\pursuit-<id>\`, and each step's key points show on the dashboard. The drafts
+are numbered: `draft_v1.md` (First draft), `draft_v2.md` (Compliance check), `draft_v3.md` (Reviews) and
+`draft_final.md` (Final checks). Final checks runs the AI slop check from `AI_SLOP_SCAN`, or from the
+skill's default place in your profile; without the scanner the step says the check did not run. The worker
 cannot open portal pages or download attachments yet, so its steps work from what the scanner saved and
 list what the owner should fetch. Login-gated text (Vulcan SOF, NSTXL member pages) goes to the Anthropic
 API and these local files, by David's decision of 27 Oct, and never into the repo. The log is

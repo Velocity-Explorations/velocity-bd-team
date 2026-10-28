@@ -22,6 +22,12 @@ REPLIES = {
     "analyzing requirements": "# Requirements analysis\nKEYWORDS: edge AI",
     "submission checklist": json.dumps({"key_points": ["PDF"], "checklist": [], "submit_by": "2026-11-30"}),
     "go or no-go brief": f'# Go or no-go brief\nGo.\n{FENCE}json\n{{"key_points": ["Go"], "fit": "Strong fit", "recommendation": "go"}}\n{FENCE}',
+    "building outline": f'# Outline\n## 1. Technical Approach\n{FENCE}json\n{{"key_points": ["One section"], "sections": []}}\n{FENCE}',
+    "drafting response": "# White paper\n\nEcho C2 runs offline " + chr(0x2014) + " on laptops. [NEEDS INPUT: rates]",
+    "compliance check": "## 1. Keywords\n- ok\n---CORRECTED DRAFT---\n# White paper v2",
+    "building checklist": "# Checklist\n- [ ] rates",
+    "formatting document": "# White paper, final\n\nBody.",
+    "submission packet": f'# Submission packet\nEmail it.\n{FENCE}json\n{{"key_points": ["Email"], "files": [{{"file": "PDF", "slot": "email"}}]}}\n{FENCE}',
 }
 
 
@@ -50,6 +56,8 @@ class Model:
             on_usage(llm.Usage(phase_label=phase_label, model=model or llm.DEFAULT_MODEL, input_tokens=tokens_in,
                                output_tokens=tokens_out, cache_read_tokens=0, cache_write_tokens=0, seconds=1.0,
                                truncated=False, request_id=""))
+        if phase_label.startswith("review pass "):
+            return f"# White paper after {phase_label}"
         return REPLIES[phase_label]
 
     def labels(self) -> list[str]:
@@ -205,7 +213,9 @@ def test_a_failed_step_says_why(ledger_db: str, local: Path) -> None:
     assert lq.retry_step(step["id"], "David Wood")                        # and Retry queues it again
 
 
-def test_a_step_the_worker_cannot_run_yet_fails_with_the_reason(ledger_db: str, local: Path) -> None:
+def test_a_step_the_worker_cannot_run_yet_fails_with_the_reason(ledger_db: str, local: Path,
+                                                                monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(worker, "RUNNERS", {step: run for step, run in worker.RUNNERS.items() if step != "outline"})
     pursuit_id = _pursuit(approval_mode="key_gates")
     model = Model()
     _drain(model)
@@ -214,6 +224,36 @@ def test_a_step_the_worker_cannot_run_yet_fails_with_the_reason(ledger_db: str, 
     worker.work_once(generate=model)
     outline = lq.pursuit_steps(pursuit_id)[-1]
     assert (outline["step"], outline["state"], outline["error"]) == ("outline", "failed", "The worker cannot run Outline yet.")
+
+
+def test_every_step_has_its_work() -> None:
+    assert set(worker.RUNNERS) == set(lq.STEPS)
+
+
+def test_with_key_gates_a_pursuit_runs_from_discovery_to_the_submit_gate(ledger_db: str, local: Path) -> None:
+    pursuit_id = _pursuit(approval_mode="key_gates")
+    model = Model()
+    _drain(model)
+    lq.approve_step(lq.pursuit_steps(pursuit_id)[-1]["id"], "David Wood", decision="go")   # the owner's gate
+    _drain(model)
+    outline = lq.pursuit_steps(pursuit_id)[-1]
+    assert (outline["step"], outline["state"]) == ("outline", "ready")                     # a key gate waits
+    lq.approve_step(outline["id"], "David Wood")
+    _drain(model)
+    assert [(step, state) for step, _, state in _steps(pursuit_id)][5:] == [
+        ("outline", "approved"), ("draft", "approved"), ("compliance", "approved"), ("reviews", "approved"),
+        ("final", "approved"), ("submit", "ready")]
+    work = local / "drafting" / "pursuits" / f"pursuit-{pursuit_id}"
+    saved = {path.name for path in work.iterdir()}
+    assert {"outline.md", "draft_v1.md", "draft_v2.md", "draft_v3.md", "draft_final.md", "submission_packet.md"} <= saved
+    for path in work.glob("*.md"):
+        assert chr(0x2013) not in path.read_text(encoding="utf-8") and chr(0x2014) not in path.read_text(encoding="utf-8")
+    draft = next(s for s in lq.pursuit_steps(pursuit_id) if s["step"] == "draft")
+    assert chr(0x2014) not in draft["content"] and "Echo C2 runs offline, on laptops" in json.loads(draft["content"])["document"]
+    submit = json.loads(lq.pursuit_steps(pursuit_id)[-1]["content"])
+    assert [c["check"] for c in submit["checks"]] == ["Checklist", "Placeholders", "AI slop check", "Dashes",
+                                                      "Internal submit-by date"]
+    assert submit["files"] == [{"file": "PDF", "slot": "email"}]
 
 
 # ---------------------------------------------------------------------------- serving

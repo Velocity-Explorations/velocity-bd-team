@@ -13,19 +13,19 @@ question for the owner (QUESTIONS) is shown on its card rather than asked by the
 """
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 from drafting import prompts
 from drafting.company import profile
 from drafting.dates import business_day_before, deadline_day
-from drafting.inputs import call_facts, clashes_text, draft_inputs
+from drafting.inputs import clashes_text, draft_inputs
 from drafting.pipeline import MAX_TOKENS as PIPELINE_MAX_TOKENS
 from drafting.prompts import Prompt
-from drafting.steps import StepContext, StepResult, bullets, first_lines, split_reply
+from drafting.steps import (StepContext, StepResult, choice, iso_date, points, skill_part, split_reply, strings,
+                            system_prompt, user_prompt)
 from ledger import queries as lq
 
 SKILL = Path(__file__).resolve().parent / "skills" / "opportunity_assessment.md"
@@ -66,15 +66,6 @@ RESULT_DAYS = 90
 DEFAULT_SOURCE = "default, 90 days after the deadline"
 OWNER_WORDS = ("owner", "the owner", "proposal owner", "the proposal owner")
 
-HOW_IT_RUNS = """How this step runs here:
-- You cannot open web pages, sign in to portals or download files. Everything known about the call is in the message. Where a task needs a page, a login or a file you do not have, say so plainly and name what the owner should fetch. Never guess what such a page or file says.
-- Write the document in Markdown, starting with its heading. The worker saves it in the pursuit's folder and makes the Word file, so leave file names to it.
-- The dashboard asks the owner this step's question for you, so do not end with a question.
-- Never use an em dash or an en dash.
-"""
-AFTER_DOCUMENT = "- After the document, add one fenced json block with these fields, and nothing after it:\n"
-JSON_ONLY = "- Reply with one fenced json block with these fields and nothing else; the worker writes the document from it:\n"
-
 DISCOVERY_SPEC = """{"key_points": ["three to six short points for the step's card"],
  "tasks": {"call_page": "done or for_owner", "attachments": "done or for_owner", "parent_instructions": "done or for_owner",
            "key_facts": "done or for_owner", "past_work": "done or for_owner", "clashes": "done or for_owner",
@@ -105,16 +96,9 @@ GO_NO_GO_SPEC = """{"key_points": ["three to six short points for the step's car
 
 # ------------------------------------------------------------------------- the skill
 
-def _skill() -> str:
-    return SKILL.read_text(encoding="utf-8")
-
-
 def skill_section(step: str) -> str:
     """The skill's part for a step: its "## Phase N:" section, up to the rule before the next."""
-    text = _skill()
-    start = text.index(f"## Phase {PHASES[step]}:")
-    end = text.find("\n---\n", start)
-    return text[start:end if end >= 0 else len(text)].strip()
+    return skill_part(SKILL, f"## Phase {PHASES[step]}:")
 
 
 def checklist_instructions() -> str:
@@ -126,45 +110,11 @@ def checklist_instructions() -> str:
 
 
 def _system(step: str, label: str, spec: str, instructions: str | None = None, json_only: bool = False) -> str:
-    company = profile()
-    return (f"You are a senior BD analyst at {company.get('company_name', 'Velocity Explorations')}, "
-            f"{company.get('company_description', '')}. You run one step of the proposal workspace on the BD Team "
-            f"dashboard, for a call the team chose to pursue: {label}.\n\n"
-            "Your instructions for this step, from Velocity's opportunity-assessment workflow:\n\n"
-            f"{instructions or skill_section(step)}\n\n{HOW_IT_RUNS}{JSON_ONLY if json_only else AFTER_DOCUMENT}{spec}")
-
-
-def _user(ctx: StepContext, *sections: tuple[str, str]) -> str:
-    parts = [call_facts(ctx.record, ctx.today)]
-    for title, text in sections:
-        if text.strip():
-            parts += ["", title, text.strip()]
-    return "\n".join(parts) + ctx.redo_block()
+    return system_prompt("a senior BD analyst", label, "opportunity-assessment", instructions or skill_section(step), spec,
+                         json_only)
 
 
 # ----------------------------------------------------------------------- the checks
-
-def _date(value: Any) -> str | None:
-    """A YYYY-MM-DD string, or None."""
-    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value.strip()):
-        return None
-    try:
-        return date.fromisoformat(value.strip()).isoformat()
-    except ValueError:
-        return None
-
-
-def _strings(value: Any) -> list[str]:
-    return [str(v).strip() for v in value if str(v).strip()] if isinstance(value, list) else []
-
-
-def _points(data: Mapping[str, Any], document: str) -> str:
-    return bullets(data.get("key_points")) or first_lines(document)
-
-
-def _choice(value: Any, allowed: tuple[str, ...]) -> str | None:
-    return value if isinstance(value, str) and value in allowed else None
-
 
 def _tasks(found: Any) -> dict[str, str]:
     """Each Discovery task's state: done or for the owner. Anything else is left for the owner, and the
@@ -179,7 +129,7 @@ def _result_expected(ctx: StepContext, found: Any) -> dict[str, str | None]:
     """When the result is expected (P4): the date the call gives, with its words and where they are;
     else 90 days after the deadline, when the deadline is a date."""
     found = found if isinstance(found, dict) else {}
-    when, source = _date(found.get("date")), None
+    when, source = iso_date(found.get("date")), None
     if when:
         words, where = str(found.get("words") or "").strip(), str(found.get("where") or "").strip()
         source = f'"{words}" ({where})' if words and where else (words or where or "the call")
@@ -198,39 +148,39 @@ def discovery(ctx: StepContext) -> StepResult:
     """Step 1 (PW6): the eight tasks with their states, and when the result is expected."""
     ctx.progress({task: "working" for task in TASKS})
     reply = ctx.ask(Prompt(_system("discovery", "Discovery", DISCOVERY_SPEC),
-                           _user(ctx, ("CLASH CHECK, FROM THE LEDGER", clashes_text(ctx.record)))),
+                           user_prompt(ctx, ("CLASH CHECK, FROM THE LEDGER", clashes_text(ctx.record)))),
                     "discovery", MAX_TOKENS["discovery"])
     document, data = split_reply(reply)
     tasks = _tasks(data.get("tasks"))
     ctx.progress(tasks)
     expected = _result_expected(ctx, data.get("result_expected"))
     saved = ctx.save("discovery.md", document or reply, "Discovery summary")
-    return StepResult(summary=_points(data, document), files=[saved],
-                      content={"document": document, "tasks": tasks, "owner_fetch": _strings(data.get("owner_fetch")),
+    return StepResult(summary=points(data, document), files=[saved],
+                      content={"document": document, "tasks": tasks, "owner_fetch": strings(data.get("owner_fetch")),
                                "result_expected": expected, "question": QUESTIONS["discovery"]})
 
 
 def summary(ctx: StepContext) -> StepResult:
     """Step 2 (PW7): the call in two minutes' reading, and a first word on the fit."""
     reply = ctx.ask(Prompt(_system("summary", "Opportunity summary", SUMMARY_SPEC),
-                           _user(ctx, ("DISCOVERY SUMMARY, FROM STEP 1", ctx.earlier("discovery.md")))),
+                           user_prompt(ctx, ("DISCOVERY SUMMARY, FROM STEP 1", ctx.earlier("discovery.md")))),
                     "opportunity summary", MAX_TOKENS["summary"])
     document, data = split_reply(reply)
     saved = ctx.save("opportunity_summary.md", document or reply, "Opportunity summary")
-    return StepResult(summary=_points(data, document), files=[saved],
-                      content={"document": document, "worth_it": _choice(data.get("worth_it"), WORTH_IT),
+    return StepResult(summary=points(data, document), files=[saved],
+                      content={"document": document, "worth_it": choice(data.get("worth_it"), WORTH_IT),
                                "question": QUESTIONS["summary"]})
 
 
 def alignment(ctx: StepContext) -> StepResult:
     """Step 3 (PW8): the verdict, and Claude's angle beside the owner's direction."""
     reply = ctx.ask(Prompt(_system("alignment", "Alignment", ALIGNMENT_SPEC),
-                           _user(ctx, ("DISCOVERY SUMMARY, FROM STEP 1", ctx.earlier("discovery.md")),
-                                 ("OPPORTUNITY SUMMARY, FROM STEP 2", ctx.earlier("opportunity_summary.md")))),
+                           user_prompt(ctx, ("DISCOVERY SUMMARY, FROM STEP 1", ctx.earlier("discovery.md")),
+                                       ("OPPORTUNITY SUMMARY, FROM STEP 2", ctx.earlier("opportunity_summary.md")))),
                     "alignment", MAX_TOKENS["alignment"])
     document, data = split_reply(reply)
     saved = ctx.save("alignment.md", document or reply, "Alignment")
-    return StepResult(summary=_points(data, document), files=[saved],
+    return StepResult(summary=points(data, document), files=[saved],
                       content={"document": document, "verdict": str(data.get("verdict") or "").strip() or None,
                                "angle": str(data.get("angle") or "").strip() or None,
                                "comparison": str(data.get("comparison") or "").strip() or None,
@@ -248,7 +198,7 @@ def _checklist_items(ctx: StepContext, found: Any) -> list[dict[str, Any]]:
         who = str(item.get("owner") or "").strip()
         items.append({"part": item["part"], "text": str(item["text"]).strip(), "source": str(item.get("source") or "").strip() or None,
                       "owner": owner if not who or who.lower() in OWNER_WORDS else who,
-                      "due_date": _date(item.get("due")), "done": item.get("done") is True})
+                      "due_date": iso_date(item.get("due")), "done": item.get("done") is True})
     return items
 
 
@@ -256,7 +206,7 @@ def _target_dates(ctx: StepContext, data: Mapping[str, Any]) -> dict[str, str]:
     """The internal submit-by date, at least one business day before the deadline, and the milestones
     that fall on or before it (PW9)."""
     deadline = deadline_day(ctx.record.call.get("due_date"))
-    submit_by = _date(data.get("submit_by"))
+    submit_by = iso_date(data.get("submit_by"))
     if deadline and (submit_by is None or submit_by > business_day_before(deadline).isoformat()):
         submit_by = business_day_before(deadline).isoformat()
     if not submit_by:
@@ -264,7 +214,7 @@ def _target_dates(ctx: StepContext, data: Mapping[str, Any]) -> dict[str, str]:
     found = data.get("milestones") if isinstance(data.get("milestones"), dict) else {}
     dates = {"submit_by": submit_by}
     for step in MILESTONES:
-        when = _date(found.get(step))
+        when = iso_date(found.get(step))
         if when and when <= submit_by:
             dates[step] = when
     return dates
@@ -318,8 +268,8 @@ def requirements(ctx: StepContext) -> StepResult:
     first = ctx.save("requirements.md", text, "Requirements analysis")
     reply = ctx.ask(Prompt(_system("requirements", "Requirements and checklist", CHECKLIST_SPEC, checklist_instructions(),
                                    json_only=True),
-                           _user(ctx, ("REQUIREMENTS ANALYSIS, FROM THE FIRST HALF OF THIS STEP", text),
-                                 ("DISCOVERY SUMMARY, FROM STEP 1", ctx.earlier("discovery.md")))),
+                           user_prompt(ctx, ("REQUIREMENTS ANALYSIS, FROM THE FIRST HALF OF THIS STEP", text),
+                                       ("DISCOVERY SUMMARY, FROM STEP 1", ctx.earlier("discovery.md")))),
                     "submission checklist", MAX_TOKENS["checklist"])
     _, data = split_reply(reply)
     items = _checklist_items(ctx, data.get("checklist"))
@@ -330,7 +280,7 @@ def requirements(ctx: StepContext) -> StepResult:
     checklist = render_checklist(items, dates, data)
     second = ctx.save("submission_checklist.md", "# Requirements and submission checklist\n\n" + checklist,
                       "Requirements and submission checklist")
-    return StepResult(summary=_points(data, text), files=[first, second],
+    return StepResult(summary=points(data, text), files=[first, second],
                       content={"document": text.rstrip() + "\n\n" + checklist, "checklist_items": len(items),
                                "submit_by": dates.get("submit_by"), "milestones": {k: v for k, v in dates.items() if k != "submit_by"},
                                "question": QUESTIONS["requirements"]})
@@ -339,17 +289,17 @@ def requirements(ctx: StepContext) -> StepResult:
 def go_no_go(ctx: StepContext) -> StepResult:
     """The Go or no-go gate (PW10): the decision brief and a recommendation. The owner decides."""
     reply = ctx.ask(Prompt(_system("go_no_go", "the Go or no-go gate", GO_NO_GO_SPEC),
-                           _user(ctx, ("OPPORTUNITY SUMMARY, FROM STEP 2", ctx.earlier("opportunity_summary.md")),
-                                 ("ALIGNMENT, FROM STEP 3", ctx.earlier("alignment.md")),
-                                 ("REQUIREMENTS ANALYSIS, FROM STEP 4", ctx.earlier("requirements.md")),
-                                 ("SUBMISSION CHECKLIST AND DATES, FROM STEP 4", ctx.earlier("submission_checklist.md")))),
+                           user_prompt(ctx, ("OPPORTUNITY SUMMARY, FROM STEP 2", ctx.earlier("opportunity_summary.md")),
+                                       ("ALIGNMENT, FROM STEP 3", ctx.earlier("alignment.md")),
+                                       ("REQUIREMENTS ANALYSIS, FROM STEP 4", ctx.earlier("requirements.md")),
+                                       ("SUBMISSION CHECKLIST AND DATES, FROM STEP 4", ctx.earlier("submission_checklist.md")))),
                     "go or no-go brief", MAX_TOKENS["go_no_go"])
     document, data = split_reply(reply)
     saved = ctx.save("go_no_go_brief.md", document or reply, "Go or no-go brief")
-    return StepResult(summary=_points(data, document), files=[saved],
-                      content={"document": document, "fit": _choice(data.get("fit"), FITS),
-                               "recommendation": _choice(data.get("recommendation"), RECOMMENDATIONS),
-                               "conditions": _strings(data.get("conditions")), "question": QUESTIONS["go_no_go"]})
+    return StepResult(summary=points(data, document), files=[saved],
+                      content={"document": document, "fit": choice(data.get("fit"), FITS),
+                               "recommendation": choice(data.get("recommendation"), RECOMMENDATIONS),
+                               "conditions": strings(data.get("conditions")), "question": QUESTIONS["go_no_go"]})
 
 
 RUNNERS = {"discovery": discovery, "summary": summary, "alignment": alignment, "requirements": requirements,
