@@ -13,11 +13,11 @@ import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
 import type { ProfileFields } from "./profile";
-import { startRefusal, workerReadiness, type ProposalCall } from "./proposals";
+import { pushDate, RESULTS, resultWord, startRefusal, workerReadiness, type ProposalCall } from "./proposals";
 import { DESCRIPTION_READ } from "./description";
 import { STALE_MS } from "./runs";
 import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
-import type { ScanJob, ScanRow } from "./slop";
+import { finalGate, type ScanJob, type ScanRow } from "./slop";
 import {
   changeCounts,
   decidedLine,
@@ -79,8 +79,8 @@ function newestVerdict(db: Db, judge: string) {
 }
 
 /** due_date as a date, from either shape the portals write: "27 OCT 2026 : 21:59 MDT" or "2026-10-27". */
-function dueDate(db: Db) {
-  return db`CASE
+function dueDate(db: Db | Tx) {
+  return (db as Db)`CASE
       WHEN due_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN to_date(substring(due_date from 1 for 10), 'YYYY-MM-DD')
       WHEN due_date ~ '^[0-9]{1,2} [A-Za-z]{3} [0-9]{4}'
         THEN to_date(substring(due_date from '^[0-9]{1,2} [A-Za-z]{3} [0-9]{4}'), 'DD Mon YYYY')
@@ -849,7 +849,8 @@ export async function proposalCalls(f: BarFilters): Promise<ProposalCall[]> {
              extra, ai_verdict, ai_reasoning, human_status, human_by, human_at,
              NULL::int AS pursuit_id, NULL AS owner, NULL AS pursuit_state, NULL AS current_step, NULL AS step_state,
              NULL AS drive_folder_id, NULL AS submitted_at, NULL AS submitted_by, NULL AS confirmation_number,
-             NULL AS result_expected_by, NULL AS result_expected_source, NULL AS result, NULL AS result_at
+             NULL AS result_expected_by, NULL AS result_expected_source, NULL AS result, NULL AS result_at,
+             NULL AS debrief, NULL AS next_time
       FROM calls
       WHERE human_status IN ('pursue', 'submitted') ${panelWhere(db, barOnly(f))}`;
     return [...rows];
@@ -861,7 +862,7 @@ export async function proposalCalls(f: BarFilters): Promise<ProposalCall[]> {
            calls.extra, calls.ai_verdict, calls.ai_reasoning, calls.human_status, calls.human_by, calls.human_at,
            p.id AS pursuit_id, p.owner, p.state AS pursuit_state, p.current_step, s.state AS step_state, p.drive_folder_id,
            p.submitted_at, p.submitted_by, p.confirmation_number, p.result_expected_by, p.result_expected_source,
-           p.result, p.result_at
+           p.result, p.result_at, p.debrief, p.next_time
     FROM calls
     LEFT JOIN pursuits AS p ON p.call_id = calls.id
     LEFT JOIN pursuit_steps AS s
@@ -1013,7 +1014,14 @@ export type PursuitRow = {
   budget_usd: number;
   submitted_at: string | null;
   submitted_by: string | null;
+  confirmation_number: string | null;
   result_expected_by: string | null;
+  result_expected_source: string | null;
+  result: string | null;
+  result_at: string | null;
+  result_by: string | null;
+  debrief: string | null;
+  next_time: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1155,6 +1163,12 @@ export async function approveStep(input: {
       const open = openChangesReason(counts.proposed);
       if (open) return { ok: false, reason: open };
       decided = decidedLine(counts);
+    }
+    if (r.step === "final") {
+      // Final checks is approved once the newest scan of the final version says Ready (PW13, PW21).
+      const [scan] = await tx<ScanRow[]>`SELECT * FROM slop_scans WHERE pursuit_id = ${r.pursuit_id} ORDER BY id DESC LIMIT 1`;
+      const notReady = finalGate(scan ?? null);
+      if (notReady) return { ok: false, reason: notReady };
     }
     const now = isoNow();
     const note = (input.note ?? "").trim();
@@ -1463,5 +1477,118 @@ export async function checkAgain(input: { pursuitId: number; by: string }): Prom
       VALUES ('slop_scan', ${input.pursuitId}, NULL, 'queued', ${input.by}, ${now}, ${now})`;
     await addEvent(tx, input.pursuitId, input.by, "check_again", "Asked for the AI slop check again", null, now);
     return { ok: true, notice: "Check again is queued. The worker scans the newest draft when no step is waiting." };
+  });
+}
+
+// ----------------------------------------------------------------- the Submit gate and after (phase 9b)
+
+/**
+ * Mark submitted (PW14, P7): the Submit gate's step is done and the pursuit waits in Submitted and waiting, with
+ * who submitted it and when, the confirmation number and the result expected by date. A form left open while the
+ * call's decision changed writes nothing and says what the call is now (C8). The caller then records the call's
+ * decision as Submitted.
+ */
+export async function markSubmitted(input: {
+  stepId: number;
+  by: string;
+  expected: string;
+  expectedCall: string | null;
+  confirmation: string;
+  submittedAt: string;
+  resultBy: string;
+  resultSource: string;
+}): Promise<WorkspaceResult> {
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const [r] = await tx<StepRow[]>`SELECT * FROM pursuit_steps WHERE id = ${input.stepId} FOR UPDATE`;
+    if (!r || r.step !== "submit") return { ok: false, reason: "Mark submitted is on the Submit gate." };
+    const [call] = await tx<{ human_status: string | null; human_by: string | null }[]>`
+      SELECT c.human_status, c.human_by FROM calls c JOIN pursuits p ON p.call_id = c.id WHERE p.id = ${r.pursuit_id} FOR UPDATE OF c`;
+    const current = call?.human_status ?? null;
+    if (current !== input.expectedCall) {
+      return {
+        ok: false,
+        reason: `The call's decision changed since the page loaded: it is ${current ? `${current.replace(/_/g, " ")}${call?.human_by ? `, by ${call.human_by}` : ""}` : "undecided"} now. Nothing saved; reload to see it.`,
+      };
+    }
+    const now = isoNow();
+    const confirmation = input.confirmation.trim() || null;
+    const done = await tx`
+      UPDATE pursuit_steps SET state = 'approved', decision = 'submitted', decided_by = ${input.by}, decided_at = ${now},
+             decision_note = ${confirmation}, updated_at = ${now}
+      WHERE id = ${input.stepId} AND state = 'ready' AND updated_at = ${input.expected}
+        AND pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')
+      RETURNING id`;
+    if (done.length !== 1) return { ok: false, reason: staleReason(r) };
+    await tx`
+      UPDATE pursuits SET state = 'submitted', submitted_at = ${input.submittedAt}, submitted_by = ${input.by},
+             confirmation_number = ${confirmation}, result_expected_by = ${input.resultBy},
+             result_expected_source = ${input.resultSource || null}, updated_at = ${now}
+      WHERE id = ${r.pursuit_id}`;
+    await addEvent(tx, r.pursuit_id, input.by, "submitted",
+      `Marked submitted${confirmation ? `, confirmation ${confirmation}` : ""}; result expected by ${input.resultBy}`, r.id, now);
+    return { ok: true, notice: "Marked submitted. It waits in Submitted and waiting until the result is recorded." };
+  });
+}
+
+/** A submitted call's pursuit; a call marked Submitted outside the workspace gets one here, so its result can be kept (P4). */
+async function submittedPursuit(tx: Tx, callId: string, by: string): Promise<PursuitRow | null> {
+  const [found] = await tx<PursuitRow[]>`SELECT * FROM pursuits WHERE call_id = ${callId} FOR UPDATE`;
+  if (found) return found.state === "submitted" ? found : null;
+  const [call] = await tx<{ human_status: string | null; human_by: string | null; human_at: string | null }[]>`
+    SELECT human_status, human_by, human_at FROM calls WHERE id = ${callId} FOR UPDATE`;
+  if (call?.human_status !== "submitted") return null;
+  const now = isoNow();
+  const [made] = await tx<PursuitRow[]>`
+    INSERT INTO pursuits (call_id, owner, current_step, state, submitted_at, submitted_by, created_at, updated_at)
+    VALUES (${callId}, ${call.human_by ?? by}, 'submit', 'submitted', ${call.human_at}, ${call.human_by}, ${now}, ${now})
+    RETURNING *`;
+  await addEvent(tx, made.id, by, "submitted", "Submitted outside the workspace; its result is kept here", null, now);
+  return made;
+}
+
+/** No news yet (P4): the result expected by date moves on, guarded on the date the page showed. */
+export async function noNewsYet(input: { callId: string; by: string; shown: string; days: number }): Promise<WorkspaceResult> {
+  if (input.days !== 30 && input.days !== 60) return { ok: false, reason: "Choose 30 or 60 days." };
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const pursuit = await submittedPursuit(tx, input.callId, input.by);
+    if (!pursuit || pursuit.result) return { ok: false, reason: "This call is no longer waiting on a result. Reload to see it." };
+    const [row] = await tx<{ current: string | null }[]>`
+      SELECT COALESCE(p.result_expected_by, to_char(${dueDate(tx)} + 90, 'YYYY-MM-DD')) AS current
+      FROM pursuits p JOIN calls ON calls.id = p.call_id WHERE p.id = ${pursuit.id}`;
+    const current = row?.current ?? null;
+    if (current !== (input.shown || null)) {
+      return { ok: false, reason: `The expected date changed since the page loaded: it is ${current ?? "not set"} now. Nothing saved; reload to see it.` };
+    }
+    const now = isoNow();
+    const moved = pushDate(current ?? now.slice(0, 10), input.days);
+    await tx`
+      UPDATE pursuits SET result_expected_by = ${moved}, result_expected_source = ${`No news yet on ${now.slice(0, 10)}, moved ${input.days} days on`},
+             updated_at = ${now}
+      WHERE id = ${pursuit.id}`;
+    await addEvent(tx, pursuit.id, input.by, "no_news", `No news yet: the result is now expected by ${moved}`, null, now);
+    return { ok: true, notice: `No news yet: the result is now expected by ${moved}.` };
+  });
+}
+
+/** Record result (P4): won, lost, withdrawn or cancelled by the agency, with an optional debrief and a note for next time. */
+export async function recordResult(input: { callId: string; by: string; result: string; debrief: string; nextTime: string }): Promise<WorkspaceResult> {
+  if (!RESULTS.some((r) => r.value === input.result)) return { ok: false, reason: "Choose Won, Lost, Withdrawn or Cancelled by the agency." };
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const pursuit = await submittedPursuit(tx, input.callId, input.by);
+    if (!pursuit) return { ok: false, reason: "This call is no longer waiting on a result. Reload to see it." };
+    const now = isoNow();
+    const done = await tx`
+      UPDATE pursuits SET result = ${input.result}, result_at = ${now}, result_by = ${input.by},
+             debrief = ${input.debrief.trim() || null}, next_time = ${input.nextTime.trim() || null}, updated_at = ${now}
+      WHERE id = ${pursuit.id} AND result IS NULL
+      RETURNING id`;
+    if (done.length !== 1) return { ok: false, reason: "A result was recorded meanwhile. Nothing saved; reload to see it." };
+    await addEvent(tx, pursuit.id, input.by, "result", `Result: ${resultWord(input.result)}${input.debrief.trim() ? `. Debrief: ${input.debrief.trim()}` : ""}`,
+      null, now);
+    const follow = input.result === "lost" ? " Ask for a debrief: agencies usually allow only a short window." : "";
+    return { ok: true, notice: `Recorded: ${resultWord(input.result)}. The call is in Results.${follow}` };
   });
 }

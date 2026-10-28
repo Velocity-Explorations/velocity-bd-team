@@ -8,6 +8,7 @@ import {
   changeWord,
   checklistProgress,
   decidedLine,
+  expectedDefault,
   DISCOVERY_TASKS,
   fitTone,
   latestSteps,
@@ -93,12 +94,12 @@ test("only the owner decides; the people working with them contribute (PW17, PW2
 
 test("a step's actions follow its state, the step and the owner (PW4, PW10, PW15, PW19)", () => {
   const owner = { pursuitState: "working", decide: true };
-  assert.deepEqual(actionsFor(row("summary"), owner), { approve: true, askChanges: true, noGo: true, gate: false, retry: false, raiseCap: false });
-  assert.deepEqual(actionsFor(row("outline"), owner), { approve: true, askChanges: true, noGo: false, gate: false, retry: false, raiseCap: false });
-  assert.deepEqual(actionsFor(row("go_no_go"), owner), { approve: false, askChanges: true, noGo: false, gate: true, retry: false, raiseCap: false });
-  assert.deepEqual(actionsFor(row("submit"), owner), { approve: false, askChanges: false, noGo: false, gate: false, retry: false, raiseCap: false });
-  assert.deepEqual(actionsFor(row("draft", { state: "failed" }), owner), { approve: false, askChanges: false, noGo: false, gate: false, retry: true, raiseCap: false });
-  assert.deepEqual(actionsFor(row("draft", { state: "blocked" }), owner), { approve: false, askChanges: false, noGo: false, gate: false, retry: false, raiseCap: true });
+  assert.deepEqual(actionsFor(row("summary"), owner), { approve: true, askChanges: true, noGo: true, gate: false, retry: false, raiseCap: false, submit: false });
+  assert.deepEqual(actionsFor(row("outline"), owner), { approve: true, askChanges: true, noGo: false, gate: false, retry: false, raiseCap: false, submit: false });
+  assert.deepEqual(actionsFor(row("go_no_go"), owner), { approve: false, askChanges: true, noGo: false, gate: true, retry: false, raiseCap: false, submit: false });
+  assert.deepEqual(actionsFor(row("submit"), owner), { approve: false, askChanges: false, noGo: false, gate: false, retry: false, raiseCap: false, submit: true });
+  assert.deepEqual(actionsFor(row("draft", { state: "failed" }), owner), { approve: false, askChanges: false, noGo: false, gate: false, retry: true, raiseCap: false, submit: false });
+  assert.deepEqual(actionsFor(row("draft", { state: "blocked" }), owner), { approve: false, askChanges: false, noGo: false, gate: false, retry: false, raiseCap: true, submit: false });
   assert.equal(actionsFor(row("draft", { state: "failed", decision: "retried" }), owner).retry, false);
   assert.equal(actionsFor(row("summary"), { pursuitState: "working", decide: false }).approve, false);
   assert.equal(actionsFor(row("summary"), { pursuitState: "closed", decide: true }).approve, false);
@@ -172,4 +173,16 @@ test("changes are counted by decision, and Reviews waits until every change is d
 test("each change's state in words and tones", () => {
   assert.deepEqual(["proposed", "accepted", "edited", "rejected"].map(changeWord), ["to decide", "accepted", "edited", "rejected"]);
   assert.deepEqual(["proposed", "accepted", "edited", "rejected"].map(changeTone), ["warn", "good", "good", "grey"]);
+});
+
+
+test("the result expected by date the Submit gate starts with: the pursuit's, then Discovery's, then 90 days after the deadline (P4)", () => {
+  assert.deepEqual(expectedDefault({ pursuit: "2027-03-01", pursuitSource: "set at the Submit gate", discovery: { date: "2027-02-01", source: "Section 6" }, due: "2026-12-01" }),
+    { date: "2027-03-01", note: "set at the Submit gate" });
+  assert.deepEqual(expectedDefault({ pursuit: null, pursuitSource: null, discovery: { date: "2027-02-01", source: "Section 6: awards by 1 Feb" }, due: "2026-12-01" }),
+    { date: "2027-02-01", note: "From Discovery: Section 6: awards by 1 Feb" });
+  assert.deepEqual(expectedDefault({ pursuit: null, pursuitSource: null, discovery: null, due: "2026-12-01T17:00:00-05:00" }),
+    { date: "2027-03-01", note: "About 90 days after the deadline. Change it if the solicitation says otherwise." });
+  assert.deepEqual(expectedDefault({ pursuit: null, pursuitSource: null, discovery: null, due: "30 OCT 2026 : 21:59 MDT" }),
+    { date: "", note: "The deadline does not give a date to count from; set one." });
 });

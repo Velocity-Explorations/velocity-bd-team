@@ -14,7 +14,7 @@ export const SECTIONS: { key: Section; label: string; href: string }[] = [
 /** What a section's count chip counts, read aloud in place of the bare number (N3). */
 export function countLabel(section: Exclude<Section, "home">, n: number): string {
   if (section === "calls") return `${n} waiting for you`;
-  if (section === "proposals") return `${n} to draft or ready for you`;
+  if (section === "proposals") return `${n} to draft, ready for you or overdue`;
   return `${n} ${n === 1 ? "request" : "requests"} waiting`;
 }
 

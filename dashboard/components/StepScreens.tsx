@@ -1,4 +1,4 @@
-import { Check, CheckCheck, Pencil, Undo2, X } from "lucide-react";
+import { Check, CheckCheck, ExternalLink, Pencil, Undo2, X } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   acceptAllAction,
@@ -10,7 +10,7 @@ import {
 } from "@/app/actions";
 import { formatDue, formatTime } from "@/lib/format";
 import type { ChecklistRow, PursuitRow, WorkspaceCall } from "@/lib/queries";
-import { slopHref, type ScanRow } from "@/lib/slop";
+import { finalChecks, slopHref, type FinalCheck, type ScanRow } from "@/lib/slop";
 import {
   changeCounts,
   changeTone,
@@ -623,6 +623,124 @@ export function ReviewsView({ callId, row, content, changes, scan, decidable, la
           </div>
         );
       })}
+    </section>
+  );
+}
+
+
+function checkTone(ok: boolean | null): "good" | "warn" | "grey" {
+  return ok ? "good" : ok === false ? "warn" : "grey";
+}
+
+/** A list of checks with their result in words (PW13, PW14). */
+function Checks({ checks }: { checks: FinalCheck[] }) {
+  return (
+    <ol className="ws-checks">
+      {checks.map((c, i) => (
+        <li key={c.check}>
+          <span className="ws-step-num">{i + 1}</span>
+          <span>
+            <strong>{c.check}</strong>
+            <span className="meta">{c.detail}</span>
+          </span>
+          <span className={`badge tone-${checkTone(c.ok)}`}>{c.result ?? (c.ok ? "passed" : c.ok === false ? "to fix" : "not known")}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+type Open = { kind: string; text: string; line: number; section: string };
+
+/**
+ * Step 9 (PW13): the seven checks with their result in words, what is still open in the final version with the
+ * line it is on, then the checklist to tick. A newer scan from Check again updates the placeholder sweep and the
+ * slop check's final pass.
+ */
+export function FinalView({ callId, row, content, scan, checklist, editable, owner, label }: {
+  callId: string;
+  row: StepRow;
+  content: Content;
+  scan: ScanRow | null;
+  checklist: ChecklistRow[];
+  editable: boolean;
+  owner: string;
+  label: Label;
+}) {
+  const checks = finalChecks(Array.isArray(content.checks) ? (content.checks as FinalCheck[]) : [], scan, row.finished_at);
+  const open = Array.isArray(content.placeholders) ? (content.placeholders as Open[]) : [];
+  const stillOpen = checks.find((c) => c.check === "Placeholder sweep")?.ok === true ? [] : open;
+  const done = checklist.filter((item) => item.done).length;
+  return (
+    <section className="ws-screen" aria-label="Final checks">
+      {checks.length ? (
+        <div className="ws-subsection">
+          <h3 className="field-label">Final checks, {checks.filter((c) => c.ok).length} of {checks.length} passed</h3>
+          <Checks checks={checks} />
+        </div>
+      ) : null}
+      {stillOpen.length ? (
+        <div className="ws-subsection">
+          <h3 className="field-label">Still open in the final version, {stillOpen.length}</h3>
+          <ul className="ws-spots">
+            {stillOpen.map((item) => (
+              <li key={`${item.line}-${item.text}`}>
+                <span className="ws-match">
+                  {item.section ? `${item.section}. ` : ""}{item.text} <span className="meta">{item.kind}, for {label(owner)}</span>
+                </span>
+                <a href={slopHref(row.step, item.line, item.line)}>Line {item.line}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {checklist.length ? (
+        <div className="ws-subsection">
+          <h3 className="field-label">Submission checklist, {done} of {checklist.length} done</h3>
+          <Checklist callId={callId} step={row.step} items={checklist} editable={editable} label={label} />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** The Submit gate (PW14): the files and their slots, the portal with the call's page at the end of its row, the
+ *  checklist, what the gate checked, and the portal's steps. The owner submits on the portal. */
+export function SubmitView({ call, content, checklist, tz }: { call: WorkspaceCall; content: Content; checklist: ChecklistRow[]; tz: string }) {
+  const files = Array.isArray(content.files) ? (content.files as { file: string; slot?: string }[]).filter((f) => f && f.file) : [];
+  const checks = Array.isArray(content.checks) ? (content.checks as FinalCheck[]) : [];
+  const steps = list(content.portal_steps);
+  const deadline = text(content.deadline) || formatDue(call.due_date, tz);
+  const page = text(content.call_page) || call.url || "";
+  const done = checklist.filter((item) => item.done).length;
+  return (
+    <section className="ws-screen" aria-label="Submit">
+      <Rows rows={[
+        ["Files", files.length ? <ul>{files.map((f) => <li key={f.file}>{f.slot ? `${f.file}: ${f.slot}` : f.file}</li>)}</ul>
+          : "As the submission packet lists them"],
+        ["Portal", (
+          <span className="ws-portal-row">
+            <span>
+              {call.portal}{deadline ? `, before ${deadline}` : ""}
+              {page ? <span className="meta"> {page}. Sign in there to submit.</span> : null}
+            </span>
+            {page ? <a className="btn" href={page} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" />Open the call page</a> : null}
+          </span>
+        )],
+        ["Checklist", checklist.length ? `${done} of ${checklist.length} done` : "No checklist yet"],
+      ]} />
+      {checks.length ? (
+        <div className="ws-subsection">
+          <h3 className="field-label">Before you submit</h3>
+          <Checks checks={checks} />
+        </div>
+      ) : null}
+      {steps.length ? (
+        <div className="ws-subsection">
+          <h3 className="field-label">On the portal</h3>
+          <ol className="ws-portal-steps">{steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+        </div>
+      ) : null}
     </section>
   );
 }

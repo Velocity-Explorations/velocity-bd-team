@@ -1,4 +1,5 @@
 import { FolderOpen } from "lucide-react";
+import { noNewsYetAction, recordResultAction } from "@/app/actions";
 import { CallCell, DueCell } from "@/components/CallCells";
 import { DraftBadge } from "@/components/DraftBadge";
 import { FilterBar } from "@/components/FilterBar";
@@ -13,22 +14,25 @@ import { verdictsFor, type Verdicts } from "@/lib/judges";
 import { drafting, labeler, timeZone } from "@/lib/me";
 import { displayPerson } from "@/lib/people";
 import {
+  CLOSING_DAYS,
   draftBlock,
   draftFormat,
+  overdueCount,
+  overdueFirst,
+  type ProposalCall,
   proposalCards,
+  type ProposalView,
   resultExpected,
+  RESULTS,
   sortIntoViews,
   stepLabel,
   stepStateWords,
   waitingDays,
-  CLOSING_DAYS,
-  type ProposalCall,
-  type ProposalView,
 } from "@/lib/proposals";
 import { latestJudgments, listProposals, portals, proposalCalls, tagOptions, winRateByPortal, type DraftInfo } from "@/lib/queries";
 import { firstParam } from "@/lib/text";
 import { pickAllowed } from "@/lib/values";
-import { allowlist } from "@/lib/viewer";
+import { allowlist, currentViewer } from "@/lib/viewer";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -122,20 +126,23 @@ export async function ProposalsView({ view, sp }: { view: ProposalView; sp: Sear
   };
   const key = KEYS[view];
   const dir = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : key.first;
-  const [rows, register, rates, tz, label, { readiness }] = await Promise.all([
+  const [rows, register, rates, tz, label, { readiness }, viewer] = await Promise.all([
     proposalCalls(bar),
     listProposals(bar.portals, view === "results" ? dir : "desc"),
     winRateByPortal(),
     timeZone(),
     labeler(),
     drafting(),
+    currentViewer(),
   ]);
   const views = sortIntoViews(rows);
   const users = allowlist();
   const nameOf = (by: string | null) => label(displayPerson(by, users));
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
-  const listed = dir === key.first ? views[view] : [...views[view]].reverse();
+  // Overdue results come first in Submitted and waiting (P4); a reversed sort is by waiting alone.
+  const ordered = view === "submitted" ? overdueFirst(views.submitted, today) : views[view];
+  const listed = dir === key.first ? ordered : [...views[view]].reverse();
   const judged = await latestJudgments(listed.map((r) => r.id));
   // After Pursue and start the draft: the call to open the dialog for, when this view does not list it.
   const startId = firstParam(sp.start, 300);
@@ -174,6 +181,7 @@ export async function ProposalsView({ view, sp }: { view: ProposalView; sp: Sear
           },
           dueBy: dayMonth(new Date(now.getTime() + CLOSING_DAYS * 24 * 3600 * 1000), tz),
           longestWait: Math.max(0, ...views.submitted.map((r) => waitingDays(r, now))),
+          overdue: overdueCount(views.submitted, today),
           results: { won, lost },
         })}
       />
@@ -266,7 +274,11 @@ export async function ProposalsView({ view, sp }: { view: ProposalView; sp: Sear
                 <>
                   {listed.map((r) => (
                     <tr key={r.id} data-call-id={r.id}>
-                      <td className="call">{r.title || r.id}</td>
+                      <td className="call">
+                        {r.title || r.id}
+                        {r.debrief ? <div className="meta">Debrief: {r.debrief}</div> : null}
+                        {r.next_time ? <div className="meta">Next time: {r.next_time}</div> : null}
+                      </td>
                       <td>{r.portal}</td>
                       <td>{r.type ?? ""}</td>
                       <td className="when">{formatTime(r.submitted_at ?? r.human_at, tz)}</td>
@@ -335,6 +347,48 @@ export async function ProposalsView({ view, sp }: { view: ProposalView; sp: Sear
                           </div>
                         ) : null}
                         {r.confirmation_number ? <div className="meta">Confirmation {r.confirmation_number}</div> : null}
+                        {viewer ? (
+                          <div className="result-actions">
+                            <details className="ws-more">
+                              <summary className="btn fn-approve">Record result</summary>
+                              <form action={recordResultAction} className="ws-more-form">
+                                <input type="hidden" name="call_id" value={r.id} />
+                                <fieldset className="field result-choices">
+                                  <legend className="field-label">Result</legend>
+                                  {RESULTS.map((choice) => (
+                                    <label key={choice.value}>
+                                      <input type="radio" name="result" value={choice.value} required /> {choice.label}
+                                    </label>
+                                  ))}
+                                </fieldset>
+                                <label className="field">
+                                  <span className="field-label">Debrief, optional</span>
+                                  <textarea name="debrief" rows={2} maxLength={2000} />
+                                </label>
+                                <label className="field">
+                                  <span className="field-label">What to do differently next time, optional</span>
+                                  <textarea name="next_time" rows={2} maxLength={2000} />
+                                </label>
+                                <p className="hint">Moves the call to Results; the next alignment check reads what to do differently.</p>
+                                <button type="submit" className="btn fn-approve">Record result</button>
+                              </form>
+                            </details>
+                            <details className="ws-more">
+                              <summary className="btn">No news yet</summary>
+                              <form action={noNewsYetAction} className="ws-more-form">
+                                <input type="hidden" name="call_id" value={r.id} />
+                                <input type="hidden" name="shown" value={expected.date ?? ""} />
+                                <fieldset className="field result-choices">
+                                  <legend className="field-label">Move the expected date on by</legend>
+                                  <label><input type="radio" name="days" value="30" defaultChecked /> 30 days</label>
+                                  <label><input type="radio" name="days" value="60" /> 60 days</label>
+                                </fieldset>
+                                <p className="hint">The history notes it.</p>
+                                <button type="submit" className="btn">Push the date</button>
+                              </form>
+                            </details>
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   );

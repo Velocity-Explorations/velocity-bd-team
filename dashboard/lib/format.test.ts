@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatAgo, formatDue, formatDuration, formatTime, isoNow, parseStageCounts } from "./format.ts";
+import { formatAgo, formatDue, formatDuration, formatTime, isoNow, localInput, parseStageCounts, zonedToIso } from "./format.ts";
 
 test("isoNow matches the ledger format: second precision, Z suffix", () => {
   assert.equal(isoNow(new Date("2026-10-17T09:44:33.789Z")), "2026-10-17T09:44:33Z");
@@ -53,4 +53,17 @@ test("formatDue shows ISO deadlines in the dashboard's zone and leaves portal te
   assert.equal(formatDue("2026-10-30", "America/Denver"), "2026-10-30");
   assert.equal(formatDue("30 OCT 2026 : 21:59 MDT", "America/Denver"), "30 OCT 2026 : 21:59 MDT");
   assert.equal(formatDue(null, "UTC"), "");
+});
+
+
+test("a time typed in the viewer's zone is kept in UTC, winter and summer alike", () => {
+  assert.equal(zonedToIso("2026-11-24T15:40", "America/Denver"), "2026-11-24T22:40:00Z");
+  assert.equal(zonedToIso("2026-07-01T09:00", "America/Denver"), "2026-07-01T15:00:00Z");
+  assert.equal(zonedToIso("2026-07-01T09:00", "UTC"), "2026-07-01T09:00:00Z");
+  for (const bad of ["", "tomorrow", "2026-13-01T09:00", "2026-07-01"]) assert.equal(zonedToIso(bad, "UTC"), null, bad);
+});
+
+test("a stored time reads back as the zone's wall time for a datetime field", () => {
+  assert.equal(localInput("2026-11-24T22:40:00Z", "America/Denver"), "2026-11-24T15:40");
+  assert.equal(localInput(null, "UTC"), "");
 });

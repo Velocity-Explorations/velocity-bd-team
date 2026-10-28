@@ -68,7 +68,7 @@ export default async function WorkspacePage({ params, searchParams }: { params: 
             linesParam={firstParam(sp.lines, 20) || undefined} tz={tz} />
         ) : row ? (
           <StepCard call={call} pursuit={pursuit} row={row} steps={found.steps} checklist={found.checklist} changes={found.changes}
-            scan={found.scan} can={can} worker={worker} label={name} tz={tz} />
+            scan={found.scan} job={found.job} can={can} worker={worker} label={name} tz={tz} />
         ) : (
           <p className="muted">Nothing has been queued for this pursuit yet.</p>
         )}

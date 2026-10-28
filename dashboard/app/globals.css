@@ -3567,3 +3567,97 @@ button[disabled] {
     position: static;
   }
 }
+
+/* ------------------------------------------------------------------ Final checks and the Submit gate (PW13, PW14) */
+
+.ws-checks {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-checks li {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.ws-checks li > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.ws-portal-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.ws-portal-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 4px;
+  font: var(--type-small);
+}
+
+.ws-submit-form {
+  display: grid;
+  gap: 10px;
+  flex-basis: 100%;
+}
+
+.ws-submit-form > button {
+  justify-self: start;
+}
+
+.ws-submit-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.ws-submit-fields input {
+  width: 100%;
+  height: var(--field-height);
+}
+
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.result-actions .ws-more[open] {
+  flex-basis: 100%;
+}
+
+.result-choices {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: var(--type-small);
+}
+
+.result-choices label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 1100px) {
+  .ws-submit-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

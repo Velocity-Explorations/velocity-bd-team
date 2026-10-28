@@ -36,6 +36,8 @@ export type ProposalCall = {
   result_expected_source: string | null;
   result: string | null;
   result_at: string | null;
+  debrief: string | null;
+  next_time: string | null;
 };
 
 /** Days ahead that make a pursued or drafting call Closing in 14 days. */
@@ -164,6 +166,7 @@ export function proposalCards(input: {
   counts: Record<ProposalView, number>;
   dueBy: string;
   longestWait: number;
+  overdue: number;
   results: { won: number; lost: number };
 }): Card[] {
   const { won, lost } = input.results;
@@ -172,7 +175,9 @@ export function proposalCards(input: {
     closing: `pursued, by ${input.dueBy}`,
     "to-draft": "pursued, no draft yet",
     drafting: "draft started, not submitted",
-    submitted: input.counts.submitted ? `longest ${input.longestWait} ${input.longestWait === 1 ? "day" : "days"}` : "none waiting",
+    submitted: input.overdue
+      ? `${input.overdue} ${input.overdue === 1 ? "result" : "results"} overdue`
+      : input.counts.submitted ? `longest ${input.longestWait} ${input.longestWait === 1 ? "day" : "days"}` : "none waiting",
     results: decided ? `${won} won, ${lost} lost, ${((100 * won) / decided).toFixed(1)}% win rate` : "no results yet",
   };
   const labels: Record<ProposalView, string> = {
@@ -189,7 +194,7 @@ export function proposalCards(input: {
     description: lines[view],
     href: href(view, input.params),
     current: input.current === view,
-    needsYou: view === "to-draft",
+    needsYou: view === "to-draft" || (view === "submitted" && input.overdue > 0),
   }));
 }
 
@@ -262,4 +267,40 @@ export function draftBadge(p: { pursuit_state: string | null; current_step: stri
   if (p.current_step === "discovery" && p.step_state === "queued") return { text: "draft started", tone: "info" };
   const number = /^Step (\d+)/.exec(stepLabel(p.current_step))?.[1];
   return { text: number ? `step ${number}` : "draft started", tone: "info" };
+}
+
+// ------------------------------------------------------------------- Submitted and waiting (P4, phase 9b)
+
+function overdue(row: ProposalCall, today: string): boolean {
+  return resultExpected(row, today).overdue;
+}
+
+/** Overdue results first, the oldest expected date first; the rest keep their order (P4). */
+export function overdueFirst(rows: ProposalCall[], today: string): ProposalCall[] {
+  const late = rows.filter((r) => overdue(r, today))
+    .sort((a, b) => (resultExpected(a, today).date ?? "").localeCompare(resultExpected(b, today).date ?? ""));
+  return [...late, ...rows.filter((r) => !overdue(r, today))];
+}
+
+/** How many submitted calls are past their result expected by date; these count where the team looks (P4). */
+export function overdueCount(rows: ProposalCall[], today: string): number {
+  return rows.filter((r) => overdue(r, today)).length;
+}
+
+/** No news yet moves the result expected by date on by some days (P4). */
+export function pushDate(date: string, days: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+export const RESULTS: { value: string; label: string }[] = [
+  { value: "won", label: "Won" },
+  { value: "lost", label: "Lost" },
+  { value: "withdrawn", label: "Withdrawn" },
+  { value: "cancelled_by_agency", label: "Cancelled by the agency" },
+];
+
+/** A recorded result in words. */
+export function resultWord(result: string): string {
+  return result === "cancelled_by_agency" ? "cancelled by the agency" : result;
 }

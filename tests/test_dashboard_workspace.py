@@ -142,6 +142,7 @@ def seed() -> dict[str, int]:
     _call("ws-undrafted", "Workspace with no draft")
     for key in ("rev-view", "rev-decide", "rev-stale", "rev-check"):   # before seed_screens, which leaves a step queued
         found[key] = _reviews(key)
+    seed_end(found)
     seed_screens(found)
     return found
 
@@ -280,6 +281,71 @@ def _reviews(key: str) -> int:
                                                "each, then approve the draft."})
     lq.save_slop_scan(pursuit_id, None, "draft_v2.md", SCAN_REPORT, verdict=VERDICT, ready=False, fixed_count=7, text=SCAN_TEXT)
     return pursuit_id
+
+
+FINAL_TEXT = "\n".join(["# White paper", "", "Hours: [NEEDS INPUT: hours per task]", "", "Body."])
+FINAL_CHECKS = [
+    {"check": "Formatting check", "ok": True, "result": "done", "detail": "the formatting pass ran on the final version"},
+    {"check": "Final compliance re-check", "ok": True, "result": "passed", "detail": "2 to check; the report is final_compliance.md"},
+    {"check": "Placeholder sweep", "ok": False, "result": "1 left", "detail": "1 NEEDS INPUT, for David Wood"},
+    {"check": "AI slop check, final pass", "ok": False, "result": "not ready",
+     "detail": "Not ready: 1 NEEDS INPUT; band clean (provisional). Dash check passed: no en or em dashes"},
+    {"check": "Submission package check", "ok": None, "result": "not run", "detail": "Runs once Drive is set up"},
+    {"check": "Checklist updated", "ok": True, "result": "updated", "detail": "1 of 2 done; every open item has an owner and a date"},
+    {"check": "Final version saved", "ok": True, "result": "saved", "detail": "draft_final.md and its Word file"},
+]
+SUBMIT_CONTENT = {
+    "checks": [{"check": "Checklist", "ok": False, "detail": "1 item is still open"},
+               {"check": "AI slop check", "ok": True, "detail": "Ready: band light (provisional)"}],
+    "files": [{"file": "White paper (PDF)", "slot": "email attachment"}], "portal_steps": ["Email the PDF to the contracting officer"],
+    "deadline": "2027-01-15, time not given", "call_page": "https://example.invalid/ws-sub-gate",
+    "question": "Submit on the portal, then enter the confirmation number and the result expected by date, and choose Mark submitted."}
+
+
+def _scan_final(pursuit_id: int, ready: bool) -> None:
+    report = {"words": 900, "band": "clean", "confidence": "full", "points": 0, "thresholds": {"calibrated": False},
+              "families": {}, "hot_paragraphs": [],
+              "findings": [] if ready else [{"family": "prop_open_item", "tier": "proposal", "line": 3, "column": 8,
+                                             "match": "[NEEDS INPUT: hours per task]", "exempt": ""}]}
+    lq.save_slop_scan(pursuit_id, None, "draft_final.md", report, ready=ready, fixed_count=0,
+                      verdict="Ready: band clean (provisional)" if ready else "Not ready: 1 NEEDS INPUT; band clean (provisional)",
+                      text=FINAL_TEXT.replace("[NEEDS INPUT: hours per task]", "40 hours") if ready else FINAL_TEXT)
+
+
+def _submitted(call_id: str, title: str, expected: str | None, **pursuit: Any) -> int:
+    """A pursuit marked submitted, waiting on its result."""
+    from ledger.db import q, tx
+
+    pursuit_id = _pursuit(call_id, title)
+    lq.claim_next_step()
+    with tx() as conn:
+        q(conn, "UPDATE pursuits SET state = 'submitted', current_step = 'submit', submitted_at = '2026-09-01T15:00:00Z', "
+                "submitted_by = 'David Wood', confirmation_number = 'CONF-1', result_expected_by = ? WHERE id = ?", (expected, pursuit_id))
+    lq.set_human(call_id, "submitted", "David Wood")
+    return pursuit_id
+
+
+def seed_end(found: dict[str, int]) -> None:
+    """Pursuits at Final checks and the Submit gate, and calls waiting on a result (PW13, PW14, P4)."""
+    found["fin-gate"] = _pursuit("ws-fin-gate", "Workspace final gate")
+    _through(found["fin-gate"], "final")
+    _saved(found["fin-gate"], "final", content={"checks": FINAL_CHECKS, "verdict": "Not ready: 1 NEEDS INPUT; band clean (provisional)",
+                                                "placeholders": [{"kind": "NEEDS INPUT", "text": "[NEEDS INPUT: hours per task]",
+                                                                  "line": 3, "section": "White paper"}]})
+    _scan_final(found["fin-gate"], ready=False)
+    for key in ("sub-gate", "sub-stale"):
+        found[key] = _pursuit(f"ws-{key}", f"Workspace {key}")
+        _through(found[key], "submit")
+        _saved(found[key], "submit", content=SUBMIT_CONTENT)
+    found["sw-late"] = _submitted("ws-sw-late", "Waiting late", "2026-09-30")
+    found["sw-result"] = _submitted("ws-sw-result", "Waiting for a result", "2027-06-01")
+    _call("ws-sw-outside", "Submitted outside the workspace")
+    lq.set_human("ws-sw-outside", "submitted", "Shaun Jones")
+
+
+def pursuit_of(pursuit_id: int) -> dict[str, Any]:
+    with ledger():
+        return lq.get_pursuit(pursuit_id)
 
 
 def changes_of(pursuit_id: int) -> list[tuple[str, str, str | None, str | None]]:
@@ -819,3 +885,118 @@ def test_check_again_queues_a_scan_and_shows_its_state(page: Any, site: dict[str
         job = lq.claim_next_job()
     assert job is not None and job["kind"] == "slop_scan" and job["pursuit_id"] == site["rev-check"]
     assert job["requested_by"] == "Shaun Jones"
+
+
+# ------------------------------------------------------------------------------ Final checks, Submit and results (phase 9b)
+
+def test_final_checks_show_seven_checks_and_wait_for_a_ready_final_version(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-fin-gate", "final")
+    card = page.locator(".ws-card")
+    assert "final checks, 4 of 7 passed" in card.inner_text().lower()
+    checks = card.locator(".ws-checks li").all_inner_texts()
+    assert len(checks) == 7 and "Placeholder sweep" in checks[2] and "1 left" in checks[2] and "not ready" in checks[3]
+    still = card.locator("[aria-label='Final checks'] .ws-spots li").first
+    assert "White paper. [NEEDS INPUT: hours per task]" in still.inner_text() and "for David Wood" in still.inner_text()
+    assert still.locator("a").get_attribute("href") == "?step=final&view=slop&lines=3"
+    approve = card.get_by_role("button", name="Approve and continue")
+    assert approve.is_disabled()
+    assert "The AI slop check says Not ready: 1 NEEDS INPUT" in card.locator(".ws-call").inner_text()
+    assert card.get_by_role("button", name="Check again").count() == 1
+    # The owner fills it in and Check again saves a Ready scan of the final version: the checks update and Approve opens.
+    with ledger():
+        _scan_final(site["fin-gate"], ready=True)
+    open_workspace(page, "ws-fin-gate", "final")
+    card = page.locator(".ws-card")
+    checks = card.locator(".ws-checks li").all_inner_texts()
+    assert "none left, checked again" in checks[2] and "Ready: band clean (provisional), checked again" in checks[3]
+    act(page, card.get_by_role("button", name="Approve and continue"))
+    assert "Approved. Submit is queued for the worker." in notice(page)
+    assert steps_of(site["fin-gate"])[-2:] == [("final", 1, "approved"), ("submit", 1, "queued")]
+
+
+def test_the_submit_gate_lists_the_files_the_portal_and_what_was_checked(page: Any, site: dict[str, int]) -> None:
+    open_workspace(page, "ws-sub-gate", "submit")
+    card = page.locator(".ws-card")
+    assert "GATE · SUBMIT" in card.locator(".ws-band").inner_text().upper()
+    rows = card.locator(".ws-rows").first.inner_text()
+    assert "White paper (PDF): email attachment" in rows and "SAM.gov, before 2027-01-15, time not given" in rows
+    assert card.get_by_role("link", name="Open the call page").get_attribute("href") == "https://example.invalid/ws-sub-gate"
+    assert "1 item is still open" in card.inner_text() and "Email the PDF to the contracting officer" in card.inner_text()
+    assert card.get_by_role("button", name="Mark submitted").count() == 0   # nobody is logged in
+
+
+def test_mark_submitted_records_the_submission_and_the_calls_decision(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-sub-gate", "submit")
+    card = page.locator(".ws-card")
+    assert card.locator("input[name=result_by]").input_value() == "2027-04-15"
+    card.locator("input[name=confirmation]").fill("DSIP-123")
+    card.locator("input[name=submitted_at]").fill("2026-10-27T15:40")
+    act(page, card.get_by_role("button", name="Mark submitted"))
+    assert "Marked submitted." in notice(page)
+    pursuit = pursuit_of(site["sub-gate"])
+    assert (pursuit["state"], pursuit["confirmation_number"], pursuit["result_expected_by"], pursuit["submitted_by"]) == (
+        "submitted", "DSIP-123", "2027-04-15", "David Wood")
+    assert pursuit["submitted_at"] == "2026-10-27T21:40:00Z"   # 15:40 in Denver, still on summer time
+    assert pursuit["result_expected_source"].startswith("About 90 days after the deadline")
+    assert steps_of(site["sub-gate"])[-1] == ("submit", 1, "approved")
+    with ledger():
+        assert lq.get_call("ws-sub-gate")["human_status"] == "submitted"
+    assert "Submitted" in page.locator(".ws-crumb").inner_text()
+
+
+def test_mark_submitted_on_a_page_left_open_while_the_call_changed_saves_nothing(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-sub-stale", "submit")
+    with ledger():
+        lq.set_human("ws-sub-stale", "not_relevant", "Shaun Jones")
+    act(page, page.locator(".ws-card").get_by_role("button", name="Mark submitted"))
+    assert ("The call's decision changed since the page loaded: it is not relevant, by Shaun Jones now. Nothing saved"
+            in page.locator(".notice").first.inner_text())
+    assert pursuit_of(site["sub-stale"])["state"] == "working"
+    assert steps_of(site["sub-stale"])[-1] == ("submit", 1, "ready")
+
+
+def test_submitted_and_waiting_puts_overdue_first_and_no_news_yet_moves_the_date(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    page.goto(f"{WEB}/proposals/submitted", wait_until="load", timeout=120_000)
+    first = page.locator("tbody tr").first
+    assert "Waiting late" in first.inner_text() and "result overdue" in first.inner_text()
+    first.locator("summary", has_text="No news yet").click()
+    act(page, first.get_by_role("button", name="Push the date"))
+    assert "No news yet: the result is now expected by 2026-10-30." in notice(page)
+    pursuit = pursuit_of(site["sw-late"])
+    assert pursuit["result_expected_by"] == "2026-10-30" and pursuit["result_expected_source"].startswith("No news yet on ")
+
+
+def test_record_result_moves_the_call_to_results_with_its_notes(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    page.goto(f"{WEB}/proposals/submitted", wait_until="load", timeout=120_000)
+    row = page.locator("tbody tr", has_text="Waiting for a result")
+    row.locator("summary", has_text="Record result").click()
+    row.get_by_label("Lost").check()
+    row.locator("textarea[name=debrief]").fill("Weak teaming")
+    row.locator("textarea[name=next_time]").fill("Name the research partner before the outline.")
+    act(page, row.get_by_role("button", name="Record result"))
+    assert "Recorded: lost. The call is in Results. Ask for a debrief" in notice(page)
+    pursuit = pursuit_of(site["sw-result"])
+    assert (pursuit["result"], pursuit["result_by"], pursuit["debrief"], pursuit["next_time"]) == (
+        "lost", "David Wood", "Weak teaming", "Name the research partner before the outline.")
+    page.goto(f"{WEB}/proposals/results", wait_until="load", timeout=120_000)
+    result = page.locator("tbody tr", has_text="Waiting for a result").inner_text()
+    assert "lost" in result and "Debrief: Weak teaming" in result and "Next time: Name the research partner" in result
+
+
+def test_a_call_submitted_outside_the_workspace_gets_its_result_kept_too(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    page.goto(f"{WEB}/proposals/submitted", wait_until="load", timeout=120_000)
+    row = page.locator("tbody tr", has_text="Submitted outside the workspace")
+    row.locator("summary", has_text="Record result").click()
+    row.get_by_label("Cancelled by the agency").check()
+    act(page, row.get_by_role("button", name="Record result"))
+    assert "Recorded: cancelled by the agency." in notice(page)
+    with ledger():
+        pursuit = next(p for p in (lq.get_pursuit(i) for i in range(1, 200)) if p and p["call_id"] == "ws-sw-outside")
+    assert (pursuit["state"], pursuit["owner"], pursuit["submitted_by"], pursuit["result"]) == (
+        "submitted", "Shaun Jones", "Shaun Jones", "cancelled_by_agency")

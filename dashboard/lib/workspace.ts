@@ -149,7 +149,7 @@ export function permissions(viewer: string | null, owner: string, collaborators:
 
 /** What a step's card offers its owner, by the step and its state. Nothing while the pursuit is not worked. */
 export function actionsFor(r: StepRow | undefined, opts: { pursuitState: string; decide: boolean }) {
-  const none = { approve: false, askChanges: false, noGo: false, gate: false, retry: false, raiseCap: false };
+  const none = { approve: false, askChanges: false, noGo: false, gate: false, retry: false, raiseCap: false, submit: false };
   if (!r || !opts.decide || opts.pursuitState !== "working") return none;
   if (r.state === "ready") {
     return {
@@ -158,6 +158,7 @@ export function actionsFor(r: StepRow | undefined, opts: { pursuitState: string;
       askChanges: r.step !== "submit",
       noGo: NO_GO_STEPS.includes(r.step),
       gate: r.step === "go_no_go",
+      submit: r.step === "submit",   // the Submit gate ends with Mark submitted (PW14)
     };
   }
   if ((r.state === "failed" || r.state === "blocked") && r.decision === null) {
@@ -319,4 +320,23 @@ export function changeWord(state: string): string {
 
 export function changeTone(state: string): "good" | "warn" | "grey" {
   return state === "proposed" ? "warn" : state === "rejected" ? "grey" : "good";
+}
+
+// ------------------------------------------------------------------- the Submit gate (phase 9b)
+
+/** The result expected by date the Submit gate starts with (P4): the pursuit's, then Discovery's, then 90 days after the deadline. */
+export function expectedDefault(input: {
+  pursuit: string | null;
+  pursuitSource: string | null;
+  discovery: { date?: string | null; source?: string | null } | null;
+  due: string | null;
+}): { date: string; note: string } {
+  if (input.pursuit) return { date: input.pursuit, note: input.pursuitSource ?? "" };
+  if (input.discovery?.date) {
+    return { date: input.discovery.date, note: `From Discovery${input.discovery.source ? `: ${input.discovery.source}` : ""}` };
+  }
+  const deadline = /^(\d{4})-(\d{2})-(\d{2})/.exec(input.due ?? "");
+  if (!deadline) return { date: "", note: "The deadline does not give a date to count from; set one." };
+  const date = new Date(Date.UTC(Number(deadline[1]), Number(deadline[2]) - 1, Number(deadline[3]) + 90)).toISOString().slice(0, 10);
+  return { date, note: "About 90 days after the deadline. Change it if the solicitation says otherwise." };
 }

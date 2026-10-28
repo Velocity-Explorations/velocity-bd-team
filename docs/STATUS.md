@@ -220,5 +220,12 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     placeholder with its line and section, and one checklist item per kind still open. Alignment
     reads the notes for next time from recorded results. A result maps to the Register's outcome,
     cancelled by the agency as no_award, ready for the Register write with Drive.
+  - Phase 9b (Final checks, the Submit gate and results on the dashboard): Final checks shows the
+    seven checks, what is still open with links to its lines, and the checklist, and is approved only
+    once the newest scan of the final version says Ready. The Submit gate shows the files, the portal
+    with Open the call page, the checks and the portal's steps, and Mark submitted records the
+    submission and the call's decision (C8 guarded). Submitted and waiting puts overdue results first,
+    with No news yet and Record result; overdue results count in the top bar and on the cards. The
+    Register write and the folder moves on submit wait for Drive.
 
 ## Known breakages

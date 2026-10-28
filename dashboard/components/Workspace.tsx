@@ -1,8 +1,24 @@
-import { Check, ChevronRight, CircleX, FileText, FolderOpen, History, ListChecks, MessageSquare, Paperclip, RotateCcw, Users } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  CircleX,
+  FileText,
+  FolderOpen,
+  History,
+  ListChecks,
+  MessageSquare,
+  Paperclip,
+  RefreshCw,
+  RotateCcw,
+  Send,
+  Users,
+} from "lucide-react";
 import {
   addMaterialAction,
   approveStepAction,
   askChangesAction,
+  checkAgainAction,
+  markSubmittedAction,
   noGoAction,
   raiseCapAction,
   retryStepAction,
@@ -16,20 +32,23 @@ import {
   DirectionChoice,
   DiscoveryView,
   DraftView,
+  FinalView,
   GateBrief,
   OutlineView,
   RequirementsView,
   ReviewsView,
+  SubmitView,
   SummaryView,
 } from "@/components/StepScreens";
-import { formatDue, formatTime } from "@/lib/format";
+import { formatDue, formatTime, isoNow, localInput } from "@/lib/format";
 import type { ChecklistRow, EventRow, PursuitRow, WorkspaceCall } from "@/lib/queries";
-import type { ScanRow } from "@/lib/slop";
+import { finalGate, jobState, type ScanJob, type ScanRow } from "@/lib/slop";
 import {
   actionsFor,
   approveLabel,
   changeCounts,
   checklistProgress,
+  expectedDefault,
   locked,
   money,
   openChangesReason,
@@ -350,13 +369,18 @@ function StepScreen({ call, pursuit, row, steps, checklist, changes, scan, conte
     case "reviews":
       return <ReviewsView callId={call.id} row={row} content={content} changes={changes} scan={scan}
         decidable={can.decide && row.state === "ready" && pursuit.state === "working"} label={label} tz={tz} />;
+    case "final":
+      return <FinalView callId={call.id} row={row} content={content} scan={scan} checklist={checklist}
+        editable={can.contribute && pursuit.state === "working"} owner={pursuit.owner} label={label} />;
+    case "submit":
+      return <SubmitView call={call} content={content} checklist={checklist} tz={tz} />;
     default:
       return null;
   }
 }
 
 /** The open step's card (PW4): what it is for, its state, the files saved, what Claude prepared, and Your call. */
-export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, can, worker, label, tz }: {
+export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, job, can, worker, label, tz }: {
   call: WorkspaceCall;
   pursuit: PursuitRow;
   row: StepRow;
@@ -364,6 +388,7 @@ export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, 
   checklist: ChecklistRow[];
   changes: ChangeRow[];
   scan: ScanRow | null;
+  job: ScanJob | null;
   can: Can;
   worker: { readiness: string; seenAt: string | null };
   label: Label;
@@ -380,8 +405,15 @@ export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, 
   const acts = actionsFor(row, { pursuitState: pursuit.state, decide: can.decide });
   const working = pursuit.state === "working";
   const mine = changes.filter((c) => c.step_id === row.id);
-  // Reviews is approved once every change is decided (PW12).
-  const waiting = row.step === "reviews" ? openChangesReason(changeCounts(mine).proposed) : null;
+  // Reviews is approved once every change is decided (PW12); Final checks once the final version is Ready (PW13).
+  const waiting = row.step === "reviews" ? openChangesReason(changeCounts(mine).proposed) : row.step === "final" ? finalGate(scan) : null;
+  const checking = jobState(job, scan?.scanned_at ?? null);
+  const discovery = steps.filter((s) => s.step === "discovery" && s.content).at(-1);
+  const expected = expectedDefault({
+    pursuit: pursuit.result_expected_by, pursuitSource: pursuit.result_expected_source,
+    discovery: parseJson<{ result_expected?: { date?: string | null; source?: string | null } }>(discovery?.content, {}).result_expected ?? null,
+    due: call.due_date,
+  });
   return (
     <section className="ws-card" aria-labelledby="ws-step-title">
       <div className="ws-band">
@@ -451,6 +483,41 @@ export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, 
                 then runs on the final version on its own.
               </p>
             ) : null}
+            {row.step === "final" && waiting ? (
+              <p className="hint">
+                Until Drive is set up, the final version is on the scan PC. Check again scans it once more; the result here
+                updates when the worker has run it.
+                {checking === "queued" || checking === "working" ? " A check is waiting for the worker now." : ""}
+              </p>
+            ) : null}
+            {acts.submit ? (
+              <form action={markSubmittedAction} className="ws-submit-form">
+                <Fields callId={call.id} row={row} />
+                <input type="hidden" name="expected_call" value={call.human_status ?? ""} />
+                <input type="hidden" name="default_result_by" value={expected.date} />
+                <input type="hidden" name="result_source" value={expected.note} />
+                <div className="ws-submit-fields">
+                  <label className="field">
+                    <span className="field-label">Confirmation number from {call.portal}</span>
+                    <input type="text" name="confirmation" maxLength={200} />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Submitted at</span>
+                    <input type="datetime-local" name="submitted_at" required defaultValue={localInput(isoNow(), tz)} />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Result expected by</span>
+                    <input type="date" name="result_by" required defaultValue={expected.date} />
+                    {expected.note ? <span className="hint">{expected.note}</span> : null}
+                  </label>
+                </div>
+                <p className="hint">
+                  Mark submitted ends the workflow: the proposal waits in Proposals, Submitted and waiting, until its result is
+                  recorded, and the call is recorded as Submitted.
+                </p>
+                <button type="submit" className="btn-primary fn-approve"><Send aria-hidden="true" />Mark submitted</button>
+              </form>
+            ) : null}
             <div className="ws-actions">
               {acts.approve ? (
                 <form action={approveStepAction} className={row.step === "alignment" ? "ws-approve-direction" : undefined}>
@@ -494,6 +561,14 @@ export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, 
                     </form>
                   </details>
                 </>
+              ) : null}
+              {row.step === "final" && waiting && can.contribute && working ? (
+                <form action={checkAgainAction}>
+                  <Fields callId={call.id} row={row} />
+                  <button type="submit" className="btn fn-change" disabled={checking === "queued" || checking === "working"}>
+                    <RefreshCw aria-hidden="true" />Check again
+                  </button>
+                </form>
               ) : null}
               {acts.askChanges ? (
                 <details className="ws-more">
