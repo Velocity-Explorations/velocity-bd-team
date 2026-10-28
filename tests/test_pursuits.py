@@ -265,3 +265,82 @@ def test_events_are_kept_in_order_with_who_and_when(ledger_db: str) -> None:
     events = lq.pursuit_events(pursuit_id)
     assert [(e["who"], e["kind"]) for e in events] == [("David Wood", "started"), ("Shaun Jones", "material")]
     assert all(e["at"] for e in events)
+
+
+# --------------------------------------------------------------------- the worker's helpers (PRO-577)
+
+def test_the_worker_beats_in_the_workers_table(ledger_db: str) -> None:
+    assert lq.get_worker("worker") is None
+    lq.worker_started("worker")
+    first = lq.get_worker("worker")
+    assert (first["state"], first["doing"]) == ("idle", None) and first["started_at"] == first["seen_at"]
+    lq.worker_beat("worker", "working", "Discovery (pursuit 1)")
+    beat = lq.get_worker("worker")
+    assert (beat["state"], beat["doing"], beat["started_at"]) == ("working", "Discovery (pursuit 1)", first["started_at"])
+    lq.worker_beat("worker", "stopped")
+    assert (lq.get_worker("worker")["state"], lq.get_worker("worker")["doing"]) == ("stopped", None)
+    with pytest.raises(ValueError):
+        lq.worker_beat("worker", "asleep")
+
+
+def test_a_step_blocked_mid_way_keeps_what_it_cost(ledger_db: str) -> None:
+    pursuit_id = _started()
+    step = lq.claim_next_step()
+    assert lq.block_step(step["id"], "budget reached", cost_usd=1.25)
+    blocked = lq.get_step(step["id"])
+    assert (blocked["state"], blocked["error"], blocked["cost_usd"]) == ("blocked", "budget reached", 1.25)
+    assert lq.get_pursuit(pursuit_id)["cost_usd"] == 1.25
+
+
+def test_working_steps_are_listed_for_the_worker_to_recover(ledger_db: str) -> None:
+    _started("sam-1"), _started("sam-2")
+    claimed = lq.claim_next_step()
+    assert [s["id"] for s in lq.steps_in_state("working")] == [claimed["id"]]
+    assert len(lq.steps_in_state("queued")) == 1
+
+
+def test_discovery_sets_when_the_result_is_expected(ledger_db: str) -> None:
+    pursuit_id = _started()
+    assert lq.set_result_expected(pursuit_id, "2027-03-01", "Section 6.2: selections within 90 days of the close")
+    pursuit = lq.get_pursuit(pursuit_id)
+    assert (pursuit["result_expected_by"], pursuit["result_expected_source"]) == (
+        "2027-03-01", "Section 6.2: selections within 90 days of the close")
+    with pytest.raises(ValueError):
+        lq.set_result_expected(pursuit_id, "1 March 2027", "words")
+    lq.close_pursuit(pursuit_id, "David Wood")
+    assert not lq.set_result_expected(pursuit_id, "2027-04-01", "later")
+
+
+def test_requirements_set_target_dates_and_the_checklist(ledger_db: str) -> None:
+    pursuit_id = _started()
+    assert lq.set_target_dates(pursuit_id, {"submit_by": "2026-11-30", "outline": "2026-11-10"})
+    assert json.loads(lq.get_pursuit(pursuit_id)["target_dates"]) == {"submit_by": "2026-11-30", "outline": "2026-11-10"}
+    items = [
+        {"part": "registrations", "text": "SAM.gov registration active, UEI and CAGE", "source": "per BAA 3.1", "owner": "David Wood",
+         "due_date": "2026-11-20", "done": True},
+        {"part": "documents", "text": "Technical Volume: 20 pages max, PDF", "source": "per BAA 5.4", "owner": "Claude",
+         "due_date": None, "done": False},
+    ]
+    assert lq.save_checklist(pursuit_id, items, "requirements") == 2
+    saved = lq.checklist(pursuit_id)
+    assert [(i["part"], i["position"], i["done"], i["origin"]) for i in saved] == [
+        ("registrations", 0, 1, "requirements"), ("documents", 1, 0, "requirements")]
+    assert saved[0]["done_by"] == lq.WORKER and saved[1]["done_by"] is None
+
+    # A redo replaces the open items it wrote and keeps what was ticked, without repeating it.
+    redo = [items[0], {"part": "submission", "text": "Portal login tested", "source": None, "owner": "David Wood",
+                       "due_date": "2026-11-29", "done": False}]
+    assert lq.save_checklist(pursuit_id, redo, "requirements") == 1
+    assert [(i["text"], i["position"]) for i in lq.checklist(pursuit_id)] == [
+        ("SAM.gov registration active, UEI and CAGE", 0), ("Portal login tested", 1)]
+    with pytest.raises(ValueError):
+        lq.save_checklist(pursuit_id, [{"part": "snacks", "text": "x"}], "requirements")
+
+
+def test_clash_checks_find_the_same_title_and_other_pursued_calls(ledger_db: str) -> None:
+    _call("sam-1", title="Edge AI for C2")
+    _call("ssc-9", title="  edge ai for c2 ", portal="ssc_front_door")
+    _call("sam-2", title="Something else")
+    assert [c["id"] for c in lq.calls_titled("Edge AI for C2", exclude_id="sam-1")] == ["ssc-9"]
+    lq.set_human("sam-2", "pursue", "Shaun Jones")
+    assert [c["id"] for c in lq.pursued_calls(exclude_id="sam-1")] == ["sam-2"]

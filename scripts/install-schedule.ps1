@@ -1,4 +1,4 @@
-# Registers the pipeline and the portal assistant's jobs in Windows Task Scheduler.
+# Registers the pipeline, the portal assistant's jobs and the Writer's worker in Windows Task Scheduler.
 #
 #   .\scripts\install-schedule.ps1                       # Sundays 22:00, current user
 #   .\scripts\install-schedule.ps1 -Day Tuesday -At 07:30
@@ -23,7 +23,9 @@ param(
     [string]$SummaryDay = "Monday",
     [string]$SummaryAt = "09:00",
     [string[]]$RequestsAt = @("12:07", "17:07"),
-    [int]$WaitLockMinutes = 30
+    [int]$WaitLockMinutes = 30,
+    [string]$WorkerTaskName = "velocity-bd-team worker",
+    [int]$WorkerCheckMinutes = 5
 )
 
 $ErrorActionPreference = "Stop"
@@ -98,3 +100,23 @@ $requestsTriggers = $RequestsAt | ForEach-Object { New-ScheduledTaskTrigger -Dai
 Register-Job "velocity-bd-team requests" "run.py --apply-requests" $requestsTriggers 120 `
     "velocity-bd-team: carry out change requests approved on the dashboard's Requests page."
 Write-Host "  trigger:  daily at $($RequestsAt -join ' and ')"
+
+# The Writer's worker (docs/RUNBOOK.md, "The worker"): it runs the proposal workspace's steps, always on
+# while David is logged on. It starts at logon, and a check every few minutes starts it again if it
+# stopped: Task Scheduler's restart on failure cannot see python's exit code through conhost. IgnoreNew
+# leaves a running worker alone, and data\drafting\worker.lock keeps it to one. It never takes the
+# pipeline's lock, so it never holds up the Sunday scan.
+$workerAction = New-ScheduledTaskAction -Execute $conhost -Argument (Headless "-m drafting.worker") -WorkingDirectory $repo
+$workerTriggers = @(
+    (New-ScheduledTaskTrigger -AtLogOn),
+    (New-ScheduledTaskTrigger -Once -At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Minutes $WorkerCheckMinutes))
+)
+$workerSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) `
+    -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+Register-ScheduledTask -TaskName $WorkerTaskName -Action $workerAction -Trigger $workerTriggers -Settings $workerSettings `
+    -Description "velocity-bd-team: the Writer's worker, which runs the proposal workspace's steps. Logs in data\drafting\logs." `
+    -Force | Out-Null
+Write-Host "Registered '$WorkerTaskName'"
+Write-Host "  runs:     $python -m drafting.worker  (in $repo)"
+Write-Host "  trigger:  at logon, and started again within $WorkerCheckMinutes minutes if it stops"
+Write-Host "Start it now with:  Start-ScheduledTask -TaskName '$WorkerTaskName'"

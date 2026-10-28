@@ -268,9 +268,11 @@ it last.
 One row per call being drafted in the proposal workspace (spec P2 to P8 and PW1 to PW25;
 docs/design/redesign-plan.md). The Register's past submissions stay in `proposals`; a pursuit
 points at its Register row through `submission_id` once the submission is written there. Added
-by `008_pursuits.sql` (PRO-568), with the other workspace tables below. The worker, the workspace
-page and the Slack jobs that write these tables arrive in later phases of the plan; until then
-only the helpers in `ledger/queries.py` write `pursuits`, `pursuit_steps` and `pursuit_events`.
+by `008_pursuits.sql` (PRO-568), with the other workspace tables below. Start the draft on the
+dashboard writes a pursuit (PRO-576), and the Writer's worker (`python -m drafting.worker`,
+PRO-577) runs its steps through the helpers in `ledger/queries.py`; the workspace page and the
+Slack jobs arrive in later phases of the plan. The worker's record of what it did is these tables
+and its heartbeat in `workers`, not `runs`.
 
 | Column | Type | Values | Written by |
 |---|---|---|---|
@@ -335,10 +337,10 @@ The steps, in order (PW3): `discovery` (Discovery), `summary` (Opportunity summa
 | requested_by | TEXT, not null | who queued it: the person who started, approved, asked for changes or retried, or `worker (key gates only)` | same |
 | request_note | TEXT | what to change, on an attempt queued by Ask for changes; the worker puts it in its prompt | Ask for changes (`ask_changes`) |
 | summary | TEXT | the key points shown on the step (PW4) | the worker (`finish_step`) |
-| files | TEXT JSON | list of the files saved to Drive, each with `name`, `id` (the Drive file id) and `link` | same |
-| content | TEXT JSON | what the step shows beyond its summary, per step: for example the Go or no-go brief, the outline's sections, the evaluators' ratings (PW25), the final checks | same |
-| task_states | TEXT JSON | Discovery's tasks and their states (PW6) | the worker, while it works (`set_task_states`) |
-| error | TEXT | why it failed, or what it waits for when blocked (`budget reached`), in words | the worker (`fail_step`, `block_step`) |
+| files | TEXT JSON | list of the files saved to Drive, each with `name`, `id` (the Drive file id) and `link`; until Drive (phase 6), `name` and `local`, the path under `data/drafting/pursuits/` | same |
+| content | TEXT JSON | what the step shows beyond its summary, per step. Every step: `document` (its Markdown) and `question` (the owner's question on the card, PW4). Discovery: `tasks` (as in `task_states`), `owner_fetch` (pages and files for the owner to fetch) and `result_expected` (`date`, `source`). Opportunity summary: `worth_it` (`yes`, `no`, `unsure`). Alignment: `verdict`, `angle`, `comparison`, `direction`. Requirements and checklist: `checklist_items`, `submit_by`, `milestones`. Go or no-go: `fit` (Strong, Moderate, Stretch or Poor fit), `recommendation` (`go`, `go_with_conditions`, `no_go`), `conditions`. Later steps add the outline's sections, the evaluators' ratings (PW25) and the final checks | same |
+| task_states | TEXT JSON | Discovery's tasks and their states (PW6): `call_page`, `attachments`, `parent_instructions`, `key_facts`, `past_work`, `clashes`, `record` and `summary`, each `working` while the step runs, then `done` or `for_owner` (it needs a page, a login or a file the worker cannot reach) | the worker, while it works (`set_task_states`) |
+| error | TEXT | why it failed, or what it waits for when blocked (`budget reached`), in words: the model's error, `The worker cannot run <step> yet.`, or `The worker stopped while it worked on this step. Retry runs it again.` for a step a stopped worker left working | the worker (`fail_step`, `block_step`) |
 | cost_usd | REAL, not null, default 0 | what this attempt cost, in US dollars | the worker |
 | decision | TEXT | `approved`, `go`, `go_with_conditions`, `changes_asked`, `no_go`, `retried`, `submitted` | the owner's actions; the worker with key gates only |
 | decided_by | TEXT | who decided: the owner, or `worker (key gates only)` (PW5) | same |
@@ -425,7 +427,7 @@ time. Added by `008_pursuits.sql`.
 | Column | Type | Values | Written by |
 |---|---|---|---|
 | id | INTEGER, primary key, auto-increment | | database |
-| pursuit_id | INTEGER, not null | `pursuits.id` | the worker; the Go or no-go gate |
+| pursuit_id | INTEGER, not null | `pursuits.id` | the worker, at Requirements and checklist (`save_checklist`); the Go or no-go gate |
 | part | TEXT, not null | `registrations` (registrations and eligibility), `documents` (required documents and volumes), `inputs` (inputs needed from the owner and the team), `formatting` (formatting and packaging), `reviews` (reviews and approvals), `submission` | same |
 | position | INTEGER, not null | the item's place in the checklist, from 0 | same |
 | text | TEXT, not null | the item, specific to the call | same |
@@ -434,7 +436,7 @@ time. Added by `008_pursuits.sql`.
 | due_date | TEXT date | `YYYY-MM-DD` | same |
 | origin | TEXT, not null | `requirements` (Requirements and checklist made it) or `condition` (a condition from Go with conditions, owned by the pursuit's owner) | same |
 | done | INTEGER, not null, default 0 | 1 once ticked; items already met start ticked | the worker; the owner and the people working with them |
-| done_by | TEXT | who ticked it | same |
+| done_by | TEXT | who ticked it: `worker` for an item already met when the checklist was made | same |
 | done_at | TEXT timestamp | | same |
 | created_at | TEXT timestamp, not null | | the worker; the gate |
 | updated_at | TEXT timestamp, not null | touched by every write | every writer |
@@ -531,14 +533,14 @@ worker was last seen. Added by `008_pursuits.sql`.
 
 | Column | Type | Values | Written by |
 |---|---|---|---|
-| name | TEXT, primary key | the worker's name | the worker |
+| name | TEXT, primary key | the worker's name, `worker` | the worker (`worker_started`, `worker_beat`) |
 | started_at | TEXT timestamp, not null | when it last started | same |
-| seen_at | TEXT timestamp, not null | updated on every poll, every 20 seconds | same |
+| seen_at | TEXT timestamp, not null | updated on every poll, every 20 seconds, and every 30 seconds while a step runs | same |
 | state | TEXT, not null | `idle`, `working`, or `stopped` when it shut down cleanly | same |
 | doing | TEXT | what it is working on, in words | same |
 
-No row means drafting is not set up yet. A `seen_at` more than a few minutes old means the
-worker is not running, and queued steps wait for it.
+No row means drafting is not set up yet. A `seen_at` more than ten minutes old means the
+worker is not running (the dashboard says offline), and queued steps wait for it.
 
 ## Table: schema_migrations
 

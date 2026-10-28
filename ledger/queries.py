@@ -12,6 +12,7 @@ from __future__ import annotations
 import csv
 import json
 from collections.abc import Mapping, Sequence
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -810,15 +811,16 @@ def fail_step(step_id: int, error: str, cost_usd: float = 0.0) -> bool:
         return True
 
 
-def block_step(step_id: int, reason: str) -> bool:
-    """The step cannot run until a person acts, for example budget reached (PW19): queued or working -> blocked."""
+def block_step(step_id: int, reason: str, cost_usd: float = 0.0) -> bool:
+    """The step cannot run until a person acts, for example budget reached (PW19): queued or working -> blocked,
+    with what it cost when the worker stopped it mid-way."""
     now = now_iso()
     with tx() as conn:
-        cur = q(conn, "UPDATE pursuit_steps SET state = 'blocked', error = ?, finished_at = ?, updated_at = ? "
-                      "WHERE id = ? AND state IN ('queued', 'working')", (reason, now, now, step_id))
+        cur = q(conn, "UPDATE pursuit_steps SET state = 'blocked', error = ?, cost_usd = cost_usd + ?, finished_at = ?, "
+                      "updated_at = ? WHERE id = ? AND state IN ('queued', 'working')", (reason, cost_usd, now, now, step_id))
         if cur.rowcount != 1:
             return False
-        step = _spend(conn, step_id, 0.0, now)
+        step = _spend(conn, step_id, cost_usd, now)
         _event(conn, step["pursuit_id"], WORKER, "blocked", f"{_label(step)} is waiting: {reason}", step_id, now)
         return True
 
@@ -963,3 +965,124 @@ def pursuit_events(pursuit_id: int) -> list[dict[str, Any]]:
     """A pursuit's history, oldest first."""
     with tx() as conn:
         return rows(q(conn, "SELECT * FROM pursuit_events WHERE pursuit_id = ? ORDER BY id", (pursuit_id,)))
+
+
+# ------------------------------------------------------------------------------ the worker
+# The Writer's worker (drafting/worker.py, PRO-577): its heartbeat, which tells the dashboard drafting
+# is set up (P8); what Discovery and Requirements and checklist leave on the pursuit; and the facts
+# Discovery's clash check reads.
+
+WORKER_STATES = ("idle", "working", "stopped")
+CHECKLIST_PARTS = ("registrations", "documents", "inputs", "formatting", "reviews", "submission")
+CHECKLIST_ORIGINS = ("requirements", "condition")
+
+
+def _iso_date(value: str) -> str:
+    """A YYYY-MM-DD date, or ValueError."""
+    if not isinstance(value, str) or len(value) != 10:
+        raise ValueError(f"not a YYYY-MM-DD date: {value!r}")
+    return date.fromisoformat(value).isoformat()
+
+
+def worker_started(name: str) -> None:
+    """The worker started: seen now, idle."""
+    now = now_iso()
+    with tx() as conn:
+        q(conn, "INSERT INTO workers (name, started_at, seen_at, state, doing) VALUES (?, ?, ?, 'idle', NULL) "
+                "ON CONFLICT (name) DO UPDATE SET started_at = excluded.started_at, seen_at = excluded.seen_at, "
+                "state = 'idle', doing = NULL", (name, now, now))
+
+
+def worker_beat(name: str, state: str, doing: str | None = None) -> None:
+    """The worker's heartbeat: seen now, idle, working on something (said in words), or stopped."""
+    if state not in WORKER_STATES:
+        raise ValueError(f"unknown worker state: {state}")
+    now = now_iso()
+    with tx() as conn:
+        q(conn, "INSERT INTO workers (name, started_at, seen_at, state, doing) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT (name) DO UPDATE SET seen_at = excluded.seen_at, state = excluded.state, doing = excluded.doing",
+          (name, now, now, state, doing))
+
+
+def get_worker(name: str) -> dict[str, Any] | None:
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM workers WHERE name = ?", (name,)))
+
+
+def steps_in_state(state: str) -> list[dict[str, Any]]:
+    """Every attempt in one state, oldest first. At start the worker fails any left working (PW15)."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM pursuit_steps WHERE state = ? ORDER BY id", (state,)))
+
+
+def set_result_expected(pursuit_id: int, expected_by: str, source: str) -> bool:
+    """When the result is expected (P4) and where that came from, from Discovery."""
+    expected_by = _iso_date(expected_by)
+    with tx() as conn:
+        cur = q(conn, "UPDATE pursuits SET result_expected_by = ?, result_expected_source = ?, updated_at = ? "
+                      "WHERE id = ? AND state = 'working'", (expected_by, source, now_iso(), pursuit_id))
+        return cur.rowcount == 1
+
+
+def set_target_dates(pursuit_id: int, dates: Mapping[str, str]) -> bool:
+    """Each step's target date and the internal submit-by date (PW9, PW18), from Requirements and checklist."""
+    checked = {str(key): _iso_date(value) for key, value in dates.items()}
+    with tx() as conn:
+        cur = q(conn, "UPDATE pursuits SET target_dates = ?, updated_at = ? WHERE id = ? AND state = 'working'",
+                (_jsonify(checked), now_iso(), pursuit_id))
+        return cur.rowcount == 1
+
+
+def save_checklist(pursuit_id: int, items: Sequence[Mapping[str, Any]], origin: str) -> int:
+    """The submission checklist (PW9) as rows, in the order given. Items already met start ticked by the
+    worker. A redo replaces the open items of the same origin and keeps the ticked ones, each in its new
+    place when it is listed again, so nothing ticked is lost or repeated. Returns the rows added."""
+    if origin not in CHECKLIST_ORIGINS:
+        raise ValueError(f"unknown checklist origin: {origin}")
+    for item in items:
+        if item.get("part") not in CHECKLIST_PARTS:
+            raise ValueError(f"unknown checklist part: {item.get('part')!r}")
+        if not str(item.get("text") or "").strip():
+            raise ValueError("a checklist item needs its text")
+    now = now_iso()
+    added = 0
+    with tx() as conn:
+        q(conn, "DELETE FROM checklist_items WHERE pursuit_id = ? AND origin = ? AND done = 0", (pursuit_id, origin))
+        kept = {r["text"]: r["id"] for r in rows(q(conn, "SELECT id, text FROM checklist_items WHERE pursuit_id = ? "
+                                                         "AND origin = ? ORDER BY position, id", (pursuit_id, origin)))}
+        for position, item in enumerate(items):
+            text = str(item["text"]).strip()
+            if text in kept:
+                q(conn, "UPDATE checklist_items SET position = ?, updated_at = ? WHERE id = ?", (position, now, kept.pop(text)))
+                continue
+            done = bool(item.get("done"))
+            due = item.get("due_date")
+            q(conn, "INSERT INTO checklist_items (pursuit_id, part, position, text, source, owner, due_date, origin, done, "
+                    "done_by, done_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              (pursuit_id, item["part"], position, text, item.get("source") or None, item.get("owner") or None,
+               _iso_date(due) if due else None, origin, 1 if done else 0, WORKER if done else None,
+               now if done else None, now, now))
+            added += 1
+        for extra, item_id in enumerate(kept.values(), start=len(items)):
+            q(conn, "UPDATE checklist_items SET position = ?, updated_at = ? WHERE id = ?", (extra, now, item_id))
+    return added
+
+
+def checklist(pursuit_id: int) -> list[dict[str, Any]]:
+    """A pursuit's checklist in order."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM checklist_items WHERE pursuit_id = ? ORDER BY position, id", (pursuit_id,)))
+
+
+def calls_titled(title: str, exclude_id: str | None = None) -> list[dict[str, Any]]:
+    """Calls with the same title, ignoring case and spaces at the ends: the same call on another portal."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT id, portal, title, due_date, url, human_status FROM calls "
+                            "WHERE LOWER(TRIM(title)) = LOWER(TRIM(?)) AND id <> ? ORDER BY id", (title, exclude_id or "")))
+
+
+def pursued_calls(exclude_id: str | None = None) -> list[dict[str, Any]]:
+    """Calls marked Pursue, for Discovery's check on other pursued calls closing near the same date."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT id, portal, title, due_date FROM calls WHERE human_status = 'pursue' AND id <> ? "
+                            "ORDER BY id", (exclude_id or "",)))

@@ -110,6 +110,53 @@ Each task starts python through `conhost.exe --headless`, so no console window o
 python or for anything it starts. Task Scheduler's Last Run Result therefore reads 0 even
 when a run fails: look for failures in data\logs and the Slack alerts.
 
+## The worker (proposal workspace)
+
+The worker runs the proposal workspace's steps on this PC. When someone chooses Start the draft on the
+dashboard, Discovery waits in the ledger until the worker takes it, and so on, one step at a time. It is
+one always-on program, `python -m drafting.worker`, that checks the ledger every 20 seconds and runs each
+step with Claude (claude-sonnet-5-5, through `ANTHROPIC_API_KEY`).
+
+**Starting it.** Run the schedule script again in PowerShell from the repo folder. It adds a task named
+"velocity-bd-team worker" and replaces the others unchanged:
+
+```powershell
+.\scripts\install-schedule.ps1                               # adds "velocity-bd-team worker"
+Start-ScheduledTask -TaskName "velocity-bd-team worker"      # start it now rather than at the next logon
+```
+
+The task starts the worker when you log on, and checks every 5 minutes that it is running, starting it
+again if not. As soon as the worker starts it records a heartbeat in the ledger, and the dashboard's
+Start the draft buttons switch on; until then they say "Drafting is not set up yet". The dashboard shows
+the worker as offline once its heartbeat is more than 10 minutes old (the PC is off or asleep, or the
+worker stopped), and queued steps wait for it.
+
+**What it spends.** Each step's cost is added to the step and its pursuit. Every pursuit has a $200 cap:
+a step that would start past it waits as "budget reached", and a step whose spending crosses it stops
+there and waits the same way. The prices are in `drafting/costs.py`; update them when Anthropic's change.
+
+**Stopping it.**
+
+```powershell
+Stop-ScheduledTask -TaskName "velocity-bd-team worker"       # stops it; the next check starts it again
+Disable-ScheduledTask -TaskName "velocity-bd-team worker"    # keeps it stopped; Enable-ScheduledTask undoes it
+```
+
+A step the worker was working on when it stopped shows as failed ("The worker stopped while it worked on
+this step") the next time the worker starts, and Retry runs it again.
+
+**Files and logs.** Until the Drive phase, each pursuit's documents are Markdown files in
+`data\drafting\pursuits\pursuit-<id>\`, and each step's key points show on the dashboard. The worker
+cannot open portal pages or download attachments yet, so its steps work from what the scanner saved and
+list what the owner should fetch. Login-gated text (Vulcan SOF, NSTXL member pages) goes to the Anthropic
+API and these local files, by David's decision of 27 Oct, and never into the repo. The log is
+`data\drafting\logs\worker.log`, a new file each midnight with the last 30 kept; it records step ids,
+states and costs, never a call's text.
+
+**One step by hand.** With the venv active, `python -m drafting.worker --once` runs the oldest queued
+step, if there is one, and exits. While the scheduled worker runs it holds `data\drafting\worker.lock`,
+and a second worker says so and leaves, so stop the task first.
+
 ## Portal assistant
 
 Try any tool from the command line, for example `python -m assistant explain <call id>` or
@@ -285,7 +332,7 @@ stays on this PC.
    Save the file. `.env` is never committed.
 7. **Check it.** In the repo folder, with the venv active, run `python -m config`. It should list
    `GOOGLE_SERVICE_ACCOUNT_FILE` as set (it never shows values). Once the worker's Drive support is
-   built, `python -m worker drive-check` lists the library folder through the service account, which proves
+   built, `python -m drafting.worker --drive-check` lists the library folder through the service account, which proves
    steps 1 to 6 worked.
 
 If a key file is ever exposed (pasted, emailed or committed), delete that key on the service account's

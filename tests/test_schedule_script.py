@@ -4,6 +4,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = (REPO / "scripts" / "install-schedule.ps1").read_text(encoding="utf-8")
+WORKER_HEADING = "# The Writer's worker"
 
 
 def request_times() -> list[str]:
@@ -26,7 +27,7 @@ def test_every_task_starts_python_in_a_headless_console() -> None:
 def test_approved_requests_run_at_most_twice_a_day() -> None:
     times = request_times()
     assert 1 <= len(times) <= 2
-    assert "RepetitionInterval" not in SCRIPT
+    assert "RepetitionInterval" not in SCRIPT.split(WORKER_HEADING, 1)[0]   # only the worker's check repeats
     assert "New-ScheduledTaskTrigger -Daily -At $_" in SCRIPT
 
 
@@ -45,3 +46,15 @@ def test_weekly_scan_runs_sunday_night_and_may_wake_the_pc() -> None:
     assert '[string]$Day = "Sunday"' in SCRIPT and '[string]$At = "22:00"' in SCRIPT
     pipeline_settings = SCRIPT.split("$settings = New-ScheduledTaskSettingsSet `", 1)[1].split("Register-ScheduledTask", 1)[0]
     assert "-WakeToRun" in pipeline_settings
+
+
+def test_the_worker_starts_at_logon_and_again_within_minutes_if_it_stops() -> None:
+    block = SCRIPT.split(WORKER_HEADING, 1)[1]
+    assert '-Execute $conhost -Argument (Headless "-m drafting.worker")' in block
+    assert "New-ScheduledTaskTrigger -AtLogOn" in block
+    assert "-RepetitionInterval (New-TimeSpan -Minutes $WorkerCheckMinutes)" in block
+    assert "-MultipleInstances IgnoreNew" in block      # a running worker is left alone; its lock keeps it to one
+    assert "-ExecutionTimeLimit ([TimeSpan]::Zero)" in block
+    assert "--wait-lock" not in block                   # it never waits on, or holds, the pipeline's lock
+    uninstall = (REPO / "scripts" / "uninstall-schedule.ps1").read_text(encoding="utf-8")
+    assert '"velocity-bd-team worker"' in uninstall
