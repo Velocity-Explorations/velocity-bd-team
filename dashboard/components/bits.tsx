@@ -1,5 +1,6 @@
 // Small presentational pieces shared by the pages.
 
+import { ExternalLink } from "lucide-react";
 import { Notice } from "@/components/Notice";
 import type { Detail } from "@/lib/details";
 
@@ -71,14 +72,16 @@ export function Flash({ notice, error, link }: { notice?: string; error?: string
   return null;
 }
 
+/** A call's title, linked to its page on the portal in a new tab, with the external-link icon. */
 export function TitleLink({ title, url, fallback }: { title: string | null; url: string | null; fallback: string }) {
   const text = title || fallback;
   return url ? (
-    <a href={url} target="_blank" rel="noreferrer">
+    <a href={url} target="_blank" rel="noreferrer" className="call-title">
       {text}
+      <ExternalLink aria-hidden="true" />
     </a>
   ) : (
-    <span>{text}</span>
+    <span className="call-title">{text}</span>
   );
 }
 

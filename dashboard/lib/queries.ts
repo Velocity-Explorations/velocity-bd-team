@@ -10,7 +10,9 @@ import type { RequestChoice } from "./requests";
 import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
-import { DUE_SOON_DAYS, type CallView } from "./views";
+import { parseTop } from "./brief";
+import { DESCRIPTION_READ } from "./description";
+import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
 
 // ------------------------------------------------------------------------------ calls
 
@@ -26,6 +28,8 @@ export type QueueRow = {
   ai_verdict: string;
   ai_reasoning: string | null;
   due_date: string | null;
+  days_left: number | null;
+  description: string | null;
   match_tier: string | null;
   first_seen_at: string;
   extra: string | null;
@@ -132,20 +136,25 @@ function barOnly(f: BarFilters): PanelFilters {
  * person's decisions are recorded under, while everyone decides every call): the calls that
  * person has not decided. Otherwise, and before migration 004: the calls nobody has decided,
  * the "Triage backlog" query in LEDGER_SCHEMA.md. A call a later keyword change dropped leaves it.
- * The Due soon view keeps those closing within DUE_SOON_DAYS.
+ * Views narrow it (PRO-571): Due soon to those closing within DUE_SOON_DAYS, New this week to those
+ * first seen in the last NEW_DAYS; the judges views through `judges`. Top 10 lists `ids`, decided or
+ * not, in the database's order: the page puts them in the brief's.
  */
 export async function reviewQueue(
-  f: PanelFilters & { verdict: string; tier: string; view?: CallView },
+  f: PanelFilters & { verdict: string; tier: string; view?: CallView; ids?: string[] },
   waitingFor: string[] | null,
 ): Promise<{ rows: QueueRow[]; perPerson: boolean }> {
   const db = sql();
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
+  if (f.view === "top10" && !f.ids?.length) return { rows: [], perPerson };
   const rows = await db<QueueRow[]>`
     SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, due_date,
+           (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
            match_tier, first_seen_at, extra, human_status
     FROM calls
-    WHERE ${waitingWhere(db, perPerson, waitingFor)}
+    WHERE ${f.view === "top10" ? db`id IN ${db(f.ids ?? [])}` : waitingWhere(db, perPerson, waitingFor)}
       ${f.view === "due-soon" ? db`AND ${dueSoon(db)}` : db``}
+      ${f.view === "new" ? db`AND first_seen_at >= ${newSince()}` : db``}
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
       ${f.tier ? db`AND match_tier = ${f.tier}` : db``}
       ${panelWhere(db, f)}
@@ -154,18 +163,42 @@ export async function reviewQueue(
   return { rows: [...rows], perPerson };
 }
 
-/** Needs review's and Due soon's counts under the bar's filters; the column filters do not narrow them. */
-export async function queueCounts(f: BarFilters, waitingFor: string[] | null): Promise<{ waiting: number; dueSoon: number; yes: number }> {
+/** The first-seen time from which a call is New this week. */
+function newSince(now: Date = new Date()): string {
+  return isoNow(new Date(now.getTime() - NEW_DAYS * 24 * 3600 * 1000));
+}
+
+export type QueueCounts = { waiting: number; dueSoon: number; yes: number; agree: number; disagree: number; fresh: number };
+
+/**
+ * The waiting calls' view counts under the bar's filters (VC2); the column filters do not narrow them:
+ * all of them, Due soon, yes, Judges agree, Judges disagree and New this week.
+ */
+export async function queueCounts(f: BarFilters, waitingFor: string[] | null): Promise<QueueCounts> {
   const db = sql();
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
-  const [row] = await db<{ waiting: number; due_soon: number; yes: number }[]>`
+  const [row] = await db<{ waiting: number; due_soon: number; yes: number; agree: number; disagree: number; fresh: number }[]>`
     SELECT COUNT(*)::int AS waiting,
            COUNT(*) FILTER (WHERE ${dueSoon(db)})::int AS due_soon,
-           COUNT(*) FILTER (WHERE ai_verdict = 'yes')::int AS yes
+           COUNT(*) FILTER (WHERE ai_verdict = 'yes')::int AS yes,
+           COUNT(*) FILTER (WHERE ${newestVerdict(db, "claude")} = ${newestVerdict(db, "grok")})::int AS agree,
+           COUNT(*) FILTER (WHERE ${newestVerdict(db, "claude")} <> ${newestVerdict(db, "grok")})::int AS disagree,
+           COUNT(*) FILTER (WHERE first_seen_at >= ${newSince()})::int AS fresh
     FROM calls
     WHERE ${waitingWhere(db, perPerson, waitingFor)}
       ${panelWhere(db, barOnly(f))}`;
-  return { waiting: row?.waiting ?? 0, dueSoon: row?.due_soon ?? 0, yes: row?.yes ?? 0 };
+  return {
+    waiting: row?.waiting ?? 0, dueSoon: row?.due_soon ?? 0, yes: row?.yes ?? 0,
+    agree: row?.agree ?? 0, disagree: row?.disagree ?? 0, fresh: row?.fresh ?? 0,
+  };
+}
+
+/** How many of these calls (the Top 10) the bar's filters leave, for its card. */
+export async function countAmong(ids: string[], f: BarFilters): Promise<number> {
+  if (ids.length === 0) return 0;
+  const db = sql();
+  const [row] = await db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls WHERE id IN ${db(ids)} ${panelWhere(db, barOnly(f))}`;
+  return row?.n ?? 0;
 }
 
 /** All calls' count under the bar's filters, for its card. */
@@ -250,6 +283,17 @@ export async function liveTopTen(): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
+/** This week's Top 10: the newest Monday brief's, in its order, or the live ranking before the first brief (H2). */
+export async function topTenIds(): Promise<{ ids: string[]; week: string | null }> {
+  const weeks = await briefWeeks();
+  if (weeks && weeks.length) {
+    const rows = await briefRows(weeks[0]);
+    const top = parseTop(rows.find((r) => r.portal === null)?.body);
+    if (top) return { ids: top.top.map((c) => c.id), week: weeks[0] };
+  }
+  return { ids: await liveTopTen(), week: null };
+}
+
 /** "New calls this week" from LEDGER_SCHEMA.md, as a count. */
 export async function newThisWeek(): Promise<number> {
   const cutoff = isoNow(new Date(Date.now() - 7 * 24 * 3600 * 1000));
@@ -318,6 +362,8 @@ export type CallRow = {
   naics_code: string | null;
   set_aside: string | null;
   due_date: string | null;
+  days_left: number | null;
+  description: string | null;
   filter_result: string;
   filter_reason: string | null;
   match_tier: string | null;
@@ -343,7 +389,9 @@ export async function listCalls(f: CallFilters, limit = 200): Promise<{ rows: Ca
   const [count, rows] = await Promise.all([
     db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${where()}`,
     db<CallRow[]>`
-      SELECT id, portal, title, url, type, department, naics_code, set_aside, due_date, filter_result, filter_reason, match_tier,
+      SELECT id, portal, title, url, type, department, naics_code, set_aside, due_date,
+             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
+             filter_result, filter_reason, match_tier,
              ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra
       FROM calls ${where()}
       ${panelOrder(db, f)}

@@ -158,5 +158,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     link cards, the Top 10, the status line). The queue moved to `/review`, with a Due soon view.
     Each section opens on view cards in place of a title. Calls' other views, Automation's
     Decided requests and Scan problems, and Profile settings come with phases 3b and 3c.
+  - Phase 3b, part 1 (PRO-571): Calls has all seven views. The tables have the handoff's columns:
+    logos, the dotted details line, Votes, Description, and days left. Below 1280px the AI reason
+    folds under the call. The Decide menu, the reasons and notes panels, the header menus' search
+    and Hide column, and the Top 10 focus from Home follow in part 2.
 
 ## Known breakages

@@ -1,8 +1,8 @@
-// The view cards each section opens on (PRO-570): Calls' views of the queue and All calls, and
-// Automation's pages. Switching cards keeps the bar's portal, tag and open or closed filters and
+// The view cards each section opens on (PRO-570, PRO-571): Calls' views of the queue and All calls,
+// and Automation's pages. Switching cards keeps the bar's portal, tag and open or closed filters and
 // drops the sort and the column filters (N6). No imports, so `node --test` can load it directly.
 
-export type CallView = "needs-review" | "due-soon";
+export type CallView = "needs-review" | "top10" | "due-soon" | "judges-agree" | "judges-disagree" | "new";
 export type CallCard = CallView | "all";
 export type AutomationPage = "requests" | "runs" | "judges";
 
@@ -17,17 +17,48 @@ export type ViewCard = {
   needsYou: boolean;
 };
 
-const CALL_VIEWS: CallView[] = ["needs-review", "due-soon"];
+const CALL_VIEWS: CallView[] = ["needs-review", "top10", "due-soon", "judges-agree", "judges-disagree", "new"];
+
+export const VIEW_LABELS: Record<CallCard, string> = {
+  "needs-review": "Needs review",
+  top10: "Top 10",
+  "due-soon": "Due soon",
+  "judges-agree": "Judges agree",
+  "judges-disagree": "Judges disagree",
+  new: "New this week",
+  all: "All calls",
+};
 
 /** The bar's filters, which every card keeps. */
 const KEPT = ["portal", "tag", "state"] as const;
 
 /** Days ahead that make a waiting call Due soon. */
 export const DUE_SOON_DAYS = 14;
+/** Days back that make a waiting call New this week. */
+export const NEW_DAYS = 7;
 
 export function pickCallView(raw: string | string[] | undefined): CallView {
   const value = Array.isArray(raw) ? raw[0] : raw;
   return CALL_VIEWS.includes(value as CallView) ? (value as CallView) : "needs-review";
+}
+
+/** The judges filter a view applies: the judges views set it themselves, the others take the header's. */
+export function viewJudges(view: CallView, judges: string): string {
+  if (view === "judges-agree") return "agree";
+  if (view === "judges-disagree") return "disagree";
+  return judges;
+}
+
+/**
+ * The card a view and its column filters show as pressed (VC4): the view's own, or Judges agree or
+ * disagree when Needs review's judges filter says so; none when a column filter narrows the table
+ * past every view.
+ */
+export function pressedCard(view: CallView, columns: { judges: string; verdict: string; tier: string }): CallView | null {
+  if (columns.verdict || columns.tier) return null;
+  if (view === "judges-agree" || view === "judges-disagree" || !columns.judges) return view;
+  if (view === "needs-review") return columns.judges === "agree" ? "judges-agree" : "judges-disagree";
+  return null;
 }
 
 function href(base: string, view: string | null, params: Record<string, string | readonly string[]>): string {
@@ -43,47 +74,44 @@ function href(base: string, view: string | null, params: Record<string, string |
   return text ? `${base}?${text}` : base;
 }
 
-/** Calls' cards: Needs review (the count that needs the viewer, in the accent), Due soon, All calls. */
+/**
+ * Calls' cards in order: Needs review (the count that needs the viewer), Top 10, Due soon, Judges
+ * agree, Judges disagree, New this week, All calls. `current` null leaves none pressed.
+ */
 export function callViewCards(input: {
-  current: CallCard;
+  current: CallCard | null;
   params: Record<string, string | readonly string[]>;
   counts: Record<CallCard, number>;
   perPerson: boolean;
   dueBy: string;
+  newSince: string;
+  briefWeek: string | null;
+  agree: { both: number; agree: number } | null;
 }): ViewCard[] {
-  const { current, params, counts } = input;
-  return [
-    {
-      key: "needs-review",
-      label: "Needs review",
-      count: counts["needs-review"],
-      description: input.perPerson ? "every call waiting for you" : "every call nobody has decided",
-      href: href("/review", null, params),
-      current: current === "needs-review",
-      needsYou: true,
-    },
-    {
-      key: "due-soon",
-      label: "Due soon",
-      count: counts["due-soon"],
-      description: `closing by ${input.dueBy}`,
-      href: href("/review", "due-soon", params),
-      current: current === "due-soon",
-      needsYou: false,
-    },
-    {
-      key: "all",
-      label: "All calls",
-      count: counts.all,
-      description: "every call scanned, rejects too",
-      href: href("/calls", null, params),
-      current: current === "all",
-      needsYou: false,
-    },
-  ];
+  const { agree } = input;
+  const lines: Record<CallCard, string> = {
+    "needs-review": input.perPerson ? "every call waiting for you" : "nobody has decided these",
+    top10: input.briefWeek ? `Monday brief, ${input.briefWeek}, decided or not` : "the live ranking, until the first brief",
+    "due-soon": `closing by ${input.dueBy}`,
+    "judges-agree": agree && agree.both
+      ? `same verdict; ${Math.round((100 * agree.agree) / agree.both)}% of all calls, ${agree.agree} of ${agree.both}`
+      : "same verdict",
+    "judges-disagree": "yes vs no listed first",
+    new: `first seen since ${input.newSince}`,
+    all: "every call scanned, rejects too",
+  };
+  return ([...CALL_VIEWS, "all"] as CallCard[]).map((key) => ({
+    key,
+    label: VIEW_LABELS[key],
+    count: input.counts[key],
+    description: lines[key],
+    href: key === "all" ? href("/calls", null, input.params) : href("/review", key === "needs-review" ? null : key, input.params),
+    current: input.current === key,
+    needsYou: key === "needs-review",
+  }));
 }
 
-/** Automation's cards: Agent update requests (in the accent), Scans, Judges agree. */
+/** Automation's cards: Agent update requests (the count that needs the viewer), Scans, Judges agree. */
 export function automationCards(input: {
   current: AutomationPage;
   waiting: number;

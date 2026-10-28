@@ -1,25 +1,37 @@
 import type { Metadata } from "next";
 import { decide } from "@/app/actions";
+import { CallCell, DescriptionCell, DueCell, VotesCell } from "@/components/CallCells";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
-import { JudgeVerdicts } from "@/components/Judges";
 import { Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
-import { Badge, Details, Flash, TitleLink } from "@/components/bits";
-import { callDetails, deadlineNote, noDeadlineLabel } from "@/lib/details";
-import { aliasesFor, displayPerson } from "@/lib/people";
+import { Badge, Flash } from "@/components/bits";
+import { weekLabel } from "@/lib/brief";
+import { shows } from "@/lib/columns";
 import { choiceLinks, filterHref, JUDGE_CHOICES, pickMany, pickSort, pickState, sortLink, sortParams, type Params } from "@/lib/filters";
-import { formatDue, formatTime } from "@/lib/format";
+import { formatTime } from "@/lib/format";
 import { dayMonth } from "@/lib/home";
 import { pickJudgeFilter, verdictsFor } from "@/lib/judges";
-import { decisionsOn, latestJudgments, listCalls, portals, queueCounts, tagOptions, tagsOn, type CallFilters } from "@/lib/queries";
-import { tagsByCall, withoutTags } from "@/lib/tags";
-import { peopleSplit, votesByCall } from "@/lib/scoreboard";
-import { shows } from "@/lib/columns";
+import { aliasesFor, displayPerson } from "@/lib/people";
+import {
+  countAmong,
+  decisionsOn,
+  judgeAgreement,
+  latestJudgments,
+  listCalls,
+  portals,
+  queueCounts,
+  tagOptions,
+  tagsOn,
+  topTenIds,
+  type CallFilters,
+} from "@/lib/queries";
+import { votesByCall } from "@/lib/scoreboard";
 import { displayTimeZone, hiddenColumns, queueMode } from "@/lib/settings";
-import { firstParam, isClosed, parseNoteLine } from "@/lib/text";
+import { tagsByCall } from "@/lib/tags";
+import { firstParam, parseNoteLine } from "@/lib/text";
 import { DECISIONS, FILTER_RESULTS, HUMAN_STATUSES, isDecision, pickAllowed, STATUS_LABELS, VERDICTS } from "@/lib/values";
-import { callViewCards, DUE_SOON_DAYS } from "@/lib/views";
+import { callViewCards, DUE_SOON_DAYS, NEW_DAYS } from "@/lib/views";
 import { allowlist, currentViewer } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
@@ -36,9 +48,14 @@ const STATUS_CHOICES = [
   { value: "none", label: "undecided" },
 ];
 
+/**
+ * All calls (PRO-571): every call the scanner has seen, the filter's rejects included, newest first,
+ * 200 at a time. Its columns: Call, Filter, Votes, Description, AI reason, Notes, Due, First seen,
+ * Decide. A decision here changes the call's (the newest wins), and every person's is kept.
+ */
 export default async function CallsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  const [portalList, tagChoices] = await Promise.all([portals(), tagOptions()]);
+  const [portalList, tagChoices, top] = await Promise.all([portals(), tagOptions(), topTenIds()]);
   const filters: CallFilters = {
     portals: pickMany(sp.portal, portalList.map((p) => p.name)),
     state: pickState(sp.state, sp.open),
@@ -53,7 +70,12 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
   const viewer = await currentViewer();
   const users = allowlist();
   const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
-  const [{ rows, total }, counts] = await Promise.all([listCalls(filters, LIMIT), queueCounts(filters, waitingFor)]);
+  const [{ rows, total }, counts, topCount, agreement] = await Promise.all([
+    listCalls(filters, LIMIT),
+    queueCounts(filters, waitingFor),
+    countAmong(top.ids, filters),
+    judgeAgreement(),
+  ]);
   const ids = rows.map((r) => r.id);
   const [judged, decisions, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids)]);
   const tagsFor = tagsByCall(tagRows);
@@ -61,11 +83,10 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
   const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Table settings
   const votes = votesByCall(decisions, (by) => displayPerson(by, users));
   // The view as link params: every bar control, header and decision keeps the rest of it.
+  const barParams: Params = { portal: filters.portals, state: filters.state, tag: filters.tag };
   const params: Params = {
     q: filters.q,
-    portal: filters.portals,
-    state: filters.state,
-    tag: filters.tag,
+    ...barParams,
     judges: filters.judges,
     filter_result: filters.filterResult,
     verdict: filters.verdict,
@@ -73,7 +94,9 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
     ...sortParams(filters.sort),
   };
   const filtered = Object.values(params).some((value) => value.length > 0);
+  const columnFilter = Boolean(filters.q || filters.judges || filters.filterResult || filters.verdict || filters.status);
   const returnTo = filterHref("/calls", params);
+  const now = Date.now();
 
   return (
     <Shell section="calls">
@@ -81,11 +104,22 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
       <ViewCards
         label="Calls views"
         cards={callViewCards({
-          current: "all",
-          params: { portal: filters.portals, state: filters.state, tag: filters.tag },
-          counts: { "needs-review": counts.waiting, "due-soon": counts.dueSoon, all: total },
+          current: columnFilter ? null : "all",
+          params: barParams,
+          counts: {
+            "needs-review": counts.waiting,
+            top10: topCount,
+            "due-soon": counts.dueSoon,
+            "judges-agree": counts.agree,
+            "judges-disagree": counts.disagree,
+            new: counts.fresh,
+            all: total,
+          },
           perPerson: Boolean(waitingFor),
-          dueBy: dayMonth(new Date(Date.now() + DUE_SOON_DAYS * 24 * 3600 * 1000), tz),
+          dueBy: dayMonth(new Date(now + DUE_SOON_DAYS * 24 * 3600 * 1000), tz),
+          newSince: dayMonth(new Date(now - NEW_DAYS * 24 * 3600 * 1000), tz),
+          briefWeek: top.week ? weekLabel(top.week) : null,
+          agree: agreement,
         })}
       />
 
@@ -108,11 +142,13 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
         {rows.length === 0 ? (
           <div className="empty">
             <p className="title">{filtered ? "No calls match these filters." : "The ledger has no calls yet."}</p>
-            <p className="muted">Calls appear after the first scan (python run.py).</p>
+            <p className="muted">
+              {filtered ? <a href="/calls">Clear filters</a> : "Calls appear after the first scan (python run.py)."}
+            </p>
           </div>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="calls-table">
               <thead>
                 <tr>
                   <HeaderCell label="Call" sort={sortLink("/calls", params, filters.sort, "title")} />
@@ -126,9 +162,9 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                       }}
                     />
                   ) : null}
-                  {show("judges") ? (
+                  {show("votes") ? (
                     <HeaderCell
-                      label="Claude / Grok"
+                      label="Votes"
                       sort={sortLink("/calls", params, filters.sort, "verdict")}
                       menu={{
                         active: Boolean(filters.verdict || filters.judges),
@@ -139,14 +175,17 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                       }}
                     />
                   ) : null}
-                  <HeaderCell
-                    label="Decision"
-                    sort={sortLink("/calls", params, filters.sort, "decision")}
-                    menu={{ active: Boolean(filters.status), groups: [{ items: choiceLinks("/calls", params, "status", STATUS_CHOICES, filters.status) }] }}
-                  />
+                  {show("description") ? <HeaderCell label="Description" className="wide" /> : null}
+                  {show("reason") ? <HeaderCell label="AI reason" className="wide" /> : null}
                   {show("notes") ? <HeaderCell label="Notes" /> : null}
                   {show("due") ? <HeaderCell label="Due" sort={sortLink("/calls", params, filters.sort, "due")} /> : null}
                   {show("seen") ? <HeaderCell label="First seen" sort={sortLink("/calls", params, filters.sort, "seen")} /> : null}
+                  <HeaderCell
+                    label="Decide"
+                    className="decide"
+                    sort={sortLink("/calls", params, filters.sort, "decision")}
+                    menu={{ active: Boolean(filters.status), groups: [{ items: choiceLinks("/calls", params, "status", STATUS_CHOICES, filters.status) }] }}
+                  />
                 </tr>
               </thead>
               <tbody>
@@ -156,22 +195,14 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                   const decidedByViewer = callVotes.length
                     ? callVotes.some((v) => v.person === viewer)
                     : displayPerson(r.human_by, users) === viewer;
-                  const badges = show("tags") ? (tagsFor.get(r.id) ?? []) : [];
                   return (
-                    <tr key={r.id}>
-                      <td className="call">
-                        <TitleLink title={r.title} url={r.url} fallback={r.id} />
-                        <div className="meta">
-                          <span>{r.portal}</span>
-                          <Details items={withoutTags(callDetails(r), badges)} />
-                          {isClosed(r.extra) ? <span className="badge tone-grey">closed</span> : null}
-                        </div>
-                        {badges.length ? (
-                          <div className="meta tags">
-                            <Details items={badges} />
-                          </div>
-                        ) : null}
-                      </td>
+                    <tr key={r.id} data-call-id={r.id}>
+                      <CallCell
+                        row={r}
+                        tags={show("tags") ? (tagsFor.get(r.id) ?? []) : []}
+                        details={show("details")}
+                        reason={show("reason") ? r.ai_reasoning : null}
+                      />
                       {show("filter") ? (
                         <td>
                           <Badge value={r.filter_result} />
@@ -179,24 +210,34 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                           {r.filter_result === "rejected" && r.filter_reason ? <div className="meta">{r.filter_reason}</div> : null}
                         </td>
                       ) : null}
-                      {show("judges") ? (
+                      {show("votes") ? <VotesCell verdicts={verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning)} votes={callVotes} /> : null}
+                      {show("description") ? <DescriptionCell portal={r.portal} description={r.description} extra={r.extra} /> : null}
+                      {show("reason") ? <td className="reason wide">{r.ai_reasoning ?? ""}</td> : null}
+                      {show("notes") ? (
                         <td>
-                          <JudgeVerdicts verdicts={verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning)} reasonsFor={["claude", "grok"]} />
+                          {notes.length ? (
+                            <ul className="notes">
+                              {notes.map((n, i) => (
+                                <li key={i}>
+                                  {n.text}
+                                  {n.by ? (
+                                    <span className="muted">
+                                      {" "}
+                                      ({displayPerson(n.by, users)}
+                                      {n.at ? `, ${formatTime(n.at, tz)}` : ""})
+                                    </span>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
                         </td>
                       ) : null}
-                      <td>
+                      {show("due") ? <DueCell due={r.due_date} daysLeft={r.days_left} extra={r.extra} tz={tz} /> : null}
+                      {show("seen") ? <td className="when">{formatTime(r.first_seen_at, tz)}</td> : null}
+                      <td className="decide">
                         <Badge value={r.human_status} empty="undecided" />
-                        {peopleSplit(callVotes) ? <span className="badge tone-warn">people disagree</span> : null}
-                        {callVotes.length > 1 ? (
-                          <ul className="notes votes">
-                            {callVotes.map((v) => (
-                              <li key={v.person}>
-                                {v.person}: {isDecision(v.status) ? STATUS_LABELS[v.status] : v.status}{" "}
-                                <span className="when">{formatTime(v.decided_at, tz)}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : r.human_status ? (
+                        {r.human_status ? (
                           <div className="meta">
                             <span>{displayPerson(r.human_by, users)}</span>
                             <span className="when">{formatTime(r.human_at, tz)}</span>
@@ -223,30 +264,6 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                           </form>
                         </details>
                       </td>
-                      {show("notes") ? (
-                        <td>
-                          {notes.length ? (
-                            <ul className="notes">
-                              {notes.map((n, i) => (
-                                <li key={i}>
-                                  {n.text}
-                                  {n.by ? (
-                                    <span className="muted">
-                                      {" "}
-                                      ({displayPerson(n.by, users)}
-                                      {n.at ? `, ${formatTime(n.at, tz)}` : ""})
-                                    </span>
-                                  ) : null}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </td>
-                      ) : null}
-                      {show("due") ? (
-                        <td className="when" title={deadlineNote(r.extra) ?? undefined}>{formatDue(r.due_date, tz) || <span className="muted">{noDeadlineLabel(r.extra)}</span>}</td>
-                      ) : null}
-                      {show("seen") ? <td className="when">{formatTime(r.first_seen_at, tz)}</td> : null}
                     </tr>
                   );
                 })}

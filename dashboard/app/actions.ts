@@ -7,7 +7,7 @@ import { COLUMNS_COOKIE, hiddenFromForm } from "@/lib/columns";
 import { aliasesFor } from "@/lib/people";
 import { decideCall, decideRequest, type DecideRequestResult, type DecideResult } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
-import { decidedNotice, safeReturnTo } from "@/lib/text";
+import { decidedNotice, fromQueue, safeReturnTo } from "@/lib/text";
 import { isDecision, STATUS_LABELS } from "@/lib/values";
 import { allowlist, currentViewer, VIEWER_COOKIE } from "@/lib/viewer";
 
@@ -52,13 +52,12 @@ export async function decide(formData: FormData): Promise<void> {
     const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
     backTo(returnTo, "error", `Could not save the decision: ${detail}`);
   }
-  revalidatePath("/");
-  revalidatePath("/calls");
+  revalidatePath("/", "layout");
   if (result.ok) {
     const stays = result.callStatus && result.callStatus !== status ? ` The call stays ${STATUS_LABELS[result.callStatus]}.` : "";
-    const fromQueue = new URL(returnTo, "http://dashboard.local").pathname === "/";
-    const notice = decidedNotice(result.plan, STATUS_LABELS[status], result.title, stays, fromQueue);
-    backTo(returnTo, "notice", notice, fromQueue && result.plan !== "note" ? result.title : undefined);
+    const queue = fromQueue(returnTo);
+    const notice = decidedNotice(result.plan, STATUS_LABELS[status], result.title, stays, queue);
+    backTo(returnTo, "notice", notice, queue && result.plan !== "note" ? result.title : undefined);
   }
   backTo(returnTo, "error", result.reason);
 }

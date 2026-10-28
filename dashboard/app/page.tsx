@@ -4,22 +4,20 @@ import { PortalLogo } from "@/components/PortalLogo";
 import { Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
 import { Badge, Flash, TitleLink } from "@/components/bits";
-import { parseTop, weekLabel } from "@/lib/brief";
+import { weekLabel } from "@/lib/brief";
 import { formatAgo, formatDue, formatTime } from "@/lib/format";
 import { dayMonth, daysLeftText, kindsLine, topTenOrder } from "@/lib/home";
 import { verdictsFor } from "@/lib/judges";
 import { aliasesFor, displayPerson } from "@/lib/people";
 import {
-  briefRows,
-  briefWeeks,
   countSubmittedWaiting,
   countToDraft,
   judgeAgreement,
   lastCompletedRun,
   latestJudgments,
-  liveTopTen,
   listRuns,
   queueCounts,
+  topTenIds,
   topTenRows,
   waitingRequests,
 } from "@/lib/queries";
@@ -34,15 +32,11 @@ export const metadata: Metadata = { title: "Home | BD Team" };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-/** This week's Top 10 from the newest Monday brief, or the live ranking before the first brief (H2). */
-async function topTen(): Promise<{ ids: string[]; source: string }> {
-  const weeks = await briefWeeks();
-  if (weeks && weeks.length) {
-    const rows = await briefRows(weeks[0]);
-    const top = parseTop(rows.find((r) => r.portal === null)?.body);
-    if (top) return { ids: top.top.map((c) => c.id), source: `From the Monday brief, ${weekLabel(weeks[0])}, with each call's decision as of now.` };
-  }
-  return { ids: await liveTopTen(), source: "No Monday brief yet, so this is the live ranking: yes before maybe, then the nearest deadline." };
+/** Where the Top 10 comes from, in one line (H2). */
+function topSource(week: string | null): string {
+  return week
+    ? `From the Monday brief, ${weekLabel(week)}, with each call's decision as of now.`
+    : "No Monday brief yet, so this is the live ranking: yes before maybe, then the nearest deadline.";
 }
 
 /**
@@ -60,7 +54,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     waitingRequests(),
     countToDraft(),
     countSubmittedWaiting(),
-    topTen(),
+    topTenIds(),
     listRuns(1),
     lastCompletedRun(),
     judgeAgreement(),
@@ -112,7 +106,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       <section className="top-ten" aria-labelledby="top-ten-title">
         <div className="section-head">
           <h2 id="top-ten-title">Top 10</h2>
-          <p className="muted">{top.source}</p>
+          <p className="muted">{topSource(top.week)}</p>
         </div>
         {order.length === 0 ? (
           <div className="empty">

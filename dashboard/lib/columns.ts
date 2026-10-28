@@ -1,5 +1,5 @@
 // The columns the review queue and All calls show, and which ones a person has hidden in the
-// Settings dialog (PRO-555), kept per browser in a cookie. No imports, so `node --test` can load it.
+// Table settings (PRO-555), kept per browser in a cookie. No imports, so `node --test` can load it.
 
 export type TablePage = "queue" | "calls";
 export type Column = { key: string; label: string; fixed?: boolean };
@@ -7,33 +7,41 @@ export type Hidden = Record<TablePage, string[]>;
 
 export const COLUMNS_COOKIE = "bd_columns";
 
-/** Every column in the order the table shows it. A fixed column always shows. */
+/**
+ * Every column in the order the table shows it (PRO-571), with the Call cell's details and tags lines
+ * and Needs review's note box as choices too (S1). A fixed column always shows.
+ */
 export const COLUMNS: Record<TablePage, Column[]> = {
   queue: [
-    { key: "judges", label: "Claude / Grok" },
     { key: "call", label: "Call", fixed: true },
+    { key: "details", label: "Details under the title" },
     { key: "tags", label: "Tags under the title" },
-    { key: "due", label: "Due" },
-    { key: "tier", label: "Tier" },
+    { key: "votes", label: "Votes" },
+    { key: "description", label: "Description" },
     { key: "reason", label: "AI reason" },
+    { key: "due", label: "Due" },
     { key: "seen", label: "First seen" },
-    { key: "votes", label: "Decided so far" },
+    { key: "note", label: "Note box" },
     { key: "decide", label: "Decide", fixed: true },
   ],
   calls: [
     { key: "call", label: "Call", fixed: true },
+    { key: "details", label: "Details under the title" },
     { key: "tags", label: "Tags under the title" },
     { key: "filter", label: "Filter" },
-    { key: "judges", label: "Claude / Grok" },
-    { key: "decision", label: "Decision", fixed: true },
+    { key: "votes", label: "Votes" },
+    { key: "description", label: "Description" },
+    { key: "reason", label: "AI reason" },
     { key: "notes", label: "Notes" },
     { key: "due", label: "Due" },
     { key: "seen", label: "First seen" },
+    { key: "decide", label: "Decide", fixed: true },
   ],
 };
 
-// Tier (the keyword filter's match strength) is hidden until a person shows it.
-const DEFAULT_HIDDEN: Hidden = { queue: ["tier"], calls: [] };
+// First seen is hidden until a person shows it (S4). All calls' Notes column, which the handoff
+// replaces with a notes panel, is hidden too, so the table fits at 1280px.
+const DEFAULT_HIDDEN: Hidden = { queue: ["seen"], calls: ["notes", "seen"] };
 const PAGES = Object.keys(COLUMNS) as TablePage[];
 
 function defaults(): Hidden {
