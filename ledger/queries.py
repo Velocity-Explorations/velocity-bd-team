@@ -974,7 +974,10 @@ def pursuit_events(pursuit_id: int) -> list[dict[str, Any]]:
 
 WORKER_STATES = ("idle", "working", "stopped")
 CHECKLIST_PARTS = ("registrations", "documents", "inputs", "formatting", "reviews", "submission")
-CHECKLIST_ORIGINS = ("requirements", "condition")
+CHECKLIST_ORIGINS = ("requirements", "condition", "final")
+# A pursuit's result as the Proposal Register records it: the Register has no "cancelled by the agency", so that
+# result is written as no_award (docs/design/handoff/docs/decisions.md).
+REGISTER_OUTCOMES = {"won": "won", "lost": "lost", "withdrawn": "withdrawn", "cancelled_by_agency": "no_award"}
 
 
 def _iso_date(value: str) -> str:
@@ -1196,3 +1199,22 @@ def finish_job(job_id: int, state: str, result: str) -> bool:
 def get_job(job_id: int) -> dict[str, Any] | None:
     with tx() as conn:
         return one(q(conn, "SELECT * FROM worker_jobs WHERE id = ?", (job_id,)))
+
+
+def register_outcome(result: str | None) -> str | None:
+    """The Register's outcome for a pursuit's result (P5): cancelled by the agency becomes no_award."""
+    if result is None:
+        return None
+    if result not in REGISTER_OUTCOMES:
+        raise ValueError(f"unknown result: {result}")
+    return REGISTER_OUTCOMES[result]
+
+
+def lessons(limit: int = 8) -> list[dict[str, Any]]:
+    """What earlier results taught (P4): the newest recorded results with a note for next time or a debrief, for
+    the next alignment check."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT c.title, c.portal, p.result, p.result_at, p.next_time, p.debrief FROM pursuits p "
+                            "JOIN calls c ON c.id = p.call_id WHERE p.result IS NOT NULL "
+                            "AND (p.next_time IS NOT NULL OR p.debrief IS NOT NULL) ORDER BY p.result_at DESC, p.id DESC LIMIT ?",
+                      (limit,)))

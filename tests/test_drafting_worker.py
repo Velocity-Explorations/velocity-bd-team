@@ -28,6 +28,7 @@ REPLIES = {
     "compliance check": "## 1. Keywords\n- ok\n---CORRECTED DRAFT---\n# White paper v2",
     "building checklist": "# Checklist\n- [ ] rates",
     "formatting document": "# White paper, final\n\nBody.",
+    "final compliance re-check": "## 1. Keywords\n- ok",
     "submission packet": f'# Submission packet\nEmail it.\n{FENCE}json\n{{"key_points": ["Email"], "files": [{{"file": "PDF", "slot": "email"}}]}}\n{FENCE}',
 }
 

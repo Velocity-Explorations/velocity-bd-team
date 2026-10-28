@@ -209,11 +209,25 @@ def summary(ctx: StepContext) -> StepResult:
                                "question": QUESTIONS["summary"]})
 
 
+def _lessons() -> str:
+    """What the team wrote down after earlier results (P4), one line each, for the alignment check to weigh."""
+    found = []
+    for r in lq.lessons():
+        line = f"- {r['title'] or 'An earlier call'} ({str(r['result']).replace('_', ' ')}):"
+        if r["next_time"]:
+            line += f" {r['next_time'].strip()}"
+        if r["debrief"]:
+            line += f" Debrief: {r['debrief'].strip()}"
+        found.append(line)
+    return "\n".join(found)
+
+
 def alignment(ctx: StepContext) -> StepResult:
     """Step 3 (PW8): the verdict, and Claude's angle beside the owner's direction."""
     reply = ctx.ask(Prompt(_system("alignment", "Alignment", ALIGNMENT_SPEC),
                            user_prompt(ctx, ("DISCOVERY SUMMARY, FROM STEP 1", ctx.earlier("discovery.md")),
-                                       ("OPPORTUNITY SUMMARY, FROM STEP 2", ctx.earlier("opportunity_summary.md")))),
+                                       ("OPPORTUNITY SUMMARY, FROM STEP 2", ctx.earlier("opportunity_summary.md")),
+                                       ("LESSONS FROM EARLIER RESULTS", _lessons()))),
                     "alignment", MAX_TOKENS["alignment"])
     document, data = split_reply(reply)
     saved = ctx.save("alignment.md", document or reply, "Alignment")

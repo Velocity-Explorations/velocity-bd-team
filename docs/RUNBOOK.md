@@ -157,7 +157,8 @@ place in your profile, and keeps the result in the ledger (`slop_scans`); withou
 says the check did not run. Check again on the dashboard queues a scan of the newest draft, which the
 worker runs when no step is waiting. The result page (See the result in Reviews) shows the newest scan
 and the text as scanned; to clear a placeholder, edit the newest draft in the pursuit's folder, then
-choose Check again. The worker
+choose Check again. Final checks also runs the compliance check once more on the final version, as a
+report only (`final_compliance.md`); it never changes the final version, so fix what it finds by hand. The worker
 cannot open portal pages or download attachments yet, so its steps work from what the scanner saved and
 list what the owner should fetch. Login-gated text (Vulcan SOF, NSTXL member pages) goes to the Anthropic
 API and these local files, by David's decision of 27 Oct, and never into the repo. The log is

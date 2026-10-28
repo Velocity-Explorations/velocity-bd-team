@@ -233,3 +233,23 @@ def test_no_prompt_or_document_carries_a_dash(ledger_db: str, tmp_path: Path, st
     for _, prompt, _ in model.asked:
         for text in (prompt.system, prompt.user):
             assert chr(0x2013) not in text and chr(0x2014) not in text
+
+
+def test_alignment_reads_what_earlier_results_taught(ledger_db: str, tmp_path: Path) -> None:
+    from ledger.db import q, tx
+
+    model = Model()
+    ctx, _ = _context(tmp_path, model, "alignment")
+    run_id = lq.start_run("sam_gov")
+    lq.upsert_call({"id": "sam-old", "portal": "SAM.gov", "title": "Earlier C2 call", "due_date": "2026-01-15"}, run_id)
+    lq.set_human("sam-old", "pursue", "David Wood")
+    old = lq.start_pursuit("sam-old", "David Wood", format="White paper")
+    with tx() as conn:
+        q(conn, "UPDATE pursuits SET state = 'submitted', result = 'lost', result_at = '2026-05-01T12:00:00Z', "
+                "next_time = 'Name the research partner before the outline.', debrief = 'Weak teaming' WHERE id = ?", (old,))
+    assert [(r["title"], r["result"], r["next_time"]) for r in lq.lessons()] == [
+        ("Earlier C2 call", "lost", "Name the research partner before the outline.")]
+    qualify.alignment(ctx)
+    user = model.prompt("alignment").user
+    assert "LESSONS FROM EARLIER RESULTS" in user
+    assert "Earlier C2 call (lost): Name the research partner before the outline. Debrief: Weak teaming" in user

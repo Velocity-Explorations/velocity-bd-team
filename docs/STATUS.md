@@ -214,5 +214,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     open placeholders, paragraphs to revise first, findings by family with their fixes, proposal
     faults apart, the scanned text at a line, and Check again. Under 150 words a draft has no band
     and only its placeholders decide Ready.
+  - Phase 9a (the worker side of Final checks): the seven checks of PW13 in words (formatting, the
+    compliance re-check as a report only, the placeholder sweep, the AI slop check's final pass with
+    the dash check, the package check until Drive, the checklist, the final version saved), each open
+    placeholder with its line and section, and one checklist item per kind still open. Alignment
+    reads the notes for next time from recorded results. A result maps to the Register's outcome,
+    cancelled by the agency as no_award, ready for the Register write with Drive.
 
 ## Known breakages

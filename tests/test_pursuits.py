@@ -402,3 +402,11 @@ def test_worker_jobs_are_claimed_once_and_finished(ledger_db: str) -> None:
     assert (job["state"], job["result"]) == ("done", "Ready: band light (provisional)") and job["finished_at"]
     with pytest.raises(ValueError):
         lq.queue_job("make_coffee", pursuit_id, None, "David Wood")
+
+
+def test_a_result_maps_to_the_registers_outcome_with_cancelled_as_no_award() -> None:
+    assert [lq.register_outcome(r) for r in ("won", "lost", "withdrawn", "cancelled_by_agency")] == [
+        "won", "lost", "withdrawn", "no_award"]
+    assert lq.register_outcome(None) is None
+    with pytest.raises(ValueError):
+        lq.register_outcome("shortlisted")
