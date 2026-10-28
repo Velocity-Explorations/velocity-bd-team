@@ -146,7 +146,9 @@ A step the worker was working on when it stopped shows as failed ("The worker st
 this step") the next time the worker starts, and Retry runs it again.
 
 **Files and logs.** Until the Drive phase, each pursuit's documents are Markdown files in
-`data\drafting\pursuits\pursuit-<id>\`, and each step's key points show on the dashboard. The drafts
+`data\drafting\pursuits\pursuit-<id>\`, each with a Word file beside it in the format the call sets
+(font, size, margins and spacing, found at Requirements and checklist; Times New Roman 12 with one-inch
+margins until then), and each step's key points show on the dashboard. The drafts
 are numbered: `draft_v1.md` (First draft), `draft_v2.md` (Compliance check), `draft_v3.md` (Reviews) and
 `draft_final.md` (Final checks). Final checks runs the AI slop check from `AI_SLOP_SCAN`, or from the
 skill's default place in your profile; without the scanner the step says the check did not run. The worker

@@ -14,11 +14,12 @@ question for the owner (QUESTIONS) is shown on its card rather than asked by the
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import asdict
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-from drafting import prompts
+from drafting import prompts, word
 from drafting.company import profile
 from drafting.dates import business_day_before, deadline_day
 from drafting.inputs import clashes_text, draft_inputs
@@ -84,6 +85,8 @@ CHECKLIST_SPEC = """{"key_points": ["three to six short points for the step's ca
                 "owner": "Claude, the owner's name, or another named person", "due": "YYYY-MM-DD or null",
                 "done": "true only when it is already met"}],
  "submit_by": "YYYY-MM-DD, the internal submit-by date, at least one business day before the deadline",
+ "format": {"font": "the font the call requires, or null", "size": "its size in points, or null",
+            "margins": "the margins in inches, or null", "spacing": "the line spacing as a multiple, 1 for single, or null"},
  "milestones": {"outline": "YYYY-MM-DD", "draft": "YYYY-MM-DD", "compliance": "YYYY-MM-DD", "reviews": "YYYY-MM-DD", "final": "YYYY-MM-DD"},
  "questions": [{"question": "the question as you would submit it", "deadline": "the Q&A deadline", "channel": "how to send it"}],
  "sources": [{"name": "the document", "what": "what it is", "version": "its version or amendment date"}]}
@@ -265,13 +268,16 @@ def requirements(ctx: StepContext) -> StepResult:
                                        portal=draft.portal, opp_type=draft.opp_type, due_date=draft.due_date,
                                        listing_text=draft.listing_text[:80_000], attachment_text="")
     text = ctx.ask(Prompt(analysis.system, analysis.user + ctx.redo_block()), "analyzing requirements", PIPELINE_MAX_TOKENS["4"])
-    first = ctx.save("requirements.md", text, "Requirements analysis")
+    ctx.save("requirements.md", text, "Requirements analysis")
     reply = ctx.ask(Prompt(_system("requirements", "Requirements and checklist", CHECKLIST_SPEC, checklist_instructions(),
                                    json_only=True),
                            user_prompt(ctx, ("REQUIREMENTS ANALYSIS, FROM THE FIRST HALF OF THIS STEP", text),
                                        ("DISCOVERY SUMMARY, FROM STEP 1", ctx.earlier("discovery.md")))),
                     "submission checklist", MAX_TOKENS["checklist"])
     _, data = split_reply(reply)
+    found = data.get("format") if isinstance(data.get("format"), dict) else {}
+    ctx.word_format = word.format_from(found)
+    first = ctx.entry("requirements.md", "Requirements analysis")     # its Word file again, now in the call's format
     items = _checklist_items(ctx, data.get("checklist"))
     dates = _target_dates(ctx, data)
     lq.save_checklist(ctx.pursuit["id"], items, "requirements")
@@ -283,6 +289,8 @@ def requirements(ctx: StepContext) -> StepResult:
     return StepResult(summary=points(data, text), files=[first, second],
                       content={"document": text.rstrip() + "\n\n" + checklist, "checklist_items": len(items),
                                "submit_by": dates.get("submit_by"), "milestones": {k: v for k, v in dates.items() if k != "submit_by"},
+                               "format": asdict(ctx.word_format),
+                               "format_source": "the call" if any(v not in (None, "") for v in found.values()) else "plain defaults",
                                "question": QUESTIONS["requirements"]})
 
 

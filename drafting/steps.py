@@ -16,6 +16,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from drafting import word
 from drafting.company import profile
 from drafting.inputs import CallRecord, call_facts
 from drafting.prompts import Prompt
@@ -57,6 +58,7 @@ class StepContext:
     progress: Callable[[Mapping[str, str]], None]          # task states while the step works (PW6)
     previous: dict[str, Any] | None = None                 # the attempt before this one
     today: date = field(default_factory=date.today)
+    word_format: word.Format = word.DEFAULT                # the solicitation's format, from Requirements and checklist
 
     @property
     def note(self) -> str:
@@ -75,9 +77,16 @@ class StepContext:
         return self.entry(name, label)
 
     def entry(self, name: str, label: str) -> dict[str, str]:
-        """A saved file's entry for pursuit_steps.files. Local until Drive (phase 6), so it carries the path
-        under data/drafting/pursuits/."""
-        return {"name": label, "local": f"{self.work_dir.name}/{name}"}
+        """A saved file's entry for pursuit_steps.files, with its Word file written beside it in the
+        solicitation's format; a rule is a page break in drafts only. Local until Drive (phase 6b), so the
+        entry carries the paths under data/drafting/pursuits/."""
+        path = self.work_dir / name
+        found = {"name": label, "local": f"{self.work_dir.name}/{name}"}
+        if path.suffix == ".md" and path.exists():
+            saved = word.to_docx(path.read_text(encoding="utf-8"), path.with_suffix(".docx"), self.word_format,
+                                 page_breaks=name.startswith("draft"))
+            found["word"] = f"{self.work_dir.name}/{saved.name}"
+        return found
 
     def redo_block(self) -> str:
         """For Ask for changes: the owner's note and the version it is about, to go after a prompt."""

@@ -4,4 +4,5 @@ playwright>=1.47
 pyyaml>=6
 tzdata>=2024.1   # time zone data for zoneinfo, which Windows lacks
 anthropic>=1.0
+python-docx>=1.2   # Word files for the proposal workspace (drafting/word.py)
 pytest>=8

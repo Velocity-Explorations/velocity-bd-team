@@ -190,5 +190,8 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     checks (readiness checklist, formatting, the opening held for a person, the AI slop check), and
     the Submit gate's checks and submission packet. Every file and card it saves has its dashes
     replaced.
+  - Phase 6a (PRO-579): every workspace document gets a Word file beside its Markdown, in the format
+    the call sets (font, size, margins, spacing), placeholders highlighted yellow. Drive (6b) waits
+    for the Google service account (RUNBOOK, Google Drive and Sheets).
 
 ## Known breakages

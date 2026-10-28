@@ -23,6 +23,7 @@ call's text or title.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import logging.handlers
 import os
@@ -34,7 +35,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from drafting import costs, inputs, llm, qualify, write
+from drafting import costs, inputs, llm, qualify, word, write
 from drafting.pipeline import PHASE_TIMEOUT_S
 from drafting.prompts import Prompt
 from drafting.steps import StepContext, StepResult, fix_dashes
@@ -178,6 +179,16 @@ def _undashed(value: Any) -> Any:
     return value
 
 
+def _word_format(pursuit_id: int) -> word.Format:
+    """The format the solicitation sets, as Requirements and checklist found it; plain defaults before then."""
+    found = lq.latest_steps(pursuit_id).get("requirements")
+    try:
+        content = json.loads(found["content"]) if found and found.get("content") else {}
+    except ValueError:
+        content = {}
+    return word.format_from(content.get("format") if isinstance(content, dict) else None)
+
+
 def _why(exc: Exception) -> str:
     """Why a step failed, in words for the step's card (PW15)."""
     text = str(exc) if isinstance(exc, llm.PhaseError) else f"{type(exc).__name__}: {exc}"
@@ -211,7 +222,7 @@ def _run(step: dict[str, Any], pursuit: dict[str, Any], label: str, doing: str, 
         ctx = StepContext(pursuit=pursuit, step=step, record=inputs.gather(pursuit["id"]),
                           work_dir=WORK_ROOT / f"pursuit-{pursuit['id']}", ask=ask,
                           progress=lambda states: lq.set_task_states(step["id"], states), previous=_previous(step),
-                          today=today)
+                          today=today, word_format=_word_format(pursuit["id"]))
         result = runner(ctx)
     except llm.DraftCancelled:
         if meter.over:
