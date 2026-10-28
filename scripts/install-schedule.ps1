@@ -1,4 +1,5 @@
-# Registers the pipeline, the portal assistant's jobs and the Writer's worker in Windows Task Scheduler.
+# Registers the pipeline, the portal assistant's jobs, the Writer's worker and the workspace's Slack notices
+# in Windows Task Scheduler.
 #
 #   .\scripts\install-schedule.ps1                       # Sundays 22:00, current user
 #   .\scripts\install-schedule.ps1 -Day Tuesday -At 07:30
@@ -25,7 +26,9 @@ param(
     [string[]]$RequestsAt = @("12:07", "17:07"),
     [int]$WaitLockMinutes = 30,
     [string]$WorkerTaskName = "velocity-bd-team worker",
-    [int]$WorkerCheckMinutes = 5
+    [int]$WorkerCheckMinutes = 5,
+    [int]$WorkspaceSlackMinutes = 5,
+    [string]$WorkspaceMorningAt = "08:00"
 )
 
 $ErrorActionPreference = "Stop"
@@ -120,3 +123,14 @@ Write-Host "Registered '$WorkerTaskName'"
 Write-Host "  runs:     $python -m drafting.worker  (in $repo)"
 Write-Host "  trigger:  at logon, and started again within $WorkerCheckMinutes minutes if it stops"
 Write-Host "Start it now with:  Start-ScheduledTask -TaskName '$WorkerTaskName'"
+
+# Workspace notices in Slack (docs/RUNBOOK.md, "Workspace notices in Slack"): every few minutes, a card for a
+# pursued call without one and each step newly ready for its owner, in the call's thread; at 08:00, steps behind
+# their target and a digest per owner. Both exit at once, posting nothing, until WORKSPACE_SLACK=on is in .env.
+Register-Job "velocity-bd-team workspace slack" "run.py --workspace-slack" `
+    (New-ScheduledTaskTrigger -Once -At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Minutes $WorkspaceSlackMinutes)) 5 `
+    "velocity-bd-team: post the proposal workspace's step ready notices to Slack (off until WORKSPACE_SLACK=on)."
+Write-Host "  trigger:  every $WorkspaceSlackMinutes minutes"
+Register-Job "velocity-bd-team workspace morning" "run.py --workspace-morning" (New-ScheduledTaskTrigger -Daily -At $WorkspaceMorningAt) 10 `
+    "velocity-bd-team: post the workspace's behind-target notices and each owner's digest to Slack (off until WORKSPACE_SLACK=on)."
+Write-Host "  trigger:  daily at $WorkspaceMorningAt"

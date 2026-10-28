@@ -24,7 +24,7 @@ that share one ledger database: hosted Postgres in production, SQLite in tests.
 | library/ | Proposal Library of past submissions: Drive sync, text extraction, chunking, embeddings. |
 | drafting/ | Proposal briefs and response drafts built from reviewed calls and the Proposal Library, and the Writer's worker (`python -m drafting.worker`), which runs the proposal workspace's steps (docs/RUNBOOK.md, The worker). |
 | dashboard/ | Next.js triage dashboard reading the ledger directly (docs/DASHBOARD.md). Its own package.json; run npm commands inside dashboard/. |
-| slack/ | `alerts.py` (failure alerts), `sink.py` (cards, run summary, thread notes, and editing cards to show decisions made on the dashboard). |
+| slack/ | `alerts.py` (failure alerts), `sink.py` (cards, run summary, thread notes, and editing cards to show decisions made on the dashboard), `workspace.py` (the proposal workspace's notices: step ready, behind target, the morning digest; off until WORKSPACE_SLACK=on). |
 | scripts/ | PowerShell helpers, including the Task Scheduler registration script. |
 | docs/ | OWNERS.md, STATUS.md, LEDGER_SCHEMA.md, RUNBOOK.md, DASHBOARD.md, plans/, design/ (the dashboard redesign: spec, Claude Design's handoff in design/handoff/, and the build plan). |
 | tests/ | pytest suite. Every phase adds tests before code. |

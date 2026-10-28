@@ -327,6 +327,20 @@ def backfill_tags() -> int:
     return 0
 
 
+def workspace_notices(morning: bool = False) -> int:
+    """The proposal workspace's notices in Slack (PW18): every few minutes, cards and steps ready; at 08:00, steps
+    behind target and the digest. Nothing posts until WORKSPACE_SLACK is on. They never take the pipeline's lock."""
+    from slack import workspace
+
+    _console_logging()
+    done = workspace.morning() if morning else workspace.announce()
+    if done.get("off"):
+        print("Workspace notices in Slack are off; set WORKSPACE_SLACK=on in .env to turn them on.")
+    else:
+        print("Workspace notices in Slack: " + ", ".join(f"{n} {kind}" for kind, n in done.items()))
+    return 0
+
+
 SUMMARY_TOKENS_OUT = 400   # the summary line, and the thinking the model does before it
 
 
@@ -878,6 +892,10 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="record Claude's past verdicts as judgments and have Grok judge the backlog, then exit")
     parser.add_argument("--backfill-tags", action="store_true",
                         help="tag every stored call by its rules and have Claude and Grok tag the reviewed ones, then exit")
+    parser.add_argument("--workspace-slack", action="store_true",
+                        help="post workspace notices to Slack: cards for pursued calls without one, steps ready; then exit")
+    parser.add_argument("--workspace-morning", action="store_true",
+                        help="post the morning's workspace notices to Slack: steps behind target, the digest per owner; then exit")
     parser.add_argument("--backfill-summaries", action="store_true",
                         help="have Claude summarize each open, reviewed call that has no summary, then exit; "
                              "with --dry-run, count the calls and price the run instead")
@@ -900,6 +918,8 @@ def main(argv: list[str] | None = None) -> int:
         return backfill_tags()
     if args.backfill_summaries:
         return backfill_summaries(dry_run=args.dry_run)
+    if args.workspace_slack or args.workspace_morning:
+        return workspace_notices(morning=args.workspace_morning)
     try:
         acquire_lock(wait_s=args.wait_lock * 60)
     except LockHeld as exc:

@@ -46,6 +46,24 @@ feed the next review as a RECENT HUMAN DECISIONS block in the prompt. A dry run 
 cards instead of posting and makes no Slack calls. Set DASHBOARD_URL in `.env` once the
 dashboard is hosted and cards and summaries link to it.
 
+### Workspace notices in Slack
+
+The proposal workspace can post to Slack too (PW18), in two scheduled jobs that never take the
+pipeline's lock:
+- **Every 5 minutes** (`run.py --workspace-slack`, task "velocity-bd-team workspace slack"): a card
+  for any pursued call that has none, so its notices have a thread; then each step newly ready for
+  its owner, in the call's thread. Steps the worker approves itself (key gates only) are not posted.
+- **At 08:00** (`run.py --workspace-morning`, task "velocity-bd-team workspace morning"): each step
+  past its target date (worked back from the internal submit-by date) in its call's thread, then one
+  message per owner listing what waits on them: steps ready, failed (Retry) or past the budget.
+
+They post nothing until `WORKSPACE_SLACK=on` is in `.env`: the team asked on 28 Oct for fewer
+automatic posts in the channel, so they start off. Each notice goes out once; what was posted is kept
+in the pursuit's history (`slack_ready`, `slack_behind`), and the digest's day in
+`data/slack/workspace_digest.txt`. To mention people, copy DASHBOARD_USERS (`Name=<Slack id>`, comma
+separated) from `dashboard/.env.local` into `.env`; a name without a Slack id is written out. Rerun
+`scripts/install-schedule.ps1` once to register the two tasks.
+
 ## Logs
 
 - `data/logs/run_YYYY-MM-DD_HHMM.log`, one per run, same lines as stdout. The path is also

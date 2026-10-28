@@ -38,6 +38,8 @@ KNOWN_KEYS = [
     "BD_XAI_API_KEY",
     "BD_SAM_API_KEY",
     "DASHBOARD_URL",
+    "DASHBOARD_USERS",
+    "WORKSPACE_SLACK",
     "OLLAMA_URL",
 ]
 
