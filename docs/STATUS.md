@@ -171,5 +171,7 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     page has a breadcrumb home, the Top 10 table as on Home, and boards that link their portal's calls.
   - Phase 3c, part 2 (PRO-574): Profile settings at /profile, kept in the profiles table: display name
     and initials, where the dashboard opens, Calls' default filters, and time zone.
+  - Phase 4a (PRO-575): Proposals opens on five views (Closing in 14 days, To draft, Drafting,
+    Submitted and waiting, Results). Start the draft and the draft badges follow in 4b.
 
 ## Known breakages

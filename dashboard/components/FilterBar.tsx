@@ -27,6 +27,7 @@ export function FilterBar(props: {
   filtered: boolean;
   clearHref?: string;
   summary?: string;
+  settings?: boolean;
 }) {
   const chosen = props.selected.length === 0 ? "All" : props.selected.length === 1 ? props.selected[0] : `${props.selected.length} chosen`;
   const tagGroups: MenuGroup[] = [
@@ -90,10 +91,12 @@ export function FilterBar(props: {
         </a>
       ) : null}
       <p className="bar-count">{props.summary ?? ""}</p>
-      <button type="button" className="bar-settings" data-opens="table-settings">
-        <Settings2 aria-hidden="true" />
-        Table settings
-      </button>
+      {props.settings === false ? null : (
+        <button type="button" className="bar-settings" data-opens="table-settings">
+          <Settings2 aria-hidden="true" />
+          Table settings
+        </button>
+      )}
     </div>
   );
 }
