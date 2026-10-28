@@ -1,0 +1,49 @@
+/* Velocity Theme: the default card. Add the custom properties to tokens.css. */
+:root {
+  --radius-chip: 3px;
+  --radius-card: 4px;
+  --radius-panel: 6px;
+  --card-fill: linear-gradient(135deg, #2C2C2C 0%, #262626 45%, #212121 100%);
+  --card-fill-selected: linear-gradient(135deg, #363636 0%, #2E2E2E 45%, #282828 100%);
+  --card-border: #333333;
+  --card-border-hover: #757575;
+  --card-border-selected: #F5F5F5;
+  --card-band-line: #333333;
+  --card-band-selected: #383838;
+  --card-band-line-selected: #555555;
+  --card-accent-bar: #FFCB03;
+  --card-shadow: 4px 6px 14px rgba(0, 0, 0, 0.45);
+  --card-shadow-hover: 6px 10px 22px rgba(0, 0, 0, 0.55);
+  --card-shadow-selected: 4px 6px 16px rgba(0, 0, 0, 0.55);
+  --card-lift: -2px;
+  --card-transition: 140ms ease-out;
+}
+
+/* A row of cards: label, number and description line up across the row. */
+.vt-card-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; column-gap: 12px; }
+
+.vt-card {
+  position: relative; grid-row: span 3; display: grid; grid-template-rows: subgrid; overflow: hidden;
+  background: var(--card-fill); border: 2px solid var(--card-border); border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow); color: #F5F5F5; text-align: left; text-decoration: none; cursor: pointer;
+  transition: transform var(--card-transition), box-shadow var(--card-transition), border-color var(--card-transition);
+}
+.vt-card__label { display: flex; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--card-band-line);
+  font: 600 11px/1.35 'Chakra Petch', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: #BEBEBE; }
+.vt-card__number { padding: 12px 14px 6px; font: 700 30px/1 'Inter Tight', sans-serif; }
+.vt-card__number--needs-you { color: #FFCB03; }
+.vt-card__description { align-self: start; padding: 0 14px 14px; font: 12px/1.4 'Chakra Petch', sans-serif; color: #959595; }
+
+.vt-card:hover { border-color: var(--card-border-hover); transform: translateY(var(--card-lift)); box-shadow: var(--card-shadow-hover); }
+.vt-card:active { transform: translateY(0); box-shadow: var(--card-shadow); }
+.vt-card:focus-visible { outline: 2px solid #FFCB03; outline-offset: 2px; }
+
+.vt-card[aria-pressed="true"], .vt-card[aria-current="page"] { background: var(--card-fill-selected); border-color: var(--card-border-selected); box-shadow: var(--card-shadow-selected); }
+.vt-card[aria-pressed="true"] .vt-card__label { background: var(--card-band-selected); border-bottom-color: var(--card-band-line-selected); }
+.vt-card[aria-pressed="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--card-accent-bar); }
+.vt-card[aria-pressed="true"]:hover { border-color: var(--card-border-selected); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vt-card { transition: none; }
+  .vt-card:hover, .vt-card:active { transform: none; }
+}

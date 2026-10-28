@@ -2,6 +2,8 @@
 
 25 Oct 2026, David; revised 26 Oct for Home and the four sections
 
+> Superseded on 28 Oct 2026 by Claude Design's handoff package (handoff/README.md) and the build plan in redesign-plan.md. Kept for the record; requirement IDs here follow the spec as it stands.
+
 Seven prompts take the dashboard from today's UI to the Velocity Theme redesign: one for Claude Design, then six for Claude Code, each ending in a merged pull request.
 
 ## How to use
@@ -113,10 +115,10 @@ Phase 2 of 6 of the dashboard redesign: the four sections, Home and the account 
 
 Read first: AGENTS.md, docs/STATUS.md and docs/DASHBOARD.md; the design <DESIGN_LINK> (the top bar, the tabs, Home, Proposals, Automation, the account menu and Profile settings); the spec docs/design/dashboard-design-spec.md, sections Pages, Home, Proposals, Deciding, Settings, and Account menu and profile; then every page under dashboard/app/, dashboard/lib/queries.ts and dashboard/lib/brief.ts. If you cannot open the design, ask David to export it into docs/design/redesign/.
 
-Build N1 to N6, H1 to H7, P1 to P8 and U1 to U6, keeping V1 to V9 and S1 to S6:
+Build N1 to N6, H1 to H5, P1 to P8 and U1 to U6, keeping V1 to V9 and S1 to S6:
 - Top bar: Home, Calls, Proposals and Automation, with the Requests count as a badge on Automation, and the account menu (U1): the picker becomes Switch user, Clear User Selection becomes Log out, and Settings becomes Table settings, which also stays beside the filter bar.
 - Addresses: Home at /; Calls with To review at /review (today's queue, moved from /) and All at /calls; Proposals with Pursuing at /proposals, Submitted at /proposals/submitted and Results at /proposals/results (today's Proposals page); Automation with Requests at /requests, Scans at /runs and Judges at /judges; Profile settings at /profile; past weekly briefs stay at /brief, linked from Home. Every old address keeps working (N4).
-- Home, built as designed: the blocks in H1 to H7, read live from the ledger. The Top 10 ranks yes before maybe, then the nearest deadline, then the newest, the order assistant/tools.py (RANKING) uses for the Monday brief; write that order in the dashboard's own query, since the dashboard reads only the ledger (AGENTS.md rule 1).
+- Home, built as designed: the blocks in H1 to H5, read live from the ledger. The Top 10 ranks yes before maybe, then the nearest deadline, then the newest, the order assistant/tools.py (RANKING) uses for the Monday brief; write that order in the dashboard's own query, since the dashboard reads only the ledger (AGENTS.md rule 1).
 - Pursuing and Submitted read each call's decision (human_status pursue or submitted, with human_by and human_at), in phase 1's look; phase 5 brings them, Results and Automation to the design.
 - Pursuing's two sections (P5 to P8): the Draft button and draft progress need the drafts queue and worker (docs/plans, Draft-Ready Upgrade U1 and Writer Plan W2a). If they are not on main yet, list the calls in both sections, show Draft as not set up yet, and say so in the PR.
 - Profile settings (U2 to U6): display name and initials, where the dashboard opens, default filters for Calls and time zone, kept for this browser until sign-in.
@@ -243,7 +245,7 @@ Update the BD dashboard design you made earlier. On 26 Oct the structure changed
 
 Read first, from the public repo Velocity-Explorations/velocity-bd-team (plain text: https://raw.githubusercontent.com/Velocity-Explorations/velocity-bd-team/main/ followed by the path):
 - docs/design/dashboard-design-spec.md: https://github.com/Velocity-Explorations/velocity-bd-team/blob/main/docs/design/dashboard-design-spec.md
-  The sections that changed: Pages (N1 to N6), Home (H1 to H7), Proposals (P1 to P8), Account menu and profile (U1 to U6), Deciding (V1 to V4), Q9 under Calls: To review, and the 26 Oct rows of the Decision log. The rest is unchanged since your first design.
+  The sections that changed: Pages (N1 to N6), Home (H1 to H5), Proposals (P1 to P8), Account menu and profile (U1 to U6), Deciding (V1 to V4), Q9 under Calls: To review, and the 26 Oct rows of the Decision log. The rest is unchanged since your first design.
 
 The new structure:
 - Top bar: Home, Calls, Proposals and Automation, with the Requests count as a badge on Automation, and your account menu at the right.

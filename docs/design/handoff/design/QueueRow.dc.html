@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div role="row" style="border-bottom:1px solid #333333;background:{{ rowBg }};font-family:'Inter Tight',Arial,sans-serif;color:#F5F5F5">
+  <div style="display:grid;grid-template-columns:{{ cols }};align-items:start">
+    <div role="cell" style="padding:12px 10px;min-width:0">
+      <a href="#" style="font-size:14px;line-height:1.35;font-weight:600;color:#F5F5F5;text-decoration:none;text-wrap:pretty" style-hover="text-decoration:underline;text-decoration-color:#FFCB03">{{ row.title }}<span aria-hidden="true" style="display:inline-block;width:12px;height:12px;flex:none;background:#959595;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/external-link.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/external-link.svg') center / contain no-repeat;vertical-align:-1px;margin-left:6px"></span></a>
+      <div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;column-gap:6px;row-gap:3px;font-size:12.5px;line-height:1.4;color:#BEBEBE">
+        <sc-for list="{{ row.details }}" as="d" hint-placeholder-count="3">
+          <span style="display:inline-flex;gap:6px;min-width:0"><span tabindex="{{ d.tab }}" title="{{ d.tip }}" style="color:{{ d.color }};text-decoration:{{ d.deco }};text-decoration-color:#757575;text-underline-offset:3px;overflow-wrap:anywhere">{{ d.t }}</span><span style="color:#555555">{{ d.sep }}</span></span>
+        </sc-for>
+      </div>
+      <sc-if value="{{ row.hasBadges }}"><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px"><sc-for list="{{ row.badges }}" as="b" hint-placeholder-count="0">
+          <span tabindex="0" title="{{ b.tip }}" style="display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ b.bd }};border-radius:3px;color:{{ b.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ b.fg }};flex:none"></span>{{ b.text }}</span>
+        </sc-for></div></sc-if>
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+        <sc-for list="{{ row.tags }}" as="g" hint-placeholder-count="4">
+          <span tabindex="0" title="{{ g.tip }}" style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border:1px solid {{ g.bd }};border-radius:3px;color:{{ g.fg }};font-size:11.5px;white-space:nowrap;box-sizing:border-box;outline:{{ g.ring }};outline-offset:1px">{{ g.text }}</span>
+        </sc-for>
+      </div>
+      <sc-if value="{{ row.tipOpen }}">
+        <div role="tooltip" style="margin-top:6px;display:inline-block;max-width:280px;padding:7px 10px;background:#F5F5F5;color:#1E1E1E;font-size:12px;line-height:1.35;border-radius:3px">{{ row.tipOpen }}</div>
+      </sc-if>
+      <sc-if value="{{ narrow }}">
+        <p style="margin:8px 0 0;font-size:13px;line-height:1.45;color:#BEBEBE;text-wrap:pretty">{{ row.reason }}</p>
+      </sc-if>
+    </div>
+    <div role="cell" style="padding:12px 10px;min-width:0">
+      <div tabindex="{{ row.due.tab }}" title="{{ row.due.tip }}" style="font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:500;line-height:1.4;color:{{ row.due.color }};text-decoration:{{ row.due.deco }};text-decoration-color:#757575;text-underline-offset:3px"><span style="white-space:nowrap">{{ row.due.main }}</span> <span style="white-space:nowrap">{{ row.due.time }}</span></div>
+      <div style="margin-top:2px;font-family:'Chakra Petch',sans-serif;font-size:11.5px;color:#959595">{{ row.due.sub }}</div>
+    </div>
+    <sc-if value="{{ wide }}">
+      <p role="cell" style="margin:0;padding:12px 10px;font-size:13px;line-height:1.45;color:#BEBEBE;text-wrap:pretty;min-width:0">{{ row.reason }}</p>
+    </sc-if>
+    <sc-if value="{{ showFirst }}"><div role="cell" style="padding:12px 10px;font-family:'Chakra Petch',sans-serif;font-size:12px;line-height:1.4;color:#BEBEBE"><span style="white-space:nowrap">{{ row.firstDate }}</span> <span style="white-space:nowrap">{{ row.firstTime }}</span></div></sc-if>
+    <div role="cell" style="padding:12px 10px;display:grid;grid-template-columns:{{ voteCols }};column-gap:8px;row-gap:5px;align-items:center;min-width:0">
+      <sc-for list="{{ row.judges }}" as="j" hint-placeholder-count="2">
+        <span style="font-family:'Chakra Petch',sans-serif;font-size:11.5px;font-weight:500;color:#959595;white-space:nowrap">{{ j.who }}</span>
+        <span style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span style="display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ j.b.bd }};border-radius:3px;color:{{ j.b.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ j.b.fg }};flex:none"></span>{{ j.b.text }}</span>
+          <sc-if value="{{ j.why }}"><button aria-label="{{ j.label }}" aria-expanded="{{ row.openAttr }}" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;flex:none;box-sizing:border-box;background:transparent;border:1px solid {{ j.bd }};border-radius:3px;cursor:pointer" style-hover="border-color:#FFCB03"><span aria-hidden="true" style="width:14px;height:14px;background:{{ j.ink }};-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/message-square-text.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/message-square-text.svg') center / contain no-repeat"></span></button></sc-if>
+        </span>
+      </sc-for>
+      <sc-if value="{{ row.flag }}"><span style="grid-column:2;justify-self:start;display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ row.flag.bd }};border-radius:3px;color:{{ row.flag.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ row.flag.fg }};flex:none"></span>{{ row.flag.text }}</span></sc-if>
+      <span style="grid-column:1 / -1;height:0;border-top:1px dashed #434343;margin:2px 0"></span>
+      <sc-if value="{{ row.noDecided }}"><span style="grid-column:1 / -1;font-size:12.5px;color:#959595">nobody yet</span></sc-if>
+      <sc-for list="{{ row.people }}" as="p" hint-placeholder-count="0">
+        <span style="font-family:'Chakra Petch',sans-serif;font-size:11.5px;font-weight:500;color:#959595;white-space:nowrap">{{ p.who }}</span>
+        <span style="display:flex;align-items:center;gap:8px;min-width:0"><span style="display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ p.b.bd }};border-radius:3px;color:{{ p.b.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ p.b.fg }};flex:none"></span>{{ p.b.text }}</span><sc-if value="{{ p.hasNote }}"><button aria-label="{{ p.who }}'s note" aria-expanded="{{ p.noteAttr }}" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;flex:none;box-sizing:border-box;background:transparent;border:1px solid {{ p.bd }};border-radius:3px;cursor:pointer" style-hover="border-color:#FFCB03"><span aria-hidden="true" style="width:14px;height:14px;background:{{ p.ink }};-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/message-square-text.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/message-square-text.svg') center / contain no-repeat"></span></button></sc-if></span>
+      </sc-for>
+      <sc-if value="{{ row.peopleFlag }}"><span style="grid-column:2;justify-self:start;display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ row.peopleFlag.bd }};border-radius:3px;color:{{ row.peopleFlag.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ row.peopleFlag.fg }};flex:none"></span>{{ row.peopleFlag.text }}</span></sc-if>
+    </div>
+    <div role="cell" style="padding:10px 10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0">
+      <sc-if value="{{ row.menuClosed }}">
+        <button aria-haspopup="menu" aria-expanded="false" aria-label="Decide on {{ row.title }}" style="display:flex;align-items:center;justify-content:space-between;width:100%;height:28px;padding:0 10px;background:#262626;border:1px solid #434343;border-radius:4px;color:#BEBEBE;font-family:'Inter Tight',sans-serif;font-size:12.5px;cursor:pointer" style-hover="border-color:#757575">Decide<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;flex:none;background:#BEBEBE;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-down.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-down.svg') center / contain no-repeat"></span></button>
+      </sc-if>
+      <sc-if value="{{ row.menuOpen }}">
+        <button aria-haspopup="menu" aria-expanded="true" aria-label="Decide on {{ row.title }}" style="display:flex;align-items:center;justify-content:space-between;width:100%;height:28px;padding:0 10px;background:#262626;border:1px solid #FFCB03;outline:1px solid #FFCB03;border-radius:4px;color:#F5F5F5;font-family:'Inter Tight',sans-serif;font-size:12.5px">Decide<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;flex:none;background:#FFCB03;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-up.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-up.svg') center / contain no-repeat"></span></button>
+        <div role="menu" style="padding:4px;background:linear-gradient(135deg,#2C2C2C 0%,#262626 45%,#212121 100%);border:2px solid #434343;border-radius:6px;box-shadow:4px 6px 14px rgba(0,0,0,0.45)">
+          <sc-for list="{{ menu }}" as="m" hint-placeholder-count="4"><div role="menuitem" style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;background:{{ m.bg }};font-size:12.5px"><span style="width:6px;height:6px;background:{{ m.fg }};flex:none"></span>{{ m.word }}</div></sc-for>
+          <div style="padding:4px 8px 2px;font-size:11px;line-height:1.35;color:#959595">Choosing records it at once.</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ row.noteOpen }}">
+        <label style="display:flex;justify-content:space-between;font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:500;color:#BEBEBE"><span>Note (optional)</span><span style="color:#959595">0 of 2,000</span></label>
+        <div aria-label="Note on {{ row.title }}" style="height:52px;padding:6px 8px;background:#1A1A1A;border:1px solid #FFCB03;outline:1px solid #FFCB03;border-radius:4px;box-sizing:border-box"></div>
+      </sc-if>
+      <sc-if value="{{ row.noteClosed }}">
+        <button style="align-self:flex-start;padding:0;background:none;border:none;color:#BEBEBE;font-family:'Inter Tight',sans-serif;font-size:12px;text-decoration:underline;text-decoration-color:#555555;text-underline-offset:3px;cursor:pointer" style-hover="color:#F5F5F5">Add a note</button>
+      </sc-if>
+    </div>
+  </div>
+  <sc-if value="{{ row.notesOpen }}">
+    <div style="margin:0 10px 12px;padding:12px 14px;background:#1A1A1A;border:1px solid #333333">
+      <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#959595">Notes, {{ row.noteCount }}</span><button aria-label="Close notes" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;flex:none;box-sizing:border-box;background:transparent;border:1px solid #434343;border-radius:4px;cursor:pointer" style-hover="border-color:#FFCB03"><span aria-hidden="true" style="display:inline-block;width:14px;height:14px;flex:none;background:#F5F5F5;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/x.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/x.svg') center / contain no-repeat"></span></button></div>
+      <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px">
+        <sc-for list="{{ row.notes }}" as="n" hint-placeholder-count="2">
+          <div style="padding:10px 12px;background:#262626;border:1px solid #333333;border-radius:4px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600">{{ n.who }}</span><span style="display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ n.b.bd }};border-radius:3px;color:{{ n.b.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ n.b.fg }}"></span>{{ n.b.text }}</span><span style="font-family:'Chakra Petch',sans-serif;font-size:11.5px;color:#959595">{{ n.when }}</span></div>
+            <p style="margin:6px 0 0;font-size:13px;line-height:1.45;color:#F5F5F5">{{ n.note }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ row.open }}">
+    <div style="position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr);gap:28px;margin:0 10px 12px;padding:12px 14px;background:#1A1A1A;border:1px solid #333333">
+      <span style="position:absolute;top:8px;right:10px"><button aria-label="Close reasons" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;flex:none;box-sizing:border-box;background:transparent;border:1px solid #434343;border-radius:4px;cursor:pointer" style-hover="border-color:#FFCB03"><span aria-hidden="true" style="display:inline-block;width:14px;height:14px;flex:none;background:#F5F5F5;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/x.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/x.svg') center / contain no-repeat"></span></button></span>
+      <div>
+        <div style="font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#959595">Claude's reason</div>
+        <p style="margin:6px 0 0;font-size:13px;line-height:1.45;color:#F5F5F5;text-wrap:pretty">{{ row.claudeReason }}</p>
+      </div>
+      <div>
+        <div style="font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#959595">Grok's reason</div>
+        <p style="margin:6px 0 0;font-size:13px;line-height:1.45;color:#F5F5F5;text-wrap:pretty">{{ row.grok }}</p>
+      </div>
+      <div>
+        <div style="font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#959595">Where the details come from</div>
+        <div style="margin-top:6px;display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:14px;row-gap:4px;font-size:12.5px;line-height:1.4">
+          <sc-for list="{{ row.sources }}" as="s" hint-placeholder-count="3">
+            <span style="color:#BEBEBE">{{ s.k }}</span><span style="color:#F5F5F5;overflow-wrap:anywhere">{{ s.v }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1392,&quot;height&quot;:160},&quot;row&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;narrow&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const narrow = !!this.props.narrow;
+    const r = this.props.row || {};
+    const showFirst = !!this.props.showFirst;
+    return {
+      narrow, wide: !narrow,
+      showFirst,
+      cols: narrow
+        ? (showFirst ? 'minmax(0,1fr) 92px 78px 184px 148px' : 'minmax(0,1fr) 96px 196px 156px')
+        : (showFirst ? 'minmax(0,1.15fr) 112px minmax(0,1fr) 84px 200px 176px' : 'minmax(0,1.2fr) 112px minmax(0,1.05fr) 200px 176px'),
+      voteCols: '58px minmax(0,1fr)',
+      menu: (window.BD && window.BD.decideMenu) || [],
+      rowBg: (r.open || r.notesOpen || r.selected) ? '#232323' : 'transparent'
+    };
+  }
+}
+</script>
+</body>
+</html>

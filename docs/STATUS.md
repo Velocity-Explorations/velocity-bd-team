@@ -143,5 +143,8 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   so Claude Design on the Velocity account can read them from GitHub (PRO-559). The redesign
   itself waits on that design. On 2026-10-26 the brief moved from seven pages to four sections:
   Home (new), Calls, Proposals and Automation, with an account menu and Profile settings.
+- Dashboard redesign build (from 2026-10-28): Claude Design's handoff is in docs/design/handoff/,
+  its spec updates are merged into the spec, and docs/design/redesign-plan.md sets the build in
+  phases 0 to 11, with Google sign-in last (PRO-565, PRO-566).
 
 ## Known breakages

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div role="row" style="display:grid;grid-template-columns:{{ cols }};align-items:start;border-bottom:1px solid #333333;font-family:'Inter Tight',Arial,sans-serif;color:#F5F5F5">
+  <sc-if value="{{ notC }}">
+    <div role="cell" style="padding:12px 10px;display:flex;flex-direction:column;gap:5px;min-width:0">
+      <sc-for list="{{ row.judges }}" as="j" hint-placeholder-count="2">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="width:36px;flex:none;font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:500;color:#959595">{{ j.who }}</span>
+          <span style="display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ j.b.bd }};border-radius:3px;color:{{ j.b.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ j.b.fg }}"></span>{{ j.b.text }}</span>
+          <sc-if value="{{ j.why }}"><button style="padding:0;background:none;border:none;color:#F5F5F5;font-size:12px;text-decoration:underline;text-decoration-color:#757575;text-underline-offset:3px">why</button></sc-if>
+        </div>
+      </sc-for>
+      <sc-if value="{{ row.flag }}"><span style="align-self:flex-start;display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ row.flag.bd }};border-radius:3px;color:{{ row.flag.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ row.flag.fg }}"></span>{{ row.flag.text }}</span></sc-if>
+    </div>
+  </sc-if>
+  <div role="cell" style="padding:12px 10px;min-width:0">
+    <a href="#" style="font-size:14px;line-height:1.35;font-weight:600;color:#F5F5F5;text-decoration:none">{{ row.title }}<span aria-hidden="true" style="display:inline-block;width:12px;height:12px;flex:none;background:#959595;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/external-link.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/external-link.svg') center / contain no-repeat;vertical-align:-1px;margin-left:6px"></span></a>
+    <div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;column-gap:6px;row-gap:3px;font-size:12.5px;line-height:1.4;color:#BEBEBE">
+      <sc-for list="{{ row.details }}" as="d" hint-placeholder-count="3"><span style="display:inline-flex;gap:6px;min-width:0"><span tabindex="{{ d.tab }}" title="{{ d.tip }}" style="color:{{ d.color }};text-decoration:{{ d.deco }};text-decoration-color:#757575;text-underline-offset:3px;overflow-wrap:anywhere">{{ d.t }}</span><span style="color:#555555">{{ d.sep }}</span></span></sc-for>
+    </div>
+    <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+      <sc-for list="{{ row.tags }}" as="g" hint-placeholder-count="4"><span tabindex="0" title="{{ g.tip }}" style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border:1px solid {{ g.bd }};border-radius:3px;color:{{ g.fg }};font-size:11.5px;white-space:nowrap;box-sizing:border-box">{{ g.text }}</span></sc-for>
+    </div>
+  </div>
+  <div role="cell" style="padding:12px 10px;min-width:0">
+    <div title="{{ row.due.tip }}" style="font-family:'Chakra Petch',sans-serif;font-size:12.5px;font-weight:500;line-height:1.4;color:{{ row.due.color }};text-decoration:{{ row.due.deco }};text-decoration-color:#757575;text-underline-offset:3px"><span style="white-space:nowrap">{{ row.due.main }}</span> <span style="white-space:nowrap">{{ row.due.time }}</span></div>
+    <div style="margin-top:2px;font-family:'Chakra Petch',sans-serif;font-size:11.5px;color:#959595">{{ row.due.sub }}</div>
+  </div>
+  <p role="cell" style="margin:0;padding:12px 10px;font-size:13px;line-height:1.45;color:#BEBEBE;text-wrap:pretty;min-width:0">{{ row.reason }}</p>
+  <div role="cell" style="padding:12px 10px;font-family:'Chakra Petch',sans-serif;font-size:12px;line-height:1.4;color:#BEBEBE"><span style="white-space:nowrap">{{ row.firstDate }}</span> <span style="white-space:nowrap">{{ row.firstTime }}</span></div>
+
+  <sc-if value="{{ notC }}">
+    <div role="cell" style="padding:12px 10px;font-size:12.5px;line-height:1.4;display:flex;flex-direction:column;gap:4px;min-width:0">
+      <sc-if value="{{ row.noDecided }}"><span style="color:#959595">nobody yet</span></sc-if>
+      <sc-for list="{{ row.decided }}" as="v" hint-placeholder-count="0"><div><span>{{ v.who }}:</span> <span style="color:{{ v.fg }};font-weight:600">{{ v.word }}</span></div></sc-for>
+    </div>
+    <div role="cell" style="padding:10px 10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0">
+      <sc-if value="{{ row.menuClosed }}">
+        <button aria-haspopup="menu" aria-expanded="false" style="display:flex;align-items:center;justify-content:space-between;width:100%;height:28px;padding:0 10px;background:#262626;border:1px solid #434343;border-radius:4px;color:#BEBEBE;font-size:12.5px">Decide<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;flex:none;background:#BEBEBE;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-down.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-down.svg') center / contain no-repeat"></span></button>
+      </sc-if>
+      <sc-if value="{{ row.menuOpen }}">
+        <button aria-haspopup="menu" aria-expanded="true" style="display:flex;align-items:center;justify-content:space-between;width:100%;height:28px;padding:0 10px;background:#262626;border:1px solid #FFCB03;outline:1px solid #FFCB03;border-radius:4px;color:#F5F5F5;font-size:12.5px">Decide<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;flex:none;background:#FFCB03;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-up.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-up.svg') center / contain no-repeat"></span></button>
+        <div role="menu" style="padding:4px;background:linear-gradient(135deg,#2C2C2C 0%,#262626 45%,#212121 100%);border:2px solid #434343;border-radius:6px;box-shadow:4px 6px 14px rgba(0,0,0,0.45)">
+          <sc-for list="{{ menu }}" as="m" hint-placeholder-count="4"><div role="menuitem" style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;background:{{ m.bg }};font-size:12.5px"><span style="width:6px;height:6px;background:{{ m.fg }}"></span>{{ m.word }}</div></sc-for>
+          <div style="padding:4px 8px 2px;font-size:11px;color:#959595">Choosing records it at once.</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isA }}">
+        <sc-if value="{{ row.noteOpen }}"><div style="height:48px;background:#1A1A1A;border:1px solid #434343;border-radius:4px;padding:5px 8px;box-sizing:border-box;font-size:12px;color:#959595">Note (optional)</div></sc-if>
+        <sc-if value="{{ row.noteClosed }}"><button style="align-self:flex-start;padding:0;background:none;border:none;color:#BEBEBE;font-size:12px;text-decoration:underline;text-decoration-color:#555555;text-underline-offset:3px">Add a note</button></sc-if>
+      </sc-if>
+    </div>
+    <sc-if value="{{ isB }}">
+      <div role="cell" style="padding:10px 10px 12px;min-width:0">
+        <div style="height:72px;background:#1A1A1A;border:1px solid #434343;border-radius:4px;padding:6px 8px;box-sizing:border-box;font-size:12px;color:#959595">Note (optional)</div>
+        <div style="margin-top:3px;text-align:right;font-family:'Chakra Petch',sans-serif;font-size:11px;color:#959595">0 of 2,000</div>
+      </div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{ isC }}">
+    <div role="cell" style="padding:12px 10px;display:grid;grid-template-columns:64px minmax(0,1fr);column-gap:8px;row-gap:5px;align-items:center;min-width:0">
+      <sc-if value="{{ row.flag }}"><span style="grid-column:1 / -1;justify-self:start;display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ row.flag.bd }};border-radius:3px;color:{{ row.flag.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ row.flag.fg }}"></span>{{ row.flag.text }}</span></sc-if>
+      <sc-for list="{{ row.judges }}" as="j" hint-placeholder-count="2">
+        <span style="font-family:'Chakra Petch',sans-serif;font-size:11.5px;font-weight:500;color:#959595">{{ j.who }}</span>
+        <span style="display:flex;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ j.b.bd }};border-radius:3px;color:{{ j.b.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ j.b.fg }}"></span>{{ j.b.text }}</span><sc-if value="{{ j.why }}"><button style="padding:0;background:none;border:none;color:#F5F5F5;font-size:12px;text-decoration:underline;text-decoration-color:#757575;text-underline-offset:3px">why</button></sc-if></span>
+      </sc-for>
+      <span style="grid-column:1 / -1;height:0;border-top:1px dashed #434343;margin:2px 0"></span>
+      <sc-for list="{{ row.people }}" as="p" hint-placeholder-count="0">
+        <span style="font-family:'Chakra Petch',sans-serif;font-size:11.5px;font-weight:500;color:#959595">{{ p.who }}</span>
+        <span style="display:inline-flex;justify-self:start;align-items:center;gap:5px;height:18px;padding:0 6px;border:1px solid {{ p.b.bd }};border-radius:3px;color:{{ p.b.fg }};font-family:'Chakra Petch',sans-serif;font-size:11px;font-weight:600;box-sizing:border-box"><span style="width:6px;height:6px;background:{{ p.b.fg }}"></span>{{ p.b.text }}</span>
+      </sc-for>
+      <span style="font-family:'Chakra Petch',sans-serif;font-size:11.5px;font-weight:600;color:#F5F5F5">You</span>
+      <sc-if value="{{ row.menuClosed }}">
+        <button aria-haspopup="menu" aria-expanded="false" style="display:flex;align-items:center;justify-content:space-between;width:100%;height:28px;padding:0 10px;background:#262626;border:1px solid #434343;border-radius:4px;color:#BEBEBE;font-size:12.5px">Decide<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;flex:none;background:#BEBEBE;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-down.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-down.svg') center / contain no-repeat"></span></button>
+      </sc-if>
+      <sc-if value="{{ row.menuOpen }}">
+        <button aria-haspopup="menu" aria-expanded="true" style="display:flex;align-items:center;justify-content:space-between;width:100%;height:28px;padding:0 10px;background:#262626;border:1px solid #FFCB03;outline:1px solid #FFCB03;border-radius:4px;color:#F5F5F5;font-size:12.5px">Decide<span aria-hidden="true" style="display:inline-block;width:14px;height:14px;flex:none;background:#FFCB03;-webkit-mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-up.svg') center / contain no-repeat;mask:url('https://unpkg.com/lucide-static@0.460.0/icons/chevron-up.svg') center / contain no-repeat"></span></button>
+        <div role="menu" style="grid-column:2;padding:4px;background:linear-gradient(135deg,#2C2C2C 0%,#262626 45%,#212121 100%);border:2px solid #434343;border-radius:6px;box-shadow:4px 6px 14px rgba(0,0,0,0.45)">
+          <sc-for list="{{ menu }}" as="m" hint-placeholder-count="4"><div role="menuitem" style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;background:{{ m.bg }};font-size:12.5px"><span style="width:6px;height:6px;background:{{ m.fg }}"></span>{{ m.word }}</div></sc-for>
+          <div style="padding:4px 8px 2px;font-size:11px;color:#959595">Choosing records it at once.</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ row.noteOpen }}"><div style="grid-column:2;height:48px;background:#1A1A1A;border:1px solid #434343;border-radius:4px;padding:5px 8px;box-sizing:border-box;font-size:12px;color:#959595">Note (optional)</div></sc-if>
+      <sc-if value="{{ row.noteClosed }}"><button style="grid-column:2;justify-self:start;padding:0;background:none;border:none;color:#BEBEBE;font-size:12px;text-decoration:underline;text-decoration-color:#555555;text-underline-offset:3px">Add a note</button></sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1392,&quot;height&quot;:160},&quot;row&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;a&quot;,&quot;b&quot;,&quot;c&quot;],&quot;default&quot;:&quot;a&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const v = this.props.variant ?? 'a';
+    const cols = {
+      a: '136px minmax(0,1.15fr) 112px minmax(0,1fr) 84px 116px 200px',
+      b: '144px minmax(0,1.05fr) 100px minmax(0,0.9fr) 84px 104px 160px 220px',
+      c: 'minmax(0,1.25fr) 112px minmax(0,1.05fr) 84px 300px'
+    }[v];
+    return { cols, isA: v === 'a', isB: v === 'b', isC: v === 'c', notC: v !== 'c', menu: (window.BD && window.BD.decideMenu) || [] };
+  }
+}
+</script>
+</body>
+</html>

@@ -19,13 +19,14 @@ GITHUB = re.compile(r"https://github\.com/Velocity-Explorations/velocity-bd-team
 DASHES = re.compile("[" + chr(0x2013) + chr(0x2014) + "]")   # en dash, em dash
 SPEC = DESIGN / "dashboard-design-spec.md"
 PROMPTS = DESIGN / "dashboard-build-prompts.md"
-SPEC_ID = re.compile(r"^\| ([A-Z]\d+) \|", flags=re.M)
-ID_RANGE = re.compile(r"\b([A-Z])(\d+) to \1(\d+)\b")
-ID_ONE = re.compile(r"\(([A-Z]\d+)\)")
+SPEC_ID = re.compile(r"^\| ([A-Z]{1,2}\d+) \|", flags=re.M)   # Q4, and two-letter areas such as PW12
+ID_RANGE = re.compile(r"\b([A-Z]{1,2})(\d+) to \1(\d+)\b")
+ID_ONE = re.compile(r"\(([A-Z]{1,2}\d+)\)")
 
 
 def _local(target: str) -> bool:
-    return not re.match(r"([a-z]+:|#)", target)
+    """A path in this repo: not a URL or anchor, and not a template placeholder such as {{ r.url }}."""
+    return not re.match(r"([a-z]+:|#)", target) and "{{" not in target and "${" not in target
 
 
 def _resolves(base: Path, target: str) -> bool:
@@ -35,7 +36,9 @@ def _resolves(base: Path, target: str) -> bool:
 def test_the_brief_has_its_parts() -> None:
     for part in ("README.md", "dashboard-design-spec.md", "dashboard-build-prompts.md",
                  "dashboard-snapshot/README.md", "dashboard-snapshot/queue.html", "dashboard-snapshot/screens",
-                 "velocity-theme/README.md", "velocity-theme/tokens.css", "velocity-theme/components/bundle.css"):
+                 "velocity-theme/README.md", "velocity-theme/tokens.css", "velocity-theme/components/bundle.css",
+                 "redesign-plan.md", "handoff/README.md", "handoff/docs/build-plan.md", "handoff/docs/spec-updates.md",
+                 "handoff/velocity-theme/tokens-app.css", "handoff/design/Review Queue Prototype.dc.html"):
         assert (DESIGN / part).exists(), part
 
 
@@ -107,5 +110,14 @@ def test_update_prompt_covers_the_new_structure() -> None:
     text = PROMPTS.read_text(encoding="utf-8")
     blocks = re.findall(r"^## Update prompt: Claude Design.*?```text\n(.*?)```", text, flags=re.M | re.S)
     assert len(blocks) == 1
-    for ids in ("N1 to N6", "H1 to H7", "P1 to P8", "U1 to U6", "Q9"):
+    for ids in ("N1 to N6", "H1 to H5", "P1 to P8", "U1 to U6", "Q9"):
         assert ids in blocks[0]
+
+
+def test_the_redesign_rows_are_in_the_spec() -> None:
+    """The handoff's spec updates (PRO-566): view cards, the new Home, Calls, badges, Proposals, the workspace, sign-in."""
+    ids = set(SPEC_ID.findall(SPEC.read_text(encoding="utf-8")))
+    wanted = {f"VC{n}" for n in range(1, 5)} | {f"DB{n}" for n in range(1, 4)} | {f"PW{n}" for n in range(1, 26)}
+    wanted |= {f"H{n}" for n in range(1, 6)} | {f"Q{n}" for n in range(13, 18)} | {f"P{n}" for n in range(1, 9)} | {"U7"}
+    assert sorted(wanted - ids) == []
+    assert not {"H6", "H7"} & ids, "H6 and H7 were folded into H4 and H5"

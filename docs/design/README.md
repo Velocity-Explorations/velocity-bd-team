@@ -7,7 +7,10 @@ Everything needed to redesign the BD triage dashboard in the Velocity Theme, kep
 | [dashboard-design-spec.md](dashboard-design-spec.md) | Every requirement and decision behind the dashboard, with IDs (Q1, C1, F1 and so on), how the theme fits, and the open design questions |
 | [dashboard-snapshot/](dashboard-snapshot/README.md) | Today's seven pages as static HTML with their real markup and styling, and ten screenshots |
 | [velocity-theme/](velocity-theme/README.md) | The Velocity Theme design system: brand book, tokens, fonts, logos and components |
-| [dashboard-build-prompts.md](dashboard-build-prompts.md) | Prompt 0 for Claude Design, then prompts 1 to 6 for Claude Code to build the design, and an update prompt for a design made before 26 Oct |
+| [handoff/](handoff/README.md) | Claude Design's finished design, 28 Oct: every screen, the working prototype, screenshots, the app theme, decisions, spec updates and a build plan |
+| [redesign-plan.md](redesign-plan.md) | The delta between today and the handoff, and the phased build plan |
+| [handover-discovery.md](handover-discovery.md) | What exists in the code today, with file and line citations |
+| [dashboard-build-prompts.md](dashboard-build-prompts.md) | Superseded by the handoff and the plan: the earlier prompts for Claude Design and Claude Code |
 
 ## Reading order for a design
 
