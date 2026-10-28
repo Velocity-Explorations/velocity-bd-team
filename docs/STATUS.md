@@ -146,5 +146,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Dashboard redesign build (from 2026-10-28): Claude Design's handoff is in docs/design/handoff/,
   its spec updates are merged into the spec, and docs/design/redesign-plan.md sets the build in
   phases 0 to 11, with Google sign-in last (PRO-565, PRO-566).
+  - Phase 1 (PRO-568): migration 008 adds the proposal workspace's tables (pursuits, pursuit_steps,
+    step_changes, pursuit_events, checklist_items, drive_items, slop_scans, profiles, worker_jobs,
+    workers) and `ledger/queries.py` the pursuit lifecycle. `ledger/schema.sql` had stopped at 002;
+    it now matches every migration, and a test keeps it so.
 
 ## Known breakages

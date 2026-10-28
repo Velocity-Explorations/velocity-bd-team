@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `002_change_requests.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `008_pursuits.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -15,7 +15,8 @@ Current migration: `002_change_requests.sql`. The full current schema is in `led
 - Every timestamp column is ISO-8601 UTC text with second precision, for example
   `2026-10-15T14:03:09Z`. Compare and sort them as strings. Date-only columns
   (`posted_date`, `due_date`, `submitted_date`, `outcome_date`) are `YYYY-MM-DD` text as
-  the portal supplied them, or NULL.
+  the portal supplied them, or NULL. The workspace's date-only columns
+  (`pursuits.result_expected_by`, `checklist_items.due_date`) are `YYYY-MM-DD` text too.
 - Booleans are INTEGER 0/1.
 - Placeholders: `ledger/queries.py` writes `?` and `ledger/db.py` rewrites to `%s` for
   Postgres. Raw SQL against Postgres uses `%s` (psycopg) or `$1` (psql).
@@ -261,6 +262,283 @@ whenever it tags (`tag_by_rules` on each run, `run.py --backfill-tags`). Added b
 
 A tag in `call_tags` with no row here was renamed or dropped from the list; the dashboard shows
 it last.
+
+## Table: pursuits
+
+One row per call being drafted in the proposal workspace (spec P2 to P8 and PW1 to PW25;
+docs/design/redesign-plan.md). The Register's past submissions stay in `proposals`; a pursuit
+points at its Register row through `submission_id` once the submission is written there. Added
+by `008_pursuits.sql` (PRO-568), with the other workspace tables below. The worker, the workspace
+page and the Slack jobs that write these tables arrive in later phases of the plan; until then
+only the helpers in `ledger/queries.py` write `pursuits`, `pursuit_steps` and `pursuit_events`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| call_id | TEXT, not null | `calls.id`; unique, so a call is pursued once | Start the draft (`start_pursuit`) |
+| owner | TEXT, not null | the `DASHBOARD_USERS` name of the person who started it; only they approve and decide (PW17) | same |
+| collaborators | TEXT JSON | list of `DASHBOARD_USERS` names working with the owner (PW24), or NULL | Start the draft; People in the workspace header (the owner only) |
+| format | TEXT | what is being written, in words, for example `white paper`, `RFI response`, `SBIR or STTR technical volume` | Start the draft |
+| approval_mode | TEXT, not null, default `every_step` | `every_step`, or `key_gates`: the owner approves only Go or no-go, Outline and Submit (PW5) | same |
+| direction | TEXT | the owner's direction; after Alignment, the one that carries forward (PW8). Locked once the Outline is approved | Start the draft, Alignment |
+| builds_on | TEXT JSON | list of past work to build on, each `{"id": <drive_items.id>, "name": ...}`; locked once the Outline is approved (PW11) | Start the draft; the owner and the people working with them |
+| drive_folder_id | TEXT | the pursuit's folder on the shared drive, `Submissions/<YYYY-MM-DD_portal_short-title>/` | the worker, after Start |
+| drive_folder_name | TEXT | that folder's path, as the header shows it | same |
+| current_step | TEXT, not null | the step the pursuit is on: the step of its newest attempt in `pursuit_steps` | every helper that queues an attempt |
+| state | TEXT, not null, default `working` | `working`; `no_go` (stopped by a no-go); `submitted` (Mark submitted: waiting for the result, then holding it in `result`); `closed` (closed without a no-go) | see the lifecycle below |
+| target_dates | TEXT JSON | object of step name to `YYYY-MM-DD` target, plus `submit_by`, the internal submit-by date one business day before the deadline (PW9, PW18) | the worker, at Requirements and checklist |
+| cost_usd | REAL, not null, default 0 | what the pursuit's steps have cost so far, in US dollars | the worker (`finish_step`, `fail_step`, `stop_step`) |
+| budget_usd | REAL, not null, default 200 | the spending cap (PW19); the owner can raise it | Start the draft; Raise the cap |
+| submitted_at | TEXT timestamp | when Mark submitted was chosen | the Submit gate |
+| submitted_by | TEXT | who chose it | same |
+| confirmation_number | TEXT | the portal's confirmation number | same |
+| result_expected_by | TEXT date | `YYYY-MM-DD`, when the result is expected (P4); No news yet moves it 30 days on | Discovery, the Submit gate, No news yet |
+| result_expected_source | TEXT | where that date came from: the call's words and where they were found, or `default, 90 days after the deadline` | same |
+| result | TEXT | `won`, `lost`, `withdrawn`, `cancelled_by_agency`, or NULL until recorded | Record result |
+| result_at | TEXT timestamp | when the result was recorded | same |
+| result_by | TEXT | who recorded it | same |
+| debrief | TEXT | the optional debrief note | same |
+| next_time | TEXT | the optional What to do differently next time, which the next alignment check reads | same |
+| submission_id | TEXT | `proposals.submission_id` once the Register row is written | the Register write on submit |
+| created_at | TEXT timestamp, not null | when the draft was started | Start the draft |
+| updated_at | TEXT timestamp, not null | touched by every write | every writer |
+
+Unique index: `(call_id)`. Start the draft is refused, with the reason, for a call that has a
+pursuit already or is marked Not relevant. The result keeps the workspace's own values; when the
+Register row is written, `cancelled_by_agency` becomes `no_award`, since `proposals.outcome`
+cannot take a new value without a non-additive change.
+
+Lifecycle: a pursuit starts `working`. A no-go on steps 1 to 4 or at the gate makes it `no_go`;
+Mark submitted makes it `submitted`, and recording the result leaves it `submitted` with `result`
+set; the owner can close a working pursuit (`closed`). Each change is guarded on
+`state = 'working'`, and the worker only runs steps of a `working` pursuit.
+
+## Table: pursuit_steps
+
+One row per attempt at a workspace step. Asking for changes or retrying adds a new attempt and
+leaves the old row as history; the newest attempt at each step is the one the page shows
+(`latest_steps`). Added by `008_pursuits.sql`.
+
+The steps, in order (PW3): `discovery` (Discovery), `summary` (Opportunity summary), `alignment`
+(Alignment), `requirements` (Requirements and checklist), `go_no_go` (the Go or no-go gate),
+`outline` (Outline), `draft` (First draft), `compliance` (Compliance check), `reviews` (Reviews),
+`final` (Final checks), `submit` (the Submit gate). `step` is free text checked against `STEPS` in
+`ledger/queries.py`, so the list can change without a constraint change.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| pursuit_id | INTEGER, not null | `pursuits.id` | whoever queues the attempt |
+| step | TEXT, not null | one of the steps above | same |
+| attempt | INTEGER, not null, default 1 | 1, then one more for each redo or retry | same |
+| state | TEXT, not null, default `queued` | `queued`, `working`, `ready`, `approved`, `changes_asked`, `failed`, `blocked`, `stopped`, `skipped` | see the lifecycle below |
+| requested_by | TEXT, not null | who queued it: the person who started, approved, asked for changes or retried, or `worker (key gates only)` | same |
+| request_note | TEXT | what to change, on an attempt queued by Ask for changes; the worker puts it in its prompt | Ask for changes (`ask_changes`) |
+| summary | TEXT | the key points shown on the step (PW4) | the worker (`finish_step`) |
+| files | TEXT JSON | list of the files saved to Drive, each with `name`, `id` (the Drive file id) and `link` | same |
+| content | TEXT JSON | what the step shows beyond its summary, per step: for example the Go or no-go brief, the outline's sections, the evaluators' ratings (PW25), the final checks | same |
+| task_states | TEXT JSON | Discovery's tasks and their states (PW6) | the worker, while it works (`set_task_states`) |
+| error | TEXT | why it failed, or what it waits for when blocked (`budget reached`), in words | the worker (`fail_step`, `block_step`) |
+| cost_usd | REAL, not null, default 0 | what this attempt cost, in US dollars | the worker |
+| decision | TEXT | `approved`, `go`, `go_with_conditions`, `changes_asked`, `no_go`, `retried`, `submitted` | the owner's actions; the worker with key gates only |
+| decided_by | TEXT | who decided: the owner, or `worker (key gates only)` (PW5) | same |
+| decided_at | TEXT timestamp | | same |
+| decision_note | TEXT | the note given with the decision: the change asked for, the no-go reason, the conditions | same |
+| notified_at | TEXT timestamp | when Slack said the step is ready, so it says so once (PW18) | the Slack job |
+| queued_at | TEXT timestamp, not null | | whoever queues the attempt |
+| started_at | TEXT timestamp | when the worker claimed it | the worker (`claim_next_step`) |
+| finished_at | TEXT timestamp | when the worker saved, failed, blocked or stopped it | the worker |
+| updated_at | TEXT timestamp, not null | touched by every write except `notified_at`, so a form carrying it goes stale only when the step changed | every writer |
+
+Unique: `(pursuit_id, step, attempt)`. Index: `(state, id)`.
+
+Lifecycle of a row:
+
+- **Queued.** Start the draft queues `discovery`; approving a step queues the next one; Ask for
+  changes and Retry queue the same step again as a new attempt. Each sets
+  `pursuits.current_step`.
+- **The worker.** It claims the oldest `queued` row of a `working` pursuit (`working`, guarded on
+  `state = 'queued'`), then saves it (`ready`), or sets `failed` with `error`, or `blocked` when it
+  cannot run until a person acts (budget reached, PW19). Saving is guarded on the pursuit still
+  being `working`; when it stopped meanwhile, the worker sets the row `stopped` and records the cost.
+- **The owner.** On a `ready` row the owner approves (`approved`; at the gate the decision is `go`
+  or `go_with_conditions`), asks for changes (`changes_asked`, with the note), or, on steps 1 to 4
+  and the gate, chooses no-go (`stopped` with decision `no_go`, and the pursuit becomes `no_go`).
+  Each is guarded on `state = 'ready'` and the pursuit being `working`, and on `updated_at` when the
+  form carried it (spec C8's pattern), so a stale form changes nothing. With key gates only, the
+  worker approves every step except `go_no_go`, `outline` and `submit`, as
+  `worker (key gates only)`.
+- **Retry.** A `failed` or `blocked` row is retried once: its `decision` becomes `retried`
+  (guarded on `decision IS NULL`) and a new attempt is queued.
+- **Submit.** `submit` is not approved like a step: Mark submitted records it (decision
+  `submitted`) and makes the pursuit `submitted`.
+- **Closing.** Closing a pursuit stops its `queued`, `ready` and `blocked` rows; a `working` row is
+  left to the worker, which stops it at its next phase boundary.
+- **Skipped.** Kept for a step a format does not need; nothing sets it yet.
+
+## Table: step_changes
+
+The changes the review passes propose to a draft, one per row, each decided by the owner (PW12).
+Added by `008_pursuits.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| step_id | INTEGER, not null | `pursuit_steps.id` of the Reviews attempt that proposed it | the worker |
+| reviewer | TEXT, not null | `evaluator_1`, `evaluator_2` or `leadership`: the external evaluator, the second evaluator and the Velocity leadership pass | same |
+| section | TEXT | where in the draft, for example the section heading | same |
+| before_text | TEXT | the text now | same |
+| after_text | TEXT | the suggestion | same |
+| reason | TEXT | why | same |
+| state | TEXT, not null, default `proposed` | `proposed`, `accepted`, `rejected`, `edited` | the owner, guarded on `state = 'proposed'` |
+| edited_text | TEXT | the owner's own wording, when they edit the suggestion | same |
+| decided_by | TEXT | | same |
+| decided_at | TEXT timestamp | | same |
+| created_at | TEXT timestamp, not null | | the worker |
+
+Index: `(step_id, id)`. The draft is approved once every change on it is decided; accepted and
+edited changes go into the next draft.
+
+## Table: pursuit_events
+
+A pursuit's history, for Show history (PW16), including material people add. Rows are only
+added. Added by `008_pursuits.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| pursuit_id | INTEGER, not null | `pursuits.id` | the helpers in `ledger/queries.py`, the dashboard's actions, the worker |
+| step_id | INTEGER | the `pursuit_steps.id` the line is about, when there is one | same |
+| at | TEXT timestamp, not null | | same |
+| who | TEXT, not null | a person's name, `worker`, or `worker (key gates only)` | same |
+| kind | TEXT, not null | one of `EVENT_KINDS` in `ledger/queries.py`: `started`, `step_saved`, `approved`, `auto_approved`, `go`, `go_with_conditions`, `changes_asked`, `retried`, `failed`, `blocked`, `stopped`, `no_go`, `closed`, `material`, `collaborators`, `builds_on`, `direction`, `checklist`, `budget`, `submitted`, `result`, `result_date` | same |
+| text | TEXT, not null | the line in words, for example `Discovery approved`, or the link someone added | same |
+
+Index: `(pursuit_id, id)`. Add material (PW4: a link or a note) writes a `material` row; the
+worker reads the pursuit's `material` rows when it next works a step.
+
+## Table: checklist_items
+
+The submission checklist (PW9), one row per item, so several people can tick items at the same
+time. Added by `008_pursuits.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| pursuit_id | INTEGER, not null | `pursuits.id` | the worker; the Go or no-go gate |
+| part | TEXT, not null | `registrations` (registrations and eligibility), `documents` (required documents and volumes), `inputs` (inputs needed from the owner and the team), `formatting` (formatting and packaging), `reviews` (reviews and approvals), `submission` | same |
+| position | INTEGER, not null | the item's place in the checklist, from 0 | same |
+| text | TEXT, not null | the item, specific to the call | same |
+| source | TEXT | where the call asks for it, for example a section of the solicitation | same |
+| owner | TEXT | who does it: a person's name, or a party such as the research partner | same |
+| due_date | TEXT date | `YYYY-MM-DD` | same |
+| origin | TEXT, not null | `requirements` (Requirements and checklist made it) or `condition` (a condition from Go with conditions, owned by the pursuit's owner) | same |
+| done | INTEGER, not null, default 0 | 1 once ticked; items already met start ticked | the worker; the owner and the people working with them |
+| done_by | TEXT | who ticked it | same |
+| done_at | TEXT timestamp | | same |
+| created_at | TEXT timestamp, not null | | the worker; the gate |
+| updated_at | TEXT timestamp, not null | touched by every write | every writer |
+
+Index: `(pursuit_id, position)`. A tick is guarded on the `done` value the person saw.
+
+## Table: drive_items
+
+The Drive index the Builds on picker searches (P6, PW11), so the dashboard never calls Google.
+Added by `008_pursuits.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | TEXT, primary key | the Drive file or folder id | the worker's Drive refresh |
+| name | TEXT, not null | the file or folder name | same |
+| mime | TEXT | Drive's MIME type, for example `application/vnd.google-apps.folder` | same |
+| path | TEXT | the folders above it, from the top of the shared drive, for example `Submissions/2025-01-15_sbir_c2` | same |
+| parent_id | TEXT | the folder it is in | same |
+| web_link | TEXT | the link that opens it in Drive | same |
+| modified_at | TEXT timestamp | when it last changed in Drive | same |
+| indexed_at | TEXT timestamp, not null | when a refresh last saw it | same |
+
+Index: `(parent_id)`. The worker refreshes the index every 15 minutes and when someone chooses
+Refresh (a `drive_refresh` job); a file gone from Drive leaves the index.
+
+## Table: slop_scans
+
+Each AI slop check of a draft (PW20 to PW23). The scanner runs in the worker, from
+`AI_SLOP_SCAN`, never in the browser; the page reads the newest row for the pursuit's newest
+draft. Added by `008_pursuits.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| pursuit_id | INTEGER, not null | `pursuits.id` | the worker |
+| step_id | INTEGER | the `pursuit_steps.id` of the attempt whose draft was scanned | same |
+| draft_file_id | TEXT | the draft's Drive file id | same |
+| draft_name | TEXT | the draft's file name, shown as the draft the scan ran on | same |
+| scanned_at | TEXT timestamp, not null | | same |
+| words | INTEGER | the words scanned | same |
+| band | TEXT | the scanner's band, for example `clean` or `light`; NULL below 150 words (PW21) | same |
+| confidence | TEXT | the band's confidence; low below 300 words | same |
+| points | REAL | the band's points | same |
+| provisional | INTEGER, not null, default 1 | 1 until the bands are calibrated on 20 or more past Velocity proposals | same |
+| ready | INTEGER, not null, default 0 | 1 when no placeholder is open and the band is clean or light (PW21) | same |
+| verdict | TEXT, not null | the one line from `drafting/slop_gate.py`, for example `Not ready: 1 PERSON WRITES; band light (provisional)` | same |
+| fixed_count | INTEGER, not null, default 0 | the fixes the worker made before this scan | same |
+| result_json | TEXT JSON, not null | the scanner's JSON report as it returned it | same |
+| text_lines | TEXT | the scanned text, whose lines are the report's line numbers, so the page can show a line without opening Word | same |
+
+Index: `(pursuit_id, id)`. Everything shown from these rows follows PW23: writing patterns and
+their fixes only, never whether a text was or was not written by AI.
+
+## Table: profiles
+
+Each person's Profile settings (U2 to U6), so names and settings follow the person across
+devices. Added by `008_pursuits.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| name | TEXT, primary key | the person's name in `DASHBOARD_USERS` | Profile settings |
+| display_name | TEXT | the name shown on votes, notes and the account menu; NULL shows `name` | same |
+| initials | TEXT | the letters on the avatar; NULL takes them from the name | same |
+| opens | TEXT, not null, default `home` | where the dashboard opens: `home` or `calls` (U3) | same |
+| default_filters | TEXT JSON | the filters Calls applies when its address has none (U4), under the names its address uses | same |
+| time_zone | TEXT | an IANA time zone such as `America/New_York` (U5); NULL keeps the dashboard's `America/Denver` | same |
+| updated_at | TEXT timestamp, not null | | same |
+
+## Table: worker_jobs
+
+The worker's jobs other than steps: a Drive refresh, or Check again on the AI slop check (PW22).
+Added by `008_pursuits.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| kind | TEXT, not null | `drive_refresh` or `slop_scan`; free text the worker checks | the dashboard, `run.py` |
+| pursuit_id | INTEGER | `pursuits.id`, for a job about one pursuit | same |
+| payload | TEXT JSON | what the job needs beyond its kind | same |
+| state | TEXT, not null, default `queued` | `queued`, `working`, `done`, `failed` | the worker, each change guarded on the state before it |
+| requested_by | TEXT, not null | a person's name, or the job that asked | the dashboard, `run.py` |
+| requested_at | TEXT timestamp, not null | | same |
+| started_at | TEXT timestamp | when the worker took it; the page shows working since then | the worker |
+| finished_at | TEXT timestamp | | same |
+| result | TEXT | what happened, in words | same |
+| updated_at | TEXT timestamp, not null | touched by every write | every writer |
+
+Index: `(state, id)`.
+
+## Table: workers
+
+The worker's heartbeat, so the dashboard can tell whether drafting is set up (P8) and when the
+worker was last seen. Added by `008_pursuits.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| name | TEXT, primary key | the worker's name | the worker |
+| started_at | TEXT timestamp, not null | when it last started | same |
+| seen_at | TEXT timestamp, not null | updated on every poll, every 20 seconds | same |
+| state | TEXT, not null | `idle`, `working`, or `stopped` when it shut down cleanly | same |
+| doing | TEXT | what it is working on, in words | same |
+
+No row means drafting is not set up yet. A `seen_at` more than a few minutes old means the
+worker is not running, and queued steps wait for it.
 
 ## Table: schema_migrations
 

@@ -1,19 +1,70 @@
 from __future__ import annotations
 
+import re
+import sqlite3
 from pathlib import Path
 
 from ledger import migrate
 from ledger.db import sqlite_path
+
+REPO = Path(__file__).resolve().parent.parent
+SCHEMA_SQL = REPO / "ledger" / "schema.sql"
+SCHEMA_DOC = REPO / "docs" / "LEDGER_SCHEMA.md"
 
 
 def test_migrate_creates_tables_and_is_idempotent(tmp_path: Path) -> None:
     url = f"sqlite:///{(tmp_path / 'm.db').as_posix()}"
     first = migrate.apply(url)
     assert first == ["001_initial.sql", "002_change_requests.sql", "003_judgments.sql", "004_decisions.sql", "005_briefs.sql",
-                     "006_call_tags.sql", "007_tag_list.sql"]
+                     "006_call_tags.sql", "007_tag_list.sql", "008_pursuits.sql"]
     assert migrate.apply(url) == []
-    assert migrate.list_tables(url) == ["briefs", "call_tags", "calls", "change_requests", "decisions", "judgments", "proposals", "runs",
-                                         "schema_migrations", "tag_list"]
+    assert migrate.list_tables(url) == ["briefs", "call_tags", "calls", "change_requests", "checklist_items", "decisions",
+                                         "drive_items", "judgments", "profiles", "proposals", "pursuit_events", "pursuit_steps",
+                                         "pursuits", "runs", "schema_migrations", "slop_scans", "step_changes", "tag_list",
+                                         "worker_jobs", "workers"]
+
+
+def _objects(conn: sqlite3.Connection) -> dict[str, str]:
+    """Every table and index a schema creates, with its CREATE statement, whitespace collapsed."""
+    found = conn.execute("SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL "
+                         "AND name NOT LIKE 'sqlite_%' AND name <> 'schema_migrations'").fetchall()
+    return {f"{kind} {name}": " ".join(sql.split()) for kind, name, sql in found}
+
+
+def test_schema_sql_matches_the_migrations(tmp_path: Path) -> None:
+    """ledger/schema.sql is for reading, so it must say exactly what the migrations build."""
+    migrate.apply(f"sqlite:///{(tmp_path / 'm.db').as_posix()}")
+    migrated = sqlite3.connect(tmp_path / "m.db")
+    written = sqlite3.connect(":memory:")
+    for stmt in migrate.statements(SCHEMA_SQL.read_text(encoding="utf-8"), "sqlite"):
+        written.execute(stmt)
+    try:
+        assert _objects(written) == _objects(migrated)
+    finally:
+        migrated.close()
+        written.close()
+
+
+def test_schema_doc_covers_every_table_and_column(tmp_path: Path) -> None:
+    """docs/LEDGER_SCHEMA.md has a section per table and a row per column, and names the newest migration."""
+    migrate.apply(f"sqlite:///{(tmp_path / 'm.db').as_posix()}")
+    doc = SCHEMA_DOC.read_text(encoding="utf-8")
+    sections = dict(re.findall(r"^## Table: (\w+)\n(.*?)(?=^## |\Z)", doc, flags=re.M | re.S))
+    conn = sqlite3.connect(tmp_path / "m.db")
+    try:
+        tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' "
+                                             "AND name NOT LIKE 'sqlite_%' AND name <> 'schema_migrations'")]
+        missing = []
+        for table in tables:
+            if table not in sections:
+                missing.append(table)
+                continue
+            documented = set(re.findall(r"^\| (\w+) \|", sections[table], flags=re.M))
+            missing += [f"{table}.{col[1]}" for col in conn.execute(f"PRAGMA table_info({table})") if col[1] not in documented]
+    finally:
+        conn.close()
+    assert missing == []
+    assert f"Current migration: `{migrate.migration_files()[-1].name}`" in doc
 
 
 def test_dialect_tokens_differ() -> None:
