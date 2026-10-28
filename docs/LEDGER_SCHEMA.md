@@ -338,7 +338,7 @@ The steps, in order (PW3): `discovery` (Discovery), `summary` (Opportunity summa
 | request_note | TEXT | what to change, on an attempt queued by Ask for changes; the worker puts it in its prompt | Ask for changes (`ask_changes`) |
 | summary | TEXT | the key points shown on the step (PW4) | the worker (`finish_step`) |
 | files | TEXT JSON | list of the files saved to Drive, each with `name`, `id` (the Drive file id) and `link`; until Drive (phase 6b), `name`, `local` (the Markdown's path under `data/drafting/pursuits/`) and `word` (its Word file's, PRO-579) | same |
-| content | TEXT JSON | what the step shows beyond its summary, per step. Every step: `document` (its Markdown) and `question` (the owner's question on the card, PW4). Discovery: `tasks` (as in `task_states`), `owner_fetch` (pages and files for the owner to fetch) and `result_expected` (`date`, `source`). Opportunity summary: `worth_it` (`yes`, `no`, `unsure`). Alignment: `verdict`, `angle`, `comparison`, `direction`, `points` (each `tag`: `fits`, `past work`, `depends`, `risk`, `needs` or `no clash`; `text`; `source`). Requirements and checklist: `checklist_items`, `submit_by`, `milestones`, `requirements` (`volumes`, `page_limit`, `evaluation`, `eligibility`, `keywords`, a line each), `format` (the Word files' `font`, `size` in points, `margins` in inches and line `spacing`) and `format_source` (`the call` or `plain defaults`). Go or no-go: `fit` (Strong, Moderate, Stretch or Poor fit), `fit_reason`, `win_themes`, `gaps` (each `gap` and `mitigation`), `effort`, `recommendation` (`go`, `go_with_conditions`, `no_go`), `recommendation_text`, `conditions`. Outline: `sections` (each `title`, `criteria`, `share`, `evidence`), `page_limit`, `unmapped_criteria`, `evidence`, `direction`. First draft: `words`, `placeholders` (by kind). Compliance check: `corrections`, `warnings`. Reviews: `passes` (each `pass`, `reviewer`, `status`, and `words_delta` or `error`), until phase 8 replaces them with `step_changes` rows and the evaluators' ratings (PW25). Final checks: `verdict`, `ready`, `band`, `open_placeholders`, `person_writes`, `dashes_fixed`. Submit gate: `checks` (each `check`, `ok` true, false or null when not known, `detail`), `files` (each `file` and its portal `slot`), `portal_steps`, `deadline`, `call_page` | same |
+| content | TEXT JSON | what the step shows beyond its summary, per step. Every step: `document` (its Markdown) and `question` (the owner's question on the card, PW4). Discovery: `tasks` (as in `task_states`), `owner_fetch` (pages and files for the owner to fetch) and `result_expected` (`date`, `source`). Opportunity summary: `worth_it` (`yes`, `no`, `unsure`). Alignment: `verdict`, `angle`, `comparison`, `direction`, `points` (each `tag`: `fits`, `past work`, `depends`, `risk`, `needs` or `no clash`; `text`; `source`). Requirements and checklist: `checklist_items`, `submit_by`, `milestones`, `requirements` (`volumes`, `page_limit`, `evaluation`, `eligibility`, `keywords`, a line each), `format` (the Word files' `font`, `size` in points, `margins` in inches and line `spacing`) and `format_source` (`the call` or `plain defaults`). Go or no-go: `fit` (Strong, Moderate, Stretch or Poor fit), `fit_reason`, `win_themes`, `gaps` (each `gap` and `mitigation`), `effort`, `recommendation` (`go`, `go_with_conditions`, `no_go`), `recommendation_text`, `conditions`. Outline: `sections` (each `title`, `criteria`, `share`, `evidence`), `page_limit`, `unmapped_criteria`, `evidence`, `direction`. First draft: `words`, `placeholders` (by kind), `slop` (the AI slop check's verdict on Draft v1). Compliance check: `corrections`, `warnings`, `slop` (on Draft v2). Reviews: `passes` (each `pass`, `code` and `reviewer`, `status`, the evaluators' `ratings` (each `criterion`, `rating` in words, `strengths`, `weaknesses`; PW25), `changes` proposed, `dropped` (changes whose text was not in the draft), `points`), and `changes`, the total; the changes themselves are `step_changes` rows. Final checks: `verdict`, `ready`, `band`, `open_placeholders`, `person_writes`, `dashes_fixed`, `changes_applied` and `changes_missed` (the decided changes put into Draft v3, and those whose text no longer matched). Submit gate: `checks` (each `check`, `ok` true, false or null when not known, `detail`), `files` (each `file` and its portal `slot`), `portal_steps`, `deadline`, `call_page` | same |
 | task_states | TEXT JSON | Discovery's tasks and their states (PW6): `call_page`, `attachments`, `parent_instructions`, `key_facts`, `past_work`, `clashes`, `record` and `summary`, each `working` while the step runs, then `done` or `for_owner` (it needs a page, a login or a file the worker cannot reach) | the worker, while it works (`set_task_states`) |
 | error | TEXT | why it failed, or what it waits for when blocked (`budget reached`), in words: the model's error, `The worker cannot run <step> yet.`, or `The worker stopped while it worked on this step. Retry runs it again.` for a step a stopped worker left working | the worker (`fail_step`, `block_step`) |
 | cost_usd | REAL, not null, default 0 | what this attempt cost, in US dollars | the worker |
@@ -386,20 +386,22 @@ Added by `008_pursuits.sql`.
 | Column | Type | Values | Written by |
 |---|---|---|---|
 | id | INTEGER, primary key, auto-increment | | database |
-| step_id | INTEGER, not null | `pursuit_steps.id` of the Reviews attempt that proposed it | the worker |
+| step_id | INTEGER, not null | `pursuit_steps.id` of the Reviews attempt that proposed it | the worker (`add_step_changes`) |
 | reviewer | TEXT, not null | `evaluator_1`, `evaluator_2` or `leadership`: the external evaluator, the second evaluator and the Velocity leadership pass | same |
 | section | TEXT | where in the draft, for example the section heading | same |
 | before_text | TEXT | the text now | same |
 | after_text | TEXT | the suggestion | same |
 | reason | TEXT | why | same |
-| state | TEXT, not null, default `proposed` | `proposed`, `accepted`, `rejected`, `edited` | the owner, guarded on `state = 'proposed'` |
+| state | TEXT, not null, default `proposed` | `proposed`, `accepted`, `rejected`, `edited` | the owner, guarded on `state = 'proposed'` (`decide_change`); with key gates only, the worker accepts every open change as `worker (key gates only)` (`accept_open_changes`) |
 | edited_text | TEXT | the owner's own wording, when they edit the suggestion | same |
 | decided_by | TEXT | | same |
 | decided_at | TEXT timestamp | | same |
 | created_at | TEXT timestamp, not null | | the worker |
 
-Index: `(step_id, id)`. The draft is approved once every change on it is decided; accepted and
-edited changes go into the next draft.
+Index: `(step_id, id)`. The draft is approved once every change on it is decided; Final checks puts
+the accepted and edited changes into Draft v3, in order, each where its `before_text` still matches
+(PRO-565, phase 8a). A reviewer's change is kept only when its `before_text` is in the draft it
+reviewed.
 
 ## Table: pursuit_events
 

@@ -15,10 +15,11 @@ reached" (PW19). The step's work (drafting/qualify.py, drafting/write.py) asks t
 meter that adds each call's cost (drafting/costs.py) to the step and stops the step once spending
 crosses the cap. Before each call, and every 30 seconds during one, the worker checks that the
 pursuit is still being worked and stops the step when the owner closed it. The work is saved ready,
-or failed with the reason; with key gates only, the worker approves it and queues the next step
-(PW5). Files stay under data/drafting/pursuits/pursuit-<id>/ until Drive (phase 6), and the card's
-text, like every file, has its dashes replaced. The worker logs ids, states and costs, never a
-call's text or title.
+or failed with the reason; with key gates only, the worker approves it (accepting the reviewers'
+changes at Reviews) and queues the next step (PW5). With no step waiting it runs the oldest job,
+such as Check again on the AI slop check (PW22). Files stay under data/drafting/pursuits/pursuit-<id>/
+until Drive (phase 6), and the card's text, like every file, has its dashes replaced. The worker logs
+ids, states and costs, never a call's text or title.
 """
 from __future__ import annotations
 
@@ -35,10 +36,10 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from drafting import costs, inputs, llm, qualify, word, write
+from drafting import costs, inputs, llm, qualify, scan, slop_gate, word, write
 from drafting.pipeline import PHASE_TIMEOUT_S
 from drafting.prompts import Prompt
-from drafting.steps import StepContext, StepResult, fix_dashes
+from drafting.steps import StepContext, StepResult, fix_dashes, latest_draft
 from ledger import queries as lq
 from ledger.db import release as release_connection
 
@@ -249,14 +250,43 @@ def _run(step: dict[str, Any], pursuit: dict[str, Any], label: str, doing: str, 
         return
     log.info("Step %s ready, $%.4f", step["id"], meter.cost)
     if not lq.needs_owner(step["step"], pursuit["approval_mode"]):
+        if step["step"] == "reviews":
+            # With key gates only the owner chose not to decide each step, so the reviewers' changes are accepted.
+            lq.accept_open_changes(step["id"], lq.AUTO_APPROVER)
         lq.approve_step(step["id"], lq.AUTO_APPROVER)
 
 
+def run_job(job: dict[str, Any]) -> None:
+    """A job other than a step: Check again (PW22) scans the pursuit's newest draft. A Drive refresh waits for Drive."""
+    lq.worker_beat(lq.WORKER, "working", f"{job['kind']} (job {job['id']})")
+    log.info("Job %s claimed: %s, pursuit %s", job["id"], job["kind"], job["pursuit_id"])
+    try:
+        if job["kind"] != "slop_scan":
+            lq.finish_job(job["id"], "failed", "Drive is not set up yet.")
+            return
+        draft = latest_draft(WORK_ROOT / f"pursuit-{job['pursuit_id']}")
+        if draft is None:
+            lq.finish_job(job["id"], "failed", "There is no draft to check yet.")
+            return
+        solicitation = slop_gate.solicitation_text(inputs.draft_inputs(inputs.gather(job["pursuit_id"])))
+        found = scan.check(job["pursuit_id"], None, draft, solicitation)
+        lq.finish_job(job["id"], "done" if found["scan_id"] else "failed", found["verdict"])
+    except Exception as exc:   # noqa: BLE001 (the job's failure is said on the page that asked for it)
+        lq.finish_job(job["id"], "failed", _why(exc))
+        log.error("Job %s failed: %s", job["id"], type(exc).__name__)
+    finally:
+        lq.worker_beat(lq.WORKER, "idle")
+
+
 def work_once(generate: Callable[..., str] | None = None, model: str | None = None, today: date | None = None) -> bool:
-    """Claim the oldest queued step and run it. False when nothing is waiting."""
+    """Claim the oldest queued step and run it; with no step waiting, the oldest job. False when nothing is waiting."""
     step = lq.claim_next_step()
     if step is None:
-        return False
+        job = lq.claim_next_job()
+        if job is None:
+            return False
+        run_job(job)
+        return True
     pursuit = lq.get_pursuit(step["pursuit_id"])
     assert pursuit is not None
     label = lq.STEP_LABELS.get(step["step"], step["step"])

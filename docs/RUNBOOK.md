@@ -149,9 +149,13 @@ this step") the next time the worker starts, and Retry runs it again.
 `data\drafting\pursuits\pursuit-<id>\`, each with a Word file beside it in the format the call sets
 (font, size, margins and spacing, found at Requirements and checklist; Times New Roman 12 with one-inch
 margins until then), and each step's key points show on the dashboard. The drafts
-are numbered: `draft_v1.md` (First draft), `draft_v2.md` (Compliance check), `draft_v3.md` (Reviews) and
-`draft_final.md` (Final checks). Final checks runs the AI slop check from `AI_SLOP_SCAN`, or from the
-skill's default place in your profile; without the scanner the step says the check did not run. The worker
+are numbered: `draft_v1.md` (First draft), `draft_v2.md` (Compliance check), `draft_v3.md` (the
+reviewers' changes the owner accepted, put in at the start of Final checks) and `draft_final.md`
+(Final checks). Each new draft gets the AI slop check: the worker first replaces dashes and removes
+tracking parameters from links, then runs the scanner from `AI_SLOP_SCAN`, or from the skill's default
+place in your profile, and keeps the result in the ledger (`slop_scans`); without the scanner the step
+says the check did not run. Check again on the dashboard queues a scan of the newest draft, which the
+worker runs when no step is waiting. The worker
 cannot open portal pages or download attachments yet, so its steps work from what the scanner saved and
 list what the owner should fetch. Login-gated text (Vulcan SOF, NSTXL member pages) goes to the Anthropic
 API and these local files, by David's decision of 27 Oct, and never into the repo. The log is

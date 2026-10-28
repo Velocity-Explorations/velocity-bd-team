@@ -344,3 +344,61 @@ def test_clash_checks_find_the_same_title_and_other_pursued_calls(ledger_db: str
     assert [c["id"] for c in lq.calls_titled("Edge AI for C2", exclude_id="sam-1")] == ["ssc-9"]
     lq.set_human("sam-2", "pursue", "Shaun Jones")
     assert [c["id"] for c in lq.pursued_calls(exclude_id="sam-1")] == ["sam-2"]
+
+
+# ------------------------------------------------------------- reviews and the AI slop check (phase 8a)
+
+SCAN = {"band": "light", "confidence": "full", "points": 2.5, "words": 420, "thresholds": {"calibrated": False},
+        "families": {}, "findings": [], "hot_paragraphs": []}
+
+
+def test_each_scan_of_a_draft_is_kept_with_its_verdict(ledger_db: str) -> None:
+    pursuit_id = _started()
+    step = lq.claim_next_step()
+    scan_id = lq.save_slop_scan(pursuit_id, step["id"], "draft_v1.md", SCAN, verdict="Ready: band light (provisional)",
+                                ready=True, fixed_count=2, text="line one\nline two")
+    row = lq.latest_slop_scan(pursuit_id)
+    assert (row["id"], row["draft_name"], row["band"], row["points"], row["confidence"], row["words"]) == (
+        scan_id, "draft_v1.md", "light", 2.5, "full", 420)
+    assert (row["provisional"], row["ready"], row["fixed_count"], row["verdict"]) == (1, 1, 2, "Ready: band light (provisional)")
+    assert json.loads(row["result_json"])["band"] == "light" and row["text_lines"] == "line one\nline two"
+    lq.save_slop_scan(pursuit_id, step["id"], "draft_v2.md", {**SCAN, "words": 120, "thresholds": {"calibrated": True}},
+                      verdict="Not ready: band light", ready=False, fixed_count=0, text="short")
+    newest = lq.latest_slop_scan(pursuit_id)
+    assert (newest["draft_name"], newest["band"], newest["provisional"]) == ("draft_v2.md", None, 0)   # no band under 150 words
+
+
+def test_a_reviewers_change_is_decided_once(ledger_db: str) -> None:
+    _started()
+    step = lq.claim_next_step()
+    first = lq.add_step_changes(step["id"], "evaluator_1", [
+        {"section": "1. Approach", "before": "We will try.", "after": "We will deliver X by month 3.", "reason": "Vague"}])
+    second = lq.add_step_changes(step["id"], "leadership", [
+        {"section": "2. Team", "before": "a", "after": "b", "reason": "c"},
+        {"section": "3. Cost", "before": "d", "after": "e", "reason": "f"}])
+    assert len(first) == 1 and len(second) == 2
+    assert lq.decide_change(first[0], "David Wood", "accepted")
+    assert not lq.decide_change(first[0], "David Wood", "rejected")          # decided already
+    assert lq.decide_change(second[0], "David Wood", "edited", edited_text="b, better")
+    with pytest.raises(ValueError):
+        lq.decide_change(second[1], "David Wood", "maybe")
+    rows = lq.step_changes(step["id"])
+    assert [(r["reviewer"], r["state"], r["edited_text"], r["decided_by"]) for r in rows] == [
+        ("evaluator_1", "accepted", None, "David Wood"), ("leadership", "edited", "b, better", "David Wood"),
+        ("leadership", "proposed", None, None)]
+    assert lq.accept_open_changes(step["id"], lq.AUTO_APPROVER) == 1
+    assert [r["state"] for r in lq.step_changes(step["id"])] == ["accepted", "edited", "accepted"]
+
+
+def test_worker_jobs_are_claimed_once_and_finished(ledger_db: str) -> None:
+    pursuit_id = _started()
+    job_id = lq.queue_job("slop_scan", pursuit_id, None, "David Wood")
+    claimed = lq.claim_next_job()
+    assert (claimed["id"], claimed["state"], claimed["kind"]) == (job_id, "working", "slop_scan")
+    assert lq.claim_next_job() is None
+    assert lq.finish_job(job_id, "done", "Ready: band light (provisional)")
+    assert not lq.finish_job(job_id, "failed", "again")
+    job = lq.get_job(job_id)
+    assert (job["state"], job["result"]) == ("done", "Ready: band light (provisional)") and job["finished_at"]
+    with pytest.raises(ValueError):
+        lq.queue_job("make_coffee", pursuit_id, None, "David Wood")
