@@ -20,7 +20,8 @@ REPLIES = {
     "opportunity summary": f'# Opportunity summary\nArmy edge AI.\n{FENCE}json\n{{"key_points": ["Army"], "worth_it": "yes"}}\n{FENCE}',
     "alignment": f'# Alignment\nStrong.\n{FENCE}json\n{{"key_points": ["Strong"], "verdict": "Strong fit"}}\n{FENCE}',
     "analyzing requirements": "# Requirements analysis\nKEYWORDS: edge AI",
-    "submission checklist": json.dumps({"key_points": ["PDF"], "checklist": [], "submit_by": "2026-11-30"}),
+    "submission checklist": json.dumps({"key_points": ["PDF"], "checklist": [], "submit_by": "2026-11-30",
+                                        "format": {"font": "Arial", "size": 11}}),
     "go or no-go brief": f'# Go or no-go brief\nGo.\n{FENCE}json\n{{"key_points": ["Go"], "fit": "Strong fit", "recommendation": "go"}}\n{FENCE}',
     "building outline": f'# Outline\n## 1. Technical Approach\n{FENCE}json\n{{"key_points": ["One section"], "sections": []}}\n{FENCE}',
     "drafting response": "# White paper\n\nEcho C2 runs offline " + chr(0x2014) + " on laptops. [NEEDS INPUT: rates]",
@@ -131,7 +132,8 @@ def test_a_step_is_saved_ready_with_what_it_cost_and_waits_for_the_owner(ledger_
     assert model.labels() == ["discovery"] and model.calls[0]["model"] == llm.DEFAULT_MODEL
     [step] = lq.pursuit_steps(pursuit_id)
     assert (step["state"], step["summary"]) == ("ready", "- Found the notice")
-    assert json.loads(step["files"]) == [{"name": "Discovery summary", "local": f"pursuit-{pursuit_id}/discovery.md"}]
+    assert json.loads(step["files"]) == [{"name": "Discovery summary", "local": f"pursuit-{pursuit_id}/discovery.md",
+                                          "word": f"pursuit-{pursuit_id}/discovery.docx"}]
     assert (local / "drafting" / "pursuits" / f"pursuit-{pursuit_id}" / "discovery.md").exists()
     assert json.loads(step["content"])["document"].startswith("# Discovery summary")
     assert json.loads(step["task_states"])["summary"] == "done"
@@ -254,6 +256,10 @@ def test_with_key_gates_a_pursuit_runs_from_discovery_to_the_submit_gate(ledger_
     assert [c["check"] for c in submit["checks"]] == ["Checklist", "Placeholders", "AI slop check", "Dashes",
                                                       "Internal submit-by date"]
     assert submit["files"] == [{"file": "PDF", "slot": "email"}]
+    from docx import Document
+    first_draft = Document(str(work / "draft_v1.docx"))      # the solicitation's format, from Requirements and checklist
+    assert (first_draft.styles["Normal"].font.name, first_draft.styles["Normal"].font.size.pt) == ("Arial", 11.0)
+    assert {"draft_final.docx", "checklist.docx", "slop_report.docx", "submission_packet.docx"} <= saved
 
 
 # ---------------------------------------------------------------------------- serving

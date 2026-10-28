@@ -44,6 +44,7 @@ CHECKLIST = json.dumps({
         {"part": "inputs", "text": "Key personnel bios", "source": None, "owner": "", "due": None, "done": False},
     ],
     "submit_by": "2026-12-05",
+    "format": {"font": "Arial", "size": 11, "margins": 1, "spacing": None},
     "milestones": {"outline": "2026-11-10", "draft": "2026-11-18", "final": "2026-12-04", "lunch": "2026-11-01"},
     "questions": [{"question": "Is a cost volume required?", "deadline": "2026-11-15", "channel": "the contracting officer by email"}],
     "sources": [{"name": "Notice W1-26-R-0001", "what": "the call", "version": "original"}],
@@ -106,7 +107,9 @@ def test_discovery_reports_its_tasks_and_when_the_result_is_expected(ledger_db: 
     result = qualify.discovery(ctx)
     saved = (ctx.work_dir / "discovery.md").read_text(encoding="utf-8")
     assert saved.startswith("# Discovery summary") and "json" not in saved
-    assert result.files == [{"name": "Discovery summary", "local": f"{ctx.work_dir.name}/discovery.md"}]
+    assert result.files == [{"name": "Discovery summary", "local": f"{ctx.work_dir.name}/discovery.md",
+                             "word": f"{ctx.work_dir.name}/discovery.docx"}]
+    assert (ctx.work_dir / "discovery.docx").exists()
     assert result.summary == "- Due 1 Dec 2026\n- Attachments must be fetched"
     assert result.content["tasks"]["call_page"] == "for_owner" and result.content["tasks"]["summary"] == "done"
     assert result.content["owner_fetch"] == ["The call page on SAM.gov, for amendments"]
@@ -174,6 +177,10 @@ def test_requirements_save_the_analysis_the_checklist_and_the_dates(ledger_db: s
     dates = json.loads(lq.get_pursuit(ctx.pursuit["id"])["target_dates"])
     assert dates == {"submit_by": "2026-11-30", "outline": "2026-11-10", "draft": "2026-11-18"}
     assert result.content["submit_by"] == "2026-11-30" and result.content["checklist_items"] == 3
+    assert result.content["format"] == {"font": "Arial", "size": 11.0, "margins": 1.0, "spacing": 1.0}
+    from docx import Document
+    assert Document(str(ctx.work_dir / "requirements.docx")).styles["Normal"].font.name == "Arial"
+    assert Document(str(ctx.work_dir / "submission_checklist.docx")).tables
     assert [f["name"] for f in result.files] == ["Requirements analysis", "Requirements and submission checklist"]
     assert "Section 2, submission checklist" in model.prompt("submission checklist").system
     assert "KEYWORDS: edge AI" in model.prompt("submission checklist").user
