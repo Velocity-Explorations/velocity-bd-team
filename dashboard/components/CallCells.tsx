@@ -128,7 +128,7 @@ export function DescriptionCell({ portal, description, extra, summary }: {
   return (
     <td className="description wide">
       {cell.label || cell.text ? (
-        <p className="clamp-4" title={cell.full || undefined} tabIndex={cell.full ? 0 : undefined}>
+        <p className={cell.label === "Summary" ? "clamp-4 whole" : "clamp-4"} title={cell.full || undefined} tabIndex={cell.full ? 0 : undefined}>
           {cell.label ? <span className="desc-label">{cell.label}</span> : null}
           {cell.label && cell.text ? " " : null}
           {cell.text}

@@ -331,9 +331,10 @@ SUMMARY_TOKENS_OUT = 400   # the summary line, and the thinking the model does b
 
 
 def backfill_summaries(dry_run: bool = False) -> int:
-    """Have Claude write the executive summary (phase 9c) for each open, kept and reviewed call that has none, asking
-    for the summary alone. A dry run counts the calls and prices the run instead. Safe to rerun: a call that could
-    not be summarized is asked again next time."""
+    """Have Claude write the executive summary (phase 9c) for each kept and reviewed call that has none and is still
+    open or still waiting for a decision (Needs review lists those whatever their deadline), asking for the summary
+    alone. A dry run counts the calls and prices the run instead. Safe to rerun: a call that could not be summarized
+    is asked again next time."""
     from drafting.costs import PRICES
     from drafting.dates import parse_due
     from ledger.queries import calls_without_summary
@@ -341,15 +342,16 @@ def backfill_summaries(dry_run: bool = False) -> int:
 
     _console_logging()
     now = datetime.now(timezone.utc)
-    pending = [row for row in calls_without_summary() if (due := parse_due(row.get("due_date"))) is None or due >= now]
+    pending = [row for row in calls_without_summary()
+               if row.get("human_status") is None or (due := parse_due(row.get("due_date"))) is None or due >= now]
     if dry_run or not pending:
         price = PRICES[MODEL_ID]
         tokens_in = sum(len(build_summary_prompt(row)) // 4 for row in pending)
         cost = (tokens_in * price.input + len(pending) * SUMMARY_TOKENS_OUT * price.output) / 1_000_000
-        print(f"{len(pending)} open {'call needs' if len(pending) == 1 else 'calls need'} a summary; "
+        print(f"{len(pending)} {'call needs' if len(pending) == 1 else 'calls need'} a summary; "
               f"about ${cost:.2f} with {MODEL_ID}.")
         return 0
-    print(f"Summarized {summarize_calls(pending, review_model())} of {len(pending)} open "
+    print(f"Summarized {summarize_calls(pending, review_model())} of {len(pending)} "
           f"{'call' if len(pending) == 1 else 'calls'}.")
     return 0
 

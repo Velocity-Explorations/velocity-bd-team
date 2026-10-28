@@ -255,9 +255,11 @@ about calls a judge has not tagged.
 The review also asks Claude for a SUMMARY line, two plain sentences for an executive, kept in
 `calls.ai_summary` (migration 009); the dashboard's Description column shows it, with the portal's
 own words on hover. Apply the migration once with `python -m ledger.migrate`. For calls reviewed
-before it, `python run.py --backfill-summaries --dry-run` counts the open, reviewed calls with no
-summary and prices the run; without `--dry-run` it summarizes them with claude-haiku-5-5, asking
-for the summary alone. It is safe to rerun: each pass only asks about calls with no summary.
+before it, `python run.py --backfill-summaries --dry-run` counts the reviewed calls with no summary
+that are still open or still waiting for a decision, and prices the run; without `--dry-run` it
+summarizes them with claude-haiku-5-5, asking for the summary alone. It is safe to rerun: each pass
+only asks about calls with no summary. Migration 009 and the first backfill ran on the live ledger
+on 28 Oct (73 open calls, about $0.02).
 
 To change the list, edit `review/tags.yaml`: each tag with a few words on what it covers, which
 the judges read. Names must differ across groups. The next run (or `--backfill-tags`) copies the
