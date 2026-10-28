@@ -266,7 +266,7 @@ Phases 2 and 3 change only `dashboard/`, and phase 5 changes only the worker and
   - the fonts are self-hosted;
   - `lucide-react` is added;
   - components: button, badge, tag, card and view cards, menu (focus and arrow keys), dialog, notice, tooltip, table, field.
-- **2b Shell:**
+- **2b Shell** (ships in one PR with 3a, since the bar's Home has nothing to open before Home exists):
   - the top bar with four sections, icons and count chips;
   - the account menu: Profile settings, Table settings, Switch user (today's picker), and Log out (clears the name until phase 11);
   - the new notices;

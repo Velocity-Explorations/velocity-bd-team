@@ -31,10 +31,10 @@ function WaitingCard({ req, tz }: { req: RequestRow; tz: string }) {
         <input type="hidden" name="id" value={req.id} />
         <input type="text" name="note" maxLength={2000} placeholder="Note (optional)" aria-label={`Note on request ${req.id}`} />
         <div className="buttons">
-          <button type="submit" name="choice" value="approve" className="btn-pursue" title={`Approve request ${req.id}`}>
+          <button type="submit" name="choice" value="approve" className="fn-approve" title={`Approve request ${req.id}`}>
             Approve
           </button>
-          <button type="submit" name="choice" value="reject" className="btn-dismissed" title={`Reject request ${req.id}`}>
+          <button type="submit" name="choice" value="reject" className="fn-stop" title={`Reject request ${req.id}`}>
             Reject
           </button>
         </div>

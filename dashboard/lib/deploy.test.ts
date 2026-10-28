@@ -13,3 +13,9 @@ test(".dockerignore keeps local settings and build output out of the image", () 
   }
   assert.ok(!lines.some((line) => line.startsWith("!")), "nothing is let back in");
 });
+
+// Next's standalone build leaves public/ behind, and the theme's fonts live there (PRO-569).
+test("the image carries public/, where the fonts are", () => {
+  const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
+  assert.match(dockerfile, /^COPY --from=build --chown=node:node \/app\/public \.\/public$/m);
+});

@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { MenuLinks, type MenuGroup } from "@/components/HeaderCell";
 import { choiceLinks, filterHref, type CallState, type Params, type PortalOption } from "@/lib/filters";
 import { optionGroups, type TagOption } from "@/lib/tags";
@@ -55,7 +56,10 @@ export function FilterBar(props: {
         </form>
       ) : null}
       <details className="menu" data-apply-on-close="">
-        <summary>Portals: {chosen}</summary>
+        <summary>
+          Portals: {chosen}
+          <ChevronDown aria-hidden="true" />
+        </summary>
         <div className="menu-body">
           <form action={props.action}>
             <Kept params={props.params} except="portal" />
@@ -67,13 +71,18 @@ export function FilterBar(props: {
               </label>
             ))}
             <p className="hint">None ticked shows every portal. Applies when this menu closes.</p>
-            <button type="submit">Apply</button>
+            <button type="submit" className="btn-primary">
+              Apply
+            </button>
           </form>
         </div>
       </details>
       {props.tags.length ? (
         <details className="menu">
-          <summary>Tag: {props.tag || "Any"}</summary>
+          <summary>
+            Tag: {props.tag || "Any"}
+            <ChevronDown aria-hidden="true" />
+          </summary>
           <div className="menu-body">
             <MenuLinks groups={tagGroups} />
           </div>
@@ -87,7 +96,7 @@ export function FilterBar(props: {
         ))}
       </nav>
       {props.filtered ? (
-        <a href={props.action} className="reset">
+        <a href={props.action} className="reset btn-text">
           Clear filters
         </a>
       ) : null}

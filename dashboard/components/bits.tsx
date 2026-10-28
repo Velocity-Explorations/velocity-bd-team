@@ -1,5 +1,6 @@
 // Small presentational pieces shared by the pages.
 
+import { Notice } from "@/components/Notice";
 import type { Detail } from "@/lib/details";
 
 const TONES: Record<string, string> = {
@@ -45,17 +46,18 @@ export function Badge({ value, empty = "none" }: { value: string | null | undefi
   return <span className={`badge tone-${toneOf(value)}`}>{LABELS[value] ?? value}</span>;
 }
 
+/** What an action reports, as a notice: Refused for an error, Done for the rest. */
 export function Flash({ notice, error, link }: { notice?: string; error?: string; link?: { href: string; label: string } | null }) {
   if (error) {
     return (
-      <p className="flash flash-error" role="alert">
+      <Notice key={error} tone="conflict">
         {error}
-      </p>
+      </Notice>
     );
   }
   if (notice) {
     return (
-      <p className="flash flash-ok" role="status">
+      <Notice key={notice} tone="good">
         {notice}
         {link ? (
           <>
@@ -63,7 +65,7 @@ export function Flash({ notice, error, link }: { notice?: string; error?: string
             <a href={link.href}>{link.label}</a>
           </>
         ) : null}
-      </p>
+      </Notice>
     );
   }
   return null;
@@ -80,13 +82,19 @@ export function TitleLink({ title, url, fallback }: { title: string | null; url:
   );
 }
 
+/** Hover text on something that is not a link: focusable and dotted, so the keyboard reaches it too. */
+function tip(title: string | undefined, className = ""): { title?: string; tabIndex?: number; className?: string } {
+  if (!title) return className ? { className } : {};
+  return { title, tabIndex: 0, className: `${className} tip`.trim() };
+}
+
 /** A call's portal details (lib/details.ts), after the portal name in a row's meta line. */
 export function Details({ items }: { items: Detail[] }) {
   return (
     <>
       {items.map((item, i) =>
         item.tone ? (
-          <span key={i} className={`badge tone-${item.tone}`} title={item.title}>
+          <span key={i} {...tip(item.title, `badge tone-${item.tone}`)}>
             {item.text}
           </span>
         ) : item.href ? (
@@ -94,7 +102,7 @@ export function Details({ items }: { items: Detail[] }) {
             {item.text}
           </a>
         ) : (
-          <span key={i} title={item.title}>
+          <span key={i} {...tip(item.title)}>
             {item.text}
           </span>
         ),
