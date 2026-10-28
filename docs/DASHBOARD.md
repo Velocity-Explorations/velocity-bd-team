@@ -56,6 +56,7 @@ column filters. The account menu shows who is deciding.
 | `/requests` | **Agent update requests** (section Automation, where it opens): change requests from the portal assistant (docs/ASSISTANT.md, "Approvals"). It shows the requests waiting for approval, oldest first, each with who asked, why, and the preview of what approving would do, plus Approve and Reject buttons and an optional note. Decided requests (`?view=decided`, PRO-573) lists the last 50 decided, with their status, who decided, and the result, or what an approved request is waiting for. Automation's five cards: Agent update requests, Decided requests, Scans, Scan problems, Judges agree. Automation's chip in the top bar shows how many are waiting. |
 | `/runs` | **Scans** (section Automation; PRO-573). The most recent run as a content card (status, start, duration, stage counts, error and log), then the last 100 runs, with a Portals filter, each portal's logo, and a Started column that sorts newest or oldest first. Scan problems (`?view=problems`) keeps only the runs that failed, timed out, or still say running two hours after they started (the process probably died). |
 | `/proposals` | **Proposals** (section Proposals; PRO-575): five view cards over the pursued, drafting and submitted calls and the Proposal Register, with the filter bar as on Calls and each view's key column sortable. To draft (`/proposals`): pursued calls with no draft whose deadline has not passed, nearest deadline first, each saying why it cannot be drafted when it cannot (closed, or needs the solicitation first), or offering Start the draft (PRO-576). Closing in 14 days (`?view=closing`): pursued and drafting calls closing within 14 days. Drafting (`?view=drafting`): each pursuit with its current step, its state in words, the owner, Open workspace and the Drive folder. Submitted and waiting (`/proposals/submitted`): who submitted and when, days waiting, both verdicts, the confirmation number, and the result expected by date (the one Discovery found, else 90 days after the deadline), flagged result overdue once it passes. Results (`/proposals/results`): results recorded here and the Register's submissions, with win rate by portal. |
+| `/proposals/{call id}` | **The proposal workspace** (PRO-580): one pursuit step by step, with its header, stage strip, step list and the open step's card and actions. See The proposal workspace below. |
 
 The queue and the proposals tiles use the "Triage backlog" and "Win rate by portal" queries
 from [LEDGER_SCHEMA.md](LEDGER_SCHEMA.md); the "new this week" count uses its "New calls this
@@ -155,6 +156,33 @@ N, Go or no-go, draft finished at the Submit gate, submitted with its date, no-g
 The badge opens a menu (DB3): who owns the draft and its step, or who submitted it, when and when the
 result is expected; the draft in Google Drive once the worker has made its folder; and View in
 Proposals.
+
+## The proposal workspace
+
+`/proposals/{call id}` (PW1 to PW25, PRO-580) follows one pursuit step by step. Open workspace on Proposals'
+Drafting view, in a call's Decide cell and in its draft badge's menu all lead here.
+
+- **Header (PW1, PW19, PW24):**
+  - the portal's logo, the breadcrumb with the stage (Qualifying to Submitting, or No-go, Submitted or Closed), and the title;
+  - a line with the portal, the format, the deadline with the days left, the owner, the people working with them, the approval mode, what has been spent against the cap, and the folder (on the scan PC until Drive is set up);
+  - at the right, People, Checklist (once Requirements and checklist has made one, with how many items are done) and Show history, each opening a panel under the header.
+- **Stage strip and step list (PW1 to PW3):** Qualify, Plan, Draft, Review, Finalize and Submit, each done, now or next. Under them, the nine steps and two gates in their stages, each with its state in words: waiting, working, ready, done, failed, budget reached or stopped. A reached step opens with `?step=`; a done step opens read only.
+- **The step card (PW4, PW15, PW19):**
+  - what the step is for, and the note when the step was redone after Ask for changes;
+  - its state: waiting for the worker (with a word when the worker is offline), working with its start time, failed with the reason and Retry, or budget reached with Raise the cap;
+  - the files saved, what Claude prepared (the key points), and the full document;
+  - Your call: the step's question and its actions.
+- **Actions.** Only the owner sees them (PW17, a courtesy check until sign-in); everyone else sees whom the step waits on. Each is guarded by the step's state and the time the page showed it, so a page left open while the step changed saves nothing and says so.
+  - **Approve and continue:** the step is done and the next is queued for the worker.
+  - **Ask for changes:** takes a note; the step is queued again with it, and Claude redoes it with the note and its last version.
+  - **Stop here, no-go:** steps 1 to 4. Takes the reason and what would change the answer; the draft stops and the call is marked Not relevant with that reason (P7).
+  - **At the gate:** Go; Go with conditions, one per line, each joining the checklist as an item the owner owns; or No-go with its reason.
+  - **Retry:** queues a failed step again.
+  - **Raise the cap:** sets a higher budget and queues the step that reached the cap again.
+- **What the people working with the owner do (PW24):** they add material (a note or a link, which Claude reads from the next step on) and tick checklist items; the owner can too.
+- **Show history (PW16):** every event with its time and who, newest first.
+
+Each step's own screen (Discovery's tasks, Alignment's direction, the gate's brief, the Outline's sections) follows in phase 7b.
 
 ## Profile settings
 

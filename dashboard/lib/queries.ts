@@ -1,6 +1,7 @@
 // Every query the dashboard runs. The SQL follows docs/LEDGER_SCHEMA.md; counts are cast to
 // int and rates to float8 because Postgres returns bigint and numeric, which arrive as strings.
 
+import type { TransactionSql } from "postgres";
 import { sql } from "./db";
 import { CLOSED_PATTERN, portalOptions, type CallState, type PortalOption, type Sort } from "./filters";
 import type { JudgeFilter, Judgment } from "./judges";
@@ -16,6 +17,7 @@ import { startRefusal, workerReadiness, type ProposalCall } from "./proposals";
 import { DESCRIPTION_READ } from "./description";
 import { STALE_MS } from "./runs";
 import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
+import { NO_GO_STEPS, stateWord, stepInfo, STEPS, type StepRow } from "./workspace";
 
 // ------------------------------------------------------------------------------ calls
 
@@ -44,6 +46,8 @@ export type QueueRow = {
 export type PanelFilters = { portals: string[]; state: CallState; sort: Sort; judges: JudgeFilter; tag: string };
 
 type Db = ReturnType<typeof sql>;
+/** A transaction from db.begin, for the helpers that write inside one. */
+type Tx = TransactionSql<Record<string, never>>;
 
 /** The panel's portal and open-or-closed conditions, appended after a WHERE. */
 function panelWhere(db: Db, f: PanelFilters) {
@@ -973,4 +977,285 @@ export async function saveProfile(name: string, f: ProfileFields): Promise<void>
 /** Profile settings' Reset to defaults: the person's row goes, so every default applies. */
 export async function deleteProfile(name: string): Promise<void> {
   await sql()`DELETE FROM profiles WHERE name = ${name}`;
+}
+
+// ----------------------------------------------------------------- the proposal workspace
+
+/** A pursuit as the workspace shows it (pursuits, migration 008). */
+export type PursuitRow = {
+  id: number;
+  call_id: string;
+  owner: string;
+  collaborators: string | null;
+  format: string | null;
+  approval_mode: string;
+  direction: string | null;
+  builds_on: string | null;
+  drive_folder_id: string | null;
+  drive_folder_name: string | null;
+  current_step: string;
+  state: string;
+  target_dates: string | null;
+  cost_usd: number;
+  budget_usd: number;
+  submitted_at: string | null;
+  submitted_by: string | null;
+  result_expected_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EventRow = { id: number; step_id: number | null; at: string; who: string; kind: string; text: string };
+
+export type ChecklistRow = {
+  id: number;
+  part: string;
+  position: number;
+  text: string;
+  source: string | null;
+  owner: string | null;
+  due_date: string | null;
+  origin: string;
+  done: number;
+  done_by: string | null;
+  done_at: string | null;
+};
+
+export type WorkspaceCall = {
+  id: string;
+  portal: string;
+  title: string | null;
+  url: string | null;
+  type: string | null;
+  due_date: string | null;
+  days_left: number | null;
+  human_status: string | null;
+};
+
+export type Workspace = { call: WorkspaceCall; pursuit: PursuitRow | null; steps: StepRow[]; events: EventRow[]; checklist: ChecklistRow[] };
+
+/** A call, its pursuit, every attempt at every step, the history newest first, and the checklist (PW1). */
+export async function workspace(callId: string): Promise<Workspace | null> {
+  const db = sql();
+  const [call] = await db<WorkspaceCall[]>`
+    SELECT id, portal, title, url, type, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, human_status
+    FROM calls WHERE id = ${callId}`;
+  if (!call) return null;
+  const empty: Workspace = { call, pursuit: null, steps: [], events: [], checklist: [] };
+  if (!(await hasTable(db, "pursuits"))) return empty;
+  const [pursuit] = await db<PursuitRow[]>`SELECT * FROM pursuits WHERE call_id = ${callId}`;
+  if (!pursuit) return empty;
+  const [steps, events, checklist] = await Promise.all([
+    db<StepRow[]>`SELECT * FROM pursuit_steps WHERE pursuit_id = ${pursuit.id} ORDER BY id`,
+    db<EventRow[]>`SELECT id, step_id, at, who, kind, text FROM pursuit_events WHERE pursuit_id = ${pursuit.id} ORDER BY id DESC`,
+    db<ChecklistRow[]>`SELECT * FROM checklist_items WHERE pursuit_id = ${pursuit.id} ORDER BY position, id`,
+  ]);
+  return { call, pursuit, steps: [...steps], events: [...events], checklist: [...checklist] };
+}
+
+export type WorkspaceResult = { ok: true; notice: string } | { ok: false; reason: string };
+
+/** A step's name in history: its label, with the attempt after the first (as ledger/queries.py writes it). */
+function stepName(r: { step: string; attempt: number }): string {
+  const label = stepInfo(r.step)?.label ?? r.step;
+  return r.attempt > 1 ? `${label} (attempt ${r.attempt})` : label;
+}
+
+function staleReason(r: StepRow): string {
+  return `This step changed since the page loaded: it is ${stateWord(r)} now. Nothing saved; reload to see it.`;
+}
+
+/** The next attempt at a step, queued for the worker, and the pursuit's current step (ledger/queries.py `_queue_step`). */
+async function queueStep(tx: Tx, pursuitId: number, step: string, by: string, note: string | null, now: string): Promise<number> {
+  const [last] = await tx<{ n: number | null }[]>`
+    SELECT MAX(attempt) AS n FROM pursuit_steps WHERE pursuit_id = ${pursuitId} AND step = ${step}`;
+  const [row] = await tx<{ id: number }[]>`
+    INSERT INTO pursuit_steps (pursuit_id, step, attempt, state, requested_by, request_note, queued_at, updated_at)
+    VALUES (${pursuitId}, ${step}, ${Number(last?.n ?? 0) + 1}, 'queued', ${by}, ${note}, ${now}, ${now})
+    RETURNING id`;
+  await tx`UPDATE pursuits SET current_step = ${step}, updated_at = ${now} WHERE id = ${pursuitId}`;
+  return row.id;
+}
+
+async function addEvent(tx: Tx, pursuitId: number, who: string, kind: string, text: string, stepId: number | null, now: string) {
+  await tx`
+    INSERT INTO pursuit_events (pursuit_id, step_id, at, who, kind, text)
+    VALUES (${pursuitId}, ${stepId}, ${now}, ${who}, ${kind}, ${text})`;
+}
+
+function withNote(text: string, note: string): string {
+  return note.trim() ? `${text}: ${note.trim()}` : text;
+}
+
+/**
+ * Approve and continue (PW4), or Go and Go with conditions at the gate (PW10): ready -> approved, and the
+ * next step queued for the worker. Each condition joins the checklist as an item the owner owns. Guarded by
+ * the step's state and the updated_at the page showed, and the pursuit still being worked.
+ */
+export async function approveStep(input: {
+  stepId: number;
+  by: string;
+  expected: string;
+  decision?: string;
+  note?: string;
+  conditions?: string[];
+}): Promise<WorkspaceResult> {
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const [r] = await tx<StepRow[]>`SELECT * FROM pursuit_steps WHERE id = ${input.stepId} FOR UPDATE`;
+    if (!r) return { ok: false, reason: "That step is no longer in the ledger." };
+    const at = STEPS.findIndex((s) => s.name === r.step);
+    const following = STEPS[at + 1]?.name;
+    if (!following || r.step === "submit") return { ok: false, reason: "Submit is recorded with Mark submitted." };
+    const chosen = r.step === "go_no_go" ? (input.decision === "go_with_conditions" ? "go_with_conditions" : "go") : "approved";
+    const conditions = (input.conditions ?? []).map((c) => c.trim()).filter(Boolean);
+    if (chosen === "go_with_conditions" && conditions.length === 0) {
+      return { ok: false, reason: "Go with conditions needs at least one condition, one per line." };
+    }
+    const now = isoNow();
+    const note = (input.note ?? "").trim();
+    const done = await tx`
+      UPDATE pursuit_steps SET state = 'approved', decision = ${chosen}, decided_by = ${input.by}, decided_at = ${now},
+             decision_note = ${note || (conditions.length ? conditions.join("\n") : null)}, updated_at = ${now}
+      WHERE id = ${input.stepId} AND state = 'ready' AND updated_at = ${input.expected}
+        AND pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')
+      RETURNING id`;
+    if (done.length !== 1) return { ok: false, reason: staleReason(r) };
+    await queueStep(tx, r.pursuit_id, following, input.by, null, now);
+    if (chosen === "go_with_conditions") {
+      const [last] = await tx<{ n: number | null }[]>`SELECT MAX(position) AS n FROM checklist_items WHERE pursuit_id = ${r.pursuit_id}`;
+      let position = Number(last?.n ?? -1) + 1;
+      for (const condition of conditions) {
+        await tx`
+          INSERT INTO checklist_items (pursuit_id, part, position, text, source, owner, due_date, origin, done, created_at, updated_at)
+          VALUES (${r.pursuit_id}, 'inputs', ${position++}, ${condition}, 'Go with conditions', ${input.by}, NULL, 'condition', 0, ${now}, ${now})`;
+      }
+    }
+    const text = chosen === "approved" ? withNote(`${stepName(r)} approved`, note)
+      : chosen === "go" ? withNote("Go", note) : `Go with conditions: ${conditions.join("; ")}`;
+    await addEvent(tx, r.pursuit_id, input.by, chosen, text, r.id, now);
+    const next = stepInfo(following)?.label ?? following;
+    return { ok: true, notice: chosen === "approved" ? `Approved. ${next} is queued for the worker.`
+      : `${chosen === "go" ? "Go" : "Go with conditions"} recorded. ${next} is queued for the worker.` };
+  });
+}
+
+/** Ask for changes (PW4): ready -> changes_asked, and the step queued again with the note for the worker. */
+export async function askChanges(input: { stepId: number; by: string; expected: string; note: string }): Promise<WorkspaceResult> {
+  const note = input.note.trim();
+  if (!note) return { ok: false, reason: "Say what to change: the note goes to Claude with the step." };
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const [r] = await tx<StepRow[]>`SELECT * FROM pursuit_steps WHERE id = ${input.stepId} FOR UPDATE`;
+    if (!r) return { ok: false, reason: "That step is no longer in the ledger." };
+    const now = isoNow();
+    const done = await tx`
+      UPDATE pursuit_steps SET state = 'changes_asked', decision = 'changes_asked', decided_by = ${input.by}, decided_at = ${now},
+             decision_note = ${note}, updated_at = ${now}
+      WHERE id = ${input.stepId} AND state = 'ready' AND updated_at = ${input.expected}
+        AND pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')
+      RETURNING id`;
+    if (done.length !== 1) return { ok: false, reason: staleReason(r) };
+    await queueStep(tx, r.pursuit_id, r.step, input.by, note, now);
+    await addEvent(tx, r.pursuit_id, input.by, "changes_asked", `Asked for changes to ${stepName(r)}: ${note}`, r.id, now);
+    return { ok: true, notice: `Asked for changes. ${stepInfo(r.step)?.label ?? r.step} is queued again for the worker.` };
+  });
+}
+
+async function retryIn(tx: Tx, r: StepRow, by: string, now: string): Promise<boolean> {
+  const done = await tx`
+    UPDATE pursuit_steps SET decision = 'retried', decided_by = ${by}, decided_at = ${now}, updated_at = ${now}
+    WHERE id = ${r.id} AND state IN ('failed', 'blocked') AND decision IS NULL
+      AND pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')
+    RETURNING id`;
+  if (done.length !== 1) return false;
+  const redo = await queueStep(tx, r.pursuit_id, r.step, by, null, now);
+  await addEvent(tx, r.pursuit_id, by, "retried", `Retried ${stepInfo(r.step)?.label ?? r.step}`, redo, now);
+  return true;
+}
+
+/** Retry a failed or blocked attempt as a new one (PW15, PW19); the old attempt keeps its error. */
+export async function retryStep(input: { stepId: number; by: string }): Promise<WorkspaceResult> {
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const [r] = await tx<StepRow[]>`SELECT * FROM pursuit_steps WHERE id = ${input.stepId} FOR UPDATE`;
+    if (!r) return { ok: false, reason: "That step is no longer in the ledger." };
+    if (!(await retryIn(tx, r, input.by, isoNow()))) return { ok: false, reason: staleReason(r) };
+    return { ok: true, notice: `${stepInfo(r.step)?.label ?? r.step} is queued again for the worker.` };
+  });
+}
+
+/**
+ * Stop here, no-go (PW4, steps 1 to 4) or No-go at the gate (PW10): the step stops with the reason and the
+ * pursuit becomes no_go. The caller then records the call as Not relevant (P7).
+ */
+export async function noGoStep(input: { stepId: number; by: string; expected: string; note: string }): Promise<WorkspaceResult> {
+  const note = input.note.trim();
+  if (!note) return { ok: false, reason: "No-go needs the reason, and what would change the answer." };
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const [r] = await tx<StepRow[]>`SELECT * FROM pursuit_steps WHERE id = ${input.stepId} FOR UPDATE`;
+    if (!r) return { ok: false, reason: "That step is no longer in the ledger." };
+    if (![...NO_GO_STEPS, "go_no_go"].includes(r.step)) return { ok: false, reason: "No-go is offered on steps 1 to 4 and the gate." };
+    const now = isoNow();
+    const done = await tx`
+      UPDATE pursuit_steps SET state = 'stopped', decision = 'no_go', decided_by = ${input.by}, decided_at = ${now},
+             decision_note = ${note}, updated_at = ${now}
+      WHERE id = ${input.stepId} AND state = 'ready' AND updated_at = ${input.expected}
+        AND pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')
+      RETURNING id`;
+    if (done.length !== 1) return { ok: false, reason: staleReason(r) };
+    await tx`UPDATE pursuits SET state = 'no_go', updated_at = ${now} WHERE id = ${r.pursuit_id} AND state = 'working'`;
+    await addEvent(tx, r.pursuit_id, input.by, "no_go", `No-go at ${stepName(r)}: ${note}`, r.id, now);
+    return { ok: true, notice: "No-go recorded." };
+  });
+}
+
+/** Raise the cap (PW19): a higher budget, and the step that reached it queued again. */
+export async function raiseCap(input: { pursuitId: number; by: string; budget: number }): Promise<WorkspaceResult> {
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const now = isoNow();
+    const raised = await tx<{ current_step: string }[]>`
+      UPDATE pursuits SET budget_usd = ${input.budget}, updated_at = ${now}
+      WHERE id = ${input.pursuitId} AND state = 'working' AND budget_usd < ${input.budget}
+      RETURNING current_step`;
+    if (raised.length !== 1) return { ok: false, reason: "The cap is already that high, or the draft is no longer being worked." };
+    await addEvent(tx, input.pursuitId, input.by, "budget", `Raised the cap to $${input.budget.toFixed(2)}`, null, now);
+    const [blocked] = await tx<StepRow[]>`
+      SELECT * FROM pursuit_steps WHERE pursuit_id = ${input.pursuitId} AND state = 'blocked' AND decision IS NULL
+      ORDER BY id DESC LIMIT 1`;
+    const again = blocked ? await retryIn(tx, blocked, input.by, now) : false;
+    return { ok: true, notice: `The cap is $${input.budget.toFixed(2)}.${again ? " The step is queued again for the worker." : ""}` };
+  });
+}
+
+/** Add material (PW4, PW24): a note or a link for Claude, kept in the history; the worker reads it. */
+export async function addMaterial(input: { pursuitId: number; who: string; text: string; stepId: number | null }): Promise<WorkspaceResult> {
+  const text = input.text.trim();
+  if (!text) return { ok: false, reason: "Add the material first: a note, or a link to a page or file." };
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const [pursuit] = await tx<{ state: string }[]>`SELECT state FROM pursuits WHERE id = ${input.pursuitId}`;
+    if (pursuit?.state !== "working") return { ok: false, reason: "This draft is no longer being worked." };
+    await addEvent(tx, input.pursuitId, input.who, "material", text, input.stepId, isoNow());
+    return { ok: true, notice: "Material added. Claude reads it from the next step on." };
+  });
+}
+
+/** Tick or untick a checklist item (PW9, PW24), guarded on the state the person saw. */
+export async function tickChecklist(input: { itemId: number; by: string; done: boolean; expectedDone: boolean }): Promise<WorkspaceResult> {
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const now = isoNow();
+    const [item] = await tx<{ pursuit_id: number; text: string }[]>`
+      UPDATE checklist_items SET done = ${input.done ? 1 : 0}, done_by = ${input.done ? input.by : null},
+             done_at = ${input.done ? now : null}, updated_at = ${now}
+      WHERE id = ${input.itemId} AND done = ${input.expectedDone ? 1 : 0}
+        AND pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')
+      RETURNING pursuit_id, text`;
+    if (!item) return { ok: false, reason: "That item changed since the page loaded. Nothing saved; reload to see it." };
+    await addEvent(tx, item.pursuit_id, input.by, "checklist", `${input.done ? "Ticked" : "Unticked"}: ${item.text}`, null, now);
+    return { ok: true, notice: `${input.done ? "Ticked" : "Unticked"}: ${item.text}` };
+  });
 }

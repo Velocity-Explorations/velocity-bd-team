@@ -28,6 +28,7 @@ export function DraftBadge({ draft, nameOf }: { draft: DraftInfo; nameOf: (by: s
           ) : (
             <p className="hint">The Drive folder shows here once the worker creates it.</p>
           )}
+          <a href={`/proposals/${encodeURIComponent(draft.call_id)}`}>Open the workspace</a>
           <a href={submitted ? "/proposals/submitted" : "/proposals?view=drafting"}>View in Proposals</a>
         </div>
       </details>

@@ -39,6 +39,7 @@ class CallRecord:
     decisions: list[dict[str, Any]]
     past_work: list[dict[str, Any]]
     clashes: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    material: list[dict[str, Any]] = field(default_factory=list)   # what people added on the workspace (PW4)
 
 
 def _json_list(value: Any) -> list[Any]:
@@ -107,7 +108,8 @@ def gather(pursuit_id: int) -> CallRecord:
     ranked = sorted(register, key=lambda p: (-_relevance(p, call), p.get("submission_id") or ""))
     return CallRecord(pursuit=pursuit, call=call, judges=lq.latest_judgments(call["id"]),
                       decisions=lq.decision_history(call["id"]), past_work=ranked[:PAST_WORK_LIMIT],
-                      clashes=_clashes(call, register))
+                      clashes=_clashes(call, register),
+                      material=[e for e in lq.pursuit_events(pursuit_id) if e["kind"] == "material"])
 
 
 def details_text(record: CallRecord) -> str:
@@ -201,7 +203,15 @@ def call_facts(record: CallRecord, today: date) -> str:
         "",
         "PAST SUBMISSIONS IN THE PROPOSAL REGISTER, MOST RELEVANT FIRST",
         past_work_text(record),
+        *material_lines(record),
     ])
+
+
+def material_lines(record: CallRecord) -> list[str]:
+    """The notes and links people added on the workspace (Add material, PW4), oldest first."""
+    if not record.material:
+        return []
+    return ["", "MATERIAL THE TEAM ADDED"] + [f"- {(m.get('at') or '')[:10]} {m['who']}: {m['text']}" for m in record.material]
 
 
 def company_text() -> str:
