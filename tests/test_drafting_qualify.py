@@ -31,7 +31,10 @@ SUMMARY = f"# Opportunity summary\n\nArmy, edge AI, white paper.\n\n{FENCE}json\
 ALIGNMENT = (f"# Alignment\n\nStrong on C2, a gap on Army past performance.\n\n{FENCE}json\n"
              '{"key_points": ["Strong on C2"], "verdict": "Strong fit on C2, one gap", '
              '"angle": "Lead with Echo C2 at Cobra Gold; team for Army past performance", '
-             '"comparison": "Both lead with Echo C2; the angle adds a teaming partner"}\n' + FENCE)
+             '"comparison": "Both lead with Echo C2; the angle adds a teaming partner", '
+             '"points": [{"tag": "fits", "text": "Army C2 work matches Echo C2", "source": "Claude and Grok"}, '
+             '{"tag": "risk", "text": "No Army past performance", "source": "Grok"}, '
+             '{"tag": "banana", "text": "Not a tag", "source": "nowhere"}, {"tag": "needs", "text": "", "source": "x"}]}\n' + FENCE)
 REQUIREMENTS = "# Requirements analysis\n\n## 6. SOLICITATION TERMINOLOGY\nKEYWORDS: edge AI"
 CHECKLIST = json.dumps({
     "key_points": ["Ten pages, PDF", "Submit by 30 Nov"],
@@ -45,13 +48,18 @@ CHECKLIST = json.dumps({
     ],
     "submit_by": "2026-12-05",
     "format": {"font": "Arial", "size": 11, "margins": 1, "spacing": None},
+    "requirements": {"volumes": "One white paper", "page_limit": "10 pages, 12 point, PDF", "evaluation": "Technical merit",
+                     "eligibility": "Small business", "keywords": "edge AI; C2", "snacks": "not a field"},
     "milestones": {"outline": "2026-11-10", "draft": "2026-11-18", "final": "2026-12-04", "lunch": "2026-11-01"},
     "questions": [{"question": "Is a cost volume required?", "deadline": "2026-11-15", "channel": "the contracting officer by email"}],
     "sources": [{"name": "Notice W1-26-R-0001", "what": "the call", "version": "original"}],
 })
 GO_NO_GO = (f"# Go or no-go brief\n\nModerate fit.\n\n{FENCE}json\n"
             '{"key_points": ["Moderate fit"], "fit": "Moderate fit", "recommendation": "go_with_conditions", '
-            '"conditions": ["Sign a teaming partner with Army past performance"]}\n' + FENCE)
+            '"conditions": ["Sign a teaming partner with Army past performance"], '
+            '"fit_reason": "C2 matches; no Army past performance", "win_themes": ["Echo C2 offline", "Fast fielding"], '
+            '"gaps": [{"gap": "No Army past performance", "mitigation": "Team with a partner"}, {"gap": "", "mitigation": "x"}], '
+            '"effort": "30 days to the deadline; the milestones fit", "recommendation_text": "Go once a partner signs"}\n' + FENCE)
 REPLIES = {"discovery": DISCOVERY, "opportunity summary": SUMMARY, "alignment": ALIGNMENT,
            "analyzing requirements": REQUIREMENTS, "submission checklist": CHECKLIST, "go or no-go brief": GO_NO_GO}
 
@@ -155,6 +163,8 @@ def test_alignment_sets_the_angle_beside_the_owners_direction(ledger_db: str, tm
     assert result.content["verdict"] == "Strong fit on C2, one gap"
     assert result.content["angle"].startswith("Lead with Echo C2 at Cobra Gold")
     assert result.content["direction"] == "Lead with Echo C2"
+    assert result.content["points"] == [{"tag": "fits", "text": "Army C2 work matches Echo C2", "source": "Claude and Grok"},
+                                        {"tag": "risk", "text": "No Army past performance", "source": "Grok"}]
     assert "## Phase 3: Alignment" in model.prompt("alignment").system
 
 
@@ -178,6 +188,9 @@ def test_requirements_save_the_analysis_the_checklist_and_the_dates(ledger_db: s
     assert dates == {"submit_by": "2026-11-30", "outline": "2026-11-10", "draft": "2026-11-18"}
     assert result.content["submit_by"] == "2026-11-30" and result.content["checklist_items"] == 3
     assert result.content["format"] == {"font": "Arial", "size": 11.0, "margins": 1.0, "spacing": 1.0}
+    assert result.content["requirements"] == {"volumes": "One white paper", "page_limit": "10 pages, 12 point, PDF",
+                                              "evaluation": "Technical merit", "eligibility": "Small business",
+                                              "keywords": "edge AI; C2"}
     from docx import Document
     assert Document(str(ctx.work_dir / "requirements.docx")).styles["Normal"].font.name == "Arial"
     assert Document(str(ctx.work_dir / "submission_checklist.docx")).tables
@@ -192,6 +205,10 @@ def test_the_go_or_no_go_brief_recommends_and_names_its_conditions(ledger_db: st
     result = qualify.go_no_go(ctx)
     assert (result.content["fit"], result.content["recommendation"]) == ("Moderate fit", "go_with_conditions")
     assert result.content["conditions"] == ["Sign a teaming partner with Army past performance"]
+    assert (result.content["fit_reason"], result.content["win_themes"], result.content["effort"]) == (
+        "C2 matches; no Army past performance", ["Echo C2 offline", "Fast fielding"], "30 days to the deadline; the milestones fit")
+    assert result.content["gaps"] == [{"gap": "No Army past performance", "mitigation": "Team with a partner"}]
+    assert result.content["recommendation_text"] == "Go once a partner signs"
     ctx.ask = Model({**REPLIES, "go or no-go brief": GO_NO_GO.replace(
         '"Moderate fit", "recommendation": "go_with_conditions"', '"Great", "recommendation": "maybe"')})
     again = qualify.go_no_go(ctx).content

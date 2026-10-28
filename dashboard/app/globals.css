@@ -2902,3 +2902,228 @@ dialog.start-draft {
     justify-content: flex-start;
   }
 }
+
+/* ------------------------------------------------------------------ each step's own screen (PW6 to PW11) */
+
+.ws-screen {
+  display: grid;
+  gap: 12px;
+}
+
+.ws-rows {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.ws-rows > div {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.ws-rows dt {
+  margin: 0;
+  padding-top: 2px;
+}
+
+.ws-rows dd {
+  margin: 0;
+  font: var(--type-small);
+}
+
+.ws-rows dd ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.ws-subsection h3 {
+  margin: 0 0 6px;
+}
+
+.ws-subsection ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.ws-progress {
+  margin: 0;
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+.ws-tasks {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-tasks li {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.ws-tasks li > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.ws-lead,
+.ws-verdict {
+  margin: 0;
+}
+
+.ws-verdict {
+  font: var(--type-row-title);
+}
+
+.ws-tagged {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-tagged li {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-subtle);
+  font: var(--type-small);
+}
+
+.ws-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ws-box {
+  padding: 12px 14px;
+  background: var(--field);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-card);
+}
+
+.ws-box h3 {
+  margin: 0 0 6px;
+}
+
+.ws-box p {
+  margin: 0 0 4px;
+}
+
+.ws-approve-direction {
+  display: grid;
+  gap: 10px;
+  flex-basis: 100%;
+}
+
+.ws-approve-direction > button {
+  justify-self: start;
+}
+
+.ws-choice {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ws-choice-cards {
+  grid-template-columns: repeat(3, minmax(0, max-content));
+}
+
+.ws-choice textarea {
+  width: 100%;
+}
+
+.ws-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.ws-chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  font: var(--type-small);
+}
+
+.ws-chips form {
+  margin: 0;
+}
+
+.chip-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.chip-remove:hover {
+  color: var(--stop);
+}
+
+.chip-remove svg {
+  width: 12px;
+  height: 12px;
+}
+
+.ws-sections {
+  width: 100%;
+}
+
+.ws-sections td,
+.ws-sections th {
+  font: var(--type-small);
+  vertical-align: top;
+}
+
+@media (max-width: 1100px) {
+  .ws-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ws-rows > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ws-tagged .badge {
+  justify-self: start;
+}
+
+.ws-box .ws-more > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ws-box .ws-more > summary svg {
+  width: 13px;
+  height: 13px;
+}

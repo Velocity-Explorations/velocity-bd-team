@@ -2,17 +2,26 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   actionsFor,
+  approveLabel,
   checklistProgress,
+  DISCOVERY_TASKS,
+  fitTone,
   latestSteps,
+  locked,
   money,
   openStep,
   parseJson,
   permissions,
+  RECOMMENDATIONS,
+  REQUIREMENT_ROWS,
   stageStates,
   stateTone,
   stateWord,
   STEPS,
   stepTitle,
+  tagTone,
+  taskLine,
+  taskWord,
   type StepRow,
 } from "./workspace.ts";
 
@@ -93,4 +102,29 @@ test("the checklist counts what is done, the JSON columns parse, and money reads
   assert.deepEqual(parseJson(null, { none: true }), { none: true });
   assert.equal(money(0.4007), "$0.40");
   assert.equal(money(200), "$200.00");
+});
+
+test("Discovery's eight tasks read with their states and a progress line (PW6)", () => {
+  assert.equal(DISCOVERY_TASKS.length, 8);
+  assert.equal(DISCOVERY_TASKS[0].id, "call_page");
+  assert.equal(taskLine({ call_page: "done", attachments: "working", summary: "done", key_facts: "for_owner" }), "2 of 8 done, 1 working, 1 for you");
+  assert.equal(taskLine({}), "0 of 8 done");
+  assert.equal(taskWord("for_owner"), "for you");
+  assert.equal(taskWord(undefined), "waiting");
+});
+
+test("the screens' badges and labels: alignment tags, the fit rating, the recommendation", () => {
+  assert.deepEqual(["fits", "past work", "depends", "risk", "needs", "no clash"].map(tagTone), ["good", "good", "warn", "warn", "warn", "good"]);
+  assert.deepEqual(["Strong fit", "Moderate fit", "Stretch fit", "Poor fit", "odd"].map(fitTone), ["good", "warn", "warn", "conflict", "grey"]);
+  assert.equal(RECOMMENDATIONS.go_with_conditions, "Go with conditions");
+  assert.deepEqual(REQUIREMENT_ROWS.map(([key]) => key), ["volumes", "page_limit", "evaluation", "eligibility", "keywords"]);
+  assert.equal(approveLabel("summary"), "Continue to Alignment");
+  assert.equal(approveLabel("draft"), "Approve and continue");
+});
+
+test("approving the Outline locks the direction and the past work (PW8, PW11)", () => {
+  assert.equal(locked([row("outline", { state: "ready" })]), false);
+  assert.equal(locked([row("outline", { state: "approved" })]), true);
+  assert.equal(locked([row("outline", { id: 1, state: "approved" }), row("outline", { id: 2, attempt: 2, state: "queued" })]), true);
+  assert.equal(locked([row("alignment")]), false);
 });

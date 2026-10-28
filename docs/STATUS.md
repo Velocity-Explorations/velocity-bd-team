@@ -197,7 +197,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     Checklist and Show history, the stage strip, the step list and the step card, with Approve and
     continue, Ask for changes, Add material, Stop here no-go, the gate's Go, Go with conditions and
     No-go, Retry, Raise the cap and checklist ticks, each guarded and owner-only where the spec says.
-    Its browser tests run on a throwaway Postgres (RUNBOOK, Dashboard). Each step's own screen
-    follows in 7b.
+    Its browser tests run on a throwaway Postgres (RUNBOOK, Dashboard).
+  - Phase 7b (PRO-581): each step's own screen: Discovery's tasks, the summary's key facts,
+    Alignment's tagged points with the direction choice, Requirements' rows with the checklist, the
+    gate's decision brief with Claude's conditions filled in, and the Outline's direction, past work
+    and sections, locked once it is approved. The owner changes who works with them from People.
 
 ## Known breakages

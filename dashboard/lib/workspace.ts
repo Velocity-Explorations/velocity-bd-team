@@ -183,3 +183,72 @@ export function parseJson<T>(text: string | null | undefined, fallback: T): T {
 export function money(n: number): string {
   return `$${Number(n || 0).toFixed(2)}`;
 }
+
+// ------------------------------------------------------------------- each step's own screen (PRO-581)
+
+/** Discovery's eight tasks (PW6), as the opportunity-assessment skill lists them. */
+export const DISCOVERY_TASKS: { id: string; label: string; detail: string }[] = [
+  { id: "call_page", label: "Re-check the call page", detail: "Still open, the deadline unchanged, amendments and posted questions and answers; the page saved as a PDF." },
+  { id: "attachments", label: "Download every attachment", detail: "The solicitation or BAA, the statement of work, templates, forms and amendments." },
+  { id: "parent_instructions", label: "Find the parent instructions", detail: "The BAA or the agency's own instructions the call points to, which hold page limits and format rules." },
+  { id: "key_facts", label: "Pull out the key facts", detail: "Number, agency, point of contact, dates in our time zone, phase, funding, eligibility, the portal, and when results are announced." },
+  { id: "past_work", label: "Compare with our past work", detail: "Starting from the past work chosen at Start the draft: similar topics, the same agency, wins, losses and debriefs." },
+  { id: "clashes", label: "Check for clashes", detail: "An earlier submission to this call, the same call on another portal, and other pursued calls closing near the same date." },
+  { id: "record", label: "Bring in the dashboard's record", detail: "Both judges' reasons, and the team's votes and notes." },
+  { id: "summary", label: "Write the Discovery summary", detail: "What was found, what is missing and why, and questions for the point of contact." },
+];
+
+const TASK_WORDS: Record<string, string> = { done: "done", working: "working", for_owner: "for you", waiting: "waiting" };
+
+export function taskWord(state: string | undefined): string {
+  return (state && TASK_WORDS[state]) || "waiting";
+}
+
+/** "6 of 8 done, 2 for you": the progress line over Discovery's tasks. */
+export function taskLine(tasks: Record<string, string>): string {
+  const count = (state: string) => DISCOVERY_TASKS.filter((t) => tasks[t.id] === state).length;
+  const parts = [`${count("done")} of ${DISCOVERY_TASKS.length} done`];
+  if (count("working")) parts.push(`${count("working")} working`);
+  if (count("for_owner")) parts.push(`${count("for_owner")} for you`);
+  return parts.join(", ");
+}
+
+/** How each alignment point's tag reads (PW8): what fits in green, what depends or is at risk in amber. */
+export function tagTone(tag: string): "good" | "warn" {
+  return tag === "fits" || tag === "past work" || tag === "no clash" ? "good" : "warn";
+}
+
+export function fitTone(fit: string): "good" | "warn" | "conflict" | "grey" {
+  switch (fit) {
+    case "Strong fit":
+      return "good";
+    case "Moderate fit":
+    case "Stretch fit":
+      return "warn";
+    case "Poor fit":
+      return "conflict";
+    default:
+      return "grey";
+  }
+}
+
+export const RECOMMENDATIONS: Record<string, string> = { go: "Go", go_with_conditions: "Go with conditions", no_go: "No-go" };
+
+/** Requirements and checklist's summary rows (PW9). */
+export const REQUIREMENT_ROWS: [string, string][] = [
+  ["volumes", "Volumes"],
+  ["page_limit", "Page limit and format"],
+  ["evaluation", "Evaluation"],
+  ["eligibility", "Eligibility"],
+  ["keywords", "Keywords"],
+];
+
+/** The approve button's words: the summary continues to Alignment (PW7); the rest approve and continue. */
+export function approveLabel(step: string): string {
+  return step === "summary" ? "Continue to Alignment" : "Approve and continue";
+}
+
+/** Approving the Outline locks the direction and the past work (PW8, PW11): any approved attempt locks them. */
+export function locked(rows: StepRow[]): boolean {
+  return rows.some((r) => r.step === "outline" && r.state === "approved");
+}
