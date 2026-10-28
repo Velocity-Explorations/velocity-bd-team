@@ -57,8 +57,9 @@ class Model:
             on_usage(llm.Usage(phase_label=phase_label, model=model or llm.DEFAULT_MODEL, input_tokens=tokens_in,
                                output_tokens=tokens_out, cache_read_tokens=0, cache_write_tokens=0, seconds=1.0,
                                truncated=False, request_id=""))
-        if phase_label.startswith("review pass "):
-            return f"# White paper after {phase_label}"
+        if phase_label.startswith("review "):
+            change = {"section": "Title", "now": "# White paper v2", "suggested": "# White paper v2, reviewed", "why": "Clearer"}
+            return f"# Review\n{FENCE}json\n{json.dumps({'key_points': ['One change'], 'changes': [change] if phase_label.startswith('review 1 ') else []})}\n{FENCE}"
         return REPLIES[phase_label]
 
     def labels(self) -> list[str]:
@@ -84,6 +85,13 @@ def _pursuit(call_id: str = "sam-1", **options: Any) -> int:
 
 def _steps(pursuit_id: int) -> list[tuple[str, int, str]]:
     return [(s["step"], s["attempt"], s["state"]) for s in lq.pursuit_steps(pursuit_id)]
+
+
+def _scans(pursuit_id: int) -> list[dict[str, Any]]:
+    from ledger.db import q, rows, tx
+
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM slop_scans WHERE pursuit_id = ? ORDER BY id", (pursuit_id,)))
 
 
 def _drain(model: Model) -> int:
@@ -252,6 +260,11 @@ def test_with_key_gates_a_pursuit_runs_from_discovery_to_the_submit_gate(ledger_
         assert chr(0x2013) not in path.read_text(encoding="utf-8") and chr(0x2014) not in path.read_text(encoding="utf-8")
     draft = next(s for s in lq.pursuit_steps(pursuit_id) if s["step"] == "draft")
     assert chr(0x2014) not in draft["content"] and "Echo C2 runs offline, on laptops" in json.loads(draft["content"])["document"]
+    reviews = next(s for s in lq.pursuit_steps(pursuit_id) if s["step"] == "reviews")
+    changes = lq.step_changes(reviews["id"])
+    assert len(changes) == 1 and {(c["state"], c["decided_by"]) for c in changes} == {("accepted", lq.AUTO_APPROVER)}
+    assert "# White paper v2, reviewed" in (work / "draft_v3.md").read_text(encoding="utf-8")
+    assert [s["draft_name"] for s in _scans(pursuit_id)] == ["draft_v1.md", "draft_v2.md", "draft_final.md"]
     submit = json.loads(lq.pursuit_steps(pursuit_id)[-1]["content"])
     assert [c["check"] for c in submit["checks"]] == ["Checklist", "Placeholders", "AI slop check", "Dashes",
                                                       "Internal submit-by date"]
@@ -283,3 +296,20 @@ def test_a_second_worker_leaves_quietly(ledger_db: str, local: Path, monkeypatch
     assert worker.serve(once=True, generate=Model()) == 0
     assert lq.get_worker(lq.WORKER) is None
     assert worker.LOCK_FILE.read_text(encoding="utf-8").startswith("4242")
+
+
+def test_check_again_scans_the_newest_draft_when_no_step_is_waiting(ledger_db: str, local: Path) -> None:
+    pursuit_id = _pursuit()
+    worker.work_once(generate=Model())                       # Discovery is ready; nothing is queued now
+    work = local / "drafting" / "pursuits" / f"pursuit-{pursuit_id}"
+    (work / "draft_v1.md").write_text("# White paper\n\n[NEEDS INPUT: rates] " + "Words. " * 200, encoding="utf-8")
+    job_id = lq.queue_job("slop_scan", pursuit_id, None, "David Wood")
+    assert worker.work_once(generate=Model()) is True
+    job = lq.get_job(job_id)
+    assert (job["state"], job["result"]) == ("done", "Not ready: 1 NEEDS INPUT; band clean (provisional)")
+    scan = lq.latest_slop_scan(pursuit_id)
+    assert (scan["draft_name"], scan["step_id"]) == ("draft_v1.md", None)
+    other = lq.queue_job("slop_scan", _pursuit("sam-2"), None, "David Wood")    # a pursuit with no draft yet
+    while worker.work_once(generate=Model()):
+        pass
+    assert (lq.get_job(other)["state"], lq.get_job(other)["result"]) == ("failed", "There is no draft to check yet.")

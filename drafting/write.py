@@ -22,7 +22,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from drafting import llm, pipeline, prompts, slop_gate
+from drafting import llm, pipeline, prompts, scan, slop_gate
 from drafting.company import profile
 from drafting.inputs import builds_on_text, draft_inputs
 from drafting.phases import Phase
@@ -37,7 +37,7 @@ QUESTIONS = {
                "Any sections you want weighted differently, or evidence to add or drop?",
     "draft": "Here is the first complete draft. What are your first reactions before the compliance check and the reviews?",
     "compliance": "Here is what the compliance check found and fixed. Approve the fixes and move into the reviews?",
-    "reviews": "Here is the draft after four review passes. Approve it for the final checks, or ask for changes.",
+    "reviews": "Here is what the reviews found, as changes to decide. Accept, reject or edit each, then approve the draft.",
     "final": "The final version is saved. Here is the updated checklist, with what is complete and what is still open, "
              "and who owns each item. Tick what people have done, then go to the Submit gate.",
     "submit": "Submit on the portal, then enter the confirmation number and the result expected by date, and choose "
@@ -94,6 +94,11 @@ def _draft(ctx: StepContext, label: str) -> tuple[Path, str]:
     return path, path.read_text(encoding="utf-8")
 
 
+def _scan(ctx: StepContext, name: str) -> dict[str, Any]:
+    """The AI slop check on a new draft (PW12): the worker's own fixes, the scan, kept in slop_scans."""
+    return scan.check(ctx.pursuit["id"], ctx.step["id"], ctx.work_dir / name, slop_gate.solicitation_text(draft_inputs(ctx.record)))
+
+
 def _alignment(ctx: StepContext) -> str:
     alignment = ctx.earlier("alignment.md")
     return prompts.ALIGNMENT_BLOCK_HEADER + alignment[:15_000] if alignment else ""
@@ -141,11 +146,15 @@ def draft(ctx: StepContext) -> StepResult:
                          alignment=ctx.earlier("alignment.md", 20_000))
     text = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, _skill("## Phase 3:"), placeholders=True)), "drafting response",
                    pipeline.MAX_TOKENS["6"])
-    saved = ctx.save("draft_v1.md", text, "Draft v1")
-    document = fix_dashes(text)
+    ctx.save("draft_v1.md", text, "Draft v1")
+    slop = _scan(ctx, "draft_v1.md")
+    saved = ctx.entry("draft_v1.md", "Draft v1")
+    document = (ctx.work_dir / "draft_v1.md").read_text(encoding="utf-8")
     counts, words = placeholder_counts(document), len(document.split())
-    return StepResult(summary=bullets([f"{words:,} words", placeholder_line(counts)]), files=[saved],
-                      content={"document": document, "words": words, "placeholders": counts, "question": QUESTIONS["draft"]})
+    return StepResult(summary=bullets([f"{words:,} words", placeholder_line(counts), f"AI slop check: {slop['verdict']}"]),
+                      files=[saved],
+                      content={"document": document, "words": words, "placeholders": counts, "slop": slop["verdict"],
+                               "question": QUESTIONS["draft"]})
 
 
 # ---------------------------------------------------------------------------------- Review
@@ -162,44 +171,103 @@ def compliance(ctx: StepContext) -> StepResult:
                     pipeline.MAX_TOKENS["6.75"])
     report, corrected = reply.split(prompts.CORRECTED_DRAFT_SEPARATOR, 1) if prompts.CORRECTED_DRAFT_SEPARATOR in reply else ("", reply)
     files = [ctx.save("compliance_report.md", report.strip(), "Compliance report")] if report.strip() else []
-    files.append(ctx.save("draft_v2.md", corrected.strip() or current, "Draft v2"))
+    ctx.save("draft_v2.md", corrected.strip() or current, "Draft v2")
+    slop = _scan(ctx, "draft_v2.md")
+    files.append(ctx.entry("draft_v2.md", "Draft v2"))
     corrections, warnings = report.count(CORRECTION), report.count(WARNING)
     lines = [f"{corrections} {'item' if corrections == 1 else 'items'} corrected in Draft v2",
              f"{warnings} {'warning' if warnings == 1 else 'warnings'} to check"]
     if not report.strip():
         lines = ["The check gave no report; its corrected text is Draft v2"]
+    lines.append(f"AI slop check: {slop['verdict']}")
     return StepResult(summary=bullets(lines), files=files,
                       content={"document": fix_dashes(report.strip()), "corrections": corrections, "warnings": warnings,
-                               "question": QUESTIONS["compliance"]})
+                               "slop": slop["verdict"], "question": QUESTIONS["compliance"]})
+
+
+REVIEWERS = [   # code (step_changes.reviewer), name, the role the model takes, the skill's part, whether it rates the criteria
+    ("evaluator_1", "External evaluator", "an independent government evaluator scoring proposals against the published criteria",
+     "### Review 1:", True),
+    ("evaluator_2", "Second independent evaluator", "a second, independent government evaluator", "### Review 2:", True),
+    ("leadership", "Velocity leadership", "a member of Velocity Explorations' leadership, who knows what the company can deliver",
+     "### Review 3:", False),
+]
+REVIEW_TOKENS = 16_000
+MAX_CHANGES = 25
+RATED_SPEC = """{"key_points": ["three to six short points for the step's card"],
+ "ratings": [{"criterion": "each evaluation criterion", "rating": "Outstanding, Good, Acceptable, Marginal or Unacceptable, or the call's own scale",
+              "strengths": "the strengths an evaluator would note", "weaknesses": "the weaknesses or gaps"}],
+ "changes": [{"section": "the section", "now": "the exact text in the draft to change, copied character for character",
+              "suggested": "the text to put in its place", "why": "why, in a sentence"}]}
+Propose at most 25 changes, the ones that matter most. Each change's now must appear in the draft exactly as written."""
+UNRATED_SPEC = RATED_SPEC.replace(""" "ratings": [{"criterion": "each evaluation criterion", "rating": "Outstanding, Good, Acceptable, Marginal or Unacceptable, or the call's own scale",
+              "strengths": "the strengths an evaluator would note", "weaknesses": "the weaknesses or gaps"}],
+""", "")
+
+
+def _review_part(heading: str) -> str:
+    """One reviewer's part of the skill's Phase 4: from its heading to the next subsection or rule."""
+    section = _skill("## Phase 4:")
+    start = section.index(heading)
+    ends = [i for i in (section.find("\n### ", start + 1), section.find("\n**After each review", start + 1)) if i >= 0]
+    return section[start:min(ends) if ends else len(section)].strip()
+
+
+def _changes(found: Any, draft: str) -> tuple[list[dict[str, Any]], int]:
+    """A reviewer's changes whose text is in the draft, so each can be applied as decided; and how many were not."""
+    kept, dropped = [], 0
+    for item in found if isinstance(found, list) else []:
+        now = str(item.get("now") or "") if isinstance(item, dict) else ""
+        if not now.strip() or now not in draft:
+            dropped += 1
+            continue
+        kept.append({"section": str(item.get("section") or "").strip() or None, "before": now,
+                     "after": str(item.get("suggested") or ""), "reason": str(item.get("why") or "").strip() or None})
+    return kept[:MAX_CHANGES], dropped + max(0, len(kept) - MAX_CHANGES)
+
+
+def _ratings(found: Any) -> list[dict[str, str]]:
+    return [{key: str(r.get(key) or "").strip() for key in ("criterion", "rating", "strengths", "weaknesses")}
+            for r in found if isinstance(r, dict) and str(r.get("criterion") or "").strip() and str(r.get("rating") or "").strip()
+            ] if isinstance(found, list) else []
 
 
 def reviews(ctx: StepContext) -> StepResult:
-    """Step 8, until phase 8: the reference pipeline's four review passes, each revising the draft the one before
-    left, as Draft v3. A pass that fails keeps the draft and the next pass goes on."""
+    """Step 8 (PW12, PW25): three reviewers in turn (two evaluators who rate each criterion in words, then Velocity's
+    leadership) read the newest draft and propose changes, one per row, for the owner to accept, reject or edit.
+    The draft changes once the owner has decided; Final checks applies the accepted changes as Draft v3. A
+    reviewer sees what the earlier ones proposed, so it does not repeat them."""
     _, current = _draft(ctx, "Reviews")
-    d, company = draft_inputs(ctx.record), profile()
     passes: list[dict[str, Any]] = []
-    for n in range(1, len(prompts.REVIEW_PASSES) + 1):
-        reviewer = prompts.review_pass_label(n, company)
-        p = prompts.p65_review_pass(n, company=company, knowledge_base=d.company_context, rag_context=d.past_experience[:20_000],
-                                    title=d.title, agency=d.agency, opp_type=d.opp_type, due_date=d.due_date,
-                                    requirements=ctx.earlier("requirements.md", 20_000), alignment_block=_alignment(ctx),
-                                    draft=current[:50_000])
+    files: list[dict[str, str]] = []
+    documents: list[str] = []
+    proposed: list[str] = []
+    for n, (code, name, role, heading, rates) in enumerate(REVIEWERS, start=1):
+        system = system_prompt(role, "Reviews", "proposal-drafting", _review_part(heading), RATED_SPEC if rates else UNRATED_SPEC)
+        user = user_prompt(ctx, ("REQUIREMENTS ANALYSIS, FROM STEP 4", ctx.earlier("requirements.md")),
+                           ("THE DRAFT TO REVIEW", current[:60_000]),
+                           ("CHANGES EARLIER REVIEWERS PROPOSED; DO NOT PROPOSE THEM AGAIN", "\n".join(proposed)))
         try:
-            revised = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, direction=False, placeholders=True)),
-                              f"review pass {n}/{len(prompts.REVIEW_PASSES)}: {reviewer}", pipeline.MAX_TOKENS["6.5"])
+            reply = ctx.ask(Prompt(system, user + "\n\n" + PLACEHOLDER_RULE), f"review {n} of 3: {name}", REVIEW_TOKENS)
         except llm.PhaseError as exc:
-            passes.append({"pass": n, "reviewer": reviewer, "status": "failed", "error": str(exc)[:300]})
+            passes.append({"pass": n, "code": code, "reviewer": name, "status": "failed", "error": str(exc)[:300]})
             continue
-        passes.append({"pass": n, "reviewer": reviewer, "status": "revised",
-                       "words_delta": len(revised.split()) - len(current.split())})
-        current = revised
-    if not any(p["status"] == "revised" for p in passes):
+        document, data = split_reply(reply)
+        changes, dropped = _changes(data.get("changes"), current)
+        lq.add_step_changes(ctx.step["id"], code, changes)
+        proposed += [f"- {c['section'] or 'the draft'}: change {c['before'][:300]!r} to {c['after'][:300]!r}" for c in changes]
+        files.append(ctx.save(f"review_{n}.md", document or reply, f"Review {n}, {name}"))
+        documents.append(document)
+        passes.append({"pass": n, "code": code, "reviewer": name, "status": "done", "ratings": _ratings(data.get("ratings")) if rates else [],
+                       "changes": len(changes), "dropped": dropped, "points": strings(data.get("key_points"))})
+    if not any(p["status"] == "done" for p in passes):
         raise llm.PhaseError("Reviews: every review pass failed")
-    saved = ctx.save("draft_v3.md", current, "Draft v3")
-    lines = [f"Pass {p['pass']}, {p['reviewer']}: " + ("revised" if p["status"] == "revised" else "failed, draft kept") for p in passes]
-    return StepResult(summary=bullets(lines), files=[saved],
-                      content={"document": fix_dashes(current), "passes": passes, "question": QUESTIONS["reviews"]})
+    total = sum(p.get("changes", 0) for p in passes)
+    lines = [f"{p['reviewer']}: " + (f"{p['changes']} {'change' if p['changes'] == 1 else 'changes'} proposed" if p["status"] == "done"
+                                     else "failed") for p in passes]
+    return StepResult(summary=bullets(lines), files=files,
+                      content={"document": "\n\n".join(documents), "passes": passes, "changes": total,
+                               "question": QUESTIONS["reviews"]})
 
 
 # ------------------------------------------------------------------------------- Finalize
@@ -238,10 +306,37 @@ def _undash(path: Path) -> int:
     return found
 
 
+def _apply_changes(ctx: StepContext) -> tuple[str, int, int]:
+    """Draft v3: the reviewers' changes the owner accepted or edited (PW12), applied to the draft they reviewed.
+    A change whose text no longer matches is counted, not forced. Once Draft v3 exists it stands, so a redo of
+    Final checks never applies the changes twice."""
+    v3 = ctx.work_dir / "draft_v3.md"
+    if v3.exists():
+        return v3.read_text(encoding="utf-8"), 0, 0
+    base = next((ctx.work_dir / name for name in ("draft_v2.md", "draft_v1.md") if (ctx.work_dir / name).exists()), None)
+    if base is None:
+        raise llm.PhaseError("Final checks: there is no draft yet; run the First draft step first")
+    current = base.read_text(encoding="utf-8")
+    applied = missed = 0
+    found = lq.latest_steps(ctx.pursuit["id"]).get("reviews")
+    for change in lq.step_changes(found["id"]) if found else []:
+        if change["state"] not in ("accepted", "edited"):
+            continue
+        before = change["before_text"] or ""
+        if before and before in current:
+            current = current.replace(before, (change["edited_text"] if change["state"] == "edited" else change["after_text"]) or "", 1)
+            applied += 1
+        else:
+            missed += 1
+    ctx.save("draft_v3.md", current, "Draft v3")
+    return (ctx.work_dir / "draft_v3.md").read_text(encoding="utf-8"), applied, missed
+
+
 def final(ctx: StepContext) -> StepResult:
-    """Step 9: the readiness checklist, the formatting pass, the opening held for a person to write, the dashes
-    replaced, then the AI slop check's verdict on the final version (PW13 lists the checks the page adds)."""
-    _, current = _draft(ctx, "Final checks")
+    """Step 9: Draft v3 with the decided changes, the readiness checklist, the formatting pass, the opening held for a
+    person to write, the dashes replaced, then the AI slop check's verdict on the final version (PW13 lists the
+    checks the page adds)."""
+    current, applied, missed = _apply_changes(ctx)
     d, hooks = draft_inputs(ctx.record), _Quiet()
     state = _pipeline_state(ctx, current)
     state.stats = {}
@@ -256,22 +351,22 @@ def final(ctx: StepContext) -> StepResult:
     person_writes = int(state.stats.get("person_writes") or 0)
     dashes += _undash(final_path)
     _undash(ctx.work_dir / "checklist.md")
-    state.stats = {}
-    pipeline.phase_77_slop(d, state, ctx.work_dir, hooks)
-    scan = dict(state.stats)
-    note = str(scan.get("note") or "the scanner did not run").removeprefix("Slop check: ")
-    verdict = str(scan.get("verdict") or f"Not checked: {note}")
+    slop = _scan(ctx, "draft_final.md")
+    verdict = slop["verdict"]
     document = final_path.read_text(encoding="utf-8")
     files = [ctx.entry("draft_final.md", "Final version"), ctx.entry("checklist.md", "Submission readiness checklist")]
     if (ctx.work_dir / "slop_report.md").exists():
         files.append(ctx.entry("slop_report.md", "AI slop check report"))
     lines = [f"AI slop check: {verdict}", placeholder_line(placeholder_counts(document))]
+    if applied or missed:
+        lines.insert(0, f"{applied} {'change' if applied == 1 else 'changes'} applied in Draft v3"
+                        + (f"; {missed} no longer matched the draft" if missed else ""))
     if dashes:
         lines.append(f"{dashes} {'dash' if dashes == 1 else 'dashes'} replaced")
     return StepResult(summary=bullets(lines), files=files,
-                      content={"document": document, "verdict": verdict, "ready": bool(scan.get("ready")),
-                               "band": scan.get("band"), "open_placeholders": scan.get("open_placeholders"),
-                               "person_writes": person_writes, "dashes_fixed": dashes, "question": QUESTIONS["final"]})
+                      content={"document": document, "verdict": verdict, "ready": bool(slop["ready"]), "band": slop["band"],
+                               "open_placeholders": slop["placeholders"], "person_writes": person_writes, "dashes_fixed": dashes,
+                               "changes_applied": applied, "changes_missed": missed, "question": QUESTIONS["final"]})
 
 
 # --------------------------------------------------------------------------------- Submit

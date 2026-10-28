@@ -45,6 +45,26 @@ REPLIES = {"building outline": OUTLINE, "drafting response": DRAFT, "compliance 
            "framing the opening": "PLACE 1:\n- the customer's problem\n- our discriminator", "submission packet": PACKET}
 
 
+def review_reply(n: int) -> str:
+    """A reviewer's evaluation: one change whose text is in the draft, one whose text is not; evaluators rate."""
+    data = {"key_points": [f"Pass {n} found one fix"],
+            "ratings": [{"criterion": "Technical merit", "rating": "Good", "strengths": "Clear", "weaknesses": "Thin evidence"}] if n < 3 else [],
+            "changes": [{"section": "1. Approach", "now": f"Claim {n}.", "suggested": f"Claim {n}, with evidence.", "why": "Unsupported"},
+                        {"section": "2. Team", "now": "Text that is not in the draft", "suggested": "x", "why": "y"}]}
+    return f"# Review {n}\n\nThe evaluation.\n\n{FENCE}json\n{json.dumps(data)}\n{FENCE}"
+
+
+def _reviews_step(pursuit_id: int) -> int:
+    """A Reviews attempt the owner has decided, made directly in the ledger for the Final checks tests."""
+    from ledger.db import now_iso, q, tx
+
+    now = now_iso()
+    with tx() as conn:
+        cur = q(conn, "INSERT INTO pursuit_steps (pursuit_id, step, attempt, state, requested_by, queued_at, updated_at) "
+                      "VALUES (?, 'reviews', 1, 'approved', 'David Wood', ?, ?) RETURNING id", (pursuit_id, now, now))
+        return int(cur.fetchone()[0])
+
+
 class Model:
     def __init__(self, fail: set[str] | None = None) -> None:
         self.asked: list[tuple[str, Prompt, int]] = []
@@ -54,8 +74,8 @@ class Model:
         self.asked.append((label, prompt, max_tokens))
         if any(label.startswith(f) for f in self.fail):
             raise llm.PhaseError(f"{label}: the model refused this request")
-        if label.startswith("review pass "):
-            return f"# Edge AI white paper after pass {label[len('review pass '):][0]}"
+        if label.startswith("review "):
+            return review_reply(int(label.split()[1]))
         return REPLIES[label]
 
     def labels(self) -> list[str]:
@@ -122,6 +142,8 @@ def test_the_first_draft_follows_the_outline_and_counts_its_placeholders(ledger_
     assert "Echo C2, it runs offline" in saved and "Pages 3 to 5" in saved and steps.count_dashes(saved) == 0
     assert result.content["placeholders"] == {"PERSON WRITES": 1, "NEEDS INPUT": 2, "NEEDS EVIDENCE": 1, "other": 0}
     assert result.summary.splitlines()[1] == "- Placeholders to fill: 1 PERSON WRITES, 2 NEEDS INPUT, 1 NEEDS EVIDENCE"
+    assert result.content["slop"] == "Not ready: 1 PERSON WRITES, 2 NEEDS INPUT, 1 NEEDS EVIDENCE; band clean (provisional)"
+    assert lq.latest_slop_scan(ctx.pursuit["id"])["draft_name"] == "draft_v1.md"
     system, user = model.prompt("drafting response")
     assert system.startswith("You are a proposal writer at Velocity Explorations")
     assert "## 1. Technical Approach" in user and "## Phase 3: Drafting" in user and "Lead with Echo C2" in user
@@ -141,15 +163,33 @@ def test_the_compliance_check_needs_a_draft(ledger_db: str, tmp_path: Path) -> N
         write.compliance(_context(tmp_path, Model(), "compliance", EARLIER))
 
 
-def test_reviews_revise_the_draft_pass_by_pass_and_keep_it_when_one_fails(ledger_db: str, tmp_path: Path) -> None:
-    model = Model(fail={"review pass 2/4"})
-    ctx = _context(tmp_path, model, "reviews", {**EARLIER, "draft_v2.md": "# Edge AI white paper v2"})
+def test_reviews_propose_changes_one_per_row_and_the_evaluators_rate_the_criteria(ledger_db: str, tmp_path: Path) -> None:
+    model = Model()
+    ctx = _context(tmp_path, model, "reviews", {**EARLIER, "draft_v2.md": "# Edge AI white paper\n\nClaim 1. Claim 2. Claim 3."})
     result = write.reviews(ctx)
-    assert (ctx.work_dir / "draft_v3.md").read_text(encoding="utf-8").strip() == "# Edge AI white paper after pass 4"
-    assert [p["status"] for p in result.content["passes"]] == ["revised", "failed", "revised", "revised"]
-    assert len([label for label in model.labels() if label.startswith("review pass ")]) == 4
+    assert model.labels() == ["review 1 of 3: External evaluator", "review 2 of 3: Second independent evaluator",
+                              "review 3 of 3: Velocity leadership"]
+    rows = lq.step_changes(ctx.step["id"])
+    assert [(r["reviewer"], r["section"], r["before_text"], r["after_text"], r["state"]) for r in rows] == [
+        ("evaluator_1", "1. Approach", "Claim 1.", "Claim 1, with evidence.", "proposed"),
+        ("evaluator_2", "1. Approach", "Claim 2.", "Claim 2, with evidence.", "proposed"),
+        ("leadership", "1. Approach", "Claim 3.", "Claim 3, with evidence.", "proposed")]
+    assert [(p["reviewer"], p["changes"], p["dropped"], len(p["ratings"])) for p in result.content["passes"]] == [
+        ("External evaluator", 1, 1, 1), ("Second independent evaluator", 1, 1, 1), ("Velocity leadership", 1, 1, 0)]
+    assert result.content["changes"] == 3 and result.content["question"] == write.QUESTIONS["reviews"]
+    assert "Claim 1, with evidence." in model.prompt("review 2 of 3: Second independent evaluator").user
+    assert "### Review 3: Internal Velocity leadership" in model.prompt("review 3 of 3: Velocity leadership").system
+    assert not (ctx.work_dir / "draft_v3.md").exists()            # the draft changes once the owner has decided
+    assert [f["name"] for f in result.files] == ["Review 1, External evaluator", "Review 2, Second independent evaluator",
+                                                 "Review 3, Velocity leadership"]
+
+
+def test_a_failed_review_pass_lets_the_others_run(ledger_db: str, tmp_path: Path) -> None:
+    ctx = _context(tmp_path, Model(fail={"review 2 of 3"}), "reviews", {**EARLIER, "draft_v2.md": "# Draft\nClaim 1. Claim 3."})
+    result = write.reviews(ctx)
+    assert [p["status"] for p in result.content["passes"]] == ["done", "failed", "done"]
     with pytest.raises(llm.PhaseError, match="every review pass failed"):
-        write.reviews(steps.StepContext(**{**ctx.__dict__, "ask": Model(fail={"review pass "})}))
+        write.reviews(steps.StepContext(**{**ctx.__dict__, "ask": Model(fail={"review "})}))
 
 
 def test_final_checks_polish_hold_the_opening_fix_dashes_and_scan(ledger_db: str, tmp_path: Path) -> None:
@@ -162,6 +202,25 @@ def test_final_checks_polish_hold_the_opening_fix_dashes_and_scan(ledger_db: str
     assert (result.content["ready"], result.content["dashes_fixed"], result.content["person_writes"]) == (False, 1, 1)
     assert [f["name"] for f in result.files] == ["Final version", "Submission readiness checklist", "AI slop check report"]
     assert "written by AI" not in json.dumps(result.content)
+
+
+def test_final_checks_apply_the_owners_decided_changes_first(ledger_db: str, tmp_path: Path) -> None:
+    ctx = _context(tmp_path, Model(), "final", {**EARLIER, "outline.md": "# Outline",
+                                                "draft_v2.md": "# Edge AI white paper\n\nWe will try. Old line. Keep this."})
+    reviews_id = _reviews_step(ctx.pursuit["id"])
+    ids = lq.add_step_changes(reviews_id, "evaluator_1", [
+        {"section": "1", "before": "We will try.", "after": "We will deliver X.", "reason": "Vague"},
+        {"section": "1", "before": "Old line.", "after": "New line.", "reason": "Dated"},
+        {"section": "1", "before": "Keep this.", "after": "Drop this.", "reason": "Wrong"},
+        {"section": "2", "before": "Not in the draft.", "after": "y", "reason": "z"}])
+    lq.decide_change(ids[0], "David Wood", "accepted")
+    lq.decide_change(ids[1], "David Wood", "edited", edited_text="Edited line.")
+    lq.decide_change(ids[2], "David Wood", "rejected")
+    lq.decide_change(ids[3], "David Wood", "accepted")
+    result = write.final(ctx)
+    assert (ctx.work_dir / "draft_v3.md").read_text(encoding="utf-8") == "# Edge AI white paper\n\nWe will deliver X. Edited line. Keep this.\n"
+    assert (result.content["changes_applied"], result.content["changes_missed"]) == (2, 1)
+    assert "2 changes applied in Draft v3; 1 no longer matched the draft" in result.summary
 
 
 def test_final_checks_need_a_draft(ledger_db: str, tmp_path: Path) -> None:
@@ -224,6 +283,6 @@ def test_drafting_and_review_prompts_keep_open_items_in_the_three_counted_forms(
     write.compliance(ctx)
     write.reviews(ctx)
     asked = {label: prompt for label, prompt, _ in model.asked}
-    assert len(asked) == 6
+    assert len(asked) == 5
     for label, prompt in asked.items():
         assert write.PLACEHOLDER_RULE in prompt.user, label

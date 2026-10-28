@@ -1086,3 +1086,113 @@ def pursued_calls(exclude_id: str | None = None) -> list[dict[str, Any]]:
     with tx() as conn:
         return rows(q(conn, "SELECT id, portal, title, due_date FROM calls WHERE human_status = 'pursue' AND id <> ? "
                             "ORDER BY id", (exclude_id or "",)))
+
+
+# --------------------------------------------------------------- reviews and the AI slop check
+# Phase 8 of the redesign: each scan of a new draft (PW20 to PW23), the reviewers' changes the owner
+# decides one by one (PW12), and the worker's jobs other than steps, such as Check again (PW22).
+
+CHANGE_DECISIONS = ("accepted", "rejected", "edited")
+REVIEWER_CODES = ("evaluator_1", "evaluator_2", "leadership")   # the external evaluator, the second evaluator, Velocity leadership
+JOB_KINDS = ("slop_scan", "drive_refresh")
+NO_BAND_UNDER_WORDS = 150   # PW21: a scan of a shorter text has no band
+
+
+def save_slop_scan(pursuit_id: int, step_id: int | None, draft_name: str, report: Mapping[str, Any], *, verdict: str,
+                   ready: bool, fixed_count: int, text: str, draft_file_id: str | None = None) -> int:
+    """One AI slop check of a draft, as the scanner returned it, with the verdict the page and Slack show."""
+    words = int(report.get("words") or 0)
+    calibrated = bool((report.get("thresholds") or {}).get("calibrated"))
+    with tx() as conn:
+        cur = q(conn, "INSERT INTO slop_scans (pursuit_id, step_id, draft_file_id, draft_name, scanned_at, words, band, confidence, "
+                      "points, provisional, ready, verdict, fixed_count, result_json, text_lines) "
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                (pursuit_id, step_id, draft_file_id, draft_name, now_iso(), words,
+                 report.get("band") if words >= NO_BAND_UNDER_WORDS else None, report.get("confidence"), report.get("points"),
+                 0 if calibrated else 1, 1 if ready else 0, verdict, fixed_count, _jsonify(dict(report)), text))
+        return int(cur.fetchone()[0])
+
+
+def latest_slop_scan(pursuit_id: int) -> dict[str, Any] | None:
+    """The newest scan of a pursuit's drafts (PW20)."""
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM slop_scans WHERE pursuit_id = ? ORDER BY id DESC LIMIT 1", (pursuit_id,)))
+
+
+def add_step_changes(step_id: int, reviewer: str, changes: Sequence[Mapping[str, Any]]) -> list[int]:
+    """A reviewer's proposed changes to the draft (PW12), one row each: the section, the text now, the suggestion, why."""
+    if reviewer not in REVIEWER_CODES:
+        raise ValueError(f"unknown reviewer: {reviewer}")
+    now = now_iso()
+    ids = []
+    with tx() as conn:
+        for change in changes:
+            cur = q(conn, "INSERT INTO step_changes (step_id, reviewer, section, before_text, after_text, reason, state, created_at) "
+                          "VALUES (?, ?, ?, ?, ?, ?, 'proposed', ?) RETURNING id",
+                    (step_id, reviewer, change.get("section"), change.get("before"), change.get("after"), change.get("reason"), now))
+            ids.append(int(cur.fetchone()[0]))
+    return ids
+
+
+def step_changes(step_id: int) -> list[dict[str, Any]]:
+    """A step's proposed changes in the order the reviewers made them."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM step_changes WHERE step_id = ? ORDER BY id", (step_id,)))
+
+
+def decide_change(change_id: int, by: str, decision: str, edited_text: str | None = None) -> bool:
+    """Accept, reject or edit one change (PW12), guarded on it still being proposed."""
+    if decision not in CHANGE_DECISIONS:
+        raise ValueError(f"unknown change decision: {decision}")
+    with tx() as conn:
+        cur = q(conn, "UPDATE step_changes SET state = ?, edited_text = ?, decided_by = ?, decided_at = ? "
+                      "WHERE id = ? AND state = 'proposed'",
+                (decision, edited_text if decision == "edited" else None, by, now_iso(), change_id))
+        return cur.rowcount == 1
+
+
+def accept_open_changes(step_id: int, by: str) -> int:
+    """With key gates only, the worker accepts every change still proposed before it approves the step (PW5)."""
+    with tx() as conn:
+        cur = q(conn, "UPDATE step_changes SET state = 'accepted', decided_by = ?, decided_at = ? WHERE step_id = ? AND state = 'proposed'",
+                (by, now_iso(), step_id))
+        return cur.rowcount
+
+
+def queue_job(kind: str, pursuit_id: int | None, payload: Any, requested_by: str) -> int:
+    """A job for the worker other than a step: Check again (`slop_scan`), or a Drive refresh."""
+    if kind not in JOB_KINDS:
+        raise ValueError(f"unknown job kind: {kind}")
+    now = now_iso()
+    with tx() as conn:
+        cur = q(conn, "INSERT INTO worker_jobs (kind, pursuit_id, payload, state, requested_by, requested_at, updated_at) "
+                      "VALUES (?, ?, ?, 'queued', ?, ?, ?) RETURNING id", (kind, pursuit_id, _jsonify(payload), requested_by, now, now))
+        return int(cur.fetchone()[0])
+
+
+def claim_next_job() -> dict[str, Any] | None:
+    """The worker takes the oldest queued job: queued -> working."""
+    with tx() as conn:
+        for row in rows(q(conn, "SELECT id FROM worker_jobs WHERE state = 'queued' ORDER BY id LIMIT 5")):
+            now = now_iso()
+            cur = q(conn, "UPDATE worker_jobs SET state = 'working', started_at = ?, updated_at = ? WHERE id = ? AND state = 'queued'",
+                    (now, now, row["id"]))
+            if cur.rowcount == 1:
+                return one(q(conn, "SELECT * FROM worker_jobs WHERE id = ?", (row["id"],)))
+    return None
+
+
+def finish_job(job_id: int, state: str, result: str) -> bool:
+    """working -> done or failed, with what happened in words."""
+    if state not in ("done", "failed"):
+        raise ValueError(f"a job finishes done or failed, not {state}")
+    now = now_iso()
+    with tx() as conn:
+        cur = q(conn, "UPDATE worker_jobs SET state = ?, result = ?, finished_at = ?, updated_at = ? WHERE id = ? AND state = 'working'",
+                (state, result, now, now, job_id))
+        return cur.rowcount == 1
+
+
+def get_job(job_id: int) -> dict[str, Any] | None:
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM worker_jobs WHERE id = ?", (job_id,)))

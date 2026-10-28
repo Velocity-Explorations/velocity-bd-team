@@ -202,5 +202,12 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     Alignment's tagged points with the direction choice, Requirements' rows with the checklist, the
     gate's decision brief with Claude's conditions filled in, and the Outline's direction, past work
     and sections, locked once it is approved. The owner changes who works with them from People.
+  - Phase 8a (the worker side of Reviews and the AI slop check): every new draft (v1, v2, final) is
+    fixed where the worker can (dashes, tracking parameters) and scanned, and the scan is kept in
+    `slop_scans`. Reviews runs three reviewers (two evaluators who rate each criterion in words,
+    then Velocity's leadership) who propose changes, one per `step_changes` row. Final checks puts
+    the accepted and edited changes into Draft v3. With key gates only the worker accepts the
+    changes itself. Check again jobs run when no step is waiting. Deciding the changes on the page,
+    and the scan's result page, follow in 8b.
 
 ## Known breakages
