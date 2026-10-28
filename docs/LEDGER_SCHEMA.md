@@ -422,7 +422,7 @@ added. Added by `008_pursuits.sql`.
 | step_id | INTEGER | the `pursuit_steps.id` the line is about, when there is one | same |
 | at | TEXT timestamp, not null | | same |
 | who | TEXT, not null | a person's name, `worker`, or `worker (key gates only)` | same |
-| kind | TEXT, not null | one of `EVENT_KINDS` in `ledger/queries.py`: `started`, `step_saved`, `approved`, `auto_approved`, `go`, `go_with_conditions`, `changes_asked`, `retried`, `failed`, `blocked`, `stopped`, `no_go`, `closed`, `material`, `collaborators`, `builds_on`, `direction`, `checklist`, `budget`, `submitted`, `result`, `result_date` | same |
+| kind | TEXT, not null | one of `EVENT_KINDS` in `ledger/queries.py`: `started`, `step_saved`, `approved`, `auto_approved`, `go`, `go_with_conditions`, `changes_asked`, `retried`, `failed`, `blocked`, `stopped`, `no_go`, `closed`, `material`, `collaborators`, `builds_on`, `direction`, `checklist`, `budget`, `submitted`, `result`, `result_date`, `check_again` (Check again, PW22), `no_news` (No news yet, P4), `slack_ready` and `slack_behind` (a step's notice posted to Slack, PW18; who is `slack`) | same |
 | text | TEXT, not null | the line in words, for example `Discovery approved`, or the link someone added | same |
 
 Index: `(pursuit_id, id)`. Add material (PW4: a link or a note) writes a `material` row; the

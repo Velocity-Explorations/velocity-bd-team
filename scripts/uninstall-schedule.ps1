@@ -3,7 +3,8 @@
 #   .\scripts\uninstall-schedule.ps1
 param(
     [string[]]$TaskNames = @("velocity-bd-team pipeline", "velocity-bd-team feedback", "velocity-bd-team reminders",
-                             "velocity-bd-team weekly summary", "velocity-bd-team requests", "velocity-bd-team worker")
+                             "velocity-bd-team weekly summary", "velocity-bd-team requests", "velocity-bd-team worker",
+                             "velocity-bd-team workspace slack", "velocity-bd-team workspace morning")
 )
 
 $ErrorActionPreference = "Stop"

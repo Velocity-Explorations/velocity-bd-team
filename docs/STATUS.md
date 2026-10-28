@@ -231,5 +231,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     asks Claude for a SUMMARY line, kept in `calls.ai_summary` (migration 009), and the Description
     column shows it with the portal's words on hover. `run.py --backfill-summaries` fills open,
     reviewed calls reviewed before it.
+  - Phase 10 (the workspace's notices in Slack, PW18): every 5 minutes, a card for a pursued call
+    without one and each step newly ready for its owner, in the call's thread; at 08:00, steps behind
+    their target and a digest per owner. Built with posting off, as David chose on 28 Oct: nothing
+    posts until `WORKSPACE_SLACK=on` is in `.env`, and the two tasks need `install-schedule.ps1`
+    rerun once.
 
 ## Known breakages

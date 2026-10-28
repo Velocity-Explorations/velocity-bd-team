@@ -644,7 +644,7 @@ AUTO_APPROVER = "worker (key gates only)"
 EVENT_KINDS = (
     "started", "step_saved", "approved", "auto_approved", "go", "go_with_conditions", "changes_asked", "retried",
     "failed", "blocked", "stopped", "no_go", "closed", "material", "collaborators", "builds_on", "direction",
-    "checklist", "budget", "submitted", "result", "result_date",
+    "checklist", "budget", "submitted", "result", "result_date", "check_again", "no_news", "slack_ready", "slack_behind",
 )
 _LIVE = "pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')"
 
@@ -1232,3 +1232,42 @@ def lessons(limit: int = 8) -> list[dict[str, Any]]:
                             "JOIN calls c ON c.id = p.call_id WHERE p.result IS NOT NULL "
                             "AND (p.next_time IS NOT NULL OR p.debrief IS NOT NULL) ORDER BY p.result_at DESC, p.id DESC LIMIT ?",
                       (limit,)))
+
+
+# ------------------------------------------------------------------- workspace notices in Slack (PW18, phase 10)
+
+_NOTICE_COLUMNS = ("s.*, p.owner, p.approval_mode, p.call_id, p.target_dates, c.title, c.slack_channel, c.slack_ts "
+                   "FROM pursuit_steps s JOIN pursuits p ON p.id = s.pursuit_id JOIN calls c ON c.id = p.call_id")
+_LATEST = "s.id = (SELECT MAX(x.id) FROM pursuit_steps x WHERE x.pursuit_id = s.pursuit_id AND x.step = s.step)"
+
+
+def pursued_calls_without_card() -> list[dict[str, Any]]:
+    """Calls with a pursuit under way and no Slack card yet, so their notices have a thread (PW18)."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT c.* FROM calls c JOIN pursuits p ON p.call_id = c.id WHERE p.state = 'working' "
+                            "AND c.slack_ts IS NULL ORDER BY p.id"))
+
+
+def steps_to_announce() -> list[dict[str, Any]]:
+    """Steps ready for their owner that Slack has not been told about, with the owner and the call's thread."""
+    with tx() as conn:
+        return rows(q(conn, f"SELECT {_NOTICE_COLUMNS} WHERE s.state = 'ready' AND p.state = 'working' "
+                            "AND NOT EXISTS (SELECT 1 FROM pursuit_events e WHERE e.step_id = s.id AND e.kind = 'slack_ready') "
+                            "ORDER BY s.id"))
+
+
+def steps_behind_target() -> list[dict[str, Any]]:
+    """Each pursuit's current step, not done yet and not yet said to be behind; the caller compares its target date."""
+    with tx() as conn:
+        return rows(q(conn, f"SELECT {_NOTICE_COLUMNS} WHERE p.state = 'working' AND s.step = p.current_step AND {_LATEST} "
+                            "AND s.state NOT IN ('approved', 'stopped', 'skipped') "
+                            "AND NOT EXISTS (SELECT 1 FROM pursuit_events e WHERE e.step_id = s.id AND e.kind = 'slack_behind') "
+                            "ORDER BY s.id"))
+
+
+def steps_waiting_on_owners() -> list[dict[str, Any]]:
+    """Steps waiting on their owner, for the morning digest: ready, failed or past the budget, not yet acted on."""
+    with tx() as conn:
+        return rows(q(conn, f"SELECT {_NOTICE_COLUMNS} WHERE p.state = 'working' AND {_LATEST} "
+                            "AND (s.state = 'ready' OR (s.state IN ('failed', 'blocked') AND s.decision IS NULL)) "
+                            "ORDER BY p.owner, s.id"))

@@ -27,7 +27,7 @@ def test_every_task_starts_python_in_a_headless_console() -> None:
 def test_approved_requests_run_at_most_twice_a_day() -> None:
     times = request_times()
     assert 1 <= len(times) <= 2
-    assert "RepetitionInterval" not in SCRIPT.split(WORKER_HEADING, 1)[0]   # only the worker's check repeats
+    assert "RepetitionInterval" not in SCRIPT.split(WORKER_HEADING, 1)[0]   # only the worker and the workspace notices repeat
     assert "New-ScheduledTaskTrigger -Daily -At $_" in SCRIPT
 
 
@@ -58,3 +58,14 @@ def test_the_worker_starts_at_logon_and_again_within_minutes_if_it_stops() -> No
     assert "--wait-lock" not in block                   # it never waits on, or holds, the pipeline's lock
     uninstall = (REPO / "scripts" / "uninstall-schedule.ps1").read_text(encoding="utf-8")
     assert '"velocity-bd-team worker"' in uninstall
+
+
+def test_workspace_notices_check_every_few_minutes_and_the_morning_job_runs_at_eight() -> None:
+    block = SCRIPT.split("# Workspace notices in Slack", 1)[1]
+    assert 'Register-Job "velocity-bd-team workspace slack" "run.py --workspace-slack"' in block
+    assert "-RepetitionInterval (New-TimeSpan -Minutes $WorkspaceSlackMinutes)" in block
+    assert 'Register-Job "velocity-bd-team workspace morning" "run.py --workspace-morning"' in block
+    assert "New-ScheduledTaskTrigger -Daily -At $WorkspaceMorningAt" in block
+    assert '[string]$WorkspaceMorningAt = "08:00"' in SCRIPT and "[int]$WorkspaceSlackMinutes = 5" in SCRIPT
+    uninstall = (REPO / "scripts" / "uninstall-schedule.ps1").read_text(encoding="utf-8")
+    assert '"velocity-bd-team workspace slack"' in uninstall and '"velocity-bd-team workspace morning"' in uninstall
