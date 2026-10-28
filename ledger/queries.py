@@ -3,8 +3,9 @@
 Conventions:
 - Every function opens its own transaction; callers never pass connections.
 - Timestamps are ISO-8601 UTC text (see ledger.db.now_iso).
-- JSON columns (stage_counts, matched_keywords, extra, themes, payload, preview) accept a
-  dict/list and are stored as JSON text; they come back as text.
+- JSON columns (stage_counts, matched_keywords, extra, themes, payload, preview, and the
+  workspace's collaborators, builds_on, files, content, task_states) accept a dict/list and are
+  stored as JSON text; they come back as text.
 """
 from __future__ import annotations
 
@@ -601,3 +602,364 @@ def brief_weeks(limit: int = 52) -> list[str]:
     with tx() as conn:
         found = rows(q(conn, "SELECT DISTINCT week_of FROM briefs ORDER BY week_of DESC LIMIT ?", (limit,)))
     return [r["week_of"] for r in found]
+
+
+# ------------------------------------------------------------------------------ pursuits
+# The proposal workspace (migration 008). A pursuit is one call being drafted, at most one per
+# call, and each attempt at a step is a pursuit_steps row. The worker claims queued rows and saves
+# its work (ready); the owner approves (the next step is queued), asks for changes (a new attempt
+# with the note), retries a failed or blocked attempt, or stops. Every change is guarded by the
+# state it expects, so the owner and the worker never both win. Who may decide (only the owner,
+# PW17) is the dashboard's check; these record who did.
+
+STEPS = ("discovery", "summary", "alignment", "requirements", "go_no_go", "outline", "draft", "compliance",
+         "reviews", "final", "submit")
+STEP_LABELS = {
+    "discovery": "Discovery", "summary": "Opportunity summary", "alignment": "Alignment",
+    "requirements": "Requirements and checklist", "go_no_go": "Go or no-go", "outline": "Outline",
+    "draft": "First draft", "compliance": "Compliance check", "reviews": "Reviews", "final": "Final checks",
+    "submit": "Submit",
+}
+KEY_GATES = ("go_no_go", "outline", "submit")     # the owner decides these even with key gates only (PW5)
+NO_GO_STEPS = STEPS[:5]                            # Stop here, no-go: steps 1 to 4 and the gate (PW4, PW10)
+APPROVAL_MODES = ("every_step", "key_gates")
+DEFAULT_BUDGET_USD = 200.0
+WORKER = "worker"
+AUTO_APPROVER = "worker (key gates only)"
+EVENT_KINDS = (
+    "started", "step_saved", "approved", "auto_approved", "go", "go_with_conditions", "changes_asked", "retried",
+    "failed", "blocked", "stopped", "no_go", "closed", "material", "collaborators", "builds_on", "direction",
+    "checklist", "budget", "submitted", "result", "result_date",
+)
+_LIVE = "pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')"
+
+
+class PursuitRefused(ValueError):
+    """Start the draft was refused; the message says why, in words for the person."""
+
+
+def next_step(step: str) -> str | None:
+    """The step after this one, or None after Submit."""
+    at = STEPS.index(step)
+    return STEPS[at + 1] if at + 1 < len(STEPS) else None
+
+
+def needs_owner(step: str, approval_mode: str) -> bool:
+    """Whether the owner approves this step, or the worker may (key gates only, PW5)."""
+    return approval_mode == "every_step" or step in KEY_GATES
+
+
+def _label(step: Mapping[str, Any]) -> str:
+    label = STEP_LABELS.get(step["step"], step["step"])
+    return label if int(step["attempt"]) == 1 else f"{label} (attempt {step['attempt']})"
+
+
+def _with_note(text: str, note: str | None) -> str:
+    return f"{text}: {note}" if note else text
+
+
+def _event(conn: Any, pursuit_id: int, who: str, kind: str, text: str, step_id: int | None, at: str) -> None:
+    if kind not in EVENT_KINDS:
+        raise ValueError(f"unknown event kind: {kind}")
+    q(conn, "INSERT INTO pursuit_events (pursuit_id, step_id, at, who, kind, text) VALUES (?, ?, ?, ?, ?, ?)",
+      (pursuit_id, step_id, at, who, kind, text))
+
+
+def _queue_step(conn: Any, pursuit_id: int, step: str, by: str, note: str | None, now: str) -> int:
+    """Queue the next attempt at a step for the worker and make it the pursuit's current step."""
+    last = one(q(conn, "SELECT MAX(attempt) AS n FROM pursuit_steps WHERE pursuit_id = ? AND step = ?", (pursuit_id, step)))
+    attempt = int((last or {}).get("n") or 0) + 1
+    cur = q(conn, "INSERT INTO pursuit_steps (pursuit_id, step, attempt, state, requested_by, request_note, queued_at, "
+                  "updated_at) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?) RETURNING id",
+            (pursuit_id, step, attempt, by, note, now, now))
+    step_id = int(cur.fetchone()[0])
+    q(conn, "UPDATE pursuits SET current_step = ?, updated_at = ? WHERE id = ?", (step, now, pursuit_id))
+    return step_id
+
+
+def _spend(conn: Any, step_id: int, cost_usd: float, now: str) -> dict[str, Any]:
+    """Add what a step cost to its pursuit's total. Returns the step's row."""
+    step = one(q(conn, "SELECT * FROM pursuit_steps WHERE id = ?", (step_id,)))
+    assert step is not None
+    if cost_usd:
+        q(conn, "UPDATE pursuits SET cost_usd = cost_usd + ?, updated_at = ? WHERE id = ?", (cost_usd, now, step["pursuit_id"]))
+    return step
+
+
+def start_pursuit(
+    call_id: str,
+    owner: str,
+    *,
+    format: str | None = None,
+    approval_mode: str = "every_step",
+    direction: str | None = None,
+    collaborators: Sequence[str] = (),
+    builds_on: Sequence[Mapping[str, Any]] = (),
+    budget_usd: float = DEFAULT_BUDGET_USD,
+) -> int:
+    """Start the draft (P6): the pursuit, its Discovery step queued for the worker, and the first line of
+    its history. Refused, with the reason, for an unknown call, a call marked Not relevant, or a call
+    that already has a draft. Returns the pursuit's id."""
+    if approval_mode not in APPROVAL_MODES:
+        raise ValueError(f"unknown approval mode: {approval_mode}")
+    now = now_iso()
+    with tx() as conn:
+        call = one(q(conn, "SELECT human_status FROM calls WHERE id = ?", (call_id,)))
+        if call is None:
+            raise PursuitRefused(f"No call with id {call_id}.")
+        if call["human_status"] == "not_relevant":
+            raise PursuitRefused("This call is marked Not relevant.")
+        held = one(q(conn, "SELECT owner, created_at FROM pursuits WHERE call_id = ?", (call_id,)))
+        if held is not None:
+            raise PursuitRefused(f"This call already has a draft, started by {held['owner']} on {held['created_at'][:10]}.")
+        cur = q(conn, "INSERT INTO pursuits (call_id, owner, collaborators, format, approval_mode, direction, builds_on, "
+                      "current_step, state, budget_usd, created_at, updated_at) "
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'working', ?, ?, ?) RETURNING id",
+                (call_id, owner, _jsonify(list(collaborators)) if collaborators else None, format, approval_mode,
+                 direction or None, _jsonify([dict(b) for b in builds_on]) if builds_on else None, STEPS[0],
+                 budget_usd, now, now))
+        pursuit_id = int(cur.fetchone()[0])
+        step_id = _queue_step(conn, pursuit_id, STEPS[0], owner, None, now)
+        mode = "every step approved" if approval_mode == "every_step" else "key gates only"
+        _event(conn, pursuit_id, owner, "started", f"Started the draft: {format or 'format not set'}, {mode}", step_id, now)
+        return pursuit_id
+
+
+def get_pursuit(pursuit_id: int) -> dict[str, Any] | None:
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM pursuits WHERE id = ?", (pursuit_id,)))
+
+
+def pursuit_for_call(call_id: str) -> dict[str, Any] | None:
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM pursuits WHERE call_id = ?", (call_id,)))
+
+
+def list_pursuits(states: Sequence[str] | None = None) -> list[dict[str, Any]]:
+    """Pursuits, oldest first, optionally only those in the given states."""
+    wanted = tuple(states or ())
+    where = f" WHERE state IN ({_placeholders(len(wanted))})" if wanted else ""
+    with tx() as conn:
+        return rows(q(conn, f"SELECT * FROM pursuits{where} ORDER BY id", wanted))
+
+
+def get_step(step_id: int) -> dict[str, Any] | None:
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM pursuit_steps WHERE id = ?", (step_id,)))
+
+
+def pursuit_steps(pursuit_id: int) -> list[dict[str, Any]]:
+    """Every attempt at every step of a pursuit, oldest first."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM pursuit_steps WHERE pursuit_id = ? ORDER BY id", (pursuit_id,)))
+
+
+def latest_steps(pursuit_id: int) -> dict[str, dict[str, Any]]:
+    """The newest attempt at each step the pursuit has reached, keyed by step."""
+    return {row["step"]: row for row in pursuit_steps(pursuit_id)}
+
+
+def claim_next_step() -> dict[str, Any] | None:
+    """The worker takes the oldest queued step of a pursuit being worked: queued -> working.
+    Returns the step's row, or None when nothing is waiting."""
+    with tx() as conn:
+        waiting = rows(q(conn, f"SELECT id FROM pursuit_steps WHERE state = 'queued' AND {_LIVE} ORDER BY id LIMIT 5"))
+        for row in waiting:
+            now = now_iso()
+            cur = q(conn, f"UPDATE pursuit_steps SET state = 'working', started_at = ?, updated_at = ? "
+                          f"WHERE id = ? AND state = 'queued' AND {_LIVE}", (now, now, row["id"]))
+            if cur.rowcount == 1:
+                return one(q(conn, "SELECT * FROM pursuit_steps WHERE id = ?", (row["id"],)))
+    return None
+
+
+def set_task_states(step_id: int, states: Mapping[str, str]) -> bool:
+    """Discovery's tasks and their states (PW6), updated while the worker works the step."""
+    with tx() as conn:
+        cur = q(conn, "UPDATE pursuit_steps SET task_states = ?, updated_at = ? WHERE id = ? AND state = 'working'",
+                (_jsonify(dict(states)), now_iso(), step_id))
+        return cur.rowcount == 1
+
+
+def finish_step(step_id: int, *, summary: str | None = None, files: Any = None, content: Any = None,
+                cost_usd: float = 0.0) -> bool:
+    """The worker saved the step's work: working -> ready, with what it cost. False when the step is not
+    working, or its pursuit stopped meanwhile; the worker then calls stop_step."""
+    now = now_iso()
+    with tx() as conn:
+        cur = q(conn, f"UPDATE pursuit_steps SET state = 'ready', summary = ?, files = ?, content = ?, error = NULL, "
+                      f"cost_usd = cost_usd + ?, finished_at = ?, updated_at = ? WHERE id = ? AND state = 'working' AND {_LIVE}",
+                (summary, _jsonify(files), _jsonify(content), cost_usd, now, now, step_id))
+        if cur.rowcount != 1:
+            return False
+        step = _spend(conn, step_id, cost_usd, now)
+        _event(conn, step["pursuit_id"], WORKER, "step_saved", f"{_label(step)} saved", step_id, now)
+        return True
+
+
+def fail_step(step_id: int, error: str, cost_usd: float = 0.0) -> bool:
+    """The step failed: working -> failed, with the reason in words (PW15) and what it cost."""
+    now = now_iso()
+    with tx() as conn:
+        cur = q(conn, "UPDATE pursuit_steps SET state = 'failed', error = ?, cost_usd = cost_usd + ?, finished_at = ?, "
+                      "updated_at = ? WHERE id = ? AND state = 'working'", (error, cost_usd, now, now, step_id))
+        if cur.rowcount != 1:
+            return False
+        step = _spend(conn, step_id, cost_usd, now)
+        _event(conn, step["pursuit_id"], WORKER, "failed", f"{_label(step)} failed: {error}", step_id, now)
+        return True
+
+
+def block_step(step_id: int, reason: str) -> bool:
+    """The step cannot run until a person acts, for example budget reached (PW19): queued or working -> blocked."""
+    now = now_iso()
+    with tx() as conn:
+        cur = q(conn, "UPDATE pursuit_steps SET state = 'blocked', error = ?, finished_at = ?, updated_at = ? "
+                      "WHERE id = ? AND state IN ('queued', 'working')", (reason, now, now, step_id))
+        if cur.rowcount != 1:
+            return False
+        step = _spend(conn, step_id, 0.0, now)
+        _event(conn, step["pursuit_id"], WORKER, "blocked", f"{_label(step)} is waiting: {reason}", step_id, now)
+        return True
+
+
+def stop_step(step_id: int, cost_usd: float = 0.0) -> bool:
+    """The worker stops a step whose pursuit stopped while it worked: working -> stopped, with what it cost."""
+    now = now_iso()
+    with tx() as conn:
+        cur = q(conn, "UPDATE pursuit_steps SET state = 'stopped', cost_usd = cost_usd + ?, finished_at = ?, updated_at = ? "
+                      "WHERE id = ? AND state = 'working' AND pursuit_id IN (SELECT id FROM pursuits WHERE state <> 'working')",
+                (cost_usd, now, now, step_id))
+        if cur.rowcount != 1:
+            return False
+        step = _spend(conn, step_id, cost_usd, now)
+        _event(conn, step["pursuit_id"], WORKER, "stopped", f"{_label(step)} stopped", step_id, now)
+        return True
+
+
+def _decision_for(step: str, decision: str | None) -> str:
+    """What approving this step records: go or go_with_conditions at the gate, approved elsewhere."""
+    if step == "submit":
+        raise ValueError("Submit is recorded by Mark submitted, not approved like a step")
+    allowed = ("go", "go_with_conditions") if step == "go_no_go" else ("approved",)
+    chosen = decision or allowed[0]
+    if chosen not in allowed:
+        raise ValueError(f"{STEP_LABELS.get(step, step)} takes {' or '.join(allowed)}, not {chosen}")
+    return chosen
+
+
+def _decide(conn: Any, step_id: int, state: str, decision: str, by: str, note: str | None,
+            expected_updated_at: str | None, now: str) -> bool:
+    """ready -> state, recording the decision. Guarded by the pursuit still being worked and, when the
+    form carried it, the step's updated_at (C8's pattern), so a stale form changes nothing."""
+    sql = (f"UPDATE pursuit_steps SET state = ?, decision = ?, decided_by = ?, decided_at = ?, decision_note = ?, "
+           f"updated_at = ? WHERE id = ? AND state = 'ready' AND {_LIVE}")
+    params: list[Any] = [state, decision, by, now, note or None, now, step_id]
+    if expected_updated_at is not None:
+        sql += " AND updated_at = ?"
+        params.append(expected_updated_at)
+    return q(conn, sql, params).rowcount == 1
+
+
+def approve_step(step_id: int, by: str, *, decision: str | None = None, note: str | None = None,
+                 expected_updated_at: str | None = None) -> int | None:
+    """Approve and continue: ready -> approved, and the next step queued. At the gate the decision is go
+    or go_with_conditions (PW10); by AUTO_APPROVER is the worker approving with key gates only (PW5).
+    Returns the next step's id, or None when the step was not waiting for this decision."""
+    now = now_iso()
+    with tx() as conn:
+        step = one(q(conn, "SELECT * FROM pursuit_steps WHERE id = ?", (step_id,)))
+        if step is None:
+            return None
+        chosen = _decision_for(step["step"], decision)
+        following = next_step(step["step"])
+        if following is None or not _decide(conn, step_id, "approved", chosen, by, note, expected_updated_at, now):
+            return None
+        queued = _queue_step(conn, step["pursuit_id"], following, by, None, now)
+        if by == AUTO_APPROVER:
+            kind, text = "auto_approved", f"{_label(step)} approved automatically (key gates only)"
+        elif chosen == "approved":
+            kind, text = "approved", _with_note(f"{_label(step)} approved", note)
+        else:
+            kind, text = chosen, _with_note("Go" if chosen == "go" else "Go with conditions", note)
+        _event(conn, step["pursuit_id"], by, kind, text, step_id, now)
+        return queued
+
+
+def ask_changes(step_id: int, by: str, note: str, *, expected_updated_at: str | None = None) -> int | None:
+    """Ask for changes: ready -> changes_asked, and the step queued again as a new attempt carrying the
+    note, which the worker puts in its prompt. Returns the new attempt's id, or None when refused."""
+    note = (note or "").strip()
+    if not note:
+        raise ValueError("Ask for changes needs a note saying what to change")
+    now = now_iso()
+    with tx() as conn:
+        step = one(q(conn, "SELECT * FROM pursuit_steps WHERE id = ?", (step_id,)))
+        if step is None or not _decide(conn, step_id, "changes_asked", "changes_asked", by, note, expected_updated_at, now):
+            return None
+        redo = _queue_step(conn, step["pursuit_id"], step["step"], by, note, now)
+        _event(conn, step["pursuit_id"], by, "changes_asked", f"Asked for changes to {_label(step)}: {note}", step_id, now)
+        return redo
+
+
+def retry_step(step_id: int, by: str) -> int | None:
+    """Retry a failed or blocked attempt (PW15, PW19) as a new one; the old attempt keeps its error.
+    Returns the new attempt's id, or None when it was retried already or is not failed or blocked."""
+    now = now_iso()
+    with tx() as conn:
+        cur = q(conn, f"UPDATE pursuit_steps SET decision = 'retried', decided_by = ?, decided_at = ?, updated_at = ? "
+                      f"WHERE id = ? AND state IN ('failed', 'blocked') AND decision IS NULL AND {_LIVE}",
+                (by, now, now, step_id))
+        if cur.rowcount != 1:
+            return None
+        step = one(q(conn, "SELECT * FROM pursuit_steps WHERE id = ?", (step_id,)))
+        assert step is not None
+        redo = _queue_step(conn, step["pursuit_id"], step["step"], by, None, now)
+        _event(conn, step["pursuit_id"], by, "retried", f"Retried {STEP_LABELS.get(step['step'], step['step'])}", redo, now)
+        return redo
+
+
+def no_go(step_id: int, by: str, note: str, *, expected_updated_at: str | None = None) -> bool:
+    """Stop here, no-go (PW4) or No-go at the gate (PW10): the step stops with the note and the pursuit
+    becomes no_go. The dashboard records the call as Not relevant through its own guard (P7)."""
+    note = (note or "").strip()
+    if not note:
+        raise ValueError("No-go needs the reason and what would change the answer")
+    now = now_iso()
+    with tx() as conn:
+        step = one(q(conn, "SELECT * FROM pursuit_steps WHERE id = ?", (step_id,)))
+        if step is None:
+            return False
+        if step["step"] not in NO_GO_STEPS:
+            raise ValueError(f"no-go is offered on steps 1 to 4 and the gate, not on {STEP_LABELS.get(step['step'], step['step'])}")
+        if not _decide(conn, step_id, "stopped", "no_go", by, note, expected_updated_at, now):
+            return False
+        q(conn, "UPDATE pursuits SET state = 'no_go', updated_at = ? WHERE id = ? AND state = 'working'", (now, step["pursuit_id"]))
+        _event(conn, step["pursuit_id"], by, "no_go", f"No-go at {_label(step)}: {note}", step_id, now)
+        return True
+
+
+def close_pursuit(pursuit_id: int, by: str, note: str | None = None) -> bool:
+    """Close a pursuit being worked. Steps waiting for the worker or the owner stop at once; a working
+    step is left to the worker, which stops it at its next phase boundary (stop_step)."""
+    now = now_iso()
+    with tx() as conn:
+        cur = q(conn, "UPDATE pursuits SET state = 'closed', updated_at = ? WHERE id = ? AND state = 'working'", (now, pursuit_id))
+        if cur.rowcount != 1:
+            return False
+        q(conn, "UPDATE pursuit_steps SET state = 'stopped', updated_at = ? "
+                "WHERE pursuit_id = ? AND state IN ('queued', 'ready', 'blocked')", (now, pursuit_id))
+        _event(conn, pursuit_id, by, "closed", _with_note("Closed", note), None, now)
+        return True
+
+
+def add_event(pursuit_id: int, who: str, kind: str, text: str, step_id: int | None = None) -> None:
+    """Add a line to a pursuit's history (PW16), for example material someone added."""
+    with tx() as conn:
+        _event(conn, pursuit_id, who, kind, text, step_id, now_iso())
+
+
+def pursuit_events(pursuit_id: int) -> list[dict[str, Any]]:
+    """A pursuit's history, oldest first."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM pursuit_events WHERE pursuit_id = ? ORDER BY id", (pursuit_id,)))
