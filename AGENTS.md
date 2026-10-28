@@ -22,7 +22,7 @@ that share one ledger database: hosted Postgres in production, SQLite in tests.
 | review/ | Per-call review: regex blocklist, then LLM verdict. Writes verdicts to the ledger. |
 | assistant/ | The portal assistant's toolbox: read tools, and propose tools that record change requests for a person to approve. It reads the ledger and the portals' files only. See docs/ASSISTANT.md. |
 | library/ | Proposal Library of past submissions: Drive sync, text extraction, chunking, embeddings. |
-| drafting/ | Proposal briefs and response drafts built from reviewed calls and the Proposal Library. |
+| drafting/ | Proposal briefs and response drafts built from reviewed calls and the Proposal Library, and the Writer's worker (`python -m drafting.worker`), which runs the proposal workspace's steps (docs/RUNBOOK.md, The worker). |
 | dashboard/ | Next.js triage dashboard reading the ledger directly (docs/DASHBOARD.md). Its own package.json; run npm commands inside dashboard/. |
 | slack/ | `alerts.py` (failure alerts), `sink.py` (cards, run summary, thread notes, and editing cards to show decisions made on the dashboard). |
 | scripts/ | PowerShell helpers, including the Task Scheduler registration script. |

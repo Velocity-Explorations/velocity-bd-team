@@ -177,5 +177,12 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     and start the draft, and writes the pursuit with Discovery queued. Until the worker has run
     (phase 5) it says Drafting is not set up yet and holds Start back. Calls with a draft carry a
     badge with a menu on every table, and Open workspace replaces Start the draft in the Decide cell.
+  - Phase 5a (PRO-577): the Writer's worker, `python -m drafting.worker`, runs the workspace's steps
+    on this PC with its own lock and a heartbeat in `workers`, which switches on Start the draft. It
+    records each step's cost against the pursuit's $200 cap, approves steps itself with key gates
+    only, reruns a step with the owner's note, stops when the pursuit is closed, and fails a step a
+    stopped worker left. It runs the Qualify steps (Discovery to the Go or no-go brief) from the
+    opportunity-assessment skill; Outline onward follow in 5b. Files stay in data/drafting until
+    Drive. Not started yet: it starts once `scripts/install-schedule.ps1` is run again (RUNBOOK).
 
 ## Known breakages
