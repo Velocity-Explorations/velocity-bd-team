@@ -16,7 +16,7 @@ def test_migrate_creates_tables_and_is_idempotent(tmp_path: Path) -> None:
     url = f"sqlite:///{(tmp_path / 'm.db').as_posix()}"
     first = migrate.apply(url)
     assert first == ["001_initial.sql", "002_change_requests.sql", "003_judgments.sql", "004_decisions.sql", "005_briefs.sql",
-                     "006_call_tags.sql", "007_tag_list.sql", "008_pursuits.sql"]
+                     "006_call_tags.sql", "007_tag_list.sql", "008_pursuits.sql", "009_call_summaries.sql"]
     assert migrate.apply(url) == []
     assert migrate.list_tables(url) == ["briefs", "call_tags", "calls", "change_requests", "checklist_items", "decisions",
                                          "drive_items", "judgments", "profiles", "proposals", "pursuit_events", "pursuit_steps",

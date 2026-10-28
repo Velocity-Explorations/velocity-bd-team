@@ -116,9 +116,15 @@ export function VotesCell({ callId, verdicts, votes, notesBy }: { callId: string
   );
 }
 
-/** Description (Q13): 300 characters over four lines, the rest on hover and keyboard focus, labelled where it is not the portal's. */
-export function DescriptionCell({ portal, description, extra }: { portal: string; description: string | null; extra: string | null }) {
-  const cell = descriptionCell(portal, description, extra);
+/** Description (Q13, phase 9c): Claude's executive summary, else 300 characters of the description over four lines; the
+ *  portal's own words in full on hover and keyboard focus, labelled where the text is not the portal's. */
+export function DescriptionCell({ portal, description, extra, summary }: {
+  portal: string;
+  description: string | null;
+  extra: string | null;
+  summary?: string | null;
+}) {
+  const cell = descriptionCell(portal, description, extra, summary);
   return (
     <td className="description wide">
       {cell.label || cell.text ? (

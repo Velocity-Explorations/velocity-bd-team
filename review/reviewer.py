@@ -15,13 +15,14 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from ledger.queries import add_judgment, set_review, set_tags
+from ledger.queries import add_judgment, set_review, set_summary, set_tags
 from review.tags import parse_tags, prompt_block, tag_list
 
 log = logging.getLogger("review")
@@ -80,11 +81,25 @@ Respond with exactly this format (no other text):
 VERDICT: yes|no|maybe
 REASON: [one sentence explaining why]
 TAGS: [tags from the list below, separated by commas]
+SUMMARY: [{summary_ask}]
 
 Use "yes" if clearly relevant, "no" if clearly not, "maybe" if uncertain.
 If past experience shows similar work has been pursued or won, weight that positively.
 
 {tags_block}"""
+
+# The summary alone, for calls reviewed before summaries began (run.py --backfill-summaries, phase 9c).
+SUMMARY_PROMPT_TEMPLATE = """Summarize this government opportunity for an executive who has a minute to decide whether to read it.
+
+Title: {title}
+Portal: {portal}
+Type: {type}
+Agency: {department}
+Due: {due_date}
+Description: {description}
+
+Respond with exactly one line (no other text):
+SUMMARY: [{summary_ask}]"""
 
 # Tags alone, for calls reviewed before tagging began (run.py --backfill-tags).
 TAG_PROMPT_TEMPLATE = """Tag this government opportunity.
@@ -100,6 +115,11 @@ Description: {description}
 
 Respond with exactly one line (no other text):
 TAGS: [tags from the list, separated by commas]"""
+
+
+SUMMARY_ASK = ("two short, plain sentences for an executive, 45 words at most in all: what the agency wants, then the kind "
+               "of award, its size if the call gives it, and the date that matters. No em dashes or en dashes")
+SUMMARY_CHARS = 600
 
 
 class ModelClient(Protocol):
@@ -186,6 +206,7 @@ def build_prompt(
         department=row.get("department") or "",
         description=(row.get("description") or "")[:DESCRIPTION_CHARS],
         tags_block=prompt_block(tag_list()),
+        summary_ask=SUMMARY_ASK,
     )
 
 
@@ -199,6 +220,46 @@ def build_tag_prompt(row: Mapping[str, Any]) -> str:
         description=(row.get("description") or "")[:DESCRIPTION_CHARS],
         tags_block=prompt_block(tag_list()),
     )
+
+
+def build_summary_prompt(row: Mapping[str, Any]) -> str:
+    """The prompt that asks only for a call's summary (phase 9c)."""
+    return SUMMARY_PROMPT_TEMPLATE.format(
+        title=row.get("title") or "",
+        portal=row.get("portal") or "",
+        type=row.get("type") or "",
+        department=row.get("department") or "",
+        due_date=row.get("due_date") or "not given",
+        description=(row.get("description") or "")[:DESCRIPTION_CHARS],
+        summary_ask=SUMMARY_ASK,
+    )
+
+
+def parse_summary(text: str) -> str | None:
+    """The answer's SUMMARY line in plain words, dashes replaced, or None when there is none."""
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if line.upper().startswith("SUMMARY:"):
+            summary = line.split(":", 1)[1].strip()
+            summary = re.sub(r"(\d)\s*[\u2013\u2014]\s*(\d)", r"\1 to \2", summary)
+            summary = re.sub(r"\s*[\u2013\u2014]\s*", ", ", summary)
+            if len(summary) > SUMMARY_CHARS:
+                summary = summary[:SUMMARY_CHARS].rsplit(" ", 1)[0].rstrip(",;:") + "."
+            return summary or None
+    return None
+
+
+def store_summary(call_id: str, text: str) -> bool:
+    """Keep an answer's summary. An answer without one changes nothing, and a failure to store it only logs."""
+    summary = parse_summary(text)
+    if not summary:
+        return False
+    try:
+        set_summary(call_id, summary)
+    except Exception as exc:
+        log.warning("Could not store the summary of %s: %s", call_id, type(exc).__name__)
+        return False
+    return True
 
 
 def parse_response(text: str) -> tuple[str, str]:
@@ -291,6 +352,7 @@ def review_calls(
         if is_judgment(reason):
             add_judgment(row["id"], "claude", getattr(model_client, "model", MODEL_ID), verdict, reason)
             store_tags(row["id"], "claude", text)
+            store_summary(row["id"], text)
         reviewed = Reviewed(row["id"], str(row.get("title") or ""), verdict, reason, row.get("match_tier"))
         log.info("AI review [%s]: %s", verdict, reviewed.title[:80])
         if verdict == "no":
@@ -332,6 +394,21 @@ def judge_calls(
         if n < len(rows) - 1:
             sleep(BETWEEN_CALLS_S)
     return judged
+
+
+def summarize_calls(rows: list[Mapping[str, Any]], model_client: ModelClient, sleep: Callable[[float], None] = time.sleep) -> int:
+    """Have Claude summarize calls reviewed before summaries began, asking for the summary alone (phase 9c). Returns
+    how many it summarized; a call it could not summarize is asked again on the next pass."""
+    done = 0
+    for n, row in enumerate(rows):
+        text, error = complete_text(build_summary_prompt(row), model_client, sleep)
+        if store_summary(row["id"], text):
+            done += 1
+        elif error:
+            log.warning("Could not summarize %s: %s", row["id"], error[:120])
+        if n < len(rows) - 1:
+            sleep(BETWEEN_CALLS_S)
+    return done
 
 
 def tag_calls(

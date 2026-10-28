@@ -54,3 +54,13 @@ test("the reasons panel lists where each detail comes from, and the deadline's s
   );
   assert.deepEqual(detailSources([{ text: "x" }], null), []);
 });
+
+test("Claude's executive summary takes the cell, with the portal's own words on hover (phase 9c)", () => {
+  const summary = "The Army wants offline AI decision aids. Sources Sought; answers due 1 Dec 2026.";
+  assert.deepEqual(descriptionCell("SAM.gov", LONG, null, summary), { label: "Summary", text: summary, full: LONG });
+  assert.deepEqual(descriptionCell("AFWERX", "Written by the adapter.", null, summary),
+    { label: "Summary", text: summary, full: "Written by the adapter." });
+  assert.equal(descriptionCell("SAM.gov", LONG, null, "  ").label, null);
+  const members = JSON.stringify({ nstxl_members_only: true });
+  assert.equal(descriptionCell("NSTXL", "Member-only page.", members, summary).label, "Members only");
+});

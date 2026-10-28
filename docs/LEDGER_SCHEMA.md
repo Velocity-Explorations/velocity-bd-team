@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `008_pursuits.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `009_call_summaries.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -73,6 +73,7 @@ the component that owns them. A component never writes another group's columns.
 | matched_keywords | TEXT JSON | array of strings | filter stage |
 | ai_verdict | TEXT | NULL, `yes`, `no`, `maybe` | Reviewer (`set_review`) |
 | ai_reasoning | TEXT | the model's reasoning | Reviewer |
+| ai_summary | TEXT | two plain sentences for an executive: what the agency wants, the kind of award and its size, and the date that matters; from the review's SUMMARY line, dashes replaced, at most 600 characters (migration 009, phase 9c) | Reviewer; `run.py --backfill-summaries` for open calls reviewed before it |
 | reviewed_at | TEXT timestamp | | Reviewer |
 | slack_channel | TEXT | channel id the card was posted to | Slack delivery (`set_slack`) |
 | slack_ts | TEXT | Slack message timestamp (its id) | Slack delivery |

@@ -175,6 +175,20 @@ def set_review(call_id: str, verdict: str, reasoning: str | None) -> None:
         )
 
 
+def set_summary(call_id: str, summary: str) -> None:
+    """The review's summary of a call for an executive (phase 9c)."""
+    now = now_iso()
+    with tx() as conn:
+        q(conn, "UPDATE calls SET ai_summary = ?, updated_at = ? WHERE id = ?", (summary, now, call_id))
+
+
+def calls_without_summary() -> list[dict[str, Any]]:
+    """Kept, reviewed calls with no summary yet, newest first; the caller keeps the open ones."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM calls WHERE filter_result = 'kept' AND ai_verdict IS NOT NULL "
+                            "AND ai_summary IS NULL ORDER BY first_seen_at DESC, id"))
+
+
 def set_slack(call_id: str, channel: str, ts: str) -> None:
     now = now_iso()
     with tx() as conn:

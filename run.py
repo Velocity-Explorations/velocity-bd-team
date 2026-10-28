@@ -327,6 +327,33 @@ def backfill_tags() -> int:
     return 0
 
 
+SUMMARY_TOKENS_OUT = 400   # the summary line, and the thinking the model does before it
+
+
+def backfill_summaries(dry_run: bool = False) -> int:
+    """Have Claude write the executive summary (phase 9c) for each open, kept and reviewed call that has none, asking
+    for the summary alone. A dry run counts the calls and prices the run instead. Safe to rerun: a call that could
+    not be summarized is asked again next time."""
+    from drafting.costs import PRICES
+    from drafting.dates import parse_due
+    from ledger.queries import calls_without_summary
+    from review.reviewer import MODEL_ID, build_summary_prompt, summarize_calls
+
+    _console_logging()
+    now = datetime.now(timezone.utc)
+    pending = [row for row in calls_without_summary() if (due := parse_due(row.get("due_date"))) is None or due >= now]
+    if dry_run or not pending:
+        price = PRICES[MODEL_ID]
+        tokens_in = sum(len(build_summary_prompt(row)) // 4 for row in pending)
+        cost = (tokens_in * price.input + len(pending) * SUMMARY_TOKENS_OUT * price.output) / 1_000_000
+        print(f"{len(pending)} open {'call needs' if len(pending) == 1 else 'calls need'} a summary; "
+              f"about ${cost:.2f} with {MODEL_ID}.")
+        return 0
+    print(f"Summarized {summarize_calls(pending, review_model())} of {len(pending)} open "
+          f"{'call' if len(pending) == 1 else 'calls'}.")
+    return 0
+
+
 def backfill_judgments() -> int:
     """Copy the Claude review's existing verdicts into judgments, then have Grok judge every kept,
     reviewed call it has not judged yet. Safe to rerun: each pass only fills what is missing."""
@@ -849,6 +876,9 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="record Claude's past verdicts as judgments and have Grok judge the backlog, then exit")
     parser.add_argument("--backfill-tags", action="store_true",
                         help="tag every stored call by its rules and have Claude and Grok tag the reviewed ones, then exit")
+    parser.add_argument("--backfill-summaries", action="store_true",
+                        help="have Claude summarize each open, reviewed call that has no summary, then exit; "
+                             "with --dry-run, count the calls and price the run instead")
     return parser.parse_args(argv)
 
 
@@ -866,6 +896,8 @@ def main(argv: list[str] | None = None) -> int:
         return backfill_judgments()
     if args.backfill_tags:
         return backfill_tags()
+    if args.backfill_summaries:
+        return backfill_summaries(dry_run=args.dry_run)
     try:
         acquire_lock(wait_s=args.wait_lock * 60)
     except LockHeld as exc:

@@ -227,5 +227,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     submission and the call's decision (C8 guarded). Submitted and waiting puts overdue results first,
     with No news yet and Record result; overdue results count in the top bar and on the cards. The
     Register write and the folder moves on submit wait for Drive.
+  - Phase 9c (an executive summary for each call, added at David's request on 28 Oct): the review
+    asks Claude for a SUMMARY line, kept in `calls.ai_summary` (migration 009), and the Description
+    column shows it with the portal's words on hover. `run.py --backfill-summaries` fills open,
+    reviewed calls reviewed before it.
 
 ## Known breakages
