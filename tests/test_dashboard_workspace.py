@@ -6,6 +6,7 @@ container (Docker) and the built dashboard on port 8002 against it, and remove b
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -89,15 +90,24 @@ def _call(call_id: str, title: str) -> None:
     lq.set_human(call_id, "pursue", "David Wood")
 
 
-def _saved(pursuit_id: int, step: str, summary: str = "- Found the notice\n- Attachments to fetch") -> dict[str, Any]:
-    """The worker takes the queued step and saves it ready."""
+def _saved(pursuit_id: int, step: str, summary: str = "- Found the notice\n- Attachments to fetch",
+           content: dict[str, Any] | None = None, tasks: dict[str, str] | None = None) -> dict[str, Any]:
+    """The worker takes the queued step and saves it ready, with what its screen shows."""
     row = lq.claim_next_step()
     assert row is not None and row["pursuit_id"] == pursuit_id and row["step"] == step, row
+    if tasks:
+        lq.set_task_states(row["id"], tasks)
     assert lq.finish_step(row["id"], summary=summary, cost_usd=0.05,
                           files=[{"name": f"{step} document", "local": f"pursuit-{pursuit_id}/{step}.md",
                                   "word": f"pursuit-{pursuit_id}/{step}.docx"}],
-                          content={"document": f"# {step}\nThe full text.", "question": f"Is the {step} right?"})
+                          content={"document": f"# {step}\nThe full text.", "question": f"Is the {step} right?", **(content or {})})
     return lq.get_step(row["id"])
+
+
+def _through(pursuit_id: int, last: str) -> None:
+    """Every step before `last` saved and approved, the gate as Go."""
+    for step in lq.STEPS[:lq.STEPS.index(last)]:
+        lq.approve_step(_saved(pursuit_id, step)["id"], "David Wood", decision="go" if step == "go_no_go" else None)
 
 
 def _pursuit(call_id: str, title: str, **options: Any) -> int:
@@ -130,7 +140,59 @@ def seed() -> dict[str, int]:
         {"part": "inputs", "text": "Key personnel bios", "owner": "Shaun Jones", "due_date": "2027-01-05", "done": False},
     ], "requirements")
     _call("ws-undrafted", "Workspace with no draft")
+    seed_screens(found)
     return found
+
+
+TASKS = {"call_page": "for_owner", "attachments": "for_owner", "parent_instructions": "done", "key_facts": "done",
+         "past_work": "done", "clashes": "done", "record": "done", "summary": "done"}
+ANGLE = "Lead with Echo C2 at Cobra Gold, and name a teaming partner for Army past performance"
+BRIEF = {"fit": "Moderate fit", "fit_reason": "C2 matches; no Army past performance yet.", "win_themes": ["Echo C2 offline"],
+         "gaps": [{"gap": "No Army past performance", "mitigation": "Team with a partner who has it"}],
+         "effort": "30 days to the deadline; the milestones fit.", "recommendation": "go_with_conditions",
+         "recommendation_text": "Go once a partner signs.", "conditions": ["Sign a teaming partner", "Confirm the cost inputs"]}
+
+
+def seed_screens(found: dict[str, int]) -> None:
+    """A pursuit at each step with a screen of its own (PW6 to PW11)."""
+    found["discovery"] = _pursuit("ws-discovery", "Workspace discovery")
+    _saved(found["discovery"], "discovery", tasks=TASKS, content={
+        "tasks": TASKS, "owner_fetch": ["The call page on SAM.gov, for amendments"],
+        "result_expected": {"date": "2027-04-15", "source": "default, 90 days after the deadline"}})
+    found["summary"] = _pursuit("ws-summary", "Workspace summary")
+    _through(found["summary"], "summary")
+    _saved(found["summary"], "summary", content={"document": "# Opportunity summary\n\nThe Army wants edge AI decision aids.\n\nMore."})
+    for key in ("align", "align-new"):
+        found[key] = _pursuit(f"ws-{key}", f"Workspace {key}", direction="Lead with Echo C2")
+        _through(found[key], "alignment")
+        _saved(found[key], "alignment", content={
+            "verdict": "Strong on C2, one gap", "angle": ANGLE, "comparison": "Both lead with Echo C2",
+            "direction": "Lead with Echo C2",
+            "points": [{"tag": "fits", "text": "Army C2 work matches Echo C2", "source": "Claude and Grok"},
+                       {"tag": "risk", "text": "No Army past performance", "source": "Grok"}]})
+    found["req"] = _pursuit("ws-req", "Workspace requirements")
+    _through(found["req"], "requirements")
+    _saved(found["req"], "requirements", content={
+        "requirements": {"volumes": "One white paper", "page_limit": "10 pages, 12 point, PDF", "evaluation": "Technical merit",
+                         "eligibility": "Small business", "keywords": "Listed in the file"}, "submit_by": "2027-01-14"})
+    lq.save_checklist(found["req"], [
+        {"part": "documents", "text": "White paper, 10 pages, PDF", "owner": "Claude", "done": True},
+        {"part": "inputs", "text": "Company profile figures", "owner": "David Wood", "done": False}], "requirements")
+    found["brief"] = _pursuit("ws-brief", "Workspace brief")
+    _through(found["brief"], "go_no_go")
+    _saved(found["brief"], "go_no_go", content=BRIEF)
+    found["outline"] = _pursuit("ws-outline", "Workspace outline", direction="Lead with Echo C2",
+                                builds_on=[{"id": "d1", "name": "C2 prototype white paper"}])
+    _through(found["outline"], "outline")
+    _saved(found["outline"], "outline", content={
+        "page_limit": "10 pages", "unmapped_criteria": ["Cost realism"],
+        "sections": [{"title": "1. Technical Approach", "criteria": ["Technical merit"], "share": "5 pages",
+                      "evidence": ["Cobra Gold 2026"]}]})
+    found["draft"] = _pursuit("ws-draft", "Workspace draft")
+    _through(found["draft"], "draft")
+    _saved(found["draft"], "draft", content={"words": 3240, "placeholders": {"PERSON WRITES": 1, "NEEDS INPUT": 60,
+                                                                            "NEEDS EVIDENCE": 0, "other": 0}})
+    found["people"] = _pursuit("ws-people", "Workspace people")
 
 
 @pytest.fixture(scope="module")
@@ -362,3 +424,124 @@ def test_a_call_without_a_draft_says_so_and_an_unknown_call_is_not_found(page: A
     assert "This call has no draft yet." in page.locator("main").inner_text()
     response = page.goto(f"{WEB}/proposals/no-such-call", wait_until="load", timeout=120_000)
     assert response is not None and response.status == 404
+
+
+# --------------------------------------------------------------------- each step's own screen (PRO-581)
+
+def test_discovery_lists_its_eight_tasks_and_what_is_left_to_fetch(page: Any, site: dict[str, int]) -> None:
+    open_workspace(page, "ws-discovery")
+    card = page.locator(".ws-card")
+    assert card.locator(".ws-tasks li").count() == 8
+    assert card.locator(".ws-progress").inner_text() == "6 of 8 done, 2 for you"
+    assert "for you" in card.locator(".ws-tasks li").first.inner_text()
+    assert "The call page on SAM.gov, for amendments" in card.inner_text()
+    assert "Result expected by 2027-04-15" in card.inner_text()
+
+
+def test_the_summary_shows_the_key_facts_and_continues_to_alignment(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-summary")
+    card = page.locator(".ws-card")
+    assert "The Army wants edge AI decision aids." in card.locator(".ws-lead").inner_text()
+    rows = card.locator(".ws-rows").inner_text()
+    assert "DEPT OF THE ARMY" in rows and "Sources Sought" in rows
+    act(page, card.get_by_role("button", name="Continue to Alignment"))
+    assert steps_of(site["summary"])[-2:] == [("summary", 1, "approved"), ("alignment", 1, "queued")]
+
+
+def test_alignment_carries_claudes_angle_forward(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-align")
+    card = page.locator(".ws-card")
+    assert "Strong on C2, one gap" in card.locator(".ws-verdict").inner_text()
+    assert [t.split("\n")[0] for t in card.locator(".ws-tagged li").all_inner_texts()] == ["fits", "risk"]
+    assert "Lead with Echo C2" in card.locator(".ws-pair").inner_text() and ANGLE in card.locator(".ws-pair").inner_text()
+    assert card.locator("input[value=keep]").is_checked()
+    card.locator("input[value=claude]").check()
+    act(page, card.get_by_role("button", name="Approve and continue"))
+    with ledger():
+        assert lq.get_pursuit(site["align"])["direction"] == ANGLE
+        assert lq.pursuit_events(site["align"])[-2]["kind"] == "direction"
+
+
+def test_alignment_takes_a_new_direction(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-align-new")
+    card = page.locator(".ws-card")
+    card.locator("input[value=new]").check()
+    card.locator("textarea[name=direction]").fill("Lead with the offline demo and the Cobra Gold numbers")
+    act(page, card.get_by_role("button", name="Approve and continue"))
+    with ledger():
+        assert lq.get_pursuit(site["align-new"])["direction"] == "Lead with the offline demo and the Cobra Gold numbers"
+
+
+def test_requirements_show_their_rows_and_a_checklist_ticked_from_the_card(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-req")
+    card = page.locator(".ws-card")
+    rows = card.locator(".ws-rows").first.inner_text().lower()   # the labels are capitalised by the stylesheet
+    for expected in ("volumes", "one white paper", "page limit and format", "10 pages, 12 point, pdf", "eligibility"):
+        assert expected in rows, expected
+    assert "submission checklist, 1 of 2 done" in card.inner_text().lower()
+    act(page, card.get_by_role("button", name="Tick: Company profile figures"))
+    with ledger():
+        assert [i["done"] for i in lq.checklist(site["req"])] == [1, 1]
+
+
+def test_the_gate_shows_the_brief_and_fills_in_claudes_conditions(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-brief")
+    card = page.locator(".ws-card")
+    brief = card.locator(".ws-subsection").inner_text()
+    for expected in ("Moderate fit", "C2 matches; no Army past performance yet.", "Echo C2 offline", "No Army past performance.",
+                     "Team with a partner who has it", "30 days to the deadline", "Go with conditions", "Go once a partner signs."):
+        assert expected in brief, expected
+    card.locator("summary", has_text="Go with conditions").click()
+    assert card.locator("textarea[name=conditions]").input_value() == "Sign a teaming partner\nConfirm the cost inputs"
+
+
+def test_the_outline_lists_its_sections_and_locks_the_direction_and_past_work_when_approved(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-outline")
+    card = page.locator(".ws-card")
+    assert "direction, last chance to change" in card.inner_text().lower()
+    assert [c.inner_text() for c in card.locator(".ws-sections tbody tr td").all()] == [
+        "1. Technical Approach", "Technical merit", "5 pages", "Cobra Gold 2026"]
+    assert "No section answers: Cost realism" in card.inner_text()
+    act(page, card.get_by_role("button", name="Remove C2 prototype white paper"))
+    open_workspace(page, "ws-outline")          # a fresh page between actions, after the redirect's re-render
+    card = page.locator(".ws-card")
+    card.locator("input[name=add]").fill("Cobra Gold 2026 after-action report")
+    act(page, card.get_by_role("button", name="Add", exact=True))
+    open_workspace(page, "ws-outline")
+    card = page.locator(".ws-card")
+    card.locator("summary", has_text="Edit").click()
+    card.locator("textarea[name=direction]").fill("Lead with the Cobra Gold results")
+    act(page, card.get_by_role("button", name="Save the direction"))
+    with ledger():
+        pursuit = lq.get_pursuit(site["outline"])
+    assert json.loads(pursuit["builds_on"]) == [{"id": None, "name": "Cobra Gold 2026 after-action report"}]
+    assert pursuit["direction"] == "Lead with the Cobra Gold results"
+    open_workspace(page, "ws-outline")
+    act(page, page.locator(".ws-card").get_by_role("button", name="Approve and continue"))
+    open_workspace(page, "ws-outline", "outline")
+    card = page.locator(".ws-card")
+    assert "last chance" not in card.inner_text().lower()
+    assert card.locator("input[name=add]").count() == 0 and card.locator("summary", has_text="Edit").count() == 0
+
+
+def test_the_first_draft_shows_its_size_and_what_is_left_to_fill(page: Any, site: dict[str, int]) -> None:
+    open_workspace(page, "ws-draft")
+    rows = page.locator(".ws-card .ws-rows").inner_text()
+    assert "3,240" in rows and "1 PERSON WRITES, 60 NEEDS INPUT" in rows
+
+
+def test_the_owner_changes_who_works_with_them(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-people")
+    page.get_by_role("button", name="People").click()
+    panel = page.locator("#ws-people")
+    panel.get_by_label("Lisa Hall").check()
+    act(page, panel.get_by_role("button", name="Save who works on it"))
+    with ledger():
+        assert json.loads(lq.get_pursuit(site["people"])["collaborators"]) == ["Shaun Jones", "Lisa Hall"]

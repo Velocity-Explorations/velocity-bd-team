@@ -6,14 +6,28 @@ import {
   noGoAction,
   raiseCapAction,
   retryStepAction,
-  tickChecklistAction,
+  setCollaboratorsAction,
 } from "@/app/actions";
 import { PortalLogo } from "@/components/PortalLogo";
+import {
+  AlignmentView,
+  Checklist,
+  ComplianceView,
+  DirectionChoice,
+  DiscoveryView,
+  DraftView,
+  GateBrief,
+  OutlineView,
+  RequirementsView,
+  SummaryView,
+} from "@/components/StepScreens";
 import { formatDue, formatTime } from "@/lib/format";
 import type { ChecklistRow, EventRow, PursuitRow, WorkspaceCall } from "@/lib/queries";
 import {
   actionsFor,
+  approveLabel,
   checklistProgress,
+  locked,
   money,
   parseJson,
   stageStates,
@@ -28,15 +42,6 @@ import {
 
 type Label = (name: string) => string;
 type Can = { decide: boolean; contribute: boolean };
-
-const PARTS: [string, string][] = [
-  ["registrations", "2.1 Registrations and eligibility"],
-  ["documents", "2.2 Required documents and volumes"],
-  ["inputs", "2.3 Inputs needed from the owner and the team"],
-  ["formatting", "2.4 Formatting and packaging"],
-  ["reviews", "2.5 Reviews and approvals"],
-  ["submission", "2.6 Submission"],
-];
 
 const STOPPED: Record<string, string> = { no_go: "No-go", submitted: "Submitted", closed: "Closed" };
 
@@ -111,68 +116,20 @@ export function WorkspaceHeader({ call, pursuit, checklist, label, tz }: {
   );
 }
 
-/** The submission checklist in its six parts (PW9), tickable by the owner and the people working with them. */
-export function Checklist({ callId, step, items, editable, label }: {
-  callId: string;
-  step: string;
-  items: ChecklistRow[];
-  editable: boolean;
-  label: Label;
-}) {
-  return (
-    <div className="ws-checklist">
-      {PARTS.map(([part, title]) => {
-        const mine = items.filter((item) => item.part === part);
-        if (mine.length === 0) return null;
-        return (
-          <div key={part} className="ws-check-part">
-            <h3 className="field-label">{title}</h3>
-            <ul>
-              {mine.map((item) => (
-                <li key={item.id} className={item.done ? "done" : undefined}>
-                  {editable ? (
-                    <form action={tickChecklistAction}>
-                      <input type="hidden" name="call_id" value={callId} />
-                      <input type="hidden" name="step" value={step} />
-                      <input type="hidden" name="item_id" value={item.id} />
-                      <input type="hidden" name="expected_done" value={item.done ? "1" : "0"} />
-                      <button type="submit" name="done" value={item.done ? "0" : "1"} className="ws-tick" aria-pressed={Boolean(item.done)}
-                        aria-label={`${item.done ? "Untick" : "Tick"}: ${item.text}`}>
-                        {item.done ? <Check aria-hidden="true" /> : null}
-                      </button>
-                    </form>
-                  ) : (
-                    <span className="ws-tick" aria-hidden="true">{item.done ? <Check /> : null}</span>
-                  )}
-                  <span className="ws-check-text">
-                    {item.text}
-                    {item.source ? <span className="meta"> {item.source}</span> : null}
-                  </span>
-                  <span className="ws-check-owner">{item.owner ? label(item.owner) : ""}</span>
-                  <span className="when">{item.due_date ?? ""}</span>
-                  <span className={`badge tone-${item.done ? "good" : "grey"}`}>{item.done ? "done" : "to do"}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /** The panels the header's buttons open (PW1, PW16, PW24): People, Checklist and Show history. */
-export function WorkspacePanels({ call, pursuit, checklist, events, step, can, label, tz }: {
+export function WorkspacePanels({ call, pursuit, checklist, events, step, can, people, label, tz }: {
   call: WorkspaceCall;
   pursuit: PursuitRow;
   checklist: ChecklistRow[];
   events: EventRow[];
   step: string;
   can: Can;
+  people: { name: string; label: string }[];
   label: Label;
   tz: string;
 }) {
   const collaborators = parseJson<string[]>(pursuit.collaborators, []);
+  const others = people.filter((person) => person.name !== pursuit.owner);
   return (
     <>
       <section id="ws-people" className="ws-panel" hidden aria-label="People">
@@ -185,8 +142,27 @@ export function WorkspacePanels({ call, pursuit, checklist, events, step, can, l
           {collaborators.length ? <>; working with {collaborators.map(label).join(", ")}</> : "; nobody else is working on it yet"}.
         </p>
         <p className="hint">
-          Only the owner approves steps and decides the gates. The people working with them add material and tick checklist items.
+          Only the owner approves steps and decides the gates. The people working with them add material and past work, and
+          tick checklist items.
         </p>
+        {can.decide && pursuit.state === "working" && others.length ? (
+          <form action={setCollaboratorsAction} className="ws-more-form">
+            <input type="hidden" name="call_id" value={call.id} />
+            <input type="hidden" name="step" value={step} />
+            <fieldset className="field">
+              <legend className="field-label">Working with</legend>
+              <div className="chip-checks">
+                {others.map((person) => (
+                  <label key={person.name} className="chip-check">
+                    <input type="checkbox" name="with" value={person.name} defaultChecked={collaborators.includes(person.name)} />
+                    {person.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <button type="submit" className="btn fn-change">Save who works on it</button>
+          </form>
+        ) : null}
       </section>
       {checklist.length ? (
         <section id="ws-checklist" className="ws-panel" hidden aria-label="Checklist">
@@ -333,11 +309,49 @@ function StateNotice({ callId, pursuit, row, can, worker, tz, label }: {
   }
 }
 
-/** The open step's card (PW4): what it is for, its state, the files saved, what Claude prepared, and Your call. */
-export function StepCard({ call, pursuit, row, can, worker, label, tz }: {
+/** A step's own screen (PW6 to PW11), drawn from what the worker saved. */
+function StepScreen({ call, pursuit, row, steps, checklist, content, can, label, tz }: {
   call: WorkspaceCall;
   pursuit: PursuitRow;
   row: StepRow;
+  steps: StepRow[];
+  checklist: ChecklistRow[];
+  content: Record<string, unknown>;
+  can: Can;
+  label: Label;
+  tz: string;
+}) {
+  switch (row.step) {
+    case "discovery":
+      return <DiscoveryView row={row} content={content} />;
+    case "summary":
+      return <SummaryView call={call} content={content} tz={tz} />;
+    case "alignment":
+      return <AlignmentView pursuit={pursuit} content={content} label={label} tz={tz} />;
+    case "requirements":
+      return <RequirementsView callId={call.id} content={content} checklist={checklist}
+        editable={can.contribute && pursuit.state === "working"} label={label} />;
+    case "go_no_go":
+      return <GateBrief content={content} />;
+    case "outline":
+      return <OutlineView call={call} pursuit={pursuit} content={content} row={row} canDecide={can.decide}
+        canContribute={can.contribute} isLocked={locked(steps)} />;
+    case "draft":
+      return <DraftView content={content} />;
+    case "compliance":
+      return <ComplianceView content={content} />;
+    default:
+      return null;
+  }
+}
+
+/** The open step's card (PW4): what it is for, its state, the files saved, what Claude prepared, and Your call. */
+export function StepCard({ call, pursuit, row, steps, checklist, can, worker, label, tz }: {
+  call: WorkspaceCall;
+  pursuit: PursuitRow;
+  row: StepRow;
+  steps: StepRow[];
+  checklist: ChecklistRow[];
   can: Can;
   worker: { readiness: string; seenAt: string | null };
   label: Label;
@@ -345,6 +359,8 @@ export function StepCard({ call, pursuit, row, can, worker, label, tz }: {
 }) {
   const word = stateWord(row);
   const content = parseJson<Record<string, unknown>>(row.content, {});
+  const shown = row.content !== null || (row.step === "discovery" && row.task_states !== null);
+  const conditions = Array.isArray(content.conditions) ? content.conditions.map(String).join("\n") : "";
   const files = parseJson<{ name: string; local?: string; word?: string; link?: string }[]>(row.files, []);
   const points = (row.summary ?? "").split("\n").map((line) => line.replace(/^\s*-\s*/, "").trim()).filter(Boolean);
   const document = typeof content.document === "string" ? content.document : "";
@@ -383,6 +399,10 @@ export function StepCard({ call, pursuit, row, can, worker, label, tz }: {
             ))}
           </ul>
         ) : null}
+        {shown ? (
+          <StepScreen call={call} pursuit={pursuit} row={row} steps={steps} checklist={checklist} content={content} can={can}
+            label={label} tz={tz} />
+        ) : null}
         {points.length ? (
           <section className="ws-points" aria-label="What Claude prepared">
             <h3 className="field-label">What Claude prepared</h3>
@@ -411,9 +431,10 @@ export function StepCard({ call, pursuit, row, can, worker, label, tz }: {
             {!can.decide ? <p className="hint">Waiting on {label(pursuit.owner)}, the owner, to decide this step.</p> : null}
             <div className="ws-actions">
               {acts.approve ? (
-                <form action={approveStepAction}>
+                <form action={approveStepAction} className={row.step === "alignment" ? "ws-approve-direction" : undefined}>
                   <Fields callId={call.id} row={row} />
-                  <button type="submit" className="btn-primary fn-approve"><Check aria-hidden="true" />Approve and continue</button>
+                  {row.step === "alignment" ? <DirectionChoice content={content} /> : null}
+                  <button type="submit" className="btn-primary fn-approve"><Check aria-hidden="true" />{approveLabel(row.step)}</button>
                 </form>
               ) : null}
               {acts.gate ? (
@@ -430,7 +451,7 @@ export function StepCard({ call, pursuit, row, can, worker, label, tz }: {
                       <input type="hidden" name="decision" value="go_with_conditions" />
                       <label className="field">
                         <span className="field-label">Conditions, one per line</span>
-                        <textarea name="conditions" rows={3} required maxLength={2000} />
+                        <textarea name="conditions" rows={3} required maxLength={2000} defaultValue={conditions} />
                       </label>
                       <p className="hint">Each condition becomes a checklist item you own.</p>
                       <button type="submit" className="btn-primary fn-approve">Go with conditions</button>

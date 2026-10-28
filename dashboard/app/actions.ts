@@ -11,6 +11,7 @@ import {
   addMaterial,
   approveStep,
   askChanges,
+  changeBuildsOn,
   decideCall,
   decideRequest,
   deleteProfile,
@@ -19,6 +20,8 @@ import {
   raiseCap,
   retryStep,
   saveProfile,
+  setCollaborators,
+  setDirection,
   startPursuit,
   tagOptions,
   tickChecklist,
@@ -265,11 +268,45 @@ function stepFields(formData: FormData): { stepId: number; expected: string; not
 
 /** Approve and continue (PW4), and Go or Go with conditions at the gate (PW10). */
 export async function approveStepAction(formData: FormData): Promise<void> {
-  const { viewer, back } = await workspaceActor(formData, "decide");
+  const { viewer, back, found } = await workspaceActor(formData, "decide");
   const { stepId, expected, note } = stepFields(formData);
   const conditions = String(formData.get("conditions") ?? "").split(/\r?\n/).map((c) => c.trim().slice(0, 300)).filter(Boolean).slice(0, 20);
   const decision = String(formData.get("decision") ?? "") || undefined;
-  await workspaceWrite(back, () => approveStep({ stepId, by: viewer, expected, decision, note, conditions }));
+  // Alignment's choice (PW8): keep the owner's direction, take Claude's angle, or write a new one.
+  const choice = String(formData.get("direction_choice") ?? "");
+  let direction: string | undefined;
+  if (choice === "claude") {
+    const step = found.steps.find((s) => s.id === stepId);
+    direction = String(parseJson<{ angle?: string }>(step?.content, {}).angle ?? "").trim() || undefined;
+  } else if (choice === "new") {
+    direction = String(formData.get("direction") ?? "").trim().slice(0, MAX_NOTE_CHARS);
+    if (!direction) backTo(back, "error", "Write the new direction first, or keep yours.");
+  }
+  await workspaceWrite(back, () => approveStep({ stepId, by: viewer, expected, decision, note, conditions, direction }));
+}
+
+/** The Outline's last chance to change the direction (PW11), until it is approved. */
+export async function setDirectionAction(formData: FormData): Promise<void> {
+  const { viewer, back, pursuit } = await workspaceActor(formData, "decide");
+  const direction = String(formData.get("direction") ?? "").slice(0, MAX_NOTE_CHARS);
+  await workspaceWrite(back, () => setDirection({ pursuitId: pursuit.id, by: viewer, direction }));
+}
+
+/** Past work to build on (PW11, PW24): the owner and the people working with them add or remove it until the Outline is approved. */
+export async function changeBuildsOnAction(formData: FormData): Promise<void> {
+  const { viewer, back, pursuit } = await workspaceActor(formData, "contribute");
+  const add = String(formData.get("add") ?? "") || undefined;
+  const remove = String(formData.get("remove") ?? "") || undefined;
+  if (!add && !remove) backTo(back, "error", "Name the past work to add: a past proposal, a project, or a link.");
+  await workspaceWrite(back, () => changeBuildsOn({ pursuitId: pursuit.id, by: viewer, add, remove }));
+}
+
+/** Who works with the owner (PW24): only the owner changes the list, from People. */
+export async function setCollaboratorsAction(formData: FormData): Promise<void> {
+  const { viewer, back, pursuit } = await workspaceActor(formData, "decide");
+  const allowed = allowlist().map((p) => p.name);
+  const names = formData.getAll("with").map(String).filter((name) => allowed.includes(name) && name !== pursuit.owner);
+  await workspaceWrite(back, () => setCollaborators({ pursuitId: pursuit.id, by: viewer, names }));
 }
 
 /** Ask for changes (PW4): the step is redone with the note. */

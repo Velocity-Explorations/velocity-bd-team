@@ -17,7 +17,7 @@ import { startRefusal, workerReadiness, type ProposalCall } from "./proposals";
 import { DESCRIPTION_READ } from "./description";
 import { STALE_MS } from "./runs";
 import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
-import { NO_GO_STEPS, stateWord, stepInfo, STEPS, type StepRow } from "./workspace";
+import { NO_GO_STEPS, parseJson, stateWord, stepInfo, STEPS, type StepRow } from "./workspace";
 
 // ------------------------------------------------------------------------------ calls
 
@@ -1027,6 +1027,7 @@ export type WorkspaceCall = {
   title: string | null;
   url: string | null;
   type: string | null;
+  department: string | null;
   due_date: string | null;
   days_left: number | null;
   human_status: string | null;
@@ -1038,7 +1039,7 @@ export type Workspace = { call: WorkspaceCall; pursuit: PursuitRow | null; steps
 export async function workspace(callId: string): Promise<Workspace | null> {
   const db = sql();
   const [call] = await db<WorkspaceCall[]>`
-    SELECT id, portal, title, url, type, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, human_status
+    SELECT id, portal, title, url, type, department, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, human_status
     FROM calls WHERE id = ${callId}`;
   if (!call) return null;
   const empty: Workspace = { call, pursuit: null, steps: [], events: [], checklist: [] };
@@ -1099,6 +1100,7 @@ export async function approveStep(input: {
   decision?: string;
   note?: string;
   conditions?: string[];
+  direction?: string;
 }): Promise<WorkspaceResult> {
   const db = sql();
   return db.begin(async (tx): Promise<WorkspaceResult> => {
@@ -1121,6 +1123,15 @@ export async function approveStep(input: {
         AND pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')
       RETURNING id`;
     if (done.length !== 1) return { ok: false, reason: staleReason(r) };
+    const direction = (input.direction ?? "").trim().slice(0, 2000);
+    if (direction && r.step === "alignment") {
+      // Alignment carries the direction forward (PW8): the owner's, Claude's angle, or a new one.
+      const [current] = await tx<{ direction: string | null }[]>`SELECT direction FROM pursuits WHERE id = ${r.pursuit_id}`;
+      if ((current?.direction ?? "").trim() !== direction) {
+        await tx`UPDATE pursuits SET direction = ${direction}, updated_at = ${now} WHERE id = ${r.pursuit_id}`;
+        await addEvent(tx, r.pursuit_id, input.by, "direction", `Direction: ${direction}`, r.id, now);
+      }
+    }
     await queueStep(tx, r.pursuit_id, following, input.by, null, now);
     if (chosen === "go_with_conditions") {
       const [last] = await tx<{ n: number | null }[]>`SELECT MAX(position) AS n FROM checklist_items WHERE pursuit_id = ${r.pursuit_id}`;
@@ -1257,5 +1268,68 @@ export async function tickChecklist(input: { itemId: number; by: string; done: b
     if (!item) return { ok: false, reason: "That item changed since the page loaded. Nothing saved; reload to see it." };
     await addEvent(tx, item.pursuit_id, input.by, "checklist", `${input.done ? "Ticked" : "Unticked"}: ${item.text}`, null, now);
     return { ok: true, notice: `${input.done ? "Ticked" : "Unticked"}: ${item.text}` };
+  });
+}
+
+/** A pursuit's own edits (PW8, PW11, PW24), each only while it is worked; the direction and the past work only until the Outline is approved. */
+async function editPursuit(
+  pursuitId: number,
+  apply: (tx: Tx, pursuit: PursuitRow, now: string) => Promise<WorkspaceResult>,
+  lockedToo = false,
+): Promise<WorkspaceResult> {
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const [pursuit] = await tx<PursuitRow[]>`SELECT * FROM pursuits WHERE id = ${pursuitId} FOR UPDATE`;
+    if (pursuit?.state !== "working") return { ok: false, reason: "This draft is no longer being worked." };
+    if (lockedToo) {
+      const [approved] = await tx`SELECT 1 FROM pursuit_steps WHERE pursuit_id = ${pursuitId} AND step = 'outline' AND state = 'approved'`;
+      if (approved) return { ok: false, reason: "The Outline is approved, so the direction and the past work are locked." };
+    }
+    return apply(tx, pursuit, isoNow());
+  });
+}
+
+/** The direction that carries forward (PW8, PW11): set at Alignment, changeable until the Outline is approved. */
+export async function setDirection(input: { pursuitId: number; by: string; direction: string }): Promise<WorkspaceResult> {
+  const direction = input.direction.trim().slice(0, 2000);
+  if (!direction) return { ok: false, reason: "Write the direction first." };
+  return editPursuit(input.pursuitId, async (tx, pursuit, now) => {
+    if ((pursuit.direction ?? "").trim() === direction) return { ok: true, notice: "The direction is unchanged." };
+    await tx`UPDATE pursuits SET direction = ${direction}, updated_at = ${now} WHERE id = ${pursuit.id}`;
+    await addEvent(tx, pursuit.id, input.by, "direction", `Direction: ${direction}`, null, now);
+    return { ok: true, notice: "Direction saved. It carries forward to the Outline and the draft." };
+  }, true);
+}
+
+/** Past work to build on (PW11, PW24): added by name or link, or removed, until the Outline is approved. */
+export async function changeBuildsOn(input: { pursuitId: number; by: string; add?: string; remove?: string }): Promise<WorkspaceResult> {
+  return editPursuit(input.pursuitId, async (tx, pursuit, now) => {
+    const items = parseJson<{ id?: string | null; name: string }[]>(pursuit.builds_on, []).filter((item) => item && item.name);
+    const add = (input.add ?? "").trim().slice(0, 300);
+    let text: string;
+    if (add) {
+      if (items.some((item) => item.name === add)) return { ok: false, reason: "That past work is listed already." };
+      items.push({ id: null, name: add });
+      text = `Added past work: ${add}`;
+    } else {
+      const at = items.findIndex((item) => item.name === input.remove);
+      if (at < 0) return { ok: false, reason: "That past work is no longer listed." };
+      text = `Removed past work: ${items[at].name}`;
+      items.splice(at, 1);
+    }
+    await tx`UPDATE pursuits SET builds_on = ${items.length ? JSON.stringify(items) : null}, updated_at = ${now} WHERE id = ${pursuit.id}`;
+    await addEvent(tx, pursuit.id, input.by, "builds_on", text, null, now);
+    return { ok: true, notice: text };
+  }, true);
+}
+
+/** Who works with the owner (PW24): only the owner changes the list. */
+export async function setCollaborators(input: { pursuitId: number; by: string; names: string[] }): Promise<WorkspaceResult> {
+  return editPursuit(input.pursuitId, async (tx, pursuit, now) => {
+    const names = [...new Set(input.names)].filter((name) => name !== pursuit.owner);
+    await tx`UPDATE pursuits SET collaborators = ${names.length ? JSON.stringify(names) : null}, updated_at = ${now} WHERE id = ${pursuit.id}`;
+    const text = names.length ? `Working with: ${names.join(", ")}` : "Working alone";
+    await addEvent(tx, pursuit.id, input.by, "collaborators", text, null, now);
+    return { ok: true, notice: text };
   });
 }

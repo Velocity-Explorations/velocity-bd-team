@@ -55,12 +55,14 @@ export default async function WorkspacePage({ params, searchParams }: { params: 
     <Shell section="proposals">
       <WorkspaceHeader call={call} pursuit={pursuit} checklist={found.checklist} label={name} tz={tz} />
       <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} />
-      <WorkspacePanels call={call} pursuit={pursuit} checklist={found.checklist} events={found.events} step={open} can={can} label={name} tz={tz} />
+      <WorkspacePanels call={call} pursuit={pursuit} checklist={found.checklist} events={found.events} step={open} can={can}
+        people={users.map((person) => ({ name: person.name, label: label(person.name) }))} label={name} tz={tz} />
       <StageStrip current={pursuit.current_step} pursuitState={pursuit.state} />
       <div className="ws-body">
         <StepList latest={latest} open={open} />
         {row ? (
-          <StepCard call={call} pursuit={pursuit} row={row} can={can} worker={worker} label={name} tz={tz} />
+          <StepCard call={call} pursuit={pursuit} row={row} steps={found.steps} checklist={found.checklist} can={can} worker={worker}
+            label={name} tz={tz} />
         ) : (
           <p className="muted">Nothing has been queued for this pursuit yet.</p>
         )}

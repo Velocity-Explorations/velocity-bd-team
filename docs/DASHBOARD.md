@@ -182,7 +182,17 @@ Drafting view, in a call's Decide cell and in its draft badge's menu all lead he
 - **What the people working with the owner do (PW24):** they add material (a note or a link, which Claude reads from the next step on) and tick checklist items; the owner can too.
 - **Show history (PW16):** every event with its time and who, newest first.
 
-Each step's own screen (Discovery's tasks, Alignment's direction, the gate's brief, the Outline's sections) follows in phase 7b.
+Each step also has its own screen (PRO-581):
+
+- **Discovery (PW6):** the eight tasks with their states (done, working, for you) and a progress line, the pages and files left for the owner to fetch, and when the result is expected.
+- **Opportunity summary (PW7):** the summary's opening paragraph with the call's agency, type, deadline and portal; the button reads Continue to Alignment.
+- **Alignment (PW8):** the verdict and how the call aligns for Velocity, as tagged points (fits, past work, depends, risk, needs, no clash) with their sources; the owner's direction from Start the draft beside Claude's proposed angle. Your call offers Keep mine, Use Claude's angle or Write a new one; approving saves the chosen direction, which carries forward.
+- **Requirements and checklist (PW9):** the volumes, page limit and format, evaluation, eligibility and keywords, the internal submit-by date, and the checklist in its six parts, tickable here as in the header's panel.
+- **Go or no-go (PW10):** the decision brief (fit rating, win themes, critical gaps with how to address each, effort and timing, the recommendation) and what each choice does; Go with conditions starts with Claude's conditions filled in.
+- **Outline (PW11):** the direction and the past work, each a last chance to change (the owner edits the direction; the owner and the people working with them add or remove past work, by name or link until Drive is set up), then the sections with the criterion each answers, their share and what they draw on, and any criterion with no section. Approving the Outline locks the direction and the past work.
+- **First draft and Compliance check:** the draft's words and what is left to fill; what the check corrected and how many warnings to check.
+
+From People, the owner changes who works with them (PW24).
 
 ## Profile settings
 

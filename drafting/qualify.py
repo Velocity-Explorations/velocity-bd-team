@@ -53,6 +53,8 @@ TASK_STATES = ("done", "for_owner")
 FITS = ("Strong fit", "Moderate fit", "Stretch fit", "Poor fit")
 RECOMMENDATIONS = ("go", "go_with_conditions", "no_go")
 WORTH_IT = ("yes", "no", "unsure")
+ALIGNMENT_TAGS = ("fits", "past work", "depends", "risk", "needs", "no clash")
+REQUIREMENT_ROWS = ("volumes", "page_limit", "evaluation", "eligibility", "keywords")
 MILESTONES = ("outline", "draft", "compliance", "reviews", "final")
 PART_TITLES = {
     "registrations": "2.1 Registrations and eligibility",
@@ -78,13 +80,20 @@ SUMMARY_SPEC = """{"key_points": ["three to six short points for the step's card
 ALIGNMENT_SPEC = """{"key_points": ["three to six short points for the step's card"],
  "verdict": "the one-line verdict on the fit",
  "angle": "the angle you propose: what to lead with, and how to close each gap",
- "comparison": "where your angle and the owner's direction agree and differ, or that the owner gave none"}"""
+ "comparison": "where your angle and the owner's direction agree and differ, or that the owner gave none",
+ "points": [{"tag": "fits, past work, depends, risk, needs or no clash",
+             "text": "one finding on how the call aligns for Velocity, in a sentence",
+             "source": "where it comes from, for example Claude and Grok, Discovery, a person's note, or the call"}]}
+Give four to eight points; together they show how the call aligns for Velocity."""
 CHECKLIST_SPEC = """{"key_points": ["three to six short points for the step's card"],
  "checklist": [{"part": "registrations, documents, inputs, formatting, reviews or submission",
                 "text": "the item, specific to this call", "source": "where the call asks for it, or null",
                 "owner": "Claude, the owner's name, or another named person", "due": "YYYY-MM-DD or null",
                 "done": "true only when it is already met"}],
  "submit_by": "YYYY-MM-DD, the internal submit-by date, at least one business day before the deadline",
+ "requirements": {"volumes": "the required volumes or documents, in a line", "page_limit": "the page limit and format, in a line",
+                  "evaluation": "the evaluation criteria, in a line", "eligibility": "who may submit, in a line",
+                  "keywords": "where the call's exact terms are listed, in a line"},
  "format": {"font": "the font the call requires, or null", "size": "its size in points, or null",
             "margins": "the margins in inches, or null", "spacing": "the line spacing as a multiple, 1 for single, or null"},
  "milestones": {"outline": "YYYY-MM-DD", "draft": "YYYY-MM-DD", "compliance": "YYYY-MM-DD", "reviews": "YYYY-MM-DD", "final": "YYYY-MM-DD"},
@@ -94,7 +103,12 @@ The parts are the six subsections of Section 2; leave out parts this call does n
 GO_NO_GO_SPEC = """{"key_points": ["three to six short points for the step's card"],
  "fit": "Strong fit, Moderate fit, Stretch fit or Poor fit",
  "recommendation": "go, go_with_conditions or no_go",
- "conditions": ["each condition, one per item, when you recommend go with conditions"]}"""
+ "conditions": ["each condition, one per item, when you recommend go with conditions"],
+ "fit_reason": "the fit rating's justification, in two or three sentences",
+ "win_themes": ["each win theme, tied to real Velocity evidence"],
+ "gaps": [{"gap": "a critical gap", "mitigation": "how to address it"}],
+ "effort": "the days remaining against the milestones, and any conflict, in a sentence or two",
+ "recommendation_text": "the recommendation and its reasoning, in a sentence or two"}"""
 
 
 # ------------------------------------------------------------------------- the skill
@@ -118,6 +132,26 @@ def _system(step: str, label: str, spec: str, instructions: str | None = None, j
 
 
 # ----------------------------------------------------------------------- the checks
+
+def _alignment_points(found: Any) -> list[dict[str, str]]:
+    """Alignment's points (PW8), kept to the known tags and the ones with text."""
+    kept = []
+    for item in found if isinstance(found, list) else []:
+        if isinstance(item, dict) and item.get("tag") in ALIGNMENT_TAGS and str(item.get("text") or "").strip():
+            kept.append({"tag": item["tag"], "text": str(item["text"]).strip(), "source": str(item.get("source") or "").strip()})
+    return kept
+
+
+def _rows(found: Any) -> dict[str, str]:
+    """Requirements' summary rows (PW9), the known ones with text."""
+    found = found if isinstance(found, dict) else {}
+    return {key: str(found[key]).strip() for key in REQUIREMENT_ROWS if str(found.get(key) or "").strip()}
+
+
+def _gaps(found: Any) -> list[dict[str, str]]:
+    return [{"gap": str(g["gap"]).strip(), "mitigation": str(g.get("mitigation") or "").strip()}
+            for g in found if isinstance(g, dict) and str(g.get("gap") or "").strip()] if isinstance(found, list) else []
+
 
 def _tasks(found: Any) -> dict[str, str]:
     """Each Discovery task's state: done or for the owner. Anything else is left for the owner, and the
@@ -188,7 +222,7 @@ def alignment(ctx: StepContext) -> StepResult:
                                "angle": str(data.get("angle") or "").strip() or None,
                                "comparison": str(data.get("comparison") or "").strip() or None,
                                "direction": (ctx.pursuit.get("direction") or "").strip() or None,
-                               "question": QUESTIONS["alignment"]})
+                               "points": _alignment_points(data.get("points")), "question": QUESTIONS["alignment"]})
 
 
 def _checklist_items(ctx: StepContext, found: Any) -> list[dict[str, Any]]:
@@ -289,7 +323,7 @@ def requirements(ctx: StepContext) -> StepResult:
     return StepResult(summary=points(data, text), files=[first, second],
                       content={"document": text.rstrip() + "\n\n" + checklist, "checklist_items": len(items),
                                "submit_by": dates.get("submit_by"), "milestones": {k: v for k, v in dates.items() if k != "submit_by"},
-                               "format": asdict(ctx.word_format),
+                               "requirements": _rows(data.get("requirements")), "format": asdict(ctx.word_format),
                                "format_source": "the call" if any(v not in (None, "") for v in found.values()) else "plain defaults",
                                "question": QUESTIONS["requirements"]})
 
@@ -307,7 +341,12 @@ def go_no_go(ctx: StepContext) -> StepResult:
     return StepResult(summary=points(data, document), files=[saved],
                       content={"document": document, "fit": choice(data.get("fit"), FITS),
                                "recommendation": choice(data.get("recommendation"), RECOMMENDATIONS),
-                               "conditions": strings(data.get("conditions")), "question": QUESTIONS["go_no_go"]})
+                               "conditions": strings(data.get("conditions")),
+                               "fit_reason": str(data.get("fit_reason") or "").strip() or None,
+                               "win_themes": strings(data.get("win_themes")), "gaps": _gaps(data.get("gaps")),
+                               "effort": str(data.get("effort") or "").strip() or None,
+                               "recommendation_text": str(data.get("recommendation_text") or "").strip() or None,
+                               "question": QUESTIONS["go_no_go"]})
 
 
 RUNNERS = {"discovery": discovery, "summary": summary, "alignment": alignment, "requirements": requirements,
