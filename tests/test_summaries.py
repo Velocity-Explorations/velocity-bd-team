@@ -45,24 +45,26 @@ def test_the_review_keeps_the_summary_and_works_without_one(ledger_db: str) -> N
     assert (found["ai_verdict"], found["ai_summary"]) == ("no", None)
 
 
-def test_the_backfill_summarizes_open_reviewed_calls_without_one(ledger_db: str, monkeypatch: pytest.MonkeyPatch,
+def test_the_backfill_summarizes_reviewed_calls_open_or_waiting_for_a_decision(ledger_db: str, monkeypatch: pytest.MonkeyPatch,
                                                                   capsys: pytest.CaptureFixture[str]) -> None:
     reviewed("open-1", due_date="2099-01-15")
     reviewed("open-2")
     reviewed("past", due_date="2020-01-15")
+    lq.set_human("past", "not_relevant", "David Wood")
+    reviewed("past-undecided", due_date="2020-01-15")   # past its deadline but still waiting for a decision
     reviewed("done", due_date="2099-01-15")
     lq.set_summary("done", "Already summarized.")
     seed("unreviewed", due_date="2099-01-15")
     seed("rejected", kept=False, due_date="2099-01-15")
-    model = FakeModel([f"SUMMARY: {SUMMARY}", f"SUMMARY: {SUMMARY}"])
+    model = FakeModel([f"SUMMARY: {SUMMARY}"] * 3)
     monkeypatch.setattr(run, "review_model", lambda: model)
     assert run.backfill_summaries(dry_run=True) == 0
-    assert "2 open calls need a summary; about $0.00 with claude-haiku-5-5" in capsys.readouterr().out
+    assert "3 calls need a summary; about $0.00 with claude-haiku-5-5" in capsys.readouterr().out
     assert lq.get_call("open-1")["ai_summary"] is None and model.prompts == []
     assert run.backfill_summaries() == 0
-    assert "Summarized 2 of 2 open calls." in capsys.readouterr().out
-    assert [lq.get_call(c)["ai_summary"] for c in ("open-1", "open-2", "past", "done", "unreviewed", "rejected")] == [
-        SUMMARY, SUMMARY, None, "Already summarized.", None, None]
+    assert "Summarized 3 of 3 calls." in capsys.readouterr().out
+    assert [lq.get_call(c)["ai_summary"] for c in ("open-1", "open-2", "past-undecided", "past", "done", "unreviewed", "rejected")] == [
+        SUMMARY, SUMMARY, SUMMARY, None, "Already summarized.", None, None]
     assert "SUMMARY:" in model.prompts[0] and "C2 software" in model.prompts[0]
     assert run.backfill_summaries() == 0   # a second pass finds nothing left
-    assert "0 open calls need a summary" in capsys.readouterr().out
+    assert "0 calls need a summary" in capsys.readouterr().out

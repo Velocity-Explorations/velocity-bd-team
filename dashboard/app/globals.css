@@ -1299,6 +1299,12 @@ td.description {
   -webkit-line-clamp: 4;
 }
 
+/* A summary is short by design (45 words at most), so it shows whole. */
+.clamp-4.whole {
+  display: block;
+  overflow: visible;
+}
+
 .desc-label {
   font: var(--type-label);
   letter-spacing: 0.12em;
