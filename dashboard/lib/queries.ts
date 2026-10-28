@@ -11,6 +11,7 @@ import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
+import type { ProfileFields } from "./profile";
 import { DESCRIPTION_READ } from "./description";
 import { STALE_MS } from "./runs";
 import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
@@ -825,4 +826,42 @@ export async function winRateByPortal(): Promise<WinRate[]> {
     ) AS rates
     ORDER BY decided DESC, portal`;
   return [...rows];
+}
+
+// ------------------------------------------------------------------------------- profiles
+
+export type ProfileRow = {
+  name: string;
+  display_name: string | null;
+  initials: string | null;
+  opens: string;
+  default_filters: string | null;
+  time_zone: string | null;
+  updated_at: string;
+};
+
+/** Every saved profile, by name (PRO-574); empty before migration 008. */
+export async function allProfiles(): Promise<Map<string, ProfileRow>> {
+  const db = sql();
+  if (!(await hasTable(db, "profiles"))) return new Map();
+  const rows = await db<ProfileRow[]>`
+    SELECT name, display_name, initials, opens, default_filters, time_zone, updated_at FROM profiles`;
+  return new Map(rows.map((r) => [r.name, r]));
+}
+
+/** Profile settings' Save: one row per person, replaced whole. */
+export async function saveProfile(name: string, f: ProfileFields): Promise<void> {
+  const now = isoNow();
+  await sql()`
+    INSERT INTO profiles (name, display_name, initials, opens, default_filters, time_zone, updated_at)
+    VALUES (${name}, ${f.display_name}, ${f.initials}, ${f.opens},
+            ${f.default_filters ? JSON.stringify(f.default_filters) : null}, ${f.time_zone}, ${now})
+    ON CONFLICT (name) DO UPDATE SET
+      display_name = EXCLUDED.display_name, initials = EXCLUDED.initials, opens = EXCLUDED.opens,
+      default_filters = EXCLUDED.default_filters, time_zone = EXCLUDED.time_zone, updated_at = EXCLUDED.updated_at`;
+}
+
+/** Profile settings' Reset to defaults: the person's row goes, so every default applies. */
+export async function deleteProfile(name: string): Promise<void> {
+  await sql()`DELETE FROM profiles WHERE name = ${name}`;
 }

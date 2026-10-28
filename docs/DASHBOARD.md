@@ -119,6 +119,24 @@ kept in a cookie for that browser, and Reset to defaults clears it. By default T
 filter's match strength, is hidden (PRO-555). `tests/test_dashboard_settings.py` checks the dialog
 against a running dashboard, the same way.
 
+## Profile settings
+
+`/profile` (PRO-574), from Profile settings in the account menu, keeps each person's settings in
+the ledger's `profiles` table, one row per name in DASHBOARD_USERS, so they follow the person to any
+device (U6). Each person edits their own row; until Google sign-in that is whoever chose the name.
+- **Display name and initials** show on votes, notes, decisions and the account menu. Decisions are
+  still recorded under the name in DASHBOARD_USERS.
+- **Where the dashboard opens:** Home, or Calls. Opening `/` from outside the dashboard (a bookmark,
+  a typed address, a Slack link) takes a person who chose Calls to Needs review. Home stays one
+  click away (U3).
+- **Default filters for Calls:** portals, tag, and open or closed. The Calls link in the top bar
+  carries them, and Needs review or All calls opened from outside the dashboard with no portal, tag
+  or open or closed in its address gets them. A shared link's own filters win, and Clear filters
+  shows everything (U4).
+- **Time zone:** every time shows in it, in place of the dashboard's America/Denver. Deadlines a
+  portal wrote as text stay as written (U5).
+- **Reset to defaults** removes the row, so every default applies again.
+
 ## The write actions
 
 `dashboard/app/actions.ts` has two writes.

@@ -6,7 +6,7 @@ import { Badge, Flash } from "@/components/bits";
 import { formatTime } from "@/lib/format";
 import { decidedRequests, waitingRequests, type RequestRow } from "@/lib/queries";
 import { APPLY_WHEN, kindLabel, nextStep, previewText } from "@/lib/requests";
-import { displayTimeZone } from "@/lib/settings";
+import { timeZone } from "@/lib/me";
 import { firstParam } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +52,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Sea
   const sp = await searchParams;
   const view = firstParam(sp.view, 20) === "decided" ? "decided" : "requests";
   const [waiting, decided] = await Promise.all([waitingRequests(), view === "decided" ? decidedRequests(50) : Promise.resolve([])]);
-  const tz = displayTimeZone();
+  const tz = await timeZone();
 
   return (
     <Shell section="automation">

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Shell } from "@/components/Shell";
 import { TopTenTable } from "@/components/TopTenTable";
 import { ViewCards } from "@/components/ViewCards";
@@ -18,7 +19,8 @@ import {
   topTenIds,
   waitingRequests,
 } from "@/lib/queries";
-import { displayTimeZone, queueMode } from "@/lib/settings";
+import { labeler, openingRedirect, timeZone } from "@/lib/me";
+import { queueMode } from "@/lib/settings";
 import { firstParam } from "@/lib/text";
 import { DUE_SOON_DAYS, type ViewCard } from "@/lib/views";
 import { allowlist, currentViewer } from "@/lib/viewer";
@@ -42,10 +44,13 @@ function topSource(week: string | null): string {
  */
 export default async function HomePage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
+  const opening = await openingRedirect();
+  if (opening) redirect(opening);
   const users = allowlist();
   const viewer = await currentViewer();
   const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
-  const tz = displayTimeZone();
+  const tz = await timeZone();
+  const label = await labeler();
   const [queue, requests, toDraft, submitted, top, latest, lastRun, agreement] = await Promise.all([
     queueCounts({ portals: [], state: "", tag: "" }, waitingFor),
     waitingRequests(),
@@ -101,7 +106,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
           <h2 id="top-ten-title">Top 10</h2>
           <p className="muted">{topSource(top.week)}</p>
         </div>
-        <TopTenTable ids={top.ids} description tz={tz} nameOf={(by) => displayPerson(by, users)} />
+        <TopTenTable ids={top.ids} description tz={tz} nameOf={(by) => label(displayPerson(by, users))} />
       </section>
 
       <p className="status-line">

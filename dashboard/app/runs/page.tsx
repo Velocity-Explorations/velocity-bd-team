@@ -9,7 +9,7 @@ import { filterHref, pickMany } from "@/lib/filters";
 import { formatAgo, formatDuration, formatTime, parseStageCounts } from "@/lib/format";
 import { listRuns, runPortals } from "@/lib/queries";
 import { isProblem, isStale, pickRunsSort, runHeadline } from "@/lib/runs";
-import { displayTimeZone } from "@/lib/settings";
+import { timeZone } from "@/lib/me";
 import { firstParam } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export default async function ScansPage({ searchParams }: { searchParams: Search
   const portals = pickMany(sp.portal, known);
   const dir = pickRunsSort(sp.dir);
   const runs = await listRuns(100, { portals, problems: view === "problems", dir });
-  const tz = displayTimeZone();
+  const tz = await timeZone();
   const now = new Date();
   const latest = runs[0];
   const params = { view: view === "problems" ? "problems" : "", portal: portals, dir: dir === "asc" ? "asc" : "" };

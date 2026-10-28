@@ -5,7 +5,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
 import { aliasesFor } from "@/lib/people";
-import { decideCall, decideRequest, type DecideRequestResult, type DecideResult } from "@/lib/queries";
+import { profileFromForm } from "@/lib/profile";
+import { decideCall, decideRequest, deleteProfile, portals, saveProfile, tagOptions, type DecideRequestResult, type DecideResult } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
 import { decidedNotice, fromQueue, safeReturnTo } from "@/lib/text";
 import { isDecision, STATUS_LABELS } from "@/lib/values";
@@ -134,4 +135,25 @@ export async function hideColumnAction(formData: FormData): Promise<void> {
 export async function resetColumns(): Promise<void> {
   (await cookies()).delete(COLUMNS_COOKIE);
   revalidatePath("/", "layout");
+}
+
+/** Profile settings' Save (PRO-574): the viewer's own row, checked against the portals and tags that exist. */
+export async function saveProfileAction(formData: FormData): Promise<void> {
+  const viewer = await currentViewer();
+  if (!viewer) backTo("/profile", "error", "Log in (top right) before saving your profile.");
+  const [portalList, tagList] = await Promise.all([portals(), tagOptions()]);
+  const form = new Map<string, string[]>();
+  for (const key of new Set(formData.keys())) form.set(key, formData.getAll(key).map(String));
+  await saveProfile(viewer, profileFromForm(form, viewer, { portals: portalList.map((p) => p.name), tags: tagList.map((t) => t.name) }));
+  revalidatePath("/", "layout");
+  backTo("/profile", "notice", "Saved your profile.");
+}
+
+/** Profile settings' Reset to defaults: the viewer's row goes, so every default applies again. */
+export async function resetProfileAction(): Promise<void> {
+  const viewer = await currentViewer();
+  if (!viewer) backTo("/profile", "error", "Log in (top right) before changing your profile.");
+  await deleteProfile(viewer);
+  revalidatePath("/", "layout");
+  backTo("/profile", "notice", "Your profile is back to the defaults.");
 }

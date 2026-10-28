@@ -2074,6 +2074,219 @@ a.content-card__label:hover {
   margin: 0;
 }
 
+/* ------------------------------------------------------------------ Profile settings */
+
+.lead-text {
+  margin: 0 0 16px;
+  font: var(--type-small);
+}
+
+/* One row per setting: the label and help in a 300px column, the field up to 560px wide. */
+.setting-row {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 560px);
+  gap: 12px 32px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.setting-name {
+  margin: 0 0 4px;
+  font: var(--type-row-title);
+}
+
+.setting-help {
+  margin: 0;
+  font: var(--type-small);
+  color: var(--ink-3);
+}
+
+.setting-field .hint {
+  margin: 6px 0 10px;
+  font: 12px/1.4 var(--font-body);
+  color: var(--ink-3);
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field-label {
+  margin: 0 0 4px;
+  padding: 0;
+  font: var(--type-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.profile-form input[type="text"],
+.profile-form select {
+  height: var(--field-height);
+}
+
+.profile-form select[name="time_zone"] {
+  width: 100%;
+  max-width: 360px;
+}
+
+.name-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 36px;
+  align-items: end;
+  gap: 10px;
+}
+
+.name-fields input {
+  width: 100%;
+  min-width: 0;
+}
+
+.setting-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-card);
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+/* Radio cards: a bordered option with a ring; the chosen one gets a 2px ink border and the raised surface. */
+.radio-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.radio-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  transition: border-color var(--transition), background-color var(--transition);
+}
+
+.radio-card:hover {
+  border-color: var(--line-hover);
+}
+
+.radio-card:has(input:checked) {
+  background: var(--surface-raised);
+  border: 2px solid var(--ink);
+  padding: 9px 11px;
+}
+
+.radio-card input {
+  margin: 3px 0 0;
+  accent-color: var(--ink);
+}
+
+.radio-card strong {
+  display: block;
+  font: var(--type-row-title);
+}
+
+.radio-card span span {
+  display: block;
+  font: var(--type-small);
+  color: var(--ink-3);
+}
+
+.chip-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  font: var(--type-small);
+  cursor: pointer;
+}
+
+.chip-check:has(input:checked) {
+  border-color: var(--ink-2);
+  background: var(--surface-raised);
+}
+
+.filter-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 16px;
+}
+
+/* All, Open, Closed as radios in the segmented switch. */
+.segmented-radio label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  color: var(--ink-2);
+  font: var(--type-small);
+  cursor: pointer;
+}
+
+.segmented-radio label + label {
+  border-left: 1px solid var(--line);
+}
+
+.segmented-radio input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.segmented-radio label:has(input:checked) {
+  background: var(--line);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.segmented-radio label:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.profile-actions {
+  max-width: 892px;
+  margin-top: 8px;
+}
+
+.menu-body a.menu-link {
+  gap: 8px;
+}
+
+.menu-body a.menu-link::before {
+  content: none;
+}
+
+.menu-body a.menu-link svg,
+.menu-body button.menu-item svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
+}
+
+@media (max-width: 1100px) {
+  .setting-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* ---------------------------------------------------------------- requests */
 
 .request .request-summary {

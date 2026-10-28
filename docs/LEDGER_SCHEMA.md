@@ -499,7 +499,7 @@ devices. Added by `008_pursuits.sql`.
 | display_name | TEXT | the name shown on votes, notes and the account menu; NULL shows `name` | same |
 | initials | TEXT | the letters on the avatar; NULL takes them from the name | same |
 | opens | TEXT, not null, default `home` | where the dashboard opens: `home` or `calls` (U3) | same |
-| default_filters | TEXT JSON | the filters Calls applies when its address has none (U4), under the names its address uses | same |
+| default_filters | TEXT JSON | the filters Calls opens with (U4): `{"portals": [...], "tag": "", "state": ""}`, state `open`, `closed` or empty; NULL for none | same |
 | time_zone | TEXT | an IANA time zone such as `America/New_York` (U5); NULL keeps the dashboard's `America/Denver` | same |
 | updated_at | TEXT timestamp, not null | | same |
 

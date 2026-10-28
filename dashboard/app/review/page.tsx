@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { CallCell, DescriptionCell, DueCell, VotesCell } from "@/components/CallCells";
 import { DecideCell } from "@/components/DecideCell";
 import { FilterBar } from "@/components/FilterBar";
@@ -31,7 +32,8 @@ import {
   topTenIds,
 } from "@/lib/queries";
 import { votesByCall } from "@/lib/scoreboard";
-import { displayTimeZone, hiddenColumns, queueMode } from "@/lib/settings";
+import { defaultsRedirect, labeler, timeZone } from "@/lib/me";
+import { hiddenColumns, queueMode } from "@/lib/settings";
 import { tagsByCall } from "@/lib/tags";
 import { firstParam, parseNoteLine, votedHref } from "@/lib/text";
 import { pickAllowed } from "@/lib/values";
@@ -78,6 +80,8 @@ function emptyTitle(view: CallView, filtered: boolean, perPerson: boolean): stri
  */
 export default async function NeedsReviewPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
+  const withDefaults = await defaultsRedirect("/review", sp);
+  if (withDefaults) redirect(withDefaults);
   const voted = firstParam(sp.voted, 300);   // the call just voted on, for the notice's link
   const view = pickCallView(sp.view);
   const viewSort = VIEW_SORTS[view];
@@ -130,9 +134,10 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
   const ids = rows.map((r) => r.id);
   const [judged, decisions, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids)]);
   const tagsFor = tagsByCall(tagRows);
-  const votes = votesByCall(decisions, (by) => displayPerson(by, users));
-  const nameOf = (by: string | null) => displayPerson(by, users);
-  const tz = displayTimeZone();
+  const votes = votesByCall(decisions, (by) => displayPerson(by, users));   // by the name decisions are recorded under
+  const label = await labeler();
+  const nameOf = (by: string | null) => label(displayPerson(by, users));
+  const tz = await timeZone();
   const show = shows(await hiddenColumns(), "queue");   // the columns chosen in Table settings
   const returnTo = filterHref("/review", params);
   const filtered = Object.values({ ...barParams, ...columnParams }).some((value) => value.length > 0);
@@ -285,7 +290,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
                         <VotesCell
                           callId={r.id}
                           verdicts={verdicts}
-                          votes={listVotes ? callVotes : null}
+                          votes={listVotes ? callVotes.map((v) => ({ ...v, person: label(v.person) })) : null}
                           notesBy={new Set(notes.map((n) => nameOf(n.by)).filter(Boolean))}
                         />
                       ) : null}
