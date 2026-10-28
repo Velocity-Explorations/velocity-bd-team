@@ -77,6 +77,28 @@ export function sortParams(sort: Sort, fallback: Sort = DEFAULT_SORT): { sort: s
   return { sort: sort.key, dir: sort.dir === NATURAL[sort.key] ? "" : sort.dir };
 }
 
+/** Each column's two sorts in words, its natural direction first. */
+const SORT_WORDS: Record<SortKey, Record<SortDir, string>> = {
+  title: { asc: "A to Z", desc: "Z to A" },
+  due: { asc: "closing soonest first", desc: "closing latest first" },
+  seen: { desc: "newest first", asc: "oldest first" },
+  verdict: { asc: "yes first", desc: "no first" },
+  tier: { asc: "tight first", desc: "broad first" },
+  decision: { asc: "pursue first", desc: "dismissed first" },
+  filter: { asc: "kept first", desc: "rejected first" },
+};
+
+/** A header menu's sort items (PRO-572): the column's natural direction first, the one in force marked. */
+export function sortChoices(base: string, params: Params, current: Sort, key: SortKey, fallback: Sort = DEFAULT_SORT): MenuItem[] {
+  const first = NATURAL[key];
+  const dirs: SortDir[] = first === "asc" ? ["asc", "desc"] : ["desc", "asc"];
+  return dirs.map((dir) => ({
+    label: `Sort ${SORT_WORDS[key][dir]}`,
+    href: filterHref(base, { ...params, ...sortParams({ key, dir }, fallback) }),
+    active: current.key === key && current.dir === dir,
+  }));
+}
+
 /** A header's sort link: this view, sorted by the column (or reversed when it already is). `dir` is
  *  the column's direction now when it is the sort, else the one a click starts with. */
 export function sortLink(base: string, params: Params, current: Sort, key: SortKey,

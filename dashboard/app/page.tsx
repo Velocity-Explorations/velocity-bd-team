@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { PortalLogo } from "@/components/PortalLogo";
 import { Shell } from "@/components/Shell";
@@ -126,6 +127,9 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
                   <th>Decision now</th>
                   <th className="wide">Description</th>
                   <th className="wide">Claude&apos;s reason</th>
+                  <th className="row-arrow">
+                    <span className="sr-only">Open</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -134,7 +138,13 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
                   const verdicts = verdictsFor(judged.get(id), call.ai_verdict, call.ai_reasoning);
                   const description = (call.description ?? "").trim();
                   return (
-                    <tr key={id}>
+                    <tr
+                      key={id}
+                      className="row-link"
+                      data-href={`/review?view=top10&focus=${encodeURIComponent(id)}`}
+                      tabIndex={0}
+                      aria-label={`${call.title || call.id}: open it in Calls, Top 10`}
+                    >
                       <td className="rank num">{i + 1}</td>
                       <td className="call">
                         <div className="call-with-logo">
@@ -176,6 +186,9 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
                       </td>
                       <td className="wide reason">
                         <p className="clamp">{call.ai_reasoning ?? ""}</p>
+                      </td>
+                      <td className="row-arrow" aria-hidden="true">
+                        <ArrowRight />
                       </td>
                     </tr>
                   );

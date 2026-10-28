@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { descriptionCell, splitDetails } from "./description.ts";
+import { descriptionCell, detailSources, splitDetails } from "./description.ts";
 
 const LONG = "A".repeat(250) + " " + "B".repeat(100);
 
@@ -38,4 +38,19 @@ test("the details line keeps plain facts; badges go to their own line", () => {
   ]);
   assert.deepEqual(facts.map((d) => d.text), ["Solicitation", "Kelli Brooks"]);
   assert.deepEqual(badges.map((d) => d.text), ["members only", "Space Force"]);
+});
+
+test("the reasons panel lists where each detail comes from, and the deadline's source (PRO-572)", () => {
+  assert.deepEqual(
+    detailSources(
+      [{ text: "DEPT OF THE ARMY", title: "DEPT OF DEFENSE, DEPT OF THE ARMY" }, { text: "Solicitation" }, { text: "members only", tone: "warn", title: "Sign in to read" }],
+      "From the page: Proposals are due 1 Dec.",
+    ),
+    [
+      { text: "DEPT OF THE ARMY", source: "DEPT OF DEFENSE, DEPT OF THE ARMY" },
+      { text: "members only", source: "Sign in to read" },
+      { text: "Deadline", source: "From the page: Proposals are due 1 Dec." },
+    ],
+  );
+  assert.deepEqual(detailSources([{ text: "x" }], null), []);
 });

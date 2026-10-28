@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { COLUMNS_COOKIE, hiddenFromForm } from "@/lib/columns";
+import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
 import { aliasesFor } from "@/lib/people";
 import { decideCall, decideRequest, type DecideRequestResult, type DecideResult } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
@@ -116,6 +116,17 @@ export async function clearViewer(): Promise<void> {
 export async function saveColumns(formData: FormData): Promise<void> {
   const hidden = hiddenFromForm(new Set(formData.keys()));
   (await cookies()).set(COLUMNS_COOKIE, JSON.stringify(hidden), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+  revalidatePath("/", "layout");
+}
+
+/** A header menu's Hide column (PRO-572): one more column hidden on that table, for this browser. */
+export async function hideColumnAction(formData: FormData): Promise<void> {
+  const page = String(formData.get("page") ?? "");
+  const key = String(formData.get("key") ?? "");
+  if (!(page in COLUMNS)) return;
+  const store = await cookies();
+  const hidden = hideColumn(readHidden(store.get(COLUMNS_COOKIE)?.value), page as TablePage, key);
+  store.set(COLUMNS_COOKIE, JSON.stringify(hidden), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
   revalidatePath("/", "layout");
 }
 

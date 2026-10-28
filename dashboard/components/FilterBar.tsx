@@ -1,5 +1,5 @@
 import { ChevronDown, Settings2 } from "lucide-react";
-import { MenuLinks, type MenuGroup } from "@/components/HeaderCell";
+import { Kept, MenuLinks, type MenuGroup } from "@/components/HeaderCell";
 import { choiceLinks, filterHref, type CallState, type Params, type PortalOption } from "@/lib/filters";
 import { optionGroups, type TagOption } from "@/lib/tags";
 
@@ -8,20 +8,6 @@ const STATES: { value: CallState; label: string }[] = [
   { value: "open", label: "Open" },
   { value: "closed", label: "Closed" },
 ];
-
-/** The view's other params as hidden fields, so a form in the bar changes only its own. */
-function Kept({ params, except }: { params: Params; except: string }) {
-  return (
-    <>
-      {Object.entries(params)
-        .filter(([key]) => key !== except)
-        .flatMap(([key, value]) => (typeof value === "string" ? [value] : value).filter(Boolean).map((item) => [key, item]))
-        .map(([key, item]) => (
-          <input key={`${key}=${item}`} type="hidden" name={key} value={item} />
-        ))}
-    </>
-  );
-}
 
 /**
  * The filters that span the whole table, in a row above it (PRO-558): title search on All calls,
@@ -55,7 +41,7 @@ export function FilterBar(props: {
       {props.search !== undefined ? (
         <form action={props.action}>
           <Kept params={props.params} except="q" />
-          <input type="search" name="q" defaultValue={props.search} placeholder="Title contains" aria-label="Title contains" />
+          <input type="search" name="q" defaultValue={props.search} placeholder="Search titles, Enter to apply" aria-label="Search titles" />
         </form>
       ) : null}
       <details className="menu" data-apply-on-close="">

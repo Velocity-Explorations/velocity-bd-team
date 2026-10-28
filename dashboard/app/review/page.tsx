@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
-import { decide } from "@/app/actions";
 import { CallCell, DescriptionCell, DueCell, VotesCell } from "@/components/CallCells";
+import { DecideCell } from "@/components/DecideCell";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
+import { NotesPanel, ReasonsPanel } from "@/components/RowPanels";
 import { Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
 import { Flash } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
 import { shows } from "@/lib/columns";
-import { choiceLinks, filterHref, JUDGE_CHOICES, pickMany, pickSort, pickState, sortLink, sortParams, type Params, type Sort } from "@/lib/filters";
+import { yourVote } from "@/lib/decide";
+import { callDetails, deadlineNote } from "@/lib/details";
+import { detailSources } from "@/lib/description";
+import { choiceLinks, filterHref, JUDGE_CHOICES, pickMany, pickSort, pickState, sortChoices, sortLink, sortParams, type Params, type Sort } from "@/lib/filters";
 import { formatTime } from "@/lib/format";
 import { dayMonth } from "@/lib/home";
 import { pickJudgeFilter, verdictsFor, type JudgeFilter } from "@/lib/judges";
@@ -29,8 +33,8 @@ import {
 import { votesByCall } from "@/lib/scoreboard";
 import { displayTimeZone, hiddenColumns, queueMode } from "@/lib/settings";
 import { tagsByCall } from "@/lib/tags";
-import { firstParam, votedHref } from "@/lib/text";
-import { DECISIONS, isDecision, pickAllowed } from "@/lib/values";
+import { firstParam, parseNoteLine, votedHref } from "@/lib/text";
+import { pickAllowed } from "@/lib/values";
 import { callViewCards, DUE_SOON_DAYS, NEW_DAYS, pickCallView, pressedCard, viewJudges, VIEW_LABELS, type CallView } from "@/lib/views";
 import { allowlist, currentViewer } from "@/lib/viewer";
 
@@ -68,14 +72,16 @@ function emptyTitle(view: CallView, filtered: boolean, perPerson: boolean): stri
 }
 
 /**
- * Needs review and its views (PRO-570, PRO-571): the calls waiting for the viewer, narrowed to Due
- * soon, Judges agree or disagree, or New this week; and Top 10, this week's ten, decided or not.
+ * Needs review and its views (PRO-570, PRO-571, PRO-572): the calls waiting for the viewer, narrowed
+ * to Due soon, Judges agree or disagree, or New this week; and Top 10, this week's ten, decided or
+ * not. Opened from Home's Top 10, the chosen call is marked and focused with its reasons open.
  */
 export default async function NeedsReviewPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const voted = firstParam(sp.voted, 300);   // the call just voted on, for the notice's link
   const view = pickCallView(sp.view);
   const viewSort = VIEW_SORTS[view];
+  const focusId = view === "top10" ? firstParam(sp.focus, 300) : "";
   const [portalList, tagChoices, top] = await Promise.all([portals(), tagOptions(), topTenIds()]);
   const asked = pickJudgeFilter(sp.judges);
   const filters = {
@@ -88,12 +94,18 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
     verdict: pickAllowed(sp.verdict, ["yes", "maybe"] as const),
     tier: pickAllowed(sp.tier, ["tight", "broad"] as const),
     tag: pickAllowed(sp.tag, tagChoices.map((t) => t.name)),
+    q: firstParam(sp.q, 120),
+    desc: firstParam(sp.desc, 120),
+    why: firstParam(sp.why, 120),
   };
   // The view as link params: every bar control, header and decision keeps the rest of it.
   const columnParams: Params = {
     judges: view === "judges-agree" || view === "judges-disagree" ? "" : filters.judges,
     verdict: filters.verdict,
     tier: filters.tier,
+    q: filters.q,
+    desc: filters.desc,
+    why: filters.why,
     ...sortParams(filters.sort, viewSort),
   };
   const barParams: Params = { portal: filters.portals, state: filters.state, tag: filters.tag };
@@ -116,9 +128,10 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
     ? [...queue.rows].sort((a, b) => top.ids.indexOf(a.id) - top.ids.indexOf(b.id))
     : queue.rows;
   const ids = rows.map((r) => r.id);
-  const [judged, decisions, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(perPerson ? ids : []), tagsOn(ids)]);
+  const [judged, decisions, tagRows] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids)]);
   const tagsFor = tagsByCall(tagRows);
   const votes = votesByCall(decisions, (by) => displayPerson(by, users));
+  const nameOf = (by: string | null) => displayPerson(by, users);
   const tz = displayTimeZone();
   const show = shows(await hiddenColumns(), "queue");   // the columns chosen in Table settings
   const returnTo = filterHref("/review", params);
@@ -126,7 +139,11 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
   const order = sp.sort !== undefined ? "" : view === "due-soon" ? ", closing soonest first" : view === "top10" ? ", in the brief's order" : ", newest first";
   const viewHome = view === "needs-review" ? "/review" : `/review?view=${view}`;
   const now = Date.now();
-  const pressed = pressedCard(view, { judges: columnParams.judges as string, verdict: filters.verdict, tier: filters.tier });
+  const keywords = Boolean(filters.q || filters.desc || filters.why);
+  const pressed = keywords ? null : pressedCard(view, { judges: columnParams.judges as string, verdict: filters.verdict, tier: filters.tier });
+  const listVotes = perPerson || view === "top10";
+  const colSpan = 2 + ["votes", "description", "reason", "due", "seen"].filter((key) => show(key)).length;
+  const search = (name: "q" | "desc" | "why", placeholder: string) => ({ action: "/review", name, value: filters[name], params, placeholder });
 
   return (
     <Shell section="calls">
@@ -185,12 +202,21 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
             <table className="calls-table">
               <thead>
                 <tr>
-                  <HeaderCell label="Call" sort={sortLink("/review", params, filters.sort, "title", viewSort)} />
+                  <HeaderCell
+                    label="Call"
+                    sort={sortLink("/review", params, filters.sort, "title", viewSort)}
+                    menu={{
+                      sorts: sortChoices("/review", params, filters.sort, "title", viewSort),
+                      search: search("q", "Search titles, Enter to apply"),
+                      active: Boolean(filters.q),
+                    }}
+                  />
                   {show("votes") ? (
                     <HeaderCell
                       label="Votes"
                       sort={sortLink("/review", params, filters.sort, "verdict", viewSort)}
                       menu={{
+                        sorts: sortChoices("/review", params, filters.sort, "verdict", viewSort),
                         active: Boolean(filters.verdict || columnParams.judges),
                         groups: [
                           { title: "Claude's verdict", items: choiceLinks("/review", params, "verdict", VERDICT_CHOICES, filters.verdict) },
@@ -198,54 +224,98 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
                             ? []
                             : [{ title: "Judges", items: choiceLinks("/review", params, "judges", JUDGE_CHOICES, filters.judges) }]),
                         ],
+                        hide: { page: "queue", key: "votes" },
                       }}
                     />
                   ) : null}
-                  {show("description") ? <HeaderCell label="Description" className="wide" /> : null}
-                  {show("reason") ? <HeaderCell label="AI reason" className="wide" /> : null}
-                  {show("due") ? <HeaderCell label="Due" sort={sortLink("/review", params, filters.sort, "due", viewSort)} /> : null}
-                  {show("seen") ? <HeaderCell label="First seen" sort={sortLink("/review", params, filters.sort, "seen", viewSort)} /> : null}
+                  {show("description") ? (
+                    <HeaderCell
+                      label="Description"
+                      className="wide"
+                      menu={{ search: search("desc", "Search descriptions, Enter to apply"), active: Boolean(filters.desc), hide: { page: "queue", key: "description" } }}
+                    />
+                  ) : null}
+                  {show("reason") ? (
+                    <HeaderCell
+                      label="AI reason"
+                      className="wide"
+                      menu={{ search: search("why", "Search reasons, Enter to apply"), active: Boolean(filters.why), hide: { page: "queue", key: "reason" } }}
+                    />
+                  ) : null}
+                  {show("due") ? (
+                    <HeaderCell
+                      label="Due"
+                      sort={sortLink("/review", params, filters.sort, "due", viewSort)}
+                      menu={{ sorts: sortChoices("/review", params, filters.sort, "due", viewSort), hide: { page: "queue", key: "due" } }}
+                    />
+                  ) : null}
+                  {show("seen") ? (
+                    <HeaderCell
+                      label="First seen"
+                      sort={sortLink("/review", params, filters.sort, "seen", viewSort)}
+                      menu={{ sorts: sortChoices("/review", params, filters.sort, "seen", viewSort), hide: { page: "queue", key: "seen" } }}
+                    />
+                  ) : null}
                   <HeaderCell label="Decide" className="decide" />
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => {
-                  const label = r.title || r.id;
-                  return (
-                    <tr key={r.id} data-call-id={r.id}>
+                  const callVotes = votes.get(r.id) ?? [];
+                  const notes = (r.human_notes ?? "").split("\n").filter(Boolean).map(parseNoteLine);
+                  const verdicts = verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning);
+                  const focused = r.id === focusId;
+                  const rank = top.ids.indexOf(r.id);
+                  return [
+                    <tr
+                      key={r.id}
+                      data-call-id={r.id}
+                      className={focused ? "focused panel-open" : undefined}
+                      data-focus={focused ? "" : undefined}
+                      tabIndex={focused ? -1 : undefined}
+                    >
                       <CallCell
                         row={r}
                         tags={show("tags") ? (tagsFor.get(r.id) ?? []) : []}
                         details={show("details")}
                         reason={show("reason") ? r.ai_reasoning : null}
+                        topRank={rank >= 0 ? rank + 1 : undefined}
                       />
                       {show("votes") ? (
-                        <VotesCell verdicts={verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning)} votes={perPerson ? (votes.get(r.id) ?? []) : null} />
+                        <VotesCell
+                          callId={r.id}
+                          verdicts={verdicts}
+                          votes={listVotes ? callVotes : null}
+                          notesBy={new Set(notes.map((n) => nameOf(n.by)).filter(Boolean))}
+                        />
                       ) : null}
                       {show("description") ? <DescriptionCell portal={r.portal} description={r.description} extra={r.extra} /> : null}
                       {show("reason") ? <td className="reason wide">{r.ai_reasoning ?? ""}</td> : null}
                       {show("due") ? <DueCell due={r.due_date} daysLeft={r.days_left} extra={r.extra} tz={tz} /> : null}
                       {show("seen") ? <td className="when">{formatTime(r.first_seen_at, tz)}</td> : null}
-                      <td className="decide">
-                        <form action={decide}>
-                          <input type="hidden" name="id" value={r.id} />
-                          <input type="hidden" name="expected" value={isDecision(r.human_status) ? r.human_status : ""} />
-                          {perPerson || r.human_status ? <input type="hidden" name="keep" value="1" /> : null}
-                          <input type="hidden" name="return_to" value={returnTo} />
-                          {show("note") ? (
-                            <input type="text" name="note" maxLength={2000} placeholder="Note (optional)" aria-label={`Note on ${label}`} />
-                          ) : null}
-                          <div className="buttons">
-                            {DECISIONS.map((d) => (
-                              <button key={d.value} type="submit" name="status" value={d.value} className={`btn-${d.value}`} title={`${d.label}: ${label}`}>
-                                {d.label}
-                              </button>
-                            ))}
-                          </div>
-                        </form>
-                      </td>
-                    </tr>
-                  );
+                      <DecideCell
+                        call={r}
+                        mode={view === "top10" ? "mixed" : "waiting"}
+                        viewer={viewer}
+                        yours={yourVote(callVotes, viewer)}
+                        eligible
+                        decidedBy=""
+                        returnTo={returnTo}
+                        keep={perPerson || Boolean(r.human_status)}
+                        note={show("note")}
+                        tz={tz}
+                      />
+                    </tr>,
+                    <ReasonsPanel
+                      key={`reasons-${r.id}`}
+                      callId={r.id}
+                      colSpan={colSpan}
+                      verdicts={verdicts}
+                      sources={detailSources(callDetails(r), deadlineNote(r.extra))}
+                      open={focused}
+                    />,
+                    notes.length ? <NotesPanel key={`notes-${r.id}`} callId={r.id} colSpan={colSpan} notes={notes} nameOf={nameOf} tz={tz} /> : null,
+                  ];
                 })}
               </tbody>
             </table>

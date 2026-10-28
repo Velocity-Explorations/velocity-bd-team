@@ -34,6 +34,7 @@ export type QueueRow = {
   first_seen_at: string;
   extra: string | null;
   human_status: string | null;
+  human_notes: string | null;
 };
 
 /** The filter panel's choices (lib/filters.ts). No portals ticked means every portal; no tag, any tag. */
@@ -131,6 +132,16 @@ function barOnly(f: BarFilters): PanelFilters {
   return { portals: f.portals, state: f.state, tag: f.tag, judges: "", sort: { key: "seen", dir: "desc" } };
 }
 
+/** The header menus' keyword searches (PRO-572): words in the title, the description or Claude's reason. */
+export type Keywords = { q?: string; desc?: string; why?: string };
+
+function keywordWhere(db: Db, f: Keywords) {
+  return db`
+    ${f.q ? db`AND title ILIKE ${`%${escapeLike(f.q)}%`}` : db``}
+    ${f.desc ? db`AND description ILIKE ${`%${escapeLike(f.desc)}%`}` : db``}
+    ${f.why ? db`AND ai_reasoning ILIKE ${`%${escapeLike(f.why)}%`}` : db``}`;
+}
+
 /**
  * The triage backlog, newest first unless sorted otherwise. With `waitingFor` (the names one
  * person's decisions are recorded under, while everyone decides every call): the calls that
@@ -141,7 +152,7 @@ function barOnly(f: BarFilters): PanelFilters {
  * not, in the database's order: the page puts them in the brief's.
  */
 export async function reviewQueue(
-  f: PanelFilters & { verdict: string; tier: string; view?: CallView; ids?: string[] },
+  f: PanelFilters & Keywords & { verdict: string; tier: string; view?: CallView; ids?: string[] },
   waitingFor: string[] | null,
 ): Promise<{ rows: QueueRow[]; perPerson: boolean }> {
   const db = sql();
@@ -150,13 +161,14 @@ export async function reviewQueue(
   const rows = await db<QueueRow[]>`
     SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, due_date,
            (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
-           match_tier, first_seen_at, extra, human_status
+           match_tier, first_seen_at, extra, human_status, human_notes
     FROM calls
     WHERE ${f.view === "top10" ? db`id IN ${db(f.ids ?? [])}` : waitingWhere(db, perPerson, waitingFor)}
       ${f.view === "due-soon" ? db`AND ${dueSoon(db)}` : db``}
       ${f.view === "new" ? db`AND first_seen_at >= ${newSince()}` : db``}
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
       ${f.tier ? db`AND match_tier = ${f.tier}` : db``}
+      ${keywordWhere(db, f)}
       ${panelWhere(db, f)}
     ${panelOrder(db, f)}
     LIMIT 500`;
@@ -350,7 +362,7 @@ export async function judgeAgreement(): Promise<{ both: number; agree: number } 
   }
 }
 
-export type CallFilters = PanelFilters & { filterResult: string; verdict: string; status: string; q: string };
+export type CallFilters = PanelFilters & Keywords & { filterResult: string; verdict: string; status: string };
 
 export type CallRow = {
   id: string;
@@ -384,7 +396,7 @@ export async function listCalls(f: CallFilters, limit = 200): Promise<{ rows: Ca
       ${f.filterResult ? db`AND filter_result = ${f.filterResult}` : db``}
       ${f.verdict === "none" ? db`AND ai_verdict IS NULL` : f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
       ${f.status === "none" ? db`AND human_status IS NULL` : f.status ? db`AND human_status = ${f.status}` : db``}
-      ${f.q ? db`AND title ILIKE ${`%${escapeLike(f.q)}%`}` : db``}
+      ${keywordWhere(db, f)}
       ${panelWhere(db, f)}`;
   const [count, rows] = await Promise.all([
     db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${where()}`,

@@ -32,16 +32,14 @@ export const COLUMNS: Record<TablePage, Column[]> = {
     { key: "votes", label: "Votes" },
     { key: "description", label: "Description" },
     { key: "reason", label: "AI reason" },
-    { key: "notes", label: "Notes" },
     { key: "due", label: "Due" },
     { key: "seen", label: "First seen" },
     { key: "decide", label: "Decide", fixed: true },
   ],
 };
 
-// First seen is hidden until a person shows it (S4). All calls' Notes column, which the handoff
-// replaces with a notes panel, is hidden too, so the table fits at 1280px.
-const DEFAULT_HIDDEN: Hidden = { queue: ["seen"], calls: ["notes", "seen"] };
+// First seen is hidden until a person shows it (S4). Notes open from the Votes cell (PRO-572).
+const DEFAULT_HIDDEN: Hidden = { queue: ["seen"], calls: ["seen"] };
 const PAGES = Object.keys(COLUMNS) as TablePage[];
 
 function defaults(): Hidden {
@@ -78,4 +76,12 @@ export function hiddenFromForm(ticked: Set<string>): Hidden {
 /** Whether a table shows a column. */
 export function shows(hidden: Hidden, page: TablePage): (key: string) => boolean {
   return (key) => !hidden[page].includes(key);
+}
+
+/** A header menu's Hide column (PRO-572): one more column hidden, in table order; Call and Decide never. */
+export function hideColumn(hidden: Hidden, page: TablePage, key: string): Hidden {
+  const column = COLUMNS[page].find((c) => c.key === key);
+  if (!column || column.fixed || hidden[page].includes(key)) return hidden;
+  const keys = new Set([...hidden[page], key]);
+  return { ...hidden, [page]: COLUMNS[page].filter((c) => keys.has(c.key)).map((c) => c.key) };
 }
