@@ -110,8 +110,9 @@ Write-Host "  trigger:  daily at $($RequestsAt -join ' and ')"
 # leaves a running worker alone, and data\drafting\worker.lock keeps it to one. It never takes the
 # pipeline's lock, so it never holds up the Sunday scan.
 $workerAction = New-ScheduledTaskAction -Execute $conhost -Argument (Headless "-m drafting.worker") -WorkingDirectory $repo
+# The logon trigger names this user: one for any user's logon needs an administrator to register.
 $workerTriggers = @(
-    (New-ScheduledTaskTrigger -AtLogOn),
+    (New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"),
     (New-ScheduledTaskTrigger -Once -At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Minutes $WorkerCheckMinutes))
 )
 $workerSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) `
