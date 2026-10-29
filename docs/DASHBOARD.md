@@ -163,7 +163,9 @@ Proposals.
 ## The proposal workspace
 
 `/proposals/{call id}` (PW1 to PW25, PRO-580) follows one pursuit step by step. Open workspace on Proposals'
-Drafting view, in a call's Decide cell and in its draft badge's menu all lead here.
+Drafting view, in a call's Decide cell and in its draft badge's menu all lead here. The Writer is the
+worker's model, whichever WRITER_MODEL names on the scan PC (Grok 4.7 since 29 Oct), so the page calls
+it the Writer rather than naming a model.
 
 - **Header (PW1, PW19, PW24):**
   - the portal's logo, the breadcrumb with the stage (Qualifying to Submitting, or No-go, Submitted or Closed), and the title;
@@ -173,25 +175,25 @@ Drafting view, in a call's Decide cell and in its draft badge's menu all lead he
 - **The step card (PW4, PW15, PW19):**
   - what the step is for, and the note when the step was redone after Ask for changes;
   - its state: waiting for the worker (with a word when the worker is offline), working with its start time, failed with the reason and Retry, or budget reached with Raise the cap;
-  - the files saved, what Claude prepared (the key points), and the full document;
+  - the files saved, what the Writer prepared (the key points), and the full document;
   - Your call: the step's question and its actions.
 - **Actions.** Only the owner sees them (PW17, a courtesy check until sign-in); everyone else sees whom the step waits on. Each is guarded by the step's state and the time the page showed it, so a page left open while the step changed saves nothing and says so.
   - **Approve and continue:** the step is done and the next is queued for the worker.
-  - **Ask for changes:** takes a note; the step is queued again with it, and Claude redoes it with the note and its last version.
+  - **Ask for changes:** takes a note; the step is queued again with it, and the Writer redoes it with the note and its last version.
   - **Stop here, no-go:** steps 1 to 4. Takes the reason and what would change the answer; the draft stops and the call is marked Not relevant with that reason (P7).
   - **At the gate:** Go; Go with conditions, one per line, each joining the checklist as an item the owner owns; or No-go with its reason.
   - **Retry:** queues a failed step again.
   - **Raise the cap:** sets a higher budget and queues the step that reached the cap again.
-- **What the people working with the owner do (PW24):** they add material (a note or a link, which Claude reads from the next step on) and tick checklist items; the owner can too.
+- **What the people working with the owner do (PW24):** they add material (a note or a link, which the Writer reads from the next step on) and tick checklist items; the owner can too.
 - **Show history (PW16):** every event with its time and who, newest first.
 
 Each step also has its own screen (PRO-581):
 
 - **Discovery (PW6):** the eight tasks with their states (done, working, for you) and a progress line, the pages and files left for the owner to fetch, and when the result is expected.
 - **Opportunity summary (PW7):** the summary's opening paragraph with the call's agency, type, deadline and portal; the button reads Continue to Alignment.
-- **Alignment (PW8):** the verdict and how the call aligns for Velocity, as tagged points (fits, past work, depends, risk, needs, no clash) with their sources; the owner's direction from Start the draft beside Claude's proposed angle. Your call offers Keep mine, Use Claude's angle or Write a new one; approving saves the chosen direction, which carries forward.
+- **Alignment (PW8):** the verdict and how the call aligns for Velocity, as tagged points (fits, past work, depends, risk, needs, no clash) with their sources; the owner's direction from Start the draft beside the Writer's proposed angle. Your call offers Keep mine, Use the Writer's angle or Write a new one; approving saves the chosen direction, which carries forward.
 - **Requirements and checklist (PW9):** the volumes, page limit and format, evaluation, eligibility and keywords, the internal submit-by date, and the checklist in its six parts, tickable here as in the header's panel.
-- **Go or no-go (PW10):** the decision brief (fit rating, win themes, critical gaps with how to address each, effort and timing, the recommendation) and what each choice does; Go with conditions starts with Claude's conditions filled in.
+- **Go or no-go (PW10):** the decision brief (fit rating, win themes, critical gaps with how to address each, effort and timing, the recommendation) and what each choice does; Go with conditions starts with the Writer's conditions filled in.
 - **Outline (PW11):** the direction and the past work, each a last chance to change (the owner edits the direction; the owner and the people working with them add past work from the Proposal Library's index, or by name or link, and remove it; Refresh the list asks the worker to index the library again, one refresh at a time), then the sections with the criterion each answers, their share and what they draw on, and any criterion with no section. Approving the Outline locks the direction and the past work.
 - **First draft and Compliance check:** the draft's words and what is left to fill; what the check corrected and how many warnings to check; and the AI slop check's verdict on the draft the step saved, with a link to the latest result.
 - **Reviews (PW12, PW25):** the AI slop check's row (the newest verdict, See the result, automatic), then the three reviewers in turn: the external evaluator and the second evaluator, each with their ratings in words per criterion (Outstanding and Good in green, Marginal amber, Unacceptable red, any other scale grey) and their strengths and weaknesses, then Velocity leadership, who does not rate. Each row says how many changes it suggested and how many are still to decide. Under them, each reviewer's changes: the section, the text now (struck through), the suggestion and why, with Accept, Reject and Edit at the right, and Accept all per reviewer. A decided change shows who decided it and when, with Undo while Reviews is still ready. Only the owner decides; the people working with the owner see the changes. Approve and continue stays disabled until every change is decided (the server refuses too), and approving queues Final checks, which puts the accepted and edited changes into Draft v3. The history and the notice say how many were accepted, edited and rejected.

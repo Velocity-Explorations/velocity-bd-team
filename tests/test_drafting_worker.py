@@ -134,6 +134,15 @@ def test_nothing_queued_means_nothing_to_do(ledger_db: str, local: Path) -> None
     assert worker.work_once(generate=model) is False and model.calls == []
 
 
+def test_the_worker_drafts_with_the_model_WRITER_MODEL_names(ledger_db: str, local: Path,
+                                                             monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("WRITER_MODEL", "grok-4.7")
+    _pursuit()
+    model = Model()
+    assert worker.work_once(generate=model) is True
+    assert model.calls[0]["model"] == "grok-4.7"
+
+
 def test_a_step_is_saved_ready_with_what_it_cost_and_waits_for_the_owner(ledger_db: str, local: Path) -> None:
     pursuit_id = _pursuit()
     model = Model()

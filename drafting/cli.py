@@ -51,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     dev.add_argument("--out", required=True, type=Path, help="folder for the phase files")
     dev.add_argument("--from-phase", help="start here; earlier phases load their saved files")
     dev.add_argument("--to-phase", help="stop after this phase")
-    dev.add_argument("--model", help="model id for every call (default claude-sonnet-5-5)")
+    dev.add_argument("--model", help="model id for every call (default WRITER_MODEL, else claude-sonnet-5-5)")
     dev.add_argument("--debug", action="store_true", help="log full prompts (DEBUG)")
     check = sub.add_parser("check", help="rerun the slop check on a draft after it was edited")
     check.add_argument("--draft", required=True, type=Path, help="the draft to check, such as draft_final.md")

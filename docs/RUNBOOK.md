@@ -133,7 +133,9 @@ when a run fails: look for failures in data\logs and the Slack alerts.
 The worker runs the proposal workspace's steps on this PC. When someone chooses Start the draft on the
 dashboard, Discovery waits in the ledger until the worker takes it, and so on, one step at a time. It is
 one always-on program, `python -m drafting.worker`, that checks the ledger every 20 seconds and runs each
-step with Claude (claude-sonnet-5-5, through `ANTHROPIC_API_KEY`).
+step with the model WRITER_MODEL names in `.env`: Grok (grok-4.7, through `BD_XAI_API_KEY`) since 2026-10-29,
+or Claude (claude-sonnet-5-5, through `ANTHROPIC_API_KEY`) when it is unset. It logs the model as it starts;
+after changing WRITER_MODEL, end the worker's task and start it again.
 
 **Starting it.** Run the schedule script again in PowerShell from the repo folder. It adds a task named
 "velocity-bd-team worker" and replaces the others unchanged:

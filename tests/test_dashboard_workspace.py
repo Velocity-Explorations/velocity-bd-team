@@ -529,7 +529,7 @@ def test_a_working_step_says_so_and_asks_nothing(page: Any, site: dict[str, int]
     open_workspace(page, "ws-working")
     card = page.locator(".ws-card")
     assert "working" in card.locator(".ws-band").inner_text()
-    assert "Claude is working on this step and asks nothing until it is saved." in card.inner_text()
+    assert "The Writer is working on this step and asks nothing until it is saved." in card.inner_text()
     assert card.locator(".ws-call").count() == 0
 
 

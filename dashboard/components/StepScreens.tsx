@@ -175,7 +175,7 @@ export function SummaryView({ call, content, tz }: { call: WorkspaceCall; conten
   );
 }
 
-/** Step 3 (PW8): the verdict, how the call aligns for Velocity, and the owner's direction beside Claude's angle. */
+/** Step 3 (PW8): the verdict, how the call aligns for Velocity, and the owner's direction beside the Writer's angle. */
 export function AlignmentView({ pursuit, content, label, tz }: { pursuit: PursuitRow; content: Content; label: Label; tz: string }) {
   const points = Array.isArray(content.points) ? (content.points as { tag: string; text: string; source?: string }[]) : [];
   return (
@@ -202,7 +202,7 @@ export function AlignmentView({ pursuit, content, label, tz }: { pursuit: Pursui
           <p className="meta">{label(pursuit.owner)}, {formatTime(pursuit.created_at, tz)}</p>
         </div>
         <div className="ws-box">
-          <h3 className="field-label">Claude&apos;s proposed angle</h3>
+          <h3 className="field-label">The Writer&apos;s proposed angle</h3>
           <p>{text(content.angle) || "No angle was given."}</p>
           {text(content.comparison) ? <p className="meta">{text(content.comparison)}</p> : null}
         </div>
@@ -211,7 +211,7 @@ export function AlignmentView({ pursuit, content, label, tz }: { pursuit: Pursui
   );
 }
 
-/** Alignment's choice inside Your call (PW8): keep the owner's direction, take Claude's angle, or write a new one. */
+/** Alignment's choice inside Your call (PW8): keep the owner's direction, take the Writer's angle, or write a new one. */
 export function DirectionChoice({ content }: { content: Content }) {
   const mine = text(content.direction);
   return (
@@ -224,7 +224,7 @@ export function DirectionChoice({ content }: { content: Content }) {
         </label>
         <label className="radio-card">
           <input type="radio" name="direction_choice" value="claude" defaultChecked={!mine} disabled={!text(content.angle)} />
-          <span><strong>Use Claude&apos;s angle</strong></span>
+          <span><strong>Use the Writer&apos;s angle</strong></span>
         </label>
         <label className="radio-card">
           <input type="radio" name="direction_choice" value="new" />
@@ -266,7 +266,7 @@ export function RequirementsView({ callId, content, checklist, editable, label }
   );
 }
 
-/** The Go or no-go gate (PW10): Claude's decision brief, then what each choice does. */
+/** The Go or no-go gate (PW10): the Writer's decision brief, then what each choice does. */
 export function GateBrief({ content }: { content: Content }) {
   const gaps = Array.isArray(content.gaps) ? (content.gaps as { gap: string; mitigation?: string }[]) : [];
   const fit = text(content.fit);

@@ -299,7 +299,7 @@ function StateNotice({ callId, pursuit, row, can, worker, tz, label }: {
         </p>
       );
     case "working":
-      return <p className="ws-notice tone-info">Claude is working on this step and asks nothing until it is saved.</p>;
+      return <p className="ws-notice tone-info">The Writer is working on this step and asks nothing until it is saved.</p>;
     case "failed":
       return (
         <div className="ws-notice tone-conflict">
@@ -382,7 +382,7 @@ function StepScreen({ call, pursuit, row, steps, checklist, changes, scan, libra
   }
 }
 
-/** The open step's card (PW4): what it is for, its state, the files saved, what Claude prepared, and Your call. */
+/** The open step's card (PW4): what it is for, its state, the files saved, what the Writer prepared, and Your call. */
 export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, job, library, can, worker, label, tz }: {
   call: WorkspaceCall;
   pursuit: PursuitRow;
@@ -455,8 +455,8 @@ export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, 
             library={library} content={content} can={can} label={label} tz={tz} />
         ) : null}
         {points.length ? (
-          <section className="ws-points" aria-label="What Claude prepared">
-            <h3 className="field-label">What Claude prepared</h3>
+          <section className="ws-points" aria-label="What the Writer prepared">
+            <h3 className="field-label">What the Writer prepared</h3>
             <ul>
               {points.map((point, i) => <li key={i}>{point}</li>)}
             </ul>
@@ -583,7 +583,7 @@ export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, 
                       <span className="field-label">What to change</span>
                       <textarea name="note" rows={3} required maxLength={2000} />
                     </label>
-                    <p className="hint">Claude redoes the step with your note and its last version.</p>
+                    <p className="hint">The Writer redoes the step with your note and its last version.</p>
                     <button type="submit" className="btn fn-change">Ask for changes</button>
                   </form>
                 </details>
@@ -614,7 +614,7 @@ export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, 
                 <span className="field-label">A note, or a link to a page or file</span>
                 <textarea name="material" rows={3} required maxLength={2000} />
               </label>
-              <p className="hint">Claude reads it from the next step on. Files go in the draft&apos;s Drive folder once Drive is set up.</p>
+              <p className="hint">The Writer reads it from the next step on. Files go in the draft&apos;s Drive folder once Drive is set up.</p>
               <button type="submit" className="btn fn-change">Add material</button>
             </form>
           </details>

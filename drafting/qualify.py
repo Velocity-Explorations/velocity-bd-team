@@ -88,7 +88,7 @@ Give four to eight points; together they show how the call aligns for Velocity."
 CHECKLIST_SPEC = """{"key_points": ["three to six short points for the step's card"],
  "checklist": [{"part": "registrations, documents, inputs, formatting, reviews or submission",
                 "text": "the item, specific to this call", "source": "where the call asks for it, or null",
-                "owner": "Claude, the owner's name, or another named person", "due": "YYYY-MM-DD or null",
+                "owner": "the Writer, the owner's name, or another named person", "due": "YYYY-MM-DD or null",
                 "done": "true only when it is already met"}],
  "submit_by": "YYYY-MM-DD, the internal submit-by date, at least one business day before the deadline",
  "requirements": {"volumes": "the required volumes or documents, in a line", "page_limit": "the page limit and format, in a line",
@@ -223,7 +223,7 @@ def _lessons() -> str:
 
 
 def alignment(ctx: StepContext) -> StepResult:
-    """Step 3 (PW8): the verdict, and Claude's angle beside the owner's direction."""
+    """Step 3 (PW8): the verdict, and the Writer's angle beside the owner's direction."""
     reply = ctx.ask(Prompt(_system("alignment", "Alignment", ALIGNMENT_SPEC),
                            user_prompt(ctx, ("DISCOVERY SUMMARY, FROM STEP 1", ctx.earlier("discovery.md")),
                                        ("OPPORTUNITY SUMMARY, FROM STEP 2", ctx.earlier("opportunity_summary.md")),

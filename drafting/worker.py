@@ -457,7 +457,7 @@ def work_once(generate: Callable[..., str] | None = None, model: str | None = No
     log.info("Step %s claimed: %s, attempt %s, pursuit %s", step["id"], step["step"], step["attempt"], pursuit["id"])
     lq.worker_beat(lq.WORKER, "working", doing)
     try:
-        _run(step, pursuit, label, doing, generate or llm.generate, model or llm.DEFAULT_MODEL, today or date.today())
+        _run(step, pursuit, label, doing, generate or llm.generate, model or llm.writer_model(), today or date.today())
     finally:
         lq.worker_beat(lq.WORKER, "idle")
     return True
@@ -485,6 +485,7 @@ def serve(once: bool = False, poll_s: float = POLL_S, generate: Callable[..., st
         return 0
     try:
         lq.worker_started(lq.WORKER)
+        log.info("Writer model: %s", llm.writer_model())
         left = recover()
         if left:
             log.warning("Failed %d step(s) a stopped worker left working", left)
