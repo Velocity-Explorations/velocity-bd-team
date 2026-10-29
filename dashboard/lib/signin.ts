@@ -1,5 +1,5 @@
-// Google sign-in inside the dashboard (U7, PW17, phase 11): who may sign in, which pages need a session, where a
-// person returns to, and what the sign-in page says. Auth.js does the OAuth (auth.ts); these are its rules. Sign-in is
+// Google sign-in inside the dashboard (U7, PW17, phase 11): who may sign in (any Velocity Google account), the name
+// they decide under, which pages need a session, where a person returns to, and what the sign-in page says. Auth.js does the OAuth (auth.ts); these are its rules. Sign-in is
 // on only once its Google client is set, so until then the dashboard keeps the name picker. No imports, so
 // `node --test` can load it directly.
 
@@ -21,18 +21,28 @@ export function signInDomain(env: Env): string {
 }
 
 /**
- * A Google account gets in when Google verified its email, it belongs to the company's Workspace (Google's `hd`), and
- * its email is on DASHBOARD_USERS; it is then that person's name. Anyone else is refused, there is no sign-up.
+ * A Google account gets in when Google verified its email and it belongs to the company's Workspace (Google's `hd`, and
+ * the email's own domain). Since 29 Oct that is everyone at Velocity: no list to be on, nobody to ask.
  */
-export function allowedSignIn(
-  account: { email: string | null; verified: boolean; hd: string | null },
-  users: Person[],
-  domain: string,
-): { ok: true; name: string } | { ok: false } {
+export function allowedSignIn(account: { email: string | null; verified: boolean; hd: string | null }, domain: string): boolean {
   const email = (account.email ?? "").trim().toLowerCase();
-  if (!email || !account.verified || (account.hd ?? "").toLowerCase() !== domain || !email.endsWith(`@${domain}`)) return { ok: false };
-  const found = users.find((u) => u.email?.toLowerCase() === email);
-  return found ? { ok: true, name: found.name } : { ok: false };
+  return Boolean(email) && account.verified && (account.hd ?? "").toLowerCase() === domain && email.endsWith(`@${domain}`);
+}
+
+/**
+ * The name a person decides under: DASHBOARD_USERS's name for their email, else the name first recorded when they
+ * signed in, else their Google name. A name somebody else already has gets the email after it, so two people's
+ * decisions are never mixed up.
+ */
+export function teamName(email: string, googleName: string | null | undefined, users: Person[], known: { email: string; name: string }[]): string {
+  const lower = email.trim().toLowerCase();
+  const listed = users.find((u) => u.email?.toLowerCase() === lower);
+  if (listed) return listed.name;
+  const recorded = known.find((k) => k.email.toLowerCase() === lower);
+  if (recorded) return recorded.name;
+  const name = (googleName ?? "").trim().replace(/\s+/g, " ") || lower.split("@")[0];
+  const taken = users.some((u) => u.name === name) || known.some((k) => k.name === name);
+  return taken ? `${name} (${lower})` : name;
 }
 
 /** Pages that need a session: everything but the sign-in page, Auth.js's own routes, the health check, and the files the
@@ -50,7 +60,7 @@ export function safeFrom(value: string | null | undefined): string {
 }
 
 const ERRORS: Record<string, string> = {
-  AccessDenied: "That Google account is not on the BD Team list. Sign in with your Velocity account, or ask an admin to add you.",
+  AccessDenied: "That Google account is not a Velocity account. Sign in with your velocityexplorations.com account.",
   OAuthCallbackError: "Sign-in was cancelled.",
   Configuration: "Sign-in is not set up correctly. Tell an admin.",
 };

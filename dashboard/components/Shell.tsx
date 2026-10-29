@@ -16,7 +16,7 @@ import { pastWorkGroups, pastWorkLabel } from "@/lib/pastwork";
 import { overdueCount, sortIntoViews } from "@/lib/proposals";
 import { countStepsReadyFor, countWaitingRequests, pastWork, proposalCalls, queueCounts } from "@/lib/queries";
 import { hiddenColumns, queueMode } from "@/lib/settings";
-import { allowlist, iapAudience, sessionMode, viewerHeader } from "@/lib/viewer";
+import { allowlist, iapAudience, sessionMode, team, viewerHeader } from "@/lib/viewer";
 
 const ICONS: Record<Section, LucideIcon> = { home: House, calls: Inbox, proposals: FileText, automation: Workflow };
 
@@ -66,7 +66,7 @@ export async function Shell({ section, children }: { section: Section | null; ch
     timeZone(),
     startsDrafts ? pastWork() : null,
   ]);
-  const people = await Promise.all(allowlist().map(async (p) => ({ name: p.name, label: label(p.name), initials: await initialsOf(p.name) })));
+  const people = await Promise.all((await team()).map(async (p) => ({ name: p.name, label: label(p.name), initials: await initialsOf(p.name) })));
   const { mode, why } = viewerMode();
   return (
     <>

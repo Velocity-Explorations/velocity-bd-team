@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `009_call_summaries.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `010_people.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -502,6 +502,21 @@ draft. Added by `008_pursuits.sql`.
 
 Index: `(pursuit_id, id)`. Everything shown from these rows follows PW23: writing patterns and
 their fixes only, never whether a text was or was not written by AI.
+
+## Table: people
+
+Everyone who has signed in to the dashboard with their Velocity Google account (phase 11). Sign-in has
+been open to every company account since 29 Oct, so this, with DASHBOARD_USERS, is the team the
+dashboard offers for Working with and the people panels. Added by `010_people.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| email | TEXT, primary key | the Google account's email, lower case | the dashboard, at sign-in |
+| name | TEXT, not null, unique | the name the person decides under: DASHBOARD_USERS's name for that email, else their Google name as first recorded; a name somebody else has gets the email after it | same |
+| first_seen_at | TEXT timestamp, not null | the first sign-in | same |
+| last_seen_at | TEXT timestamp, not null | the latest sign-in | same |
+
+Unique index: `(name)`.
 
 ## Table: profiles
 

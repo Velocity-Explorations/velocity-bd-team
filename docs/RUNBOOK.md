@@ -429,9 +429,10 @@ holds the calls they have not decided. To go back to one decision per call, set
 
 ### Google sign-in
 
-With Google sign-in set up, every page of the dashboard needs a session (phase 11). People sign in at
-`/login` with their Velocity Google account, and only emails on DASHBOARD_USERS get in. Who decides
-then comes from the session: the name picker goes, and owner-only actions are the owner's alone. A
+With Google sign-in set up, every page of the dashboard needs a session (phase 11). Anyone at Velocity
+signs in at `/login` with their Velocity Google account; nobody else gets in. Who decides then comes
+from the session: the name picker goes, and owner-only actions are the owner's alone. Each sign-in
+is recorded in the ledger's people table (migration 010), which names the person from then on. A
 session lasts 12 hours. Until the three settings below are in `dashboard/.env.local`, the dashboard
 keeps the name picker. It takes about 10 minutes in the browser, in the same `velocity-bd-team`
 Cloud project as the service account.
@@ -455,8 +456,9 @@ Cloud project as the service account.
    ```
    Then, in a terminal in the `dashboard` folder, run `npx auth secret`. It adds a random `AUTH_SECRET`
    to `.env.local` for you.
-4. **The people.** Each person on DASHBOARD_USERS needs their Google email, as
-   `David Wood <david@velocityexplorations.com>=<Slack id>`. Someone without an email cannot sign in.
+4. **The people (optional).** Anyone at Velocity can sign in without being listed. To give someone a
+   set name and their Slack id, list them on DASHBOARD_USERS with their Google email, as
+   `David Wood <david@velocityexplorations.com>=<Slack id>`.
 5. **Restart the dashboard.** Opening it now goes to the sign-in page. Choose **Sign in with Google**.
    Log out is in the account menu at the top right.
 

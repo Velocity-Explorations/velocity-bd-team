@@ -220,14 +220,17 @@ scanner and saves each scan in `slop_scans`; the page only reads the newest row 
 ## Sign-in
 
 `/login` (U7, phase 11) is the BD Team sign-in page: the Velocity mark, Sign in with Google, Reset
-password (Google's account recovery) and Need access? Ask an admin. There is no sign-up: an admin adds
-people to DASHBOARD_USERS, each with their Google email. It says in words why someone is there:
-signed out, timed out (the 12-hour session ended), not allowed (a Google account not on the list, or
-not the company's), or cancelled. Dark only.
+password (Google's account recovery) and Need access? Ask an admin. It says in words why someone is
+there: signed out, timed out (the 12-hour session ended), not allowed (a Google account that is not
+the company's), or cancelled. Dark only.
 
 - **Who gets in:** Auth.js (`dashboard/auth.ts`) runs Google's sign-in for the velocityexplorations.com
-  Workspace. A verified company account whose email is on DASHBOARD_USERS gets in, as that person's
-  name (`lib/signin.ts`).
+  Workspace. Since 29 Oct any verified company account gets in, with nothing to sign up for; anyone
+  else is refused (`lib/signin.ts`). Each sign-in is recorded in the ledger's people table, so the
+  person can be chosen for Working with and the people panels from then on (`lib/team.ts`).
+- **Their name:** DASHBOARD_USERS's name for their email when they are on it (which also gives their
+  Slack id), else their Google name as first recorded; a name somebody else has gets the email after
+  it, so two people's decisions are never mixed up.
 - **Every page:** signed out, every page goes to `/login`, and back to the page asked for after
   sign-in (`proxy.ts`). The sign-in page, its files, Auth.js's routes and `/healthz` need no session.
 - **Who decides:** the session alone says who is deciding, checked on every page and action. The name

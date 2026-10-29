@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { googleKeys, IAP_HEADER, verifyIapToken } from "./iap";
 import { parseUsers, pickViewer, type Person } from "./people";
 import { signInEnabled } from "./signin";
+import { knownPeople, personByEmail } from "./team";
 
 export const VIEWER_COOKIE = "bd_viewer";
 
@@ -33,8 +34,10 @@ export function sessionMode(): boolean {
  */
 export async function currentViewer(): Promise<string | null> {
   if (sessionMode()) {
-    const session = await auth();
-    return pickViewer({ users: allowlist(), headerMode: true, headerValue: session?.user?.email ?? null });
+    const email = (await auth())?.user?.email?.trim().toLowerCase();
+    if (!email) return null;
+    // DASHBOARD_USERS's name for this email, else the name recorded at the person's first sign-in.
+    return pickViewer({ users: allowlist(), headerMode: true, headerValue: email }) ?? (await personByEmail(email));
   }
   const audience = iapAudience();
   if (audience) {
@@ -48,4 +51,15 @@ export async function currentViewer(): Promise<string | null> {
     headerValue: header ? (await headers()).get(header) : null,
     cookieValue: (await cookies()).get(VIEWER_COOKIE)?.value ?? null,
   });
+}
+
+/**
+ * The team for Working with and the people panels: DASHBOARD_USERS, and with Google sign-in everyone who has signed in
+ * (people, migration 010) and is not on it already.
+ */
+export async function team(): Promise<Person[]> {
+  const listed = allowlist();
+  if (!sessionMode()) return listed;
+  const extra = (await knownPeople()).filter((k) => !listed.some((u) => u.email?.toLowerCase() === k.email || u.name === k.name));
+  return [...listed, ...extra.map((k) => ({ name: k.name, email: k.email, slackId: null }))];
 }
