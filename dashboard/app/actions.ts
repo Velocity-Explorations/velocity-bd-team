@@ -27,6 +27,7 @@ import {
   portals,
   raiseCap,
   recordResult,
+  refreshLibrary,
   retryStep,
   saveProfile,
   setCollaborators,
@@ -218,6 +219,7 @@ export async function startDraftAction(formData: FormData): Promise<void> {
       approvalMode: formData.get("approval_mode") === "key_gates" ? "key_gates" : "every_step",
       direction: String(formData.get("direction") ?? "").slice(0, MAX_NOTE_CHARS),
       collaborators: [...new Set(formData.getAll("with").map(String))].filter((name) => names.includes(name) && name !== viewer),
+      buildsOn: [...new Set(formData.getAll("builds_on").map(String))].filter(Boolean).slice(0, 20),
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
@@ -311,9 +313,10 @@ export async function setDirectionAction(formData: FormData): Promise<void> {
 export async function changeBuildsOnAction(formData: FormData): Promise<void> {
   const { viewer, back, pursuit } = await workspaceActor(formData, "contribute");
   const add = String(formData.get("add") ?? "") || undefined;
+  const addId = String(formData.get("add_id") ?? "") || undefined;
   const remove = String(formData.get("remove") ?? "") || undefined;
-  if (!add && !remove) backTo(back, "error", "Name the past work to add: a past proposal, a project, or a link.");
-  await workspaceWrite(back, () => changeBuildsOn({ pursuitId: pursuit.id, by: viewer, add, remove }));
+  if (!add && !addId && !remove) backTo(back, "error", "Name the past work to add: a past proposal, a project, or a link.");
+  await workspaceWrite(back, () => changeBuildsOn({ pursuitId: pursuit.id, by: viewer, add, addId, remove }));
 }
 
 /** Who works with the owner (PW24): only the owner changes the list, from People. */
@@ -463,4 +466,10 @@ export async function recordResultAction(formData: FormData): Promise<void> {
     callId, by: viewer, result: String(formData.get("result") ?? ""),
     debrief: String(formData.get("debrief") ?? "").slice(0, MAX_NOTE_CHARS), nextTime: String(formData.get("next_time") ?? "").slice(0, MAX_NOTE_CHARS),
   }));
+}
+
+/** Refresh the list (phase 6b): the owner or anyone working with them asks the worker to index the Proposal Library again. */
+export async function refreshLibraryAction(formData: FormData): Promise<void> {
+  const { viewer, back } = await workspaceActor(formData, "contribute");
+  await workspaceWrite(back, () => refreshLibrary({ by: viewer }));
 }

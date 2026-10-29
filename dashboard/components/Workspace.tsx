@@ -66,6 +66,8 @@ import {
 
 type Label = (name: string) => string;
 type Can = { decide: boolean; contribute: boolean };
+/** The Proposal Library's index as the Outline offers it (phase 6b). */
+export type Library = { groups: { title: string; items: { id: string; label: string }[] }[]; indexed: string | null };
 
 const STOPPED: Record<string, string> = { no_go: "No-go", submitted: "Submitted", closed: "Closed" };
 
@@ -334,7 +336,7 @@ function StateNotice({ callId, pursuit, row, can, worker, tz, label }: {
 }
 
 /** A step's own screen (PW6 to PW12), drawn from what the worker saved. */
-function StepScreen({ call, pursuit, row, steps, checklist, changes, scan, content, can, label, tz }: {
+function StepScreen({ call, pursuit, row, steps, checklist, changes, scan, library, content, can, label, tz }: {
   call: WorkspaceCall;
   pursuit: PursuitRow;
   row: StepRow;
@@ -342,6 +344,7 @@ function StepScreen({ call, pursuit, row, steps, checklist, changes, scan, conte
   checklist: ChecklistRow[];
   changes: ChangeRow[];
   scan: ScanRow | null;
+  library: Library;
   content: Record<string, unknown>;
   can: Can;
   label: Label;
@@ -361,7 +364,7 @@ function StepScreen({ call, pursuit, row, steps, checklist, changes, scan, conte
       return <GateBrief content={content} />;
     case "outline":
       return <OutlineView call={call} pursuit={pursuit} content={content} row={row} canDecide={can.decide}
-        canContribute={can.contribute} isLocked={locked(steps)} />;
+        canContribute={can.contribute} isLocked={locked(steps)} library={library} />;
     case "draft":
       return <DraftView step={row.step} content={content} />;
     case "compliance":
@@ -380,7 +383,7 @@ function StepScreen({ call, pursuit, row, steps, checklist, changes, scan, conte
 }
 
 /** The open step's card (PW4): what it is for, its state, the files saved, what Claude prepared, and Your call. */
-export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, job, can, worker, label, tz }: {
+export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, job, library, can, worker, label, tz }: {
   call: WorkspaceCall;
   pursuit: PursuitRow;
   row: StepRow;
@@ -389,6 +392,7 @@ export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, 
   changes: ChangeRow[];
   scan: ScanRow | null;
   job: ScanJob | null;
+  library: Library;
   can: Can;
   worker: { readiness: string; seenAt: string | null };
   label: Label;
@@ -448,7 +452,7 @@ export function StepCard({ call, pursuit, row, steps, checklist, changes, scan, 
         ) : null}
         {shown ? (
           <StepScreen call={call} pursuit={pursuit} row={row} steps={steps} checklist={checklist} changes={mine} scan={scan}
-            content={content} can={can} label={label} tz={tz} />
+            library={library} content={content} can={can} label={label} tz={tz} />
         ) : null}
         {points.length ? (
           <section className="ws-points" aria-label="What Claude prepared">

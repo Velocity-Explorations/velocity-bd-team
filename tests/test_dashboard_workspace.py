@@ -143,6 +143,7 @@ def seed() -> dict[str, int]:
     for key in ("rev-view", "rev-decide", "rev-stale", "rev-check"):   # before seed_screens, which leaves a step queued
         found[key] = _reviews(key)
     seed_end(found)
+    seed_library(found)
     seed_screens(found)
     return found
 
@@ -341,6 +342,23 @@ def seed_end(found: dict[str, int]) -> None:
     found["sw-result"] = _submitted("ws-sw-result", "Waiting for a result", "2027-06-01")
     _call("ws-sw-outside", "Submitted outside the workspace")
     lq.set_human("ws-sw-outside", "submitted", "Shaun Jones")
+
+
+FOLDER = "application/vnd.google-apps.folder"
+
+
+def seed_library(found: dict[str, int]) -> None:
+    """The Proposal Library's index, a worker that has run, a call to start, and a pursuit at its Outline (phase 6b)."""
+    lq.worker_started(lq.WORKER)
+    lq.save_drive_items([
+        {"id": "lib-ve27", "name": "2026-03-17_vulcan-sof_vigilant-eagle-27", "mime": FOLDER,
+         "path": "Submissions/2026-03-17_vulcan-sof_vigilant-eagle-27", "indexed_at": "2026-10-29T15:00:00Z"},
+        {"id": "lib-bio", "name": "David Wood bio.docx", "mime": "application/msword", "path": "01 Company Reference/Bios/David Wood bio.docx",
+         "indexed_at": "2026-10-29T15:00:00Z"}])
+    _call("ws-start", "Workspace start with past work")
+    found["outline-lib"] = _pursuit("ws-outline-lib", "Workspace outline library")
+    _through(found["outline-lib"], "outline")
+    _saved(found["outline-lib"], "outline", content={"sections": [{"title": "1. Approach", "criteria": ["Merit"], "evidence": []}]})
 
 
 def pursuit_of(pursuit_id: int) -> dict[str, Any]:
@@ -671,7 +689,7 @@ def test_the_outline_lists_its_sections_and_locks_the_direction_and_past_work_wh
     open_workspace(page, "ws-outline")          # a fresh page between actions, after the redirect's re-render
     card = page.locator(".ws-card")
     card.locator("input[name=add]").fill("Cobra Gold 2026 after-action report")
-    act(page, card.get_by_role("button", name="Add", exact=True))
+    act(page, card.locator("form", has=page.locator("input[name=add]")).get_by_role("button", name="Add", exact=True))
     open_workspace(page, "ws-outline")
     card = page.locator(".ws-card")
     card.locator("summary", has_text="Edit").click()
@@ -1000,3 +1018,39 @@ def test_a_call_submitted_outside_the_workspace_gets_its_result_kept_too(page: A
         pursuit = next(p for p in (lq.get_pursuit(i) for i in range(1, 200)) if p and p["call_id"] == "ws-sw-outside")
     assert (pursuit["state"], pursuit["owner"], pursuit["submitted_by"], pursuit["result"]) == (
         "submitted", "Shaun Jones", "Shaun Jones", "cancelled_by_agency")
+
+
+# ------------------------------------------------------------------------------ Builds on from the Proposal Library (phase 6b)
+
+def test_start_the_draft_builds_on_past_work_from_the_library(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    page.goto(f"{WEB}/proposals", wait_until="load", timeout=120_000)
+    page.locator('[data-start-draft="ws-start"]').first.click()
+    dialog = page.locator("dialog[open]")
+    assert "past submissions" in dialog.inner_text().lower() and "company reference" in dialog.inner_text().lower()
+    dialog.get_by_label("Vigilant eagle 27, Vulcan SOF, 2026-03-17").check()
+    act(page, dialog.get_by_role("button", name="Start the draft"))
+    assert "Started the draft" in notice(page)
+    with ledger():
+        started = next(p for p in (lq.get_pursuit(i) for i in range(1, 300)) if p and p["call_id"] == "ws-start")
+    assert json.loads(started["builds_on"]) == [{"id": "lib-ve27", "name": "2026-03-17_vulcan-sof_vigilant-eagle-27"}]
+
+
+def test_the_outline_adds_past_work_from_the_library_and_refreshes_the_list(page: Any, site: dict[str, int]) -> None:
+    log_in(page, "David Wood")
+    open_workspace(page, "ws-outline-lib", "outline")
+    card = page.locator(".ws-card")
+    card.locator("select[name=add_id]").select_option("lib-bio")
+    act(page, card.locator("form", has=page.locator("select[name=add_id]")).get_by_role("button", name="Add"))
+    assert "Added past work: David Wood bio.docx" in notice(page)
+    with ledger():
+        assert json.loads(lq.get_pursuit(site["outline-lib"])["builds_on"]) == [{"id": "lib-bio", "name": "David Wood bio.docx"}]
+    open_workspace(page, "ws-outline-lib", "outline")
+    options = page.locator(".ws-card select[name=add_id] option").all_inner_texts()
+    assert not any("David Wood bio" in o for o in options)   # chosen already, so no longer offered
+    assert "2026-10-29" in page.locator(".ws-card").inner_text()   # when the worker last indexed the library
+    act(page, page.locator(".ws-card").get_by_role("button", name="Refresh the list"))
+    assert "The worker refreshes the Proposal Library's list when no step is waiting." in notice(page)
+    open_workspace(page, "ws-outline-lib", "outline")
+    act(page, page.locator(".ws-card").get_by_role("button", name="Refresh the list"))
+    assert "already waiting for the worker" in page.locator(".notice").first.inner_text()
