@@ -229,8 +229,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     Register write and the folder moves on submit wait for Drive.
   - Phase 9c (an executive summary for each call, added at David's request on 28 Oct): the review
     asks Claude for a SUMMARY line, kept in `calls.ai_summary` (migration 009), and the Description
-    column shows it with the portal's words on hover. `run.py --backfill-summaries` fills open,
-    reviewed calls reviewed before it.
+    column shows it with the portal's words on hover, as Home's Top 10 does since 29 Oct. Each scan
+    also summarizes the calls its review skips (the keyword filter's rejects), and
+    `run.py --backfill-summaries` fills any call without one: all 187 have one as of 29 Oct.
   - Phase 10 (the workspace's notices in Slack, PW18): every 5 minutes, a card for a pursued call
     without one and each step newly ready for its owner, in the call's thread; at 08:00, steps behind
     their target and a digest per owner. Built with posting off, as David chose on 28 Oct: nothing

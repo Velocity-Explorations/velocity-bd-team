@@ -1915,6 +1915,12 @@ tr.row-link:focus-visible .row-arrow {
   -webkit-line-clamp: 6;
 }
 
+/* A summary is short by design, so Home's Top 10 shows it whole. */
+.clamp.whole {
+  display: block;
+  overflow: visible;
+}
+
 
 .status-line {
   display: flex;

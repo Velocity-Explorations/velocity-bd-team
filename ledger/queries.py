@@ -182,11 +182,13 @@ def set_summary(call_id: str, summary: str) -> None:
         q(conn, "UPDATE calls SET ai_summary = ?, updated_at = ? WHERE id = ?", (summary, now, call_id))
 
 
-def calls_without_summary() -> list[dict[str, Any]]:
-    """Kept, reviewed calls with no summary yet, newest first; the caller keeps the open ones."""
+def calls_without_summary(portal: str | None = None) -> list[dict[str, Any]]:
+    """Every call with no summary yet, newest first, from one portal when named: the keyword filter's rejects and
+    decided calls too, since All calls and Home show them all."""
     with tx() as conn:
-        return rows(q(conn, "SELECT * FROM calls WHERE filter_result = 'kept' AND ai_verdict IS NOT NULL "
-                            "AND ai_summary IS NULL ORDER BY first_seen_at DESC, id"))
+        if portal:
+            return rows(q(conn, "SELECT * FROM calls WHERE ai_summary IS NULL AND portal = ? ORDER BY first_seen_at DESC, id", (portal,)))
+        return rows(q(conn, "SELECT * FROM calls WHERE ai_summary IS NULL ORDER BY first_seen_at DESC, id"))
 
 
 def set_slack(call_id: str, channel: str, ts: str) -> None:
