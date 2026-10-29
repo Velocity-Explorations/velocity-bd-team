@@ -9,7 +9,7 @@ export const DESCRIPTION_READ = 1200;
 /** Portals whose description the scanner writes, not the portal (handover-discovery, question 12). */
 const WRITTEN_BY_SCANNER = new Set(["AFWERX", "SpaceWERX", "APFIT", "NASA Forecast"]);
 
-export type DescriptionCell = { label: "Summary" | "Scanner summary" | "Members only" | null; text: string; full: string };
+export type DescriptionCell = { label: "Scanner summary" | "Members only" | null; text: string; full: string; summary: boolean };
 
 function membersOnly(extra: string | null | undefined): boolean {
   if (!extra) return false;
@@ -22,9 +22,9 @@ function membersOnly(extra: string | null | undefined): boolean {
 }
 
 /**
- * Claude's executive summary of the call when the review wrote one (phase 9c), else the first 300 characters of its
- * description, labelled where the text is not the portal's own: Scanner summary for the text an adapter writes,
- * Members only for NSTXL's placeholder. The cell's hover shows the description in full either way.
+ * Claude's executive summary of the call when the review wrote one (phase 9c), with no label since the column is headed
+ * Summary description; else the first 300 characters of its description, labelled Scanner summary for the text an
+ * adapter writes, Members only for NSTXL's placeholder. The cell's hover shows the description in full either way.
  */
 export function descriptionCell(
   portal: string,
@@ -33,10 +33,10 @@ export function descriptionCell(
   summary?: string | null,
 ): DescriptionCell {
   const full = (description ?? "").trim();
-  if (membersOnly(extra)) return { label: "Members only", text: "", full };
-  if (summary?.trim()) return { label: "Summary", text: summary.trim(), full };
+  if (membersOnly(extra)) return { label: "Members only", text: "", full, summary: false };
+  if (summary?.trim()) return { label: null, text: summary.trim(), full, summary: true };
   const text = full.length > SHOWN ? `${full.slice(0, SHOWN).trimEnd()}…` : full;
-  return { label: full && WRITTEN_BY_SCANNER.has(portal) ? "Scanner summary" : null, text, full };
+  return { label: full && WRITTEN_BY_SCANNER.has(portal) ? "Scanner summary" : null, text, full, summary: false };
 }
 
 type Item = { text: string; tone?: string };

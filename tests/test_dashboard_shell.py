@@ -115,3 +115,13 @@ def test_home_shows_five_link_cards_then_the_top_10(page: Any) -> None:
     assert top.count() == 1
     assert top.locator("table").count() == 1 or top.locator(".empty").count() == 1
     assert page.locator("main a[href='/brief']").count() >= 1
+
+
+def test_home_top_10_heads_its_summaries_summary_description(page: Any) -> None:
+    open_page(page, "/")
+    table = page.locator("section.top-ten table")
+    if table.count() == 0:
+        pytest.skip("there is no Top 10 yet")
+    heads = [t.strip().lower() for t in table.locator("thead th").all_inner_texts()]
+    assert "summary description" in heads and "description" not in heads
+    assert "summary" not in [t.strip().lower() for t in table.locator(".desc-label").all_inner_texts()]

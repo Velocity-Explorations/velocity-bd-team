@@ -44,7 +44,7 @@ export async function TopTenTable({ ids, description, tz, nameOf }: {
             <th>Claude</th>
             <th>Grok</th>
             <th>Decision now</th>
-            {description ? <th className="wide">Description</th> : null}
+            {description ? <th className="wide">Summary description</th> : null}
             <th className="wide">Claude&apos;s reason</th>
             <th className="row-arrow">
               <span className="sr-only">Open</span>
@@ -99,7 +99,7 @@ export async function TopTenTable({ ids, description, tz, nameOf }: {
                 {description ? (
                   <td className="wide reason">
                     {cell.label || cell.text ? (
-                      <p className={cell.label === "Summary" ? "clamp whole" : "clamp"} title={cell.full.slice(0, 1000) || undefined}
+                      <p className={cell.summary ? "clamp whole" : "clamp"} title={cell.full.slice(0, 1000) || undefined}
                         tabIndex={cell.full ? 0 : undefined}>
                         {cell.label ? <span className="desc-label">{cell.label}</span> : null}
                         {cell.label && cell.text ? " " : null}
