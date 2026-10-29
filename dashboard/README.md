@@ -96,7 +96,7 @@ stay on and awake, as it must for the worker, and Docker Desktop must start when
 4. From the repo root, `docker compose -f dashboard/compose.yml up -d --build`. Run it again
    after each merge that changes the dashboard; `docker compose -f dashboard/compose.yml down`
    stops both.
-5. Checks: `http://127.0.0.1:8080/healthz` answers `ok` on the PC and
+5. Checks: `http://127.0.0.1:8090/healthz` answers `ok` on the PC and
    `https://<the hostname>/healthz` from anywhere, and
    `docker compose -f dashboard/compose.yml logs tunnel` shows "Registered tunnel connection".
 

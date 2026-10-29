@@ -13,7 +13,7 @@ services:
     image: velocity-bd-dashboard
     env_file: .env.hosted
     ports:
-      - "127.0.0.1:8080:8080"   # this PC only, for checks; the tunnel reaches it as dashboard:8080
+      - "127.0.0.1:8090:8080"   # this PC only, for checks; the tunnel reaches it as dashboard:8080
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
