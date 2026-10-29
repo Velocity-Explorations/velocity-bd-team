@@ -135,7 +135,9 @@ dashboard, Discovery waits in the ledger until the worker takes it, and so on, o
 one always-on program, `python -m drafting.worker`, that checks the ledger every 20 seconds and runs each
 step with Claude (claude-sonnet-5-5, through `ANTHROPIC_API_KEY`). `WRITER_MODEL=grok-4.7` in `.env` would
 switch it to Grok through `BD_XAI_API_KEY`; it is unset. It logs the model as it starts; after changing
-WRITER_MODEL, restart it (Stopping it, below).
+WRITER_MODEL, restart it (Stopping it, below). Claude thinks before it answers and the thinking counts
+against a call's output limit, so each call gets 32,000 tokens of room for it on top of the answer's
+budget. A worker log line ending "(hit max_tokens, output cut off)" means an answer still ran out.
 
 **Starting it.** Run the schedule script again in PowerShell from the repo folder. It adds a task named
 "velocity-bd-team worker" and replaces the others unchanged:

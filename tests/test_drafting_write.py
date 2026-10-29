@@ -185,6 +185,26 @@ def test_reviews_propose_changes_one_per_row_and_the_evaluators_rate_the_criteri
                                                  "Review 3, Velocity leadership"]
 
 
+def test_a_review_cut_off_before_its_changes_fails_rather_than_proposing_none(ledger_db: str, tmp_path: Path) -> None:
+    """The 29 Oct trial: every reviewer hit max_tokens inside its json, and the step said "0 changes proposed"."""
+    class CutOff(Model):
+        def __call__(self, prompt: Prompt, label: str, max_tokens: int) -> str:
+            reply = super().__call__(prompt, label, max_tokens)
+            if label.startswith("review 2"):
+                return reply[:reply.index('"changes"')]
+            if label.startswith("review 3"):
+                return f"# Review 3\n\nNothing to change.\n\n{FENCE}json\n{json.dumps({'key_points': ['Ready'], 'changes': []})}\n{FENCE}"
+            return reply
+
+    ctx = _context(tmp_path, CutOff(), "reviews", {**EARLIER, "draft_v2.md": "# Draft\nClaim 1. Claim 2. Claim 3."})
+    result = write.reviews(ctx)
+    assert [(p["status"], p.get("changes"), p.get("error")) for p in result.content["passes"]] == [
+        ("done", 1, None), ("failed", None, "its answer had no readable list of changes"), ("done", 0, None)]
+    assert [r["reviewer"] for r in lq.step_changes(ctx.step["id"])] == ["evaluator_1"]
+    assert result.summary.splitlines() == ["- External evaluator: 1 change proposed", "- Second independent evaluator: failed",
+                                           "- Velocity leadership: 0 changes proposed"]
+
+
 def test_a_failed_review_pass_lets_the_others_run(ledger_db: str, tmp_path: Path) -> None:
     ctx = _context(tmp_path, Model(fail={"review 2 of 3"}), "reviews", {**EARLIER, "draft_v2.md": "# Draft\nClaim 1. Claim 3."})
     result = write.reviews(ctx)

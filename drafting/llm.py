@@ -29,6 +29,10 @@ log = logging.getLogger("drafting.llm")
 DEFAULT_MODEL = "claude-sonnet-5-5"
 RETRY_DELAY_S = 2.0
 READ_TIMEOUT_S = 300.0   # longest silence tolerated mid-stream; the call's own cap is `timeout`
+# Claude thinks before it answers, and the thinking counts against max_tokens. A call's max_tokens is room for its
+# answer; generate adds THINKING_ROOM on top, up to the Messages API's output limit.
+THINKING_ROOM = 32_000
+MAX_OUTPUT_TOKENS = 128_000
 TRANSIENT = tuple(getattr(anthropic, name) for name in (
     "APIConnectionError", "RateLimitError", "InternalServerError", "OverloadedError",
     "ServiceUnavailableError", "DeadlineExceededError", "RetryableError") if hasattr(anthropic, name))
@@ -247,8 +251,8 @@ def generate(prompt: str, system: str = "", model: str | None = None, max_tokens
     """The model's answer to one prompt, streamed. Raises PhaseError or DraftCancelled."""
     label = phase_label or "generating"
     model = model or writer_model()
-    kwargs: dict[str, Any] = {"model": model, "max_tokens": max_tokens, "timeout": READ_TIMEOUT_S,
-                              "messages": [{"role": "user", "content": prompt}]}
+    kwargs: dict[str, Any] = {"model": model, "max_tokens": min(max_tokens + THINKING_ROOM, MAX_OUTPUT_TOKENS),
+                              "timeout": READ_TIMEOUT_S, "messages": [{"role": "user", "content": prompt}]}
     if system:
         kwargs["system"] = system
     log.info("%s: prompt %d chars, system %d chars, model %s", label, len(prompt), len(system), model)
