@@ -63,6 +63,10 @@ class FakeDrive:
         self._check()
         self.items[item_id]["parents"] = [to_parent]
 
+    def rename(self, item_id: str, name: str) -> None:
+        self._check()
+        self.items[item_id]["name"] = name
+
     def path_of(self, item_id: str) -> str:
         parts = []
         while item_id != self.library:
@@ -85,6 +89,7 @@ def local(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(worker, "DATA_DIR", tmp_path / "drafting")
     monkeypatch.setattr(worker, "LOCK_FILE", tmp_path / "drafting" / "worker.lock")
     monkeypatch.setattr(worker, "WORK_ROOT", tmp_path / "drafting" / "pursuits")
+    monkeypatch.setattr(worker, "_refreshed_at", [])   # each test's idle worker starts with no index refresh behind it
     return tmp_path
 
 

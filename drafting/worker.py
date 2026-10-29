@@ -263,11 +263,61 @@ def refresh_library() -> int | None:
     return lq.save_drive_items(gdrive.index_library(found, str(gdrive.library_id())))
 
 
+def _local_day(iso: str) -> str:
+    return datetime.fromisoformat(str(iso).replace("Z", "+00:00")).astimezone().date().isoformat()
+
+
+def _file_submissions(found: gdrive.Drive, sheets: gdrive.Sheets) -> int:
+    """Each proposal marked submitted at the gate, filed in the Proposal Library once (phase 6b)."""
+    filed = 0
+    for pursuit in lq.pursuits_to_file():
+        call = lq.get_call(pursuit["call_id"]) or {}
+        final = WORK_ROOT / f"pursuit-{pursuit['id']}" / "draft_final.docx"
+        try:
+            done = gdrive.file_submission(found, sheets, str(gdrive.library_id()), pursuit, call, final if final.is_file() else None,
+                                          _local_day(pursuit["submitted_at"]), lq.drive_folder_ids())
+        except gdrive.DriveError as exc:
+            log.warning("Could not file pursuit %s: %s", pursuit["id"], exc)
+            continue
+        lq.set_filed(pursuit["id"], done["folder_id"], done["path"], done["name"])
+        copied = (f"the final version is in 01_submitted/ as {done['copied']}" if done["copied"]
+                  else "there was no final version to put in 01_submitted/")
+        lq.add_event(pursuit["id"], lq.WORKER, "filed", f"Filed in the Proposal Library as {done['path']}; {copied}; {done['register']}")
+        filed += 1
+    return filed
+
+
+def _file_results(found: gdrive.Drive, sheets: gdrive.Sheets) -> int:
+    """Each recorded result, filed with its proposal once: the note in 03_outcome/ and the outcome on the Register."""
+    filed = 0
+    for pursuit in lq.results_to_file():
+        work = WORK_ROOT / f"pursuit-{pursuit['id']}"
+        work.mkdir(parents=True, exist_ok=True)
+        lines = [f"# Result: {str(pursuit['result']).replace('_', ' ')}", "",
+                 f"Recorded by {pursuit.get('result_by') or 'the team'} on {str(pursuit.get('result_at') or '')[:10]}."]
+        if pursuit.get("debrief"):
+            lines += ["", "## Debrief", "", str(pursuit["debrief"]).strip()]
+        if pursuit.get("next_time"):
+            lines += ["", "## What to do differently next time", "", str(pursuit["next_time"]).strip()]
+        note = work / "outcome.md"
+        note.write_text(fix_dashes("\n".join(lines)) + "\n", encoding="utf-8")
+        try:
+            saved = word.to_docx(note.read_text(encoding="utf-8"), note.with_suffix(".docx"), _word_format(pursuit["id"]))
+            said = gdrive.file_outcome(found, sheets, str(gdrive.library_id()), pursuit, saved)
+        except gdrive.DriveError as exc:
+            log.warning("Could not file pursuit %s's result: %s", pursuit["id"], exc)
+            continue
+        lq.add_event(pursuit["id"], lq.WORKER, "outcome_filed", f"Filed the result in 03_outcome/; {said}")
+        filed += 1
+    return filed
+
+
 def housekeeping(now: float | None = None) -> dict[str, Any]:
-    """While idle: the library's index every 15 minutes, and each no-go pursuit's folder moved to Submissions/_no-go/."""
+    """While idle: the library's index every 15 minutes, each no-go pursuit's folder moved to Submissions/_no-go/, and
+    each submitted proposal and recorded result filed in the Proposal Library."""
     found = _drive()
     if found is None:
-        return {"refreshed": False, "moved": 0}
+        return {"refreshed": False, "moved": 0, "filed": 0, "results": 0}
     now = time.monotonic() if now is None else now
     refreshed = False
     if not _refreshed_at or now < _refreshed_at[-1] or now - _refreshed_at[-1] >= REFRESH_S:
@@ -286,7 +336,16 @@ def housekeeping(now: float | None = None) -> dict[str, Any]:
             continue
         lq.add_event(pursuit["id"], lq.WORKER, "folder_moved", f"Moved the Drive folder to {gdrive.SUBMISSIONS}/{gdrive.NO_GO}/")
         moved += 1
-    return {"refreshed": refreshed, "moved": moved}
+    filed = results = 0
+    try:
+        sheets = gdrive.sheets_client()
+    except Exception as exc:   # noqa: BLE001 (a key that will not load for Sheets is logged; filing waits)
+        log.warning("Sheets could not start: %s", type(exc).__name__)
+        sheets = None
+    if sheets is not None:
+        filed = _file_submissions(found, sheets)
+        results = _file_results(found, sheets)
+    return {"refreshed": refreshed, "moved": moved, "filed": filed, "results": results}
 
 
 # ------------------------------------------------------------------------------ steps and jobs
