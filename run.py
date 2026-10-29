@@ -253,6 +253,18 @@ def run_review(portal: Portal, limit: int | None, no_review: bool) -> int:
     return len(rows)
 
 
+def run_summaries(portal: Portal, no_review: bool) -> int:
+    """Summaries for this portal's calls the review did not summarize, the keyword filter's rejects above all (phase
+    9c); the review writes the rest in the answer it already gives. --no-review asks no model."""
+    from ledger.queries import calls_without_summary
+    from review.reviewer import summarize_calls
+
+    rows = calls_without_summary(portal.name)
+    if no_review or not rows:
+        return 0
+    return summarize_calls(rows, review_model())
+
+
 def review_model() -> Any:
     """The reviewer's model client. Tests replace this with a scripted one."""
     from review.reviewer import AnthropicModel
@@ -345,19 +357,15 @@ SUMMARY_TOKENS_OUT = 400   # the summary line, and the thinking the model does b
 
 
 def backfill_summaries(dry_run: bool = False) -> int:
-    """Have Claude write the executive summary (phase 9c) for each kept and reviewed call that has none and is still
-    open or still waiting for a decision (Needs review lists those whatever their deadline), asking for the summary
-    alone. A dry run counts the calls and prices the run instead. Safe to rerun: a call that could not be summarized
-    is asked again next time."""
+    """Have Claude write the executive summary (phase 9c) for every call that has none, asking for the summary alone:
+    the keyword filter's rejects and decided calls too, since All calls and Home show them. A dry run counts the calls
+    and prices the run instead. Safe to rerun: a call that could not be summarized is asked again next time."""
     from drafting.costs import PRICES
-    from drafting.dates import parse_due
     from ledger.queries import calls_without_summary
     from review.reviewer import MODEL_ID, build_summary_prompt, summarize_calls
 
     _console_logging()
-    now = datetime.now(timezone.utc)
-    pending = [row for row in calls_without_summary()
-               if row.get("human_status") is None or (due := parse_due(row.get("due_date"))) is None or due >= now]
+    pending = calls_without_summary()
     if dry_run or not pending:
         price = PRICES[MODEL_ID]
         tokens_in = sum(len(build_summary_prompt(row)) // 4 for row in pending)
@@ -843,6 +851,11 @@ def run_portal(portal: Portal, args: argparse.Namespace, log_path: Path) -> dict
         t0 = time.time()
         counts["reviewed"] = run_review(portal, args.limit, args.no_review)
         log.info("REVIEW: %d rows (%.1fs)", counts["reviewed"], time.time() - t0)
+
+        try:
+            log.info("SUMMARIES: %d call(s) summarized", run_summaries(portal, args.no_review))
+        except Exception as exc:   # summaries are a convenience: never let them stop a scan
+            log.warning("SUMMARIES: skipped (%s: %s)", type(exc).__name__, str(exc)[:120])
 
         fresh = new_calls(run_id)
         counts["new"] = len(fresh)

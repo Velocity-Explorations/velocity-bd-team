@@ -277,6 +277,8 @@ export type TopTenRow = {
   due_date: string | null;
   days_left: number | null;
   description: string | null;
+  ai_summary: string | null;
+  extra: string | null;
   ai_verdict: string | null;
   ai_reasoning: string | null;
   human_status: string | null;
@@ -287,9 +289,10 @@ export type TopTenRow = {
 export async function topTenRows(ids: string[]): Promise<TopTenRow[]> {
   if (ids.length === 0) return [];
   const db = sql();
+  const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
   const rows = await db<TopTenRow[]>`
-    SELECT id, portal, title, url, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, description,
-           ai_verdict, ai_reasoning, human_status, human_by
+    SELECT id, portal, title, url, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, description, ${summary},
+           extra, ai_verdict, ai_reasoning, human_status, human_by
     FROM calls WHERE id IN ${db(ids)}`;
   return [...rows];
 }

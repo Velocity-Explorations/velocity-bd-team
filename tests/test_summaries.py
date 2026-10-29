@@ -45,26 +45,36 @@ def test_the_review_keeps_the_summary_and_works_without_one(ledger_db: str) -> N
     assert (found["ai_verdict"], found["ai_summary"]) == ("no", None)
 
 
-def test_the_backfill_summarizes_reviewed_calls_open_or_waiting_for_a_decision(ledger_db: str, monkeypatch: pytest.MonkeyPatch,
-                                                                  capsys: pytest.CaptureFixture[str]) -> None:
+def test_the_backfill_summarizes_every_call_without_a_summary(ledger_db: str, monkeypatch: pytest.MonkeyPatch,
+                                                             capsys: pytest.CaptureFixture[str]) -> None:
     reviewed("open-1", due_date="2099-01-15")
-    reviewed("open-2")
     reviewed("past", due_date="2020-01-15")
-    lq.set_human("past", "not_relevant", "David Wood")
-    reviewed("past-undecided", due_date="2020-01-15")   # past its deadline but still waiting for a decision
+    lq.set_human("past", "not_relevant", "David Wood")      # decided and past its deadline: still summarized
     reviewed("done", due_date="2099-01-15")
     lq.set_summary("done", "Already summarized.")
     seed("unreviewed", due_date="2099-01-15")
-    seed("rejected", kept=False, due_date="2099-01-15")
-    model = FakeModel([f"SUMMARY: {SUMMARY}"] * 3)
+    seed("rejected", kept=False, due_date="2099-01-15")     # the keyword filter's rejects show on All calls too
+    model = FakeModel([f"SUMMARY: {SUMMARY}"] * 4)
     monkeypatch.setattr(run, "review_model", lambda: model)
     assert run.backfill_summaries(dry_run=True) == 0
-    assert "3 calls need a summary; about $0.00 with claude-haiku-5-5" in capsys.readouterr().out
+    assert "4 calls need a summary; about $0.00 with claude-haiku-5-5" in capsys.readouterr().out
     assert lq.get_call("open-1")["ai_summary"] is None and model.prompts == []
     assert run.backfill_summaries() == 0
-    assert "Summarized 3 of 3 calls." in capsys.readouterr().out
-    assert [lq.get_call(c)["ai_summary"] for c in ("open-1", "open-2", "past-undecided", "past", "done", "unreviewed", "rejected")] == [
-        SUMMARY, SUMMARY, SUMMARY, None, "Already summarized.", None, None]
+    assert "Summarized 4 of 4 calls." in capsys.readouterr().out
+    assert [lq.get_call(c)["ai_summary"] for c in ("open-1", "past", "done", "unreviewed", "rejected")] == [
+        SUMMARY, SUMMARY, "Already summarized.", SUMMARY, SUMMARY]
     assert "SUMMARY:" in model.prompts[0] and "C2 software" in model.prompts[0]
     assert run.backfill_summaries() == 0   # a second pass finds nothing left
     assert "0 calls need a summary" in capsys.readouterr().out
+
+
+def test_each_scan_summarizes_the_calls_its_review_did_not(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    seed("rejected", kept=False)
+    seed("other-portal", kept=False, portal="SAM.gov")
+    model = FakeModel([f"SUMMARY: {SUMMARY}"])
+    monkeypatch.setattr(run, "review_model", lambda: model)
+    portal = type("P", (), {"name": "Vulcan SOF"})()
+    assert run.run_summaries(portal, no_review=False) == 1
+    assert lq.get_call("rejected")["ai_summary"] == SUMMARY
+    assert lq.get_call("other-portal")["ai_summary"] is None       # another portal's scan does its own
+    assert run.run_summaries(portal, no_review=True) == 0           # --no-review asks no model
