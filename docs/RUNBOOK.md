@@ -387,6 +387,13 @@ the last under the same link, and the step's card links to them. If Drive fails,
 and the card says so. While idle the worker refreshes the library's index for Builds on every quarter of an hour
 (`drive_items`), and moves a no-go pursuit's folder to `Submissions/_no-go/`.
 
+Once a proposal is marked submitted at its Submit gate, the idle worker files it:
+- **The folder** is renamed to the day it went in. The library's submission_id carries that date.
+- **The final version** goes into `01_submitted/` under its volume's name, for example `white-paper.docx`.
+- **The Register row** is added to the "00 Proposal Register" sheet with what the workspace knows: the id, title, portal, agency, type where the format settles it, dates, outcome `pending` and the folder's link. People fill in the rest, and the next sync brings it into the ledger.
+
+When its result is recorded, the outcome note goes to `03_outcome/`. The outcome goes onto that row, cancelled by the agency as `no_award`, with its date; the debrief fills why won or lost only while that cell is blank. Replace the file in `01_submitted/` with what actually went in if it differs. Calls marked Submitted outside the workspace are not filed, so their rows are never duplicated.
+
 If a key file is ever exposed (pasted, emailed or committed), delete that key on the service account's
 **Keys** tab, make a new one (step 4), and replace the file on this PC.
 

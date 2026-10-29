@@ -302,7 +302,7 @@ and its heartbeat in `workers`, not `runs`.
 | result_by | TEXT | who recorded it | same |
 | debrief | TEXT | the optional debrief note | same |
 | next_time | TEXT | the optional What to do differently next time, which the next alignment check reads | same |
-| submission_id | TEXT | `proposals.submission_id` once the Register row is written | the Register write on submit |
+| submission_id | TEXT | the folder name the proposal was filed under, `YYYY-MM-DD_portal_short-title` with the day it went in: the Register row's `submission_id` and, after the next Register sync, `proposals.submission_id` | the worker, filing it after Mark submitted (phase 6b) |
 | created_at | TEXT timestamp, not null | when the draft was started | Start the draft |
 | updated_at | TEXT timestamp, not null | touched by every write | every writer |
 
@@ -422,7 +422,7 @@ added. Added by `008_pursuits.sql`.
 | step_id | INTEGER | the `pursuit_steps.id` the line is about, when there is one | same |
 | at | TEXT timestamp, not null | | same |
 | who | TEXT, not null | a person's name, `worker`, or `worker (key gates only)` | same |
-| kind | TEXT, not null | one of `EVENT_KINDS` in `ledger/queries.py`: `started`, `step_saved`, `approved`, `auto_approved`, `go`, `go_with_conditions`, `changes_asked`, `retried`, `failed`, `blocked`, `stopped`, `no_go`, `closed`, `material`, `collaborators`, `builds_on`, `direction`, `checklist`, `budget`, `submitted`, `result`, `result_date`, `check_again` (Check again, PW22), `no_news` (No news yet, P4), `slack_ready` and `slack_behind` (a step's notice posted to Slack, PW18; who is `slack`), `drive` (the worker made the pursuit's Drive folder) and `folder_moved` (a no-go pursuit's folder moved to `Submissions/_no-go/`) | same |
+| kind | TEXT, not null | one of `EVENT_KINDS` in `ledger/queries.py`: `started`, `step_saved`, `approved`, `auto_approved`, `go`, `go_with_conditions`, `changes_asked`, `retried`, `failed`, `blocked`, `stopped`, `no_go`, `closed`, `material`, `collaborators`, `builds_on`, `direction`, `checklist`, `budget`, `submitted`, `result`, `result_date`, `check_again` (Check again, PW22), `no_news` (No news yet, P4), `slack_ready` and `slack_behind` (a step's notice posted to Slack, PW18; who is `slack`), `drive` (the worker made the pursuit's Drive folder), `folder_moved` (a no-go pursuit's folder moved to `Submissions/_no-go/`), `filed` (a submitted proposal filed in the Proposal Library) and `outcome_filed` (its result filed with it) | same |
 | text | TEXT, not null | the line in words, for example `Discovery approved`, or the link someone added | same |
 
 Index: `(pursuit_id, id)`. Add material (PW4: a link or a note) writes a `material` row; the

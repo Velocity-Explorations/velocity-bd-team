@@ -645,7 +645,7 @@ EVENT_KINDS = (
     "started", "step_saved", "approved", "auto_approved", "go", "go_with_conditions", "changes_asked", "retried",
     "failed", "blocked", "stopped", "no_go", "closed", "material", "collaborators", "builds_on", "direction",
     "checklist", "budget", "submitted", "result", "result_date", "check_again", "no_news", "slack_ready", "slack_behind",
-    "drive", "folder_moved",
+    "drive", "folder_moved", "filed", "outcome_filed",
 )
 _LIVE = "pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')"
 
@@ -1313,3 +1313,26 @@ def pursuits_to_tidy() -> list[dict[str, Any]]:
         return rows(q(conn, "SELECT * FROM pursuits p WHERE p.state = 'no_go' AND p.drive_folder_id IS NOT NULL "
                             "AND NOT EXISTS (SELECT 1 FROM pursuit_events e WHERE e.pursuit_id = p.id AND e.kind = 'folder_moved') "
                             "ORDER BY p.id"))
+
+
+def pursuits_to_file() -> list[dict[str, Any]]:
+    """Proposals marked submitted at the Submit gate and not yet filed in the Proposal Library."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM pursuits p WHERE p.state = 'submitted' AND EXISTS (SELECT 1 FROM pursuit_steps s "
+                            "WHERE s.pursuit_id = p.id AND s.step = 'submit' AND s.decision = 'submitted') "
+                            "AND NOT EXISTS (SELECT 1 FROM pursuit_events e WHERE e.pursuit_id = p.id AND e.kind = 'filed') ORDER BY p.id"))
+
+
+def results_to_file() -> list[dict[str, Any]]:
+    """Filed proposals whose result is recorded and not yet filed with it."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM pursuits p WHERE p.result IS NOT NULL AND p.submission_id IS NOT NULL "
+                            "AND p.drive_folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM pursuit_events e "
+                            "WHERE e.pursuit_id = p.id AND e.kind = 'outcome_filed') ORDER BY p.id"))
+
+
+def set_filed(pursuit_id: int, folder_id: str, path: str, submission_id: str) -> None:
+    """The filed proposal's folder, as it is named now, and its Register submission_id."""
+    with tx() as conn:
+        q(conn, "UPDATE pursuits SET drive_folder_id = ?, drive_folder_name = ?, submission_id = ?, updated_at = ? WHERE id = ?",
+          (folder_id, path, submission_id, now_iso(), pursuit_id))

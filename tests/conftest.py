@@ -48,3 +48,4 @@ def no_real_drive(monkeypatch: pytest.MonkeyPatch) -> None:
     from drafting import drive
 
     monkeypatch.setattr(drive, "client", lambda: None)
+    monkeypatch.setattr(drive, "sheets_client", lambda: None)

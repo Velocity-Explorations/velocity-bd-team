@@ -243,6 +243,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     to `Submissions/_no-go/`; `python -m drafting.worker --drive-check` reads only.
   - Phase 6b, part 2 (Builds on from Drive): Start the draft offers past work from the library's
     index, past submissions and company reference files; the Outline adds from it too, and Refresh
-    the list queues a re-index. The Register row and the folder moves on submit follow.
+    the list queues a re-index.
+  - Phase 6b, part 3 (filing): once marked submitted at the gate, the worker renames the proposal's
+    folder to the day it went in, puts the final version in `01_submitted/`, and adds its Register
+    row; a recorded result goes to `03_outcome/` and onto the row (cancelled as no_award). With this,
+    every phase but 11 (Google sign-in) is built.
 
 ## Known breakages
