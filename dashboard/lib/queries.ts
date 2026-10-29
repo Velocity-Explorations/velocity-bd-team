@@ -1209,7 +1209,7 @@ export async function approveStep(input: {
     if (done.length !== 1) return { ok: false, reason: staleReason(r) };
     const direction = (input.direction ?? "").trim().slice(0, 2000);
     if (direction && r.step === "alignment") {
-      // Alignment carries the direction forward (PW8): the owner's, Claude's angle, or a new one.
+      // Alignment carries the direction forward (PW8): the owner's, the Writer's angle, or a new one.
       const [current] = await tx<{ direction: string | null }[]>`SELECT direction FROM pursuits WHERE id = ${r.pursuit_id}`;
       if ((current?.direction ?? "").trim() !== direction) {
         await tx`UPDATE pursuits SET direction = ${direction}, updated_at = ${now} WHERE id = ${r.pursuit_id}`;

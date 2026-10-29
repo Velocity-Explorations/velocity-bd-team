@@ -43,6 +43,20 @@ def fake_slop_scanner(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def writer_on_its_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests draft with the default model whatever WRITER_MODEL the real .env names, and the Writer never
+    reaches xAI: a test of the Grok path puts a fake stream in its place."""
+    from drafting import llm
+
+    monkeypatch.setenv("WRITER_MODEL", "")
+
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise AssertionError("tests never reach xAI")
+
+    monkeypatch.setattr(llm, "_open", refuse)
+
+
+@pytest.fixture(autouse=True)
 def no_real_drive(monkeypatch: pytest.MonkeyPatch) -> None:
     """Tests never reach Google Drive, whatever .env says; a test that needs Drive puts a fake in its place."""
     from drafting import drive

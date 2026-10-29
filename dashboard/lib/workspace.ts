@@ -41,11 +41,11 @@ export const STAGES: { name: StageName; label: string; doing: string }[] = [
 /** The steps in order (PW3): nine numbered steps and two gates, each with what it is for (PW4). */
 export const STEPS: { name: string; label: string; number: number | null; stage: StageName; purpose: string }[] = [
   { name: "discovery", label: "Discovery", number: 1, stage: "qualify",
-    purpose: "Claude gathers everything about the call before anyone reads it: the page, every attachment, our past work and the team's record." },
+    purpose: "The Writer gathers everything about the call before anyone reads it: the page, every attachment, our past work and the team's record." },
   { name: "summary", label: "Opportunity summary", number: 2, stage: "qualify",
     purpose: "A two-minute read so you can decide whether the call is worth an alignment check." },
   { name: "alignment", label: "Alignment", number: 3, stage: "qualify",
-    purpose: "How well the call fits Velocity, and the angle Claude proposes, so the requirements step reads the call the way you mean to answer it." },
+    purpose: "How well the call fits Velocity, and the angle the Writer proposes, so the requirements step reads the call the way you mean to answer it." },
   { name: "requirements", label: "Requirements and checklist", number: 4, stage: "qualify",
     purpose: "Everything the submission must contain and every rule it must meet, so nothing is found missing at the end." },
   { name: "go_no_go", label: "Go or no-go", number: null, stage: "qualify",

@@ -291,7 +291,7 @@ export async function approveStepAction(formData: FormData): Promise<void> {
   const { stepId, expected, note } = stepFields(formData);
   const conditions = String(formData.get("conditions") ?? "").split(/\r?\n/).map((c) => c.trim().slice(0, 300)).filter(Boolean).slice(0, 20);
   const decision = String(formData.get("decision") ?? "") || undefined;
-  // Alignment's choice (PW8): keep the owner's direction, take Claude's angle, or write a new one.
+  // Alignment's choice (PW8): keep the owner's direction, take the Writer's angle, or write a new one.
   const choice = String(formData.get("direction_choice") ?? "");
   let direction: string | undefined;
   if (choice === "claude") {
@@ -370,7 +370,7 @@ export async function raiseCapAction(formData: FormData): Promise<void> {
   await workspaceWrite(back, () => raiseCap({ pursuitId: pursuit.id, by: viewer, budget: Math.round(budget * 100) / 100 }));
 }
 
-/** Add material (PW4, PW24): a note or a link for Claude, from the owner or anyone working with them. */
+/** Add material (PW4, PW24): a note or a link for the Writer, from the owner or anyone working with them. */
 export async function addMaterialAction(formData: FormData): Promise<void> {
   const { viewer, back, pursuit } = await workspaceActor(formData, "contribute");
   const stepId = Number(formData.get("step_id")) || null;
