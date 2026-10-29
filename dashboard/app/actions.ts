@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
+import { signIn, signOut } from "@/auth";
 import { isoNow, zonedToIso } from "@/lib/format";
+import { safeFrom, SIGNED_IN_COOKIE } from "@/lib/signin";
 import { timeZone } from "@/lib/me";
 import { aliasesFor } from "@/lib/people";
 import { profileFromForm } from "@/lib/profile";
@@ -472,4 +474,15 @@ export async function recordResultAction(formData: FormData): Promise<void> {
 export async function refreshLibraryAction(formData: FormData): Promise<void> {
   const { viewer, back } = await workspaceActor(formData, "contribute");
   await workspaceWrite(back, () => refreshLibrary({ by: viewer }));
+}
+
+/** Sign in with Google (U7): Auth.js sends the person to Google, then back to the page they asked for. */
+export async function signInAction(formData: FormData): Promise<void> {
+  await signIn("google", { redirectTo: safeFrom(String(formData.get("from") ?? "")) });
+}
+
+/** Log out (U7): the session ends and the sign-in page says so. */
+export async function signOutAction(): Promise<void> {
+  (await cookies()).delete(SIGNED_IN_COOKIE);
+  await signOut({ redirectTo: "/login?reason=signed_out" });
 }

@@ -427,6 +427,42 @@ While the judges are being trained, everyone decides every call: each person's r
 holds the calls they have not decided. To go back to one decision per call, set
 `DASHBOARD_QUEUE=shared` in `dashboard/.env.local` and restart the dashboard.
 
+### Google sign-in
+
+With Google sign-in set up, every page of the dashboard needs a session (phase 11). People sign in at
+`/login` with their Velocity Google account, and only emails on DASHBOARD_USERS get in. Who decides
+then comes from the session: the name picker goes, and owner-only actions are the owner's alone. A
+session lasts 12 hours. Until the three settings below are in `dashboard/.env.local`, the dashboard
+keeps the name picker. It takes about 10 minutes in the browser, in the same `velocity-bd-team`
+Cloud project as the service account.
+
+1. **The consent screen.** In https://console.cloud.google.com, with `velocity-bd-team` selected, open
+   **APIs and services**, then **OAuth consent screen**. If there is no app yet, choose **Get started**:
+   - name it `BD Team` and choose your email for support;
+   - set the audience to **Internal**, so only velocityexplorations.com accounts can use it;
+   - give your email as the contact, and choose **Create**.
+2. **The OAuth client.** Open **Clients** (or **Credentials**, then **Create credentials**, then
+   **OAuth client ID**):
+   - choose **Web application** and name it `BD Team dashboard`;
+   - under **Authorized redirect URIs**, add `http://localhost:8000/api/auth/callback/google`. Once the
+     dashboard is hosted, add `https://<its address>/api/auth/callback/google` as well;
+   - choose **Create**. Google shows a client ID and a client secret. Keep that window open for step 3,
+     and never paste them in a chat or a ticket.
+3. **The settings.** Open `dashboard/.env.local` in VS Code and add the two values Google showed:
+   ```
+   AUTH_GOOGLE_ID=<the client ID>
+   AUTH_GOOGLE_SECRET=<the client secret>
+   ```
+   Then, in a terminal in the `dashboard` folder, run `npx auth secret`. It adds a random `AUTH_SECRET`
+   to `.env.local` for you.
+4. **The people.** Each person on DASHBOARD_USERS needs their Google email, as
+   `David Wood <david@velocityexplorations.com>=<Slack id>`. Someone without an email cannot sign in.
+5. **Restart the dashboard.** Opening it now goes to the sign-in page. Choose **Sign in with Google**.
+   Log out is in the account menu at the top right.
+
+If the client secret is ever exposed, open the OAuth client, add a new secret, delete the old one, and
+put the new one in `.env.local`.
+
 ## Running the stages separately
 
 The stage commands from earlier phases still work and share the same ledger:
