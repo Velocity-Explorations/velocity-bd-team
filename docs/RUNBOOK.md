@@ -365,16 +365,27 @@ stays on this PC.
    - Shared drives need a Google Workspace plan that includes them. If **Shared drives** is missing from the
      menu, the plan does not include them; tell Claude, and the worker will use a folder shared with the
      service account instead.
+   - If the library folder is already on a shared drive, as Velocity's is (checked 29 Oct), nothing moves: add
+     the service account to the folder itself, as a Content manager. It can then list, create, move and trash
+     there. It cannot delete for good, so the worker only ever trashes.
 6. **Point the repo at the key file.** Open `.env` in the repo folder in a text editor and add one line with
    the file's full path, for example:
    ```
    GOOGLE_SERVICE_ACCOUNT_FILE=C:\Users\<you>\.velocity\bd-worker.json
    ```
-   Save the file. `.env` is never committed.
+   Save the file. `.env` is never committed. Google names the downloaded key after the project and the key's
+   id; either rename it to the name on this line or put its own name here.
 7. **Check it.** In the repo folder, with the venv active, run `python -m config`. It should list
-   `GOOGLE_SERVICE_ACCOUNT_FILE` as set (it never shows values). Once the worker's Drive support is
-   built, `python -m drafting.worker --drive-check` lists the library folder through the service account, which proves
-   steps 1 to 6 worked.
+   `GOOGLE_SERVICE_ACCOUNT_FILE` as set (it never shows values). Then `python -m drafting.worker --drive-check`
+   reads the library folder through the service account and says what it found; it never writes. Run
+   `pip install -r requirements.txt` first for Google's libraries.
+
+Once Drive is set up, the worker (docs/RUNBOOK.md, The worker) makes each pursuit's folder,
+`Submissions/<YYYY-MM-DD_portal_short-title>/` with its four folders, the first time one of its steps runs;
+the date is the day the draft started. Each step's Word files go to its `02_working/`, a new version replacing
+the last under the same link, and the step's card links to them. If Drive fails, the files stay on this PC
+and the card says so. While idle the worker refreshes the library's index for Builds on every quarter of an hour
+(`drive_items`), and moves a no-go pursuit's folder to `Submissions/_no-go/`.
 
 If a key file is ever exposed (pasted, emailed or committed), delete that key on the service account's
 **Keys** tab, make a new one (step 4), and replace the file on this PC.

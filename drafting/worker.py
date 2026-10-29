@@ -17,9 +17,14 @@ crosses the cap. Before each call, and every 30 seconds during one, the worker c
 pursuit is still being worked and stops the step when the owner closed it. The work is saved ready,
 or failed with the reason; with key gates only, the worker approves it (accepting the reviewers'
 changes at Reviews) and queues the next step (PW5). With no step waiting it runs the oldest job,
-such as Check again on the AI slop check (PW22). Files stay under data/drafting/pursuits/pursuit-<id>/
-until Drive (phase 6), and the card's text, like every file, has its dashes replaced. The worker logs
-ids, states and costs, never a call's text or title.
+such as Check again on the AI slop check (PW22) or a refresh of the Proposal Library's index. Files are written
+under data/drafting/pursuits/pursuit-<id>/, and once Drive is set up (docs/RUNBOOK.md) each step's Word files also go
+to the pursuit's folder in the Proposal Library, its 02_working/, made the first time a step runs (phase 6b). Drive
+failing never fails a step: the files stay on the PC and the card says so. While idle the worker refreshes the
+library's index every 15 minutes and moves a no-go pursuit's folder to Submissions/_no-go/. The card's text, like
+every file, has its dashes replaced. The worker logs ids, states and costs, never a call's text or title.
+
+    python -m drafting.worker --drive-check   # can the service account read the library? It only reads
 """
 from __future__ import annotations
 
@@ -31,12 +36,14 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable, Mapping
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from drafting import costs, inputs, llm, qualify, scan, slop_gate, word, write
+from drafting import drive as gdrive
 from drafting.pipeline import PHASE_TIMEOUT_S
 from drafting.prompts import Prompt
 from drafting.steps import StepContext, StepResult, fix_dashes, latest_draft
@@ -52,6 +59,8 @@ WATCH_S = 30
 BUDGET_REACHED = "budget reached"
 LEFT_WORKING = "The worker stopped while it worked on this step. Retry runs it again."
 RUNNERS: dict[str, Callable[[StepContext], StepResult]] = {**qualify.RUNNERS, **write.RUNNERS}
+REFRESH_S = 15 * 60   # how often the idle worker refreshes the Proposal Library's index
+_refreshed_at: list[float] = []
 
 log = logging.getLogger("drafting.worker")
 
@@ -196,6 +205,92 @@ def _why(exc: Exception) -> str:
     return text[:300]
 
 
+# ------------------------------------------------------------------------------ Drive (phase 6b)
+
+def _drive() -> gdrive.Drive | None:
+    """The worker's Drive, or None until it is set up; a key that will not load is logged, not raised."""
+    try:
+        return gdrive.client()
+    except Exception as exc:   # noqa: BLE001 (a bad key file must not stop the steps)
+        log.warning("Drive could not start: %s", type(exc).__name__)
+        return None
+
+
+def _started_on(pursuit: Mapping[str, Any]) -> str:
+    """The day the draft started, on this PC's clock, as Start the draft named the folder."""
+    return datetime.fromisoformat(str(pursuit["created_at"]).replace("Z", "+00:00")).astimezone().date().isoformat()
+
+
+def _folder(found: gdrive.Drive, pursuit: Mapping[str, Any]) -> str:
+    """The pursuit's folder in the Proposal Library, made the first time one of its steps runs."""
+    if pursuit.get("drive_folder_id"):
+        return str(pursuit["drive_folder_id"])
+    call = lq.get_call(pursuit["call_id"]) or {}
+    name = gdrive.folder_name(_started_on(pursuit), str(call.get("portal") or "other"), call.get("title"))
+    made = gdrive.pursuit_folder(found, str(gdrive.library_id()), name, lq.drive_folder_ids())
+    if lq.set_drive_folder(pursuit["id"], made["id"], made["path"]):
+        lq.add_event(pursuit["id"], lq.WORKER, "drive", f"Made the Drive folder {made['path']}")
+        return made["id"]
+    return str((lq.get_pursuit(pursuit["id"]) or {}).get("drive_folder_id") or made["id"])
+
+
+def _to_drive(files: list[dict[str, Any]], pursuit: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Each file's Word version (or the file itself) into the pursuit's 02_working/, its entry given the link. On a
+    Drive failure the entries stay as they were: the files are on the PC and the card says so."""
+    found = _drive() if files else None
+    if found is None:
+        return files
+    try:
+        folder = _folder(found, pursuit)
+        out = []
+        for entry in files:
+            path = WORK_ROOT / str(entry.get("word") or entry.get("local") or "")
+            if path.is_file():
+                saved = gdrive.upload(found, folder, path)
+                entry = {**entry, "link": saved["link"], "drive_id": saved["id"]}
+            out.append(entry)
+        return out
+    except gdrive.DriveError as exc:
+        log.warning("Drive: %s; pursuit %s's files stay on this PC", exc, pursuit["id"])
+        return files
+
+
+def refresh_library() -> int | None:
+    """The Proposal Library's index for Builds on (drive_items); None without Drive."""
+    found = _drive()
+    if found is None:
+        return None
+    return lq.save_drive_items(gdrive.index_library(found, str(gdrive.library_id())))
+
+
+def housekeeping(now: float | None = None) -> dict[str, Any]:
+    """While idle: the library's index every 15 minutes, and each no-go pursuit's folder moved to Submissions/_no-go/."""
+    found = _drive()
+    if found is None:
+        return {"refreshed": False, "moved": 0}
+    now = time.monotonic() if now is None else now
+    refreshed = False
+    if not _refreshed_at or now < _refreshed_at[-1] or now - _refreshed_at[-1] >= REFRESH_S:
+        _refreshed_at[:] = [now]
+        try:
+            lq.save_drive_items(gdrive.index_library(found, str(gdrive.library_id())))
+            refreshed = True
+        except gdrive.DriveError as exc:
+            log.warning("Could not refresh the library's index: %s", exc)
+    moved = 0
+    for pursuit in lq.pursuits_to_tidy():
+        try:
+            gdrive.move_to_no_go(found, str(gdrive.library_id()), pursuit["drive_folder_id"])
+        except gdrive.DriveError as exc:
+            log.warning("Could not move pursuit %s's folder: %s", pursuit["id"], exc)
+            continue
+        lq.add_event(pursuit["id"], lq.WORKER, "folder_moved", f"Moved the Drive folder to {gdrive.SUBMISSIONS}/{gdrive.NO_GO}/")
+        moved += 1
+    return {"refreshed": refreshed, "moved": moved}
+
+
+# ------------------------------------------------------------------------------ steps and jobs
+
 def _run(step: dict[str, Any], pursuit: dict[str, Any], label: str, doing: str, generate: Callable[..., str],
          model: str, today: date) -> None:
     runner = RUNNERS.get(step["step"])
@@ -243,7 +338,8 @@ def _run(step: dict[str, Any], pursuit: dict[str, Any], label: str, doing: str, 
         return
     finally:
         watcher.stop()
-    if not lq.finish_step(step["id"], summary=_undashed(result.summary) or None, files=result.files or None,
+    files = _to_drive(list(result.files or []), pursuit)
+    if not lq.finish_step(step["id"], summary=_undashed(result.summary) or None, files=files or None,
                           content=_undashed(result.content) or None, cost_usd=meter.cost):
         lq.stop_step(step["id"], meter.cost)
         log.info("Step %s finished after its pursuit was closed; stopped", step["id"])
@@ -257,12 +353,20 @@ def _run(step: dict[str, Any], pursuit: dict[str, Any], label: str, doing: str, 
 
 
 def run_job(job: dict[str, Any]) -> None:
-    """A job other than a step: Check again (PW22) scans the pursuit's newest draft. A Drive refresh waits for Drive."""
+    """A job other than a step: Check again (PW22) scans the pursuit's newest draft; a Drive refresh indexes the
+    Proposal Library for Builds on."""
     lq.worker_beat(lq.WORKER, "working", f"{job['kind']} (job {job['id']})")
     log.info("Job %s claimed: %s, pursuit %s", job["id"], job["kind"], job["pursuit_id"])
     try:
+        if job["kind"] == "drive_refresh":
+            count = refresh_library()
+            if count is None:
+                lq.finish_job(job["id"], "failed", "Drive is not set up yet.")
+            else:
+                lq.finish_job(job["id"], "done", f"Indexed {count} {'item' if count == 1 else 'items'} from the Proposal Library.")
+            return
         if job["kind"] != "slop_scan":
-            lq.finish_job(job["id"], "failed", "Drive is not set up yet.")
+            lq.finish_job(job["id"], "failed", f"The worker has no job called {job['kind']}.")
             return
         draft = latest_draft(WORK_ROOT / f"pursuit-{job['pursuit_id']}")
         if draft is None:
@@ -334,6 +438,10 @@ def serve(once: bool = False, poll_s: float = POLL_S, generate: Callable[..., st
             if once:
                 break
             if not ran:
+                try:
+                    housekeeping()
+                except Exception as exc:   # noqa: BLE001 (the steps go on whatever Drive does)
+                    log.warning("Housekeeping failed: %s", type(exc).__name__)
                 stop.wait(poll_s)
                 try:
                     lq.worker_beat(lq.WORKER, "idle")
@@ -367,7 +475,17 @@ def main(argv: list[str] | None = None) -> int:
                                      description="Run the proposal workspace's steps (docs/RUNBOOK.md, The worker)")
     parser.add_argument("--once", action="store_true", help="run at most one queued step, then exit")
     parser.add_argument("--debug", action="store_true", help="log full prompts (DEBUG); never in production")
+    parser.add_argument("--drive-check", action="store_true",
+                        help="check that the service account can read the Proposal Library, then exit; it only reads")
     args = parser.parse_args(argv)
+    if args.drive_check:
+        found = _drive()
+        if found is None:
+            print("Drive is not set up: set GOOGLE_SERVICE_ACCOUNT_FILE and LIBRARY_DRIVE_FOLDER_ID in .env (docs/RUNBOOK.md).")
+            return 1
+        for line in gdrive.check(found, str(gdrive.library_id())):
+            print(line)
+        return 0
     setup_logging(debug=args.debug)
     try:
         return serve(once=args.once)

@@ -645,6 +645,7 @@ EVENT_KINDS = (
     "started", "step_saved", "approved", "auto_approved", "go", "go_with_conditions", "changes_asked", "retried",
     "failed", "blocked", "stopped", "no_go", "closed", "material", "collaborators", "builds_on", "direction",
     "checklist", "budget", "submitted", "result", "result_date", "check_again", "no_news", "slack_ready", "slack_behind",
+    "drive", "folder_moved",
 )
 _LIVE = "pursuit_id IN (SELECT id FROM pursuits WHERE state = 'working')"
 
@@ -1271,3 +1272,44 @@ def steps_waiting_on_owners() -> list[dict[str, Any]]:
         return rows(q(conn, f"SELECT {_NOTICE_COLUMNS} WHERE p.state = 'working' AND {_LATEST} "
                             "AND (s.state = 'ready' OR (s.state IN ('failed', 'blocked') AND s.decision IS NULL)) "
                             "ORDER BY p.owner, s.id"))
+
+
+# ------------------------------------------------------------------------- Google Drive (phase 6b)
+
+def set_drive_folder(pursuit_id: int, folder_id: str, name: str) -> bool:
+    """The pursuit's folder in the Proposal Library, once: False when it has one already."""
+    with tx() as conn:
+        cur = q(conn, "UPDATE pursuits SET drive_folder_id = ?, drive_folder_name = ?, updated_at = ? "
+                      "WHERE id = ? AND drive_folder_id IS NULL", (folder_id, name, now_iso(), pursuit_id))
+        return cur.rowcount == 1
+
+
+def drive_folder_ids() -> set[str]:
+    """Every pursuit's Drive folder, so a new folder never takes one that is in use."""
+    with tx() as conn:
+        return {r["drive_folder_id"] for r in rows(q(conn, "SELECT drive_folder_id FROM pursuits WHERE drive_folder_id IS NOT NULL"))}
+
+
+def save_drive_items(items: Sequence[Mapping[str, Any]]) -> int:
+    """The index of the Proposal Library for Builds on, replaced whole so it mirrors the library."""
+    with tx() as conn:
+        q(conn, "DELETE FROM drive_items")
+        for item in items:
+            q(conn, "INSERT INTO drive_items (id, name, mime, path, parent_id, web_link, modified_at, indexed_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+              (item["id"], item["name"], item.get("mime"), item.get("path"), item.get("parent_id"), item.get("web_link"),
+               item.get("modified_at"), item["indexed_at"]))
+    return len(items)
+
+
+def drive_items() -> list[dict[str, Any]]:
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM drive_items ORDER BY path, id"))
+
+
+def pursuits_to_tidy() -> list[dict[str, Any]]:
+    """Pursuits stopped with a no-go whose Drive folder has not moved to Submissions/_no-go/ yet."""
+    with tx() as conn:
+        return rows(q(conn, "SELECT * FROM pursuits p WHERE p.state = 'no_go' AND p.drive_folder_id IS NOT NULL "
+                            "AND NOT EXISTS (SELECT 1 FROM pursuit_events e WHERE e.pursuit_id = p.id AND e.kind = 'folder_moved') "
+                            "ORDER BY p.id"))
