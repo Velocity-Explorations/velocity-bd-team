@@ -16,7 +16,7 @@ import { pastWorkGroups, pastWorkLabel } from "@/lib/pastwork";
 import { overdueCount, sortIntoViews } from "@/lib/proposals";
 import { countStepsReadyFor, countWaitingRequests, pastWork, proposalCalls, queueCounts } from "@/lib/queries";
 import { hiddenColumns, queueMode } from "@/lib/settings";
-import { allowlist, iapAudience, viewerHeader } from "@/lib/viewer";
+import { allowlist, iapAudience, sessionMode, viewerHeader } from "@/lib/viewer";
 
 const ICONS: Record<Section, LucideIcon> = { home: House, calls: Inbox, proposals: FileText, automation: Workflow };
 
@@ -38,6 +38,7 @@ async function sectionCounts(viewer: string | null): Promise<Record<Exclude<Sect
 
 /** How the viewer is known, and what to say when they cannot decide. */
 function viewerMode(): { mode: ViewerMode; why: string } {
+  if (sessionMode()) return { mode: "session", why: "This Google account is not in DASHBOARD_USERS" };
   if (iapAudience()) return { mode: "header", why: "This Google account is not in DASHBOARD_USERS" };
   const header = viewerHeader();
   if (header) return { mode: "header", why: `The ${header} header is missing or not on the allowlist` };

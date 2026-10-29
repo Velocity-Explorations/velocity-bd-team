@@ -246,7 +246,12 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     the list queues a re-index.
   - Phase 6b, part 3 (filing): once marked submitted at the gate, the worker renames the proposal's
     folder to the day it went in, puts the final version in `01_submitted/`, and adds its Register
-    row; a recorded result goes to `03_outcome/` and onto the row (cancelled as no_award). With this,
-    every phase but 11 (Google sign-in) is built.
+    row; a recorded result goes to `03_outcome/` and onto the row (cancelled as no_award).
+  - Phase 11 (Google sign-in inside the dashboard, Auth.js): `/login`, Google sign-in for verified
+    velocityexplorations.com accounts on DASHBOARD_USERS, 12-hour sessions, Log out; signed out, every
+    page goes to `/login`; the session alone names the viewer, so owner-only actions are enforced. It is
+    switched on by AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET and AUTH_SECRET in `dashboard/.env.local`
+    (docs/RUNBOOK.md, Google sign-in); until David makes the OAuth client, the name picker stays. With
+    this, every phase of the redesign plan is built; hosting (PRO-477) gives sign-in its HTTPS address.
 
 ## Known breakages

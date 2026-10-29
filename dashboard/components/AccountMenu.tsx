@@ -1,12 +1,12 @@
 import { ChevronDown, LogOut, Settings2, UserRound } from "lucide-react";
 import Link from "next/link";
-import { clearViewer, setViewer } from "@/app/actions";
+import { clearViewer, setViewer, signOutAction } from "@/app/actions";
 
 /**
  * Who decides: from the picker (a cookie, until Google sign-in), from a sign-in proxy's header, the one
  * allowed person, or nobody when DASHBOARD_USERS is empty.
  */
-export type ViewerMode = "picker" | "header" | "single" | "none";
+export type ViewerMode = "picker" | "header" | "single" | "none" | "session";
 
 /** A person as the menu shows them: the name decisions are recorded under, their shown name and initials (U2). */
 export type MenuPerson = { name: string; label: string; initials: string };
@@ -79,6 +79,14 @@ export function AccountMenu({ viewer, people, mode, why, tableSettings }: {
         ) : null}
         {mode === "picker" && viewer ? (
           <form action={clearViewer} className="menu-group">
+            <button type="submit" className="menu-item">
+              <LogOut aria-hidden="true" />
+              Log out
+            </button>
+          </form>
+        ) : null}
+        {mode === "session" ? (
+          <form action={signOutAction} className="menu-group">
             <button type="submit" className="menu-item">
               <LogOut aria-hidden="true" />
               Log out

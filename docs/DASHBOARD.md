@@ -217,6 +217,26 @@ scanner and saves each scan in `slop_scans`; the page only reads the newest row 
 - **Check again (PW22):** the owner or anyone working with them queues a scan of the newest draft (a `worker_jobs` row), one at a time per pursuit. The page shows it queued or working with its start time, keeps the last result until the new one is saved, and says when a Check again did not run.
 - **Words (PW23):** the page reports writing patterns and their fixes only, never who or what wrote the text; a unit test fails if any dashboard source speaks of AI authorship or a probability of it.
 
+## Sign-in
+
+`/login` (U7, phase 11) is the BD Team sign-in page: the Velocity mark, Sign in with Google, Reset
+password (Google's account recovery) and Need access? Ask an admin. There is no sign-up: an admin adds
+people to DASHBOARD_USERS, each with their Google email. It says in words why someone is there:
+signed out, timed out (the 12-hour session ended), not allowed (a Google account not on the list, or
+not the company's), or cancelled. Dark only.
+
+- **Who gets in:** Auth.js (`dashboard/auth.ts`) runs Google's sign-in for the velocityexplorations.com
+  Workspace. A verified company account whose email is on DASHBOARD_USERS gets in, as that person's
+  name (`lib/signin.ts`).
+- **Every page:** signed out, every page goes to `/login`, and back to the page asked for after
+  sign-in (`proxy.ts`). The sign-in page, its files, Auth.js's routes and `/healthz` need no session.
+- **Who decides:** the session alone says who is deciding, checked on every page and action. The name
+  picker and its cookie count for nothing, so owner-only actions are enforced rather than courtesy
+  checks. Log out is in the account menu and ends the session.
+- **Until it is set up:** without `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` and `AUTH_SECRET`, the dashboard
+  keeps the name picker, and `/login` says sign-in is not set up. Setup is in docs/RUNBOOK.md, Google
+  sign-in.
+
 ## Profile settings
 
 `/profile` (PRO-574), from Profile settings in the account menu, keeps each person's settings in
