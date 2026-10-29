@@ -9,7 +9,7 @@ test("a portal's own text shows its first 300 characters, the rest on hover (Q13
   assert.equal(cell.label, null);
   assert.equal(cell.text, LONG.slice(0, 300).trimEnd() + "…");
   assert.equal(cell.full, LONG);
-  assert.deepEqual(descriptionCell("SAM.gov", "  Short.  ", null), { label: null, text: "Short.", full: "Short." });
+  assert.deepEqual(descriptionCell("SAM.gov", "  Short.  ", null), { label: null, text: "Short.", full: "Short.", summary: false });
 });
 
 test("text the scanner wrote is labelled Scanner summary", () => {
@@ -21,12 +21,12 @@ test("text the scanner wrote is labelled Scanner summary", () => {
 test("a members-only page says Members only in place of its placeholder", () => {
   const extra = JSON.stringify({ nstxl_members_only: true });
   const cell = descriptionCell("NSTXL", "Member-only page on NSTXL: sign in as a member to read it.", extra);
-  assert.deepEqual(cell, { label: "Members only", text: "", full: "Member-only page on NSTXL: sign in as a member to read it." });
+  assert.deepEqual(cell, { label: "Members only", text: "", full: "Member-only page on NSTXL: sign in as a member to read it.", summary: false });
   assert.equal(descriptionCell("NSTXL", "Open project text.", "{}").label, null);
 });
 
 test("no description gives an empty cell", () => {
-  assert.deepEqual(descriptionCell("DIU", null, null), { label: null, text: "", full: "" });
+  assert.deepEqual(descriptionCell("DIU", null, null), { label: null, text: "", full: "", summary: false });
 });
 
 test("the details line keeps plain facts; badges go to their own line", () => {
@@ -55,12 +55,13 @@ test("the reasons panel lists where each detail comes from, and the deadline's s
   assert.deepEqual(detailSources([{ text: "x" }], null), []);
 });
 
-test("Claude's executive summary takes the cell, with the portal's own words on hover (phase 9c)", () => {
+test("Claude's executive summary takes the cell unlabelled, the column being Summary description (phase 9c)", () => {
   const summary = "The Army wants offline AI decision aids. Sources Sought; answers due 1 Dec 2026.";
-  assert.deepEqual(descriptionCell("SAM.gov", LONG, null, summary), { label: "Summary", text: summary, full: LONG });
+  assert.deepEqual(descriptionCell("SAM.gov", LONG, null, summary), { label: null, text: summary, full: LONG, summary: true });
   assert.deepEqual(descriptionCell("AFWERX", "Written by the adapter.", null, summary),
-    { label: "Summary", text: summary, full: "Written by the adapter." });
-  assert.equal(descriptionCell("SAM.gov", LONG, null, "  ").label, null);
+    { label: null, text: summary, full: "Written by the adapter.", summary: true });
+  assert.equal(descriptionCell("SAM.gov", LONG, null, "  ").summary, false);
   const members = JSON.stringify({ nstxl_members_only: true });
-  assert.equal(descriptionCell("NSTXL", "Member-only page.", members, summary).label, "Members only");
+  assert.deepEqual(descriptionCell("NSTXL", "Member-only page.", members, summary),
+    { label: "Members only", text: "", full: "Member-only page.", summary: false });
 });

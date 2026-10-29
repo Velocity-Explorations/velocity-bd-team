@@ -204,7 +204,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                   ) : null}
                   {show("description") ? (
                     <HeaderCell
-                      label="Description"
+                      label="Summary description"
                       className="wide"
                       menu={{ search: search("desc", "Search descriptions, Enter to apply"), active: Boolean(filters.desc), hide: { page: "calls", key: "description" } }}
                     />

@@ -238,7 +238,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
                   ) : null}
                   {show("description") ? (
                     <HeaderCell
-                      label="Description"
+                      label="Summary description"
                       className="wide"
                       menu={{ search: search("desc", "Search descriptions, Enter to apply"), active: Boolean(filters.desc), hide: { page: "queue", key: "description" } }}
                     />

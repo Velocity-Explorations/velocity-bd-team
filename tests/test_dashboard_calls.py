@@ -58,14 +58,16 @@ def test_the_queue_shows_the_handoffs_columns(page: Any) -> None:
     open_page(page, "/review")
     if page.locator("table.calls-table").count() == 0:
         pytest.skip("nothing is waiting, so the queue has no table")
-    assert headers(page) == ["Call", "Votes", "Description", "AI reason", "Due", "Decide"]
+    assert headers(page) == ["Call", "Votes", "Summary description", "AI reason", "Due", "Decide"]
 
 
 def test_all_calls_shows_the_handoffs_columns(page: Any) -> None:
     open_page(page, "/calls")
     if page.locator("table.calls-table").count() == 0:
         pytest.skip("the ledger has no calls")
-    assert headers(page) == ["Call", "Filter", "Votes", "Description", "AI reason", "Due", "Decide"]
+    assert headers(page) == ["Call", "Filter", "Votes", "Summary description", "AI reason", "Due", "Decide"]
+    # The header says what the cells hold, so a summary carries no label of its own.
+    assert "summary" not in [t.strip().lower() for t in page.locator("table.calls-table .desc-label").all_inner_texts()]
 
 
 def test_top_10_lists_at_most_ten_calls(page: Any) -> None:
@@ -83,7 +85,7 @@ def test_below_1280px_the_reason_folds_under_the_call(page: Any) -> None:
     assert column.is_visible() and not folded.is_visible()
     page.set_viewport_size({"width": 1279, "height": 900})
     assert not column.is_visible() and folded.is_visible()
-    assert not page.locator("table.calls-table thead th", has_text="Description").is_visible()
+    assert not page.locator("table.calls-table thead th", has_text="Summary description").is_visible()
 
 
 def first_row(page: Any) -> Any:
@@ -120,7 +122,7 @@ def test_a_note_button_opens_the_reasons_panel_and_close_hands_focus_back(page: 
 
 def test_a_header_menu_holds_sorts_search_hide_column_and_table_settings(page: Any) -> None:
     open_page(page, "/calls")
-    header = page.locator("table.calls-table thead th", has_text="Description")
+    header = page.locator("table.calls-table thead th", has_text="Summary description")
     header.locator("summary").click()
     body = header.locator(".menu-body")
     assert body.locator("input[type=search][name=desc]").count() == 1
@@ -136,7 +138,7 @@ def test_hide_column_hides_it_until_table_settings_resets(page: Any) -> None:
     open_page(page, "/review")
     if page.locator("table.calls-table").count() == 0:
         pytest.skip("nothing is waiting, so the queue has no table")
-    header = page.locator("table.calls-table thead th", has_text="Description")
+    header = page.locator("table.calls-table thead th", has_text="Summary description")
     header.locator("summary").click()
     header.get_by_role("button", name="Hide column").click()
     page.wait_for_timeout(2000)
@@ -146,8 +148,8 @@ def test_hide_column_hides_it_until_table_settings_resets(page: Any) -> None:
     page.locator("dialog#table-settings").get_by_role("button", name="Reset to defaults").click()
     page.wait_for_timeout(2000)
     page.reload(wait_until="load")
-    assert "Description" not in hidden
-    assert "Description" in headers(page)
+    assert "Summary description" not in hidden
+    assert "Summary description" in headers(page)
 
 
 def test_a_keyword_search_narrows_the_table_and_presses_no_card(page: Any) -> None:

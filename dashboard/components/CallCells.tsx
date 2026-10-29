@@ -116,8 +116,8 @@ export function VotesCell({ callId, verdicts, votes, notesBy }: { callId: string
   );
 }
 
-/** Description (Q13, phase 9c): Claude's executive summary, else 300 characters of the description over four lines; the
- *  portal's own words in full on hover and keyboard focus, labelled where the text is not the portal's. */
+/** Summary description (Q13, phase 9c): Claude's executive summary, else 300 characters of the description over four
+ *  lines, labelled where an adapter wrote it or NSTXL hides it; the portal's own words in full on hover and keyboard focus. */
 export function DescriptionCell({ portal, description, extra, summary }: {
   portal: string;
   description: string | null;
@@ -128,7 +128,7 @@ export function DescriptionCell({ portal, description, extra, summary }: {
   return (
     <td className="description wide">
       {cell.label || cell.text ? (
-        <p className={cell.label === "Summary" ? "clamp-4 whole" : "clamp-4"} title={cell.full || undefined} tabIndex={cell.full ? 0 : undefined}>
+        <p className={cell.summary ? "clamp-4 whole" : "clamp-4"} title={cell.full || undefined} tabIndex={cell.full ? 0 : undefined}>
           {cell.label ? <span className="desc-label">{cell.label}</span> : null}
           {cell.label && cell.text ? " " : null}
           {cell.text}
