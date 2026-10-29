@@ -130,8 +130,8 @@ for review, the Proposal Library, drafting, and dashboard. Rules:
   (VELOCITY_GMAIL_APP_USERNAME, VELOCITY_GMAIL_APP_PASSWORD in .env); portals/vulcan_sof/otp.py switches to gog automatically once it is on PATH.
 - LLM for review and briefs: Anthropic API via ANTHROPIC_API_KEY
   (claude-haiku-5-5 for per-call review, claude-sonnet-5-5 for proposal briefs)
-- The Writer (drafting/) drafts with the model WRITER_MODEL names: grok-4.7 through xAI's Responses API on
-  BD_XAI_API_KEY since 2026-10-29, or claude-sonnet-5-5 when WRITER_MODEL is unset
+- The Writer (drafting/) drafts with claude-sonnet-5-5 on ANTHROPIC_API_KEY. WRITER_MODEL=grok-4.7 would switch it
+  to Grok through xAI's Responses API on BD_XAI_API_KEY; it is unset since David chose Claude on 2026-10-29
 - Embeddings: Ollama for Windows, nomic-embed-text at http://localhost:11434 (768 dims)
 - Alerts and delivery: Slack: BD_SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
 - Scheduler: Windows Task Scheduler, created by a PowerShell script in scripts/ (Register-ScheduledTask); never overlapping runs.

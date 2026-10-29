@@ -179,9 +179,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     and start the draft, and writes the pursuit with Discovery queued. Until the worker has run
     (phase 5) it says Drafting is not set up yet and holds Start back. Calls with a draft carry a
     badge with a menu on every table, and Open workspace replaces Start the draft in the Decide cell.
-  - Since 2026-10-29 the Writer drafts with Grok 4.7 on Velocity's xAI key (WRITER_MODEL=grok-4.7 in
-    `.env`), not on David's own Anthropic key; unset, it drafts with Claude Sonnet 5.5. The workspace
-    calls it the Writer either way.
+  - The Writer drafts with Claude Sonnet 5.5. It can draft with Grok 4.7 on Velocity's xAI key
+    (WRITER_MODEL=grok-4.7 in `.env`), but after the 29 Oct trial on a won call David kept Claude, whose
+    draft was the better start. The workspace calls it the Writer either way.
   - Phase 5a (PRO-577): the Writer's worker, `python -m drafting.worker`, runs the workspace's steps
     on this PC with its own lock and a heartbeat in `workers`, which switches on Start the draft. It
     records each step's cost against the pursuit's $200 cap, approves steps itself with key gates
