@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allowedSignIn, loginMessage, needsSession, safeFrom, signInDomain, signInEnabled } from "./signin.ts";
+import { allowedSignIn, loginMessage, needsSession, safeFrom, signInDomain, signInEnabled, teamName } from "./signin.ts";
 
 const USERS = [
   { name: "David Wood", email: "david@velocityexplorations.com", slackId: "U08V7ULPH1N" },
@@ -10,15 +10,24 @@ const USERS = [
 ];
 const DOMAIN = "velocityexplorations.com";
 
-test("only a verified Velocity Google account whose email is on the list gets in, as its name (U7)", () => {
+test("any verified Velocity Google account gets in; nothing else does (U7, opened to the company 29 Oct)", () => {
   const google = (email: string, over: object = {}) => ({ email, verified: true, hd: DOMAIN, ...over });
-  assert.deepEqual(allowedSignIn(google("David@VelocityExplorations.com"), USERS, DOMAIN), { ok: true, name: "David Wood" });
-  assert.deepEqual(allowedSignIn(google("shaun@velocityexplorations.com"), USERS, DOMAIN), { ok: true, name: "Shaun Jones" });
-  assert.equal(allowedSignIn(google("david@velocityexplorations.com", { verified: false }), USERS, DOMAIN).ok, false);
-  assert.equal(allowedSignIn(google("david@velocityexplorations.com", { hd: null }), USERS, DOMAIN).ok, false);   // a personal account
-  assert.equal(allowedSignIn(google("stranger@velocityexplorations.com"), USERS, DOMAIN).ok, false);             // not on the list
-  assert.equal(allowedSignIn(google("partner@example.com", { hd: "example.com" }), USERS, DOMAIN).ok, false);     // the wrong domain
-  assert.equal(allowedSignIn({ email: null, verified: true, hd: DOMAIN }, USERS, DOMAIN).ok, false);
+  assert.equal(allowedSignIn(google("David@VelocityExplorations.com"), DOMAIN), true);
+  assert.equal(allowedSignIn(google("newhire@velocityexplorations.com"), DOMAIN), true);       // not on any list, still in
+  assert.equal(allowedSignIn(google("david@velocityexplorations.com", { verified: false }), DOMAIN), false);
+  assert.equal(allowedSignIn(google("david@velocityexplorations.com", { hd: null }), DOMAIN), false);   // a personal account
+  assert.equal(allowedSignIn(google("partner@example.com", { hd: "example.com" }), DOMAIN), false);     // another company
+  assert.equal(allowedSignIn({ email: null, verified: true, hd: DOMAIN }, DOMAIN), false);
+});
+
+test("a person is named as DASHBOARD_USERS has them, else as Google does, never as somebody else", () => {
+  const known = [{ email: "lisa@velocityexplorations.com", name: "Lisa Hall" }];
+  assert.equal(teamName("david@velocityexplorations.com", "David W.", USERS, known), "David Wood");          // the list's name wins
+  assert.equal(teamName("lisa@velocityexplorations.com", "Lisa M. Hall", USERS, known), "Lisa Hall");       // as first recorded
+  assert.equal(teamName("alec@velocityexplorations.com", " Alec  Smith ", USERS, known), "Alec Smith");
+  assert.equal(teamName("alec@velocityexplorations.com", "", USERS, known), "alec");
+  assert.equal(teamName("david2@velocityexplorations.com", "David Wood", USERS, known), "David Wood (david2@velocityexplorations.com)");
+  assert.equal(teamName("lisa2@velocityexplorations.com", "Lisa Hall", USERS, known), "Lisa Hall (lisa2@velocityexplorations.com)");
 });
 
 test("sign-in is on once its Google client and secret are set, and keeps to the company's domain", () => {
@@ -34,7 +43,7 @@ test("the login page says why, in words (U7)", () => {
   assert.equal(loginMessage({ reason: "signed_out" }), "You are signed out.");
   assert.equal(loginMessage({ reason: "timed_out" }), "Your session timed out. Sign in again to carry on.");
   assert.equal(loginMessage({ error: "AccessDenied" }),
-    "That Google account is not on the BD Team list. Sign in with your Velocity account, or ask an admin to add you.");
+    "That Google account is not a Velocity account. Sign in with your velocityexplorations.com account.");
   assert.equal(loginMessage({ error: "OAuthCallbackError" }), "Sign-in was cancelled.");
   assert.equal(loginMessage({ error: "Configuration" }), "Sign-in is not set up correctly. Tell an admin.");
   assert.equal(loginMessage({ error: "Something" }), "Sign-in did not finish. Try again.");

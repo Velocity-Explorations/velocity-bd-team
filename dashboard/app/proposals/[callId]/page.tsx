@@ -9,7 +9,7 @@ import { pastWorkGroups, pastWorkLabel } from "@/lib/pastwork";
 import { pastWork, workspace } from "@/lib/queries";
 import { formatTime } from "@/lib/format";
 import { firstParam } from "@/lib/text";
-import { allowlist, currentViewer } from "@/lib/viewer";
+import { allowlist, currentViewer, team } from "@/lib/viewer";
 import { displayPerson } from "@/lib/people";
 import { latestSteps, openStep, parseJson, permissions } from "@/lib/workspace";
 
@@ -65,7 +65,7 @@ export default async function WorkspacePage({ params, searchParams }: { params: 
       <WorkspaceHeader call={call} pursuit={pursuit} checklist={found.checklist} label={name} tz={tz} />
       <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} />
       <WorkspacePanels call={call} pursuit={pursuit} checklist={found.checklist} events={found.events} step={open} can={can}
-        people={users.map((person) => ({ name: person.name, label: label(person.name) }))} label={name} tz={tz} />
+        people={(await team()).map((person) => ({ name: person.name, label: label(person.name) }))} label={name} tz={tz} />
       <StageStrip current={pursuit.current_step} pursuitState={pursuit.state} />
       <div className="ws-body">
         <StepList latest={latest} open={open} />

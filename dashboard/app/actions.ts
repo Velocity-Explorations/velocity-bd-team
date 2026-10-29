@@ -47,7 +47,7 @@ import {
 import { isRequestChoice } from "@/lib/requests";
 import { decidedNotice, fromQueue, safeReturnTo } from "@/lib/text";
 import { isDecision, STATUS_LABELS } from "@/lib/values";
-import { allowlist, currentViewer, VIEWER_COOKIE } from "@/lib/viewer";
+import { allowlist, currentViewer, team, VIEWER_COOKIE } from "@/lib/viewer";
 import { parseJson, permissions } from "@/lib/workspace";
 
 const MAX_NOTE_CHARS = 2000;
@@ -211,7 +211,7 @@ export async function startDraftAction(formData: FormData): Promise<void> {
   const callId = String(formData.get("call_id") ?? "").trim();
   if (!callId) backTo(returnTo, "error", "Choose a call to draft first.");
   const asked = String(formData.get("format") ?? "");
-  const names = allowlist().map((p) => p.name);
+  const names = (await team()).map((p) => p.name);
   let result: StartResult;
   try {
     result = await startPursuit({
@@ -324,7 +324,7 @@ export async function changeBuildsOnAction(formData: FormData): Promise<void> {
 /** Who works with the owner (PW24): only the owner changes the list, from People. */
 export async function setCollaboratorsAction(formData: FormData): Promise<void> {
   const { viewer, back, pursuit } = await workspaceActor(formData, "decide");
-  const allowed = allowlist().map((p) => p.name);
+  const allowed = (await team()).map((p) => p.name);
   const names = formData.getAll("with").map(String).filter((name) => allowed.includes(name) && name !== pursuit.owner);
   await workspaceWrite(back, () => setCollaborators({ pursuitId: pursuit.id, by: viewer, names }));
 }

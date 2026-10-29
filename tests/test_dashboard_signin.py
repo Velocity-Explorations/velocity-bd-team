@@ -99,7 +99,7 @@ def page(server: None) -> Iterator[Any]:
 def test_the_sign_in_page_says_why_in_words(page: Any) -> None:
     page.goto(f"{WEB}/login?error=AccessDenied", wait_until="load", timeout=60_000)
     card = page.locator(".login-card")
-    assert "That Google account is not on the BD Team list" in card.inner_text()
+    assert "That Google account is not a Velocity account" in card.inner_text()
     assert card.get_by_role("link", name="Reset password").get_attribute("href") == "https://accounts.google.com/signin/recovery"
     assert "need access? ask an admin" in card.inner_text().lower()
     page.goto(f"{WEB}/login?reason=signed_out", wait_until="load", timeout=60_000)
