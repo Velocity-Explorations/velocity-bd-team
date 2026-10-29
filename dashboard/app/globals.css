@@ -3667,3 +3667,32 @@ button[disabled] {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ------------------------------------------------------------------ Builds on from the Proposal Library (phase 6b) */
+
+.past-work {
+  display: grid;
+  gap: 8px;
+  max-height: 14rem;
+  overflow-y: auto;
+  padding: 8px 10px;
+  background: var(--field);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-card);
+}
+
+.past-work-group {
+  margin: 0 0 2px;
+  font: var(--type-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.past-work-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  font: var(--type-small);
+}

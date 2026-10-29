@@ -4,6 +4,7 @@ import {
   acceptAllAction,
   changeBuildsOnAction,
   decideChangeAction,
+  refreshLibraryAction,
   setDirectionAction,
   tickChecklistAction,
   undoChangeAction,
@@ -300,7 +301,7 @@ export function GateBrief({ content }: { content: Content }) {
 }
 
 /** Step 5 (PW11): the direction and the past work, a last chance to change them, then the sections. */
-export function OutlineView({ call, pursuit, content, row, canDecide, canContribute, isLocked }: {
+export function OutlineView({ call, pursuit, content, row, canDecide, canContribute, isLocked, library }: {
   call: WorkspaceCall;
   pursuit: PursuitRow;
   content: Content;
@@ -308,6 +309,7 @@ export function OutlineView({ call, pursuit, content, row, canDecide, canContrib
   canDecide: boolean;
   canContribute: boolean;
   isLocked: boolean;
+  library: { groups: { title: string; items: { id: string; label: string }[] }[]; indexed: string | null };
 }) {
   const sections = Array.isArray(content.sections)
     ? (content.sections as { title: string; criteria?: string[]; share?: string | null; evidence?: string[] }[])
@@ -359,17 +361,42 @@ export function OutlineView({ call, pursuit, content, row, canDecide, canContrib
         ) : (
           <p className="muted">No past work chosen.</p>
         )}
+        {open && canContribute && library.groups.length ? (
+          <form action={changeBuildsOnAction} className="ws-inline-form">
+            {hidden}
+            <label className="field">
+              <span className="field-label">Add from the Proposal Library</span>
+              <select name="add_id" required defaultValue="">
+                <option value="" disabled>Choose past work</option>
+                {library.groups.map((group) => (
+                  <optgroup key={group.title} label={group.title}>
+                    {group.items.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="btn fn-change">Add</button>
+          </form>
+        ) : null}
         {open && canContribute ? (
           <form action={changeBuildsOnAction} className="ws-inline-form">
             {hidden}
             <label className="field">
-              <span className="field-label">Add past work: a proposal, a project or a link</span>
+              <span className="field-label">Or name past work: a proposal, a project or a link</span>
               <input type="text" name="add" maxLength={300} required />
             </label>
             <button type="submit" className="btn fn-change">Add</button>
           </form>
         ) : null}
-        {open ? <p className="hint">Choosing from Drive and uploading files arrive with Drive.</p> : null}
+        {open && canContribute ? (
+          <form action={refreshLibraryAction} className="ws-inline-form">
+            {hidden}
+            <p className="hint">
+              {library.indexed ? `The Proposal Library as the worker last saw it, at ${library.indexed}.` : "The Proposal Library has not been indexed yet."}
+            </p>
+            <button type="submit" className="btn-text">Refresh the list</button>
+          </form>
+        ) : null}
       </div>
       {sections.length ? (
         <div className="ws-subsection">

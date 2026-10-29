@@ -13,11 +13,13 @@ type Chosen = { id: string; title: string; portal: string; due: string; format: 
  * button (after Pursue and start the draft). Its Start button is the person's approval to spend.
  * Until the worker has run, it says Drafting is not set up yet (P8).
  */
-export function StartDraftDialog({ people, owner, readiness, lastSeen }: {
+export function StartDraftDialog({ people, owner, readiness, lastSeen, pastWork, indexed }: {
   people: { name: string; label: string }[];
   owner: string | null;
   readiness: "ready" | "offline" | "not set up";
   lastSeen: string | null;
+  pastWork: { title: string; items: { id: string; label: string }[] }[];
+  indexed: string | null;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -138,9 +140,29 @@ export function StartDraftDialog({ people, owner, readiness, lastSeen }: {
               <textarea name="direction" rows={3} maxLength={2000} placeholder="The angle you want, the past work to lead with, a partner to name" />
             </label>
 
-            <p className="hint">
-              Builds on: past work to build on can be chosen once the worker indexes the Proposal Library in Drive.
-            </p>
+            {pastWork.length ? (
+              <fieldset className="field">
+                <legend className="field-label">Builds on (optional)</legend>
+                <div className="past-work">
+                  {pastWork.map((group) => (
+                    <div key={group.title}>
+                      <p className="past-work-group">{group.title}</p>
+                      {group.items.map((item) => (
+                        <label key={item.id} className="past-work-item">
+                          <input type="checkbox" name="builds_on" value={item.id} />
+                          {item.label}
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <p className="hint">From the Proposal Library in Drive{indexed ? `, as the worker last saw it at ${indexed}` : ""}.</p>
+              </fieldset>
+            ) : (
+              <p className="hint">
+                Builds on: the Proposal Library has not been indexed yet. The worker indexes it once it runs with Drive set up.
+              </p>
+            )}
             <p className="draft-folder">
               Creates <code>{folderName(today, call.portal, call.title)}</code> in Google Drive.
             </p>

@@ -5,7 +5,9 @@ import { SlopResult } from "@/components/SlopResult";
 import { StageStrip, StepCard, StepList, WorkspaceHeader, WorkspacePanels } from "@/components/Workspace";
 import { Flash } from "@/components/bits";
 import { drafting, labeler, timeZone } from "@/lib/me";
-import { workspace } from "@/lib/queries";
+import { pastWorkGroups, pastWorkLabel } from "@/lib/pastwork";
+import { pastWork, workspace } from "@/lib/queries";
+import { formatTime } from "@/lib/format";
 import { firstParam } from "@/lib/text";
 import { allowlist, currentViewer } from "@/lib/viewer";
 import { displayPerson } from "@/lib/people";
@@ -46,7 +48,12 @@ export default async function WorkspacePage({ params, searchParams }: { params: 
       </Shell>
     );
   }
-  const [viewer, label, tz, worker] = await Promise.all([currentViewer(), labeler(), timeZone(), drafting()]);
+  const [viewer, label, tz, worker, past] = await Promise.all([currentViewer(), labeler(), timeZone(), drafting(), pastWork()]);
+  const chosen = parseJson<{ id?: string | null }[]>(pursuit.builds_on, []).map((item) => item?.id).filter((id): id is string => Boolean(id));
+  const library = {
+    groups: pastWorkGroups(past.items, chosen).map((g) => ({ title: g.title, items: g.items.map((i) => ({ id: i.id, label: pastWorkLabel(i) })) })),
+    indexed: past.indexedAt ? formatTime(past.indexedAt, tz) : null,
+  };
   const users = allowlist();
   const name = (who: string) => label(displayPerson(who, users));
   const latest = latestSteps(found.steps);
@@ -68,7 +75,7 @@ export default async function WorkspacePage({ params, searchParams }: { params: 
             linesParam={firstParam(sp.lines, 20) || undefined} tz={tz} />
         ) : row ? (
           <StepCard call={call} pursuit={pursuit} row={row} steps={found.steps} checklist={found.checklist} changes={found.changes}
-            scan={found.scan} job={found.job} can={can} worker={worker} label={name} tz={tz} />
+            scan={found.scan} job={found.job} library={library} can={can} worker={worker} label={name} tz={tz} />
         ) : (
           <p className="muted">Nothing has been queued for this pursuit yet.</p>
         )}

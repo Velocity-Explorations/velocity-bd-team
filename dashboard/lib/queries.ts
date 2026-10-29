@@ -18,6 +18,7 @@ import { DESCRIPTION_READ } from "./description";
 import { STALE_MS } from "./runs";
 import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
 import { finalGate, type ScanJob, type ScanRow } from "./slop";
+import type { PastWorkItem } from "./pastwork";
 import {
   changeCounts,
   decidedLine,
@@ -944,6 +945,7 @@ export async function startPursuit(input: {
   approvalMode: "every_step" | "key_gates";
   direction: string;
   collaborators: string[];
+  buildsOn?: string[];
 }): Promise<StartResult> {
   const db = sql();
   if (!(await hasTable(db, "pursuits"))) return { ok: false, reason: "Drafting needs ledger migration 008." };
@@ -957,10 +959,15 @@ export async function startPursuit(input: {
     const [held] = await tx<{ owner: string; created_at: string }[]>`SELECT owner, created_at FROM pursuits WHERE call_id = ${input.callId}`;
     const refusal = startRefusal(call, held ?? null, readiness);
     if (refusal) return { ok: false, reason: refusal };
+    // Past work to build on, from the Proposal Library's index; an id the index does not hold is left out (phase 6b).
+    const chosen = input.buildsOn?.length
+      ? await tx<{ id: string; name: string }[]>`SELECT id, name FROM drive_items WHERE id IN ${tx(input.buildsOn)} ORDER BY name`
+      : [];
     const [pursuit] = await tx<{ id: number }[]>`
-      INSERT INTO pursuits (call_id, owner, collaborators, format, approval_mode, direction, current_step, state, created_at, updated_at)
+      INSERT INTO pursuits (call_id, owner, collaborators, format, approval_mode, direction, builds_on, current_step, state, created_at, updated_at)
       VALUES (${input.callId}, ${input.owner}, ${input.collaborators.length ? JSON.stringify(input.collaborators) : null},
-              ${input.format}, ${input.approvalMode}, ${input.direction.trim() || null}, 'discovery', 'working', ${now}, ${now})
+              ${input.format}, ${input.approvalMode}, ${input.direction.trim() || null},
+              ${chosen.length ? JSON.stringify(chosen.map((c) => ({ id: c.id, name: c.name }))) : null}, 'discovery', 'working', ${now}, ${now})
       RETURNING id`;
     const [step] = await tx<{ id: number }[]>`
       INSERT INTO pursuit_steps (pursuit_id, step, attempt, state, requested_by, queued_at, updated_at)
@@ -1377,14 +1384,21 @@ export async function setDirection(input: { pursuitId: number; by: string; direc
 }
 
 /** Past work to build on (PW11, PW24): added by name or link, or removed, until the Outline is approved. */
-export async function changeBuildsOn(input: { pursuitId: number; by: string; add?: string; remove?: string }): Promise<WorkspaceResult> {
+export async function changeBuildsOn(input: { pursuitId: number; by: string; add?: string; addId?: string; remove?: string }): Promise<WorkspaceResult> {
   return editPursuit(input.pursuitId, async (tx, pursuit, now) => {
     const items = parseJson<{ id?: string | null; name: string }[]>(pursuit.builds_on, []).filter((item) => item && item.name);
-    const add = (input.add ?? "").trim().slice(0, 300);
+    let add = (input.add ?? "").trim().slice(0, 300);
+    let addId: string | null = null;
+    if (input.addId) {
+      // Chosen from the Proposal Library's index (phase 6b).
+      const [found] = await tx<{ id: string; name: string }[]>`SELECT id, name FROM drive_items WHERE id = ${input.addId}`;
+      if (!found) return { ok: false, reason: "That item is no longer in the Proposal Library's index. Refresh the list." };
+      [add, addId] = [found.name, found.id];
+    }
     let text: string;
     if (add) {
-      if (items.some((item) => item.name === add)) return { ok: false, reason: "That past work is listed already." };
-      items.push({ id: null, name: add });
+      if (items.some((item) => item.name === add || (addId && item.id === addId))) return { ok: false, reason: "That past work is listed already." };
+      items.push({ id: addId, name: add });
       text = `Added past work: ${add}`;
     } else {
       const at = items.findIndex((item) => item.name === input.remove);
@@ -1608,5 +1622,30 @@ export async function recordResult(input: { callId: string; by: string; result: 
       null, now);
     const follow = input.result === "lost" ? " Ask for a debrief: agencies usually allow only a short window." : "";
     return { ok: true, notice: `Recorded: ${resultWord(input.result)}. The call is in Results.${follow}` };
+  });
+}
+
+// ----------------------------------------------------------------- the Proposal Library's index (phase 6b)
+
+/** Past work the worker indexed from the Proposal Library (drive_items), and when it last did. */
+export async function pastWork(): Promise<{ items: PastWorkItem[]; indexedAt: string | null }> {
+  const db = sql();
+  if (!(await hasTable(db, "drive_items"))) return { items: [], indexedAt: null };
+  const items = await db<PastWorkItem[]>`SELECT id, name, path, mime, web_link, modified_at FROM drive_items ORDER BY path, id`;
+  const [last] = await db<{ at: string | null }[]>`SELECT MAX(indexed_at) AS at FROM drive_items`;
+  return { items: [...items], indexedAt: last?.at ?? null };
+}
+
+/** Refresh the list: a Drive refresh job for the worker, one at a time. */
+export async function refreshLibrary(input: { by: string }): Promise<WorkspaceResult> {
+  const db = sql();
+  return db.begin(async (tx): Promise<WorkspaceResult> => {
+    const [waiting] = await tx`SELECT 1 FROM worker_jobs WHERE kind = 'drive_refresh' AND state IN ('queued', 'working')`;
+    if (waiting) return { ok: false, reason: "A refresh of the Proposal Library is already waiting for the worker." };
+    const now = isoNow();
+    await tx`
+      INSERT INTO worker_jobs (kind, pursuit_id, payload, state, requested_by, requested_at, updated_at)
+      VALUES ('drive_refresh', NULL, NULL, 'queued', ${input.by}, ${now}, ${now})`;
+    return { ok: true, notice: "The worker refreshes the Proposal Library's list when no step is waiting." };
   });
 }

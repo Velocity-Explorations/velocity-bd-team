@@ -132,10 +132,13 @@ the draft. It shows the call, its portal and deadline, and asks for:
 - **User approval required:** every step, or key gates only (Go or no-go, the Outline, Submit).
 - **Working with (optional):** anyone else in DASHBOARD_USERS. The owner is the viewer.
 - **Direction (optional):** up to 2,000 characters for the worker.
+- **Builds on (optional):** past work from the Proposal Library, as the worker last indexed it
+  (`drive_items`): past submissions newest first, then the company reference files. Until the
+  library is indexed the dialog says so. Only items the index holds are kept.
 
 The dialog also names the Drive folder the worker will create,
-`Submissions/YYYY-MM-DD_portal_short-title/` as in docs/LIBRARY_CONVENTIONS.md. Builds on waits
-until the worker indexes the Proposal Library. Start is the person's approval to spend: it writes
+`Submissions/YYYY-MM-DD_portal_short-title/` as in docs/LIBRARY_CONVENTIONS.md. Start is the
+person's approval to spend: it writes
 the pursuit, its Discovery step queued for the worker, and the first line of its history, in one
 transaction that locks the call. Proposals' Drafting view opens next.
 
@@ -189,7 +192,7 @@ Each step also has its own screen (PRO-581):
 - **Alignment (PW8):** the verdict and how the call aligns for Velocity, as tagged points (fits, past work, depends, risk, needs, no clash) with their sources; the owner's direction from Start the draft beside Claude's proposed angle. Your call offers Keep mine, Use Claude's angle or Write a new one; approving saves the chosen direction, which carries forward.
 - **Requirements and checklist (PW9):** the volumes, page limit and format, evaluation, eligibility and keywords, the internal submit-by date, and the checklist in its six parts, tickable here as in the header's panel.
 - **Go or no-go (PW10):** the decision brief (fit rating, win themes, critical gaps with how to address each, effort and timing, the recommendation) and what each choice does; Go with conditions starts with Claude's conditions filled in.
-- **Outline (PW11):** the direction and the past work, each a last chance to change (the owner edits the direction; the owner and the people working with them add or remove past work, by name or link until Drive is set up), then the sections with the criterion each answers, their share and what they draw on, and any criterion with no section. Approving the Outline locks the direction and the past work.
+- **Outline (PW11):** the direction and the past work, each a last chance to change (the owner edits the direction; the owner and the people working with them add past work from the Proposal Library's index, or by name or link, and remove it; Refresh the list asks the worker to index the library again, one refresh at a time), then the sections with the criterion each answers, their share and what they draw on, and any criterion with no section. Approving the Outline locks the direction and the past work.
 - **First draft and Compliance check:** the draft's words and what is left to fill; what the check corrected and how many warnings to check; and the AI slop check's verdict on the draft the step saved, with a link to the latest result.
 - **Reviews (PW12, PW25):** the AI slop check's row (the newest verdict, See the result, automatic), then the three reviewers in turn: the external evaluator and the second evaluator, each with their ratings in words per criterion (Outstanding and Good in green, Marginal amber, Unacceptable red, any other scale grey) and their strengths and weaknesses, then Velocity leadership, who does not rate. Each row says how many changes it suggested and how many are still to decide. Under them, each reviewer's changes: the section, the text now (struck through), the suggestion and why, with Accept, Reject and Edit at the right, and Accept all per reviewer. A decided change shows who decided it and when, with Undo while Reviews is still ready. Only the owner decides; the people working with the owner see the changes. Approve and continue stays disabled until every change is decided (the server refuses too), and approving queues Final checks, which puts the accepted and edited changes into Draft v3. The history and the notice say how many were accepted, edited and rejected.
 

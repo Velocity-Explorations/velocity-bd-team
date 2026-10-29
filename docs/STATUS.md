@@ -240,7 +240,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     the BD Proposal Library on its shared drive. The worker makes each pursuit's folder with its four
     parts, puts each step's Word files in `02_working/` with their links on the cards, refreshes the
     library's index (`drive_items`) every quarter of an hour and on a Drive refresh job, and moves no-go folders
-    to `Submissions/_no-go/`; `python -m drafting.worker --drive-check` reads only. Choosing past work
-    from Drive on the dashboard, and the Register row and folder moves on submit, follow.
+    to `Submissions/_no-go/`; `python -m drafting.worker --drive-check` reads only.
+  - Phase 6b, part 2 (Builds on from Drive): Start the draft offers past work from the library's
+    index, past submissions and company reference files; the Outline adds from it too, and Refresh
+    the list queues a re-index. The Register row and the folder moves on submit follow.
 
 ## Known breakages
