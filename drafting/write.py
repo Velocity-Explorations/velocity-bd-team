@@ -255,6 +255,10 @@ def reviews(ctx: StepContext) -> StepResult:
             passes.append({"pass": n, "code": code, "reviewer": name, "status": "failed", "error": str(exc)[:300]})
             continue
         document, data = split_reply(reply)
+        if not isinstance(data.get("changes"), list):   # cut off at max_tokens, or no json: not the same as no changes
+            passes.append({"pass": n, "code": code, "reviewer": name, "status": "failed",
+                           "error": "its answer had no readable list of changes"})
+            continue
         changes, dropped = _changes(data.get("changes"), current)
         lq.add_step_changes(ctx.step["id"], code, changes)
         proposed += [f"- {c['section'] or 'the draft'}: change {c['before'][:300]!r} to {c['after'][:300]!r}" for c in changes]

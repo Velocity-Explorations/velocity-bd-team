@@ -76,10 +76,20 @@ def test_generate_streams_the_text_and_reports_usage(caplog: pytest.LogCaptureFi
                             on_usage=seen.append, max_tokens=1234)
     assert text == "Hello world"
     call = client.calls[0]
-    assert call["model"] == llm.DEFAULT_MODEL == "claude-sonnet-5-5" and call["max_tokens"] == 1234
+    assert call["model"] == llm.DEFAULT_MODEL == "claude-sonnet-5-5" and call["max_tokens"] == 1234 + llm.THINKING_ROOM
     assert call["system"] == "SYS" and call["messages"] == [{"role": "user", "content": "SECRET PROMPT TEXT"}]
     assert seen[0].input_tokens == 11 and seen[0].output_tokens == 5 and not seen[0].truncated
     assert "requirements" in caplog.text and "SECRET PROMPT TEXT" not in caplog.text
+
+
+def test_claude_gets_room_to_think_on_top_of_the_answers_budget_up_to_its_output_limit() -> None:
+    """Sonnet 5.5 thinks at high effort before it answers, and its thinking counts against max_tokens: in the
+    29 Oct trial each reviewer thought through most of a 16,000-token budget and stopped before its changes."""
+    client = FakeClient([FakeStream(["ok"], final()), FakeStream(["ok"], final())])
+    llm.generate("p", client=client, max_tokens=16_000)
+    llm.generate("p", client=client, max_tokens=120_000)
+    assert llm.THINKING_ROOM >= 32_000 and llm.MAX_OUTPUT_TOKENS == 128_000
+    assert [c["max_tokens"] for c in client.calls] == [16_000 + llm.THINKING_ROOM, 128_000]
 
 
 def test_no_system_prompt_is_sent_when_empty() -> None:

@@ -182,6 +182,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   - The Writer drafts with Claude Sonnet 5.5. It can draft with Grok 4.7 on Velocity's xAI key
     (WRITER_MODEL=grok-4.7 in `.env`), but after the 29 Oct trial on a won call David kept Claude, whose
     draft was the better start. The workspace calls it the Writer either way.
+  - Since 2026-10-29 every Claude call in the Writer has 32,000 tokens of room to think on top of its
+    answer's budget. Sonnet 5.5 thinks at high effort and the thinking counts against max_tokens: in
+    the trial each reviewer stopped before its changes, so Reviews recorded none and Draft v3 matched
+    v2, and the go or no-go brief and the submission checklist were cut short. A reviewer whose answer
+    has no readable list of changes now shows as failed, not as no changes.
   - Phase 5a (PRO-577): the Writer's worker, `python -m drafting.worker`, runs the workspace's steps
     on this PC with its own lock and a heartbeat in `workers`, which switches on Start the draft. It
     records each step's cost against the pursuit's $200 cap, approves steps itself with key gates
