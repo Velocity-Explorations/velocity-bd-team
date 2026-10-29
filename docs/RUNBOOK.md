@@ -135,7 +135,7 @@ dashboard, Discovery waits in the ledger until the worker takes it, and so on, o
 one always-on program, `python -m drafting.worker`, that checks the ledger every 20 seconds and runs each
 step with the model WRITER_MODEL names in `.env`: Grok (grok-4.7, through `BD_XAI_API_KEY`) since 2026-10-29,
 or Claude (claude-sonnet-5-5, through `ANTHROPIC_API_KEY`) when it is unset. It logs the model as it starts;
-after changing WRITER_MODEL, end the worker's task and start it again.
+after changing WRITER_MODEL, restart it (Stopping it, below).
 
 **Starting it.** Run the schedule script again in PowerShell from the repo folder. It adds a task named
 "velocity-bd-team worker" and replaces the others unchanged:
@@ -153,13 +153,18 @@ worker stopped), and queued steps wait for it.
 
 **What it spends.** Each step's cost is added to the step and its pursuit. Every pursuit has a $200 cap:
 a step that would start past it waits as "budget reached", and a step whose spending crosses it stops
-there and waits the same way. The prices are in `drafting/costs.py`; update them when Anthropic's change.
+there and waits the same way. The prices are in `drafting/costs.py`; update them when Anthropic's or xAI's change.
 
-**Stopping it.**
+**Stopping it.** Ending the task leaves the worker's Python running (seen on 29 Oct, when a restart found
+the old worker still holding its lock), so end that process too, preferably while the dashboard shows the
+worker idle:
 
 ```powershell
-Stop-ScheduledTask -TaskName "velocity-bd-team worker"       # stops it; the next check starts it again
-Disable-ScheduledTask -TaskName "velocity-bd-team worker"    # keeps it stopped; Enable-ScheduledTask undoes it
+Stop-ScheduledTask -TaskName "velocity-bd-team worker"
+Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.CommandLine -like "*drafting.worker*" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+Start-ScheduledTask -TaskName "velocity-bd-team worker"      # to restart it; the log's first line names its model
+Disable-ScheduledTask -TaskName "velocity-bd-team worker"    # or keep it stopped; Enable-ScheduledTask undoes it
 ```
 
 A step the worker was working on when it stopped shows as failed ("The worker stopped while it worked on
