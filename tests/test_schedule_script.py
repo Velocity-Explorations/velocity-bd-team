@@ -51,7 +51,7 @@ def test_weekly_scan_runs_sunday_night_and_may_wake_the_pc() -> None:
 def test_the_worker_starts_at_logon_and_again_within_minutes_if_it_stops() -> None:
     block = SCRIPT.split(WORKER_HEADING, 1)[1]
     assert '-Execute $conhost -Argument (Headless "-m drafting.worker")' in block
-    assert "New-ScheduledTaskTrigger -AtLogOn" in block
+    assert r'New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"' in block   # no admin needed
     assert "-RepetitionInterval (New-TimeSpan -Minutes $WorkerCheckMinutes)" in block
     assert "-MultipleInstances IgnoreNew" in block      # a running worker is left alone; its lock keeps it to one
     assert "-ExecutionTimeLimit ([TimeSpan]::Zero)" in block
