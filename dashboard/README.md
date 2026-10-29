@@ -76,6 +76,30 @@ On GKE behind Google's Identity-Aware Proxy (IAP):
 6. Once it is live, set DASHBOARD_URL in the scan PC's `.env` to its address, so Slack cards
    and summaries link to it.
 
+### On the scan PC, through a Cloudflare Tunnel (until GKE)
+
+`compose.yml` runs the image above with a Cloudflare Tunnel beside it, so the team reaches the
+dashboard at a hostname on Cloudflare while it still runs on the scan PC. The tunnel dials out:
+no port opens to the internet, and the dashboard's Google sign-in decides who gets in. The PC must
+stay on and awake, as it must for the worker, and Docker Desktop must start when you sign in
+(Settings, General).
+
+1. Cloudflare Zero Trust: Networks, Tunnels, Create a tunnel, Cloudflared, named `velocity-bd`.
+   Copy the token from its install command into `dashboard/.env.tunnel` as `TUNNEL_TOKEN=<token>`.
+   Under Published application routes, add the hostname with service type HTTP and URL
+   `dashboard:8080`.
+2. `dashboard/.env.hosted`: the settings in `.env.local`, with DATABASE_URL set to Supabase's
+   session pooler URL (Docker cannot reach the direct host either; step 5 above) and AUTH_URL set
+   to `https://<the hostname>`. Both files are git-ignored and kept out of the image.
+3. Google Cloud, the OAuth client: add `https://<the hostname>` to Authorized JavaScript origins
+   and `https://<the hostname>/api/auth/callback/google` to Authorized redirect URIs.
+4. From the repo root, `docker compose -f dashboard/compose.yml up -d --build`. Run it again
+   after each merge that changes the dashboard; `docker compose -f dashboard/compose.yml down`
+   stops both.
+5. Checks: `http://127.0.0.1:8080/healthz` answers `ok` on the PC and
+   `https://<the hostname>/healthz` from anywhere, and
+   `docker compose -f dashboard/compose.yml logs tunnel` shows "Registered tunnel connection".
+
 ### Vercel
 
 Import the repository, set **Root Directory** to `dashboard`, keep the Next.js framework preset,
@@ -92,6 +116,7 @@ person.
 | `components/` | `Shell.tsx` (navigation and the "Deciding as" control), `bits.tsx` (badges, notices, links). |
 | `proxy.ts`, `lib/iap.ts` | Google IAP sign-in: with DASHBOARD_IAP_AUDIENCE set, every request needs IAP's verified signed header. |
 | `Dockerfile`, `.dockerignore` | The container image. |
+| `compose.yml` | The image and its Cloudflare Tunnel on the scan PC, until GKE. |
 | `lib/db.ts` | The Postgres client, created on first use. |
 | `lib/queries.ts` | Every SQL statement the dashboard runs. |
 | `lib/viewer.ts`, `lib/settings.ts` | Who is deciding; time zone and log directory. |

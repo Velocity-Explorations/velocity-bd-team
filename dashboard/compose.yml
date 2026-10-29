@@ -1,0 +1,31 @@
+# The dashboard for the team from the scan PC, until it moves to GKE: its container (Dockerfile) and a
+# Cloudflare Tunnel that publishes it at the hostname set on Cloudflare. The tunnel dials out, so no port
+# is opened to the internet; the dashboard's Google sign-in decides who gets in. Settings come from two
+# git-ignored files beside this one (README.md, On the scan PC): .env.hosted for the dashboard and
+# .env.tunnel for the tunnel's token. From the repo root, and again after each merge that changes the
+# dashboard:
+#   docker compose -f dashboard/compose.yml up -d --build
+name: velocity-bd
+
+services:
+  dashboard:
+    build: .
+    image: velocity-bd-dashboard
+    env_file: .env.hosted
+    ports:
+      - "127.0.0.1:8080:8080"   # this PC only, for checks; the tunnel reaches it as dashboard:8080
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  tunnel:
+    image: cloudflare/cloudflared:2026.9.3
+    command: tunnel --no-autoupdate run   # reads TUNNEL_TOKEN
+    env_file: .env.tunnel
+    depends_on:
+      dashboard:
+        condition: service_healthy
+    restart: unless-stopped
