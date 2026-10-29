@@ -164,7 +164,7 @@ Proposals.
 
 `/proposals/{call id}` (PW1 to PW25, PRO-580) follows one pursuit step by step. Open workspace on Proposals'
 Drafting view, in a call's Decide cell and in its draft badge's menu all lead here. The Writer is the
-worker's model, whichever WRITER_MODEL names on the scan PC (Grok 4.7 since 29 Oct), so the page calls
+worker's model, Claude Sonnet 5.5 unless WRITER_MODEL names another on the scan PC, so the page calls
 it the Writer rather than naming a model.
 
 - **Header (PW1, PW19, PW24):**
