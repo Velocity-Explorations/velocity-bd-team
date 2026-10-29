@@ -5,4 +5,6 @@ pyyaml>=6
 tzdata>=2024.1   # time zone data for zoneinfo, which Windows lacks
 anthropic>=1.0
 python-docx>=1.2   # Word files for the proposal workspace (drafting/word.py)
+google-auth>=2.30   # the worker's service account for Google Drive (drafting/drive.py)
+google-api-python-client>=2.130
 pytest>=8

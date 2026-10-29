@@ -236,5 +236,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     their target and a digest per owner. Built with posting off, as David chose on 28 Oct: nothing
     posts until `WORKSPACE_SLACK=on` is in `.env`, and the two tasks need `install-schedule.ps1`
     rerun once.
+  - Phase 6b, part 1 (the worker's Drive): the service account is set up (29 Oct) and reads and writes
+    the BD Proposal Library on its shared drive. The worker makes each pursuit's folder with its four
+    parts, puts each step's Word files in `02_working/` with their links on the cards, refreshes the
+    library's index (`drive_items`) every quarter of an hour and on a Drive refresh job, and moves no-go folders
+    to `Submissions/_no-go/`; `python -m drafting.worker --drive-check` reads only. Choosing past work
+    from Drive on the dashboard, and the Register row and folder moves on submit, follow.
 
 ## Known breakages

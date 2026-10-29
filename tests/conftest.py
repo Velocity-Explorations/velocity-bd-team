@@ -40,3 +40,11 @@ def fake_slop_scanner(monkeypatch: pytest.MonkeyPatch) -> None:
                 "findings": [{"family": "prop_open_item", "tier": "proposal", "line": 1, "match": m} for m in found]}
 
     monkeypatch.setattr(slop_gate, "run_scan", scan)
+
+
+@pytest.fixture(autouse=True)
+def no_real_drive(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never reach Google Drive, whatever .env says; a test that needs Drive puts a fake in its place."""
+    from drafting import drive
+
+    monkeypatch.setattr(drive, "client", lambda: None)
