@@ -8,6 +8,8 @@ The ledger holds what the scanner saved (the call's text and details), both judg
 team's votes and notes, the owner's choices at Start the draft, and the Proposal Library's
 Register. The worker cannot open portal pages or download attachments yet, so the call's text is
 what the scanner saved. Login-gated text goes to the model and the local files, never to logs.
+Velocity's own facts come from 01 Company Reference on Drive, read again for every step
+(drafting/facts.py); every prompt carries them as the only source for claims about the company.
 """
 from __future__ import annotations
 
@@ -17,8 +19,9 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from drafting.company import profile
 from drafting.dates import deadline_day
+from drafting.facts import Facts
+from drafting.facts import load as load_facts
 from drafting.pipeline import DraftInputs
 from ledger import queries as lq
 
@@ -40,6 +43,7 @@ class CallRecord:
     past_work: list[dict[str, Any]]
     clashes: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     material: list[dict[str, Any]] = field(default_factory=list)   # what people added on the workspace (PW4)
+    facts: Facts | None = None   # Velocity's facts, read from Drive for this step
 
 
 def _json_list(value: Any) -> list[Any]:
@@ -109,7 +113,8 @@ def gather(pursuit_id: int) -> CallRecord:
     return CallRecord(pursuit=pursuit, call=call, judges=lq.latest_judgments(call["id"]),
                       decisions=lq.decision_history(call["id"]), past_work=ranked[:PAST_WORK_LIMIT],
                       clashes=_clashes(call, register),
-                      material=[e for e in lq.pursuit_events(pursuit_id) if e["kind"] == "material"])
+                      material=[e for e in lq.pursuit_events(pursuit_id) if e["kind"] == "material"],
+                      facts=load_facts())
 
 
 def details_text(record: CallRecord) -> str:
@@ -204,7 +209,15 @@ def call_facts(record: CallRecord, today: date) -> str:
         "PAST SUBMISSIONS IN THE PROPOSAL REGISTER, MOST RELEVANT FIRST",
         past_work_text(record),
         *material_lines(record),
+        *(["", record.facts.block(hoverslam_bid(record))] if record.facts else []),
     ])
+
+
+def hoverslam_bid(record: CallRecord) -> bool:
+    """Whether the bid goes in as Hoverslam Designs LLC: the owner's direction, or material the team added, says so.
+    Otherwise the proposing company is Velocity Explorations and Hoverslam's facts stay out of the prompts."""
+    said = [record.pursuit.get("direction") or "", *(str(m.get("text") or "") for m in record.material)]
+    return any("hoverslam" in text.lower() for text in said)
 
 
 def material_lines(record: CallRecord) -> list[str]:
@@ -212,11 +225,6 @@ def material_lines(record: CallRecord) -> list[str]:
     if not record.material:
         return []
     return ["", "MATERIAL THE TEAM ADDED"] + [f"- {(m.get('at') or '')[:10]} {m['who']}: {m['text']}" for m in record.material]
-
-
-def company_text() -> str:
-    company = profile()
-    return "\n".join(f"- {key.replace('_', ' ')}: {value}" for key, value in company.items() if value)
 
 
 def draft_inputs(record: CallRecord) -> DraftInputs:
@@ -235,6 +243,6 @@ def draft_inputs(record: CallRecord) -> DraftInputs:
         "description": call.get("description") or "",
         "listing_text": details_text(record),
         "past_experience": past_work_text(record),
-        "company_context": company_text(),
+        "company_context": record.facts.block(hoverslam_bid(record)) if record.facts else "",
         "team_notes": notes,
     })

@@ -44,6 +44,9 @@ REPLIES = {"building outline": OUTLINE, "drafting response": DRAFT, "compliance 
            "building checklist": "# Checklist\n- [ ] rates", "formatting document": FINAL,
            "framing the opening": "PLACE 1:\n- the customer's problem\n- our discriminator", "submission packet": PACKET,
            "final compliance re-check": "## 1. Keyword Verification\n- ❌ edge AI paraphrased\n- ⚠️ check CDIF"}
+FACTS_USED = (f"{FENCE}json\n" + json.dumps({"used": [{"id": "F-02", "claims": ["the UEI on the cover page"]},
+                                                     {"id": "F-12", "claims": ["the facility clearance"]}],
+                                            "unsupported": ["Velocity has 40 staff"]}) + f"\n{FENCE}")
 
 
 def review_reply(n: int) -> str:
@@ -77,6 +80,8 @@ class Model:
             raise llm.PhaseError(f"{label}: the model refused this request")
         if label.startswith("review "):
             return review_reply(int(label.split()[1]))
+        if label.startswith("facts used: "):
+            return FACTS_USED
         return REPLIES[label]
 
     def labels(self) -> list[str]:
@@ -141,7 +146,7 @@ def test_the_first_draft_follows_the_outline_and_counts_its_placeholders(ledger_
     result = write.draft(ctx)
     saved = (ctx.work_dir / "draft_v1.md").read_text(encoding="utf-8")
     assert "Echo C2, it runs offline" in saved and "Pages 3 to 5" in saved and steps.count_dashes(saved) == 0
-    assert result.content["placeholders"] == {"PERSON WRITES": 1, "NEEDS INPUT": 2, "NEEDS EVIDENCE": 1, "other": 0}
+    assert result.content["placeholders"] == {"PERSON WRITES": 1, "NEEDS INPUT": 2, "NEEDS FACT": 0, "NEEDS EVIDENCE": 1, "other": 0}
     assert result.summary.splitlines()[1] == "- Placeholders to fill: 1 PERSON WRITES, 2 NEEDS INPUT, 1 NEEDS EVIDENCE"
     assert result.content["slop"] == "Not ready: 1 PERSON WRITES, 2 NEEDS INPUT, 1 NEEDS EVIDENCE; band clean (provisional)"
     assert lq.latest_slop_scan(ctx.pursuit["id"])["draft_name"] == "draft_v1.md"
@@ -150,13 +155,37 @@ def test_the_first_draft_follows_the_outline_and_counts_its_placeholders(ledger_
     assert "## 1. Technical Approach" in user and "## Phase 3: Drafting" in user and "Lead with Echo C2" in user
 
 
+def test_each_draft_is_written_from_the_facts_and_gets_its_facts_used_notes(ledger_db: str, tmp_path: Path) -> None:
+    """The facts come from 01 Company Reference at draft time (here a made-up one); each draft's notes list the ids
+    it rests on and what needs review (PRO-565)."""
+    model = Model()
+    ctx = _context(tmp_path, model, "draft", {**EARLIER, "outline.md": "# Proposal outline\n## 1. Technical Approach"})
+    result = write.draft(ctx)
+    sent = "\n".join(model.prompt("drafting response"))
+    assert "VELOCITY FACTS" in sent and "F-02 | UEI: TESTUEI00001" in sent and "[NEEDS FACT:" in sent
+    assert "Velocity built Echo C2" in model.prompt("facts used: Draft v1").user
+    notes = (ctx.work_dir / "facts_used_v1.md").read_text(encoding="utf-8")
+    assert notes.startswith("# Facts used, Draft v1") and "| F-02 | the UEI on the cover page |" in notes
+    assert "F-12 is SENSITIVE" in notes and "Velocity has 40 staff" in notes
+    assert [f["name"] for f in result.files] == ["Draft v1", "Facts used, Draft v1"]
+    assert result.summary.splitlines()[-1] == "- Facts used: 2 cited, 1 to review, 1 with no fact"
+
+
+def test_a_failed_facts_check_leaves_the_draft_and_says_so(ledger_db: str, tmp_path: Path) -> None:
+    model = Model(fail={"facts used: "})
+    ctx = _context(tmp_path, model, "draft", {**EARLIER, "outline.md": "# Proposal outline"})
+    result = write.draft(ctx)
+    assert (ctx.work_dir / "draft_v1.md").exists() and not (ctx.work_dir / "facts_used_v1.md").exists()
+    assert result.summary.splitlines()[-1].startswith("- Facts used: the check did not run")
+
+
 def test_the_compliance_check_saves_its_report_and_the_next_draft(ledger_db: str, tmp_path: Path) -> None:
     ctx = _context(tmp_path, Model(), "compliance", {**EARLIER, "draft_v1.md": "# Edge AI white paper"})
     result = write.compliance(ctx)
     assert (ctx.work_dir / "compliance_report.md").read_text(encoding="utf-8").startswith("## 1. Keyword Verification")
     assert (ctx.work_dir / "draft_v2.md").read_text(encoding="utf-8").startswith("# Edge AI white paper v2")
     assert (result.content["corrections"], result.content["warnings"]) == (1, 1)
-    assert [f["name"] for f in result.files] == ["Compliance report", "Draft v2"]
+    assert [f["name"] for f in result.files] == ["Compliance report", "Draft v2", "Facts used, Draft v2"]
 
 
 def test_the_compliance_check_needs_a_draft(ledger_db: str, tmp_path: Path) -> None:
@@ -245,7 +274,7 @@ def test_final_checks_polish_hold_the_opening_fix_dashes_and_scan(ledger_db: str
     assert result.content["verdict"] == "Not ready: 1 PERSON WRITES; band clean (provisional)"
     assert (result.content["ready"], result.content["dashes_fixed"], result.content["person_writes"]) == (False, 1, 1)
     assert [f["name"] for f in result.files] == ["Final version", "Submission readiness checklist", "AI slop check report",
-                                                 "Final compliance re-check"]
+                                                 "Final compliance re-check", "Facts used, final version"]
     assert "written by AI" not in json.dumps(result.content)
 
 
@@ -316,21 +345,30 @@ def test_other_bracketed_notes_count_as_open_items_too() -> None:
             "[REVIEW NEEDED: check the order] [DATE] [ADD one line]\n[INTERNAL PRE-SUBMISSION NOTE, delete this box\nbefore export.] "
             "[Insert the legend] [status. none verified] [x] [ ] [the notice](https://sam.gov/opp/1) [TBD](https://example.invalid)")
     counts = steps.placeholder_counts(text)
-    assert counts == {"PERSON WRITES": 1, "NEEDS INPUT": 1, "NEEDS EVIDENCE": 0, "other": 6}
+    assert counts == {"PERSON WRITES": 1, "NEEDS INPUT": 1, "NEEDS FACT": 0, "NEEDS EVIDENCE": 0, "other": 6}
     assert steps.placeholder_line(counts) == "Placeholders to fill: 1 PERSON WRITES, 1 NEEDS INPUT, 6 other bracketed notes"
     assert steps.placeholder_line(steps.placeholder_counts("[DATE]")) == "Placeholders to fill: 1 other bracketed note"
 
 
-def test_drafting_and_review_prompts_keep_open_items_in_the_three_counted_forms(ledger_db: str, tmp_path: Path) -> None:
+def test_drafting_and_review_prompts_keep_open_items_in_the_four_counted_forms(ledger_db: str, tmp_path: Path) -> None:
     model = Model()
     ctx = _context(tmp_path, model, "draft", {**EARLIER, "outline.md": "# Outline", "draft_v1.md": "# D1", "draft_v2.md": "# D2"})
     write.draft(ctx)
     write.compliance(ctx)
     write.reviews(ctx)
-    asked = {label: prompt for label, prompt, _ in model.asked}
+    asked = {label: prompt for label, prompt, _ in model.asked if not label.startswith("facts used: ")}
     assert len(asked) == 5
     for label, prompt in asked.items():
         assert write.PLACEHOLDER_RULE in prompt.user, label
+    assert "[NEEDS FACT: ...]" in write.PLACEHOLDER_RULE and "four forms" in write.PLACEHOLDER_RULE
+
+
+def test_a_company_fact_the_files_lack_is_a_counted_placeholder() -> None:
+    text = "Velocity is certified. [NEEDS FACT: the certification date] [NEEDS INPUT: rates]\n**CAGE**: [F-03: CAGE]"
+    counts = steps.placeholder_counts(text)
+    assert counts == {"PERSON WRITES": 0, "NEEDS INPUT": 1, "NEEDS FACT": 1, "NEEDS EVIDENCE": 0, "other": 1}
+    assert steps.placeholder_line(counts) == "Placeholders to fill: 1 NEEDS INPUT, 1 NEEDS FACT, 1 other bracketed note"
+    assert [(p["kind"], p["line"]) for p in write.placeholder_list(text)] == [("NEEDS FACT", 1), ("NEEDS INPUT", 1), ("other", 2)]
 
 
 def test_final_checks_report_seven_checks_in_words(ledger_db: str, tmp_path: Path) -> None:

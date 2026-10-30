@@ -132,6 +132,9 @@ for review, the Proposal Library, drafting, and dashboard. Rules:
   (claude-haiku-5-5 for per-call review, claude-sonnet-5-5 for proposal briefs)
 - The Writer (drafting/) drafts with claude-sonnet-5-5 on ANTHROPIC_API_KEY. WRITER_MODEL=grok-4.7 would switch it
   to Grok through xAI's Responses API on BD_XAI_API_KEY; it is unset since David chose Claude on 2026-10-29
+- Velocity's facts: the Writer reads them from the BD Proposal Library's 01 Company Reference on Drive for every step
+  (drafting/facts.py; the six files' Drive ids in .env). They are edited there. Never copy a fact into the repo, a test
+  fixture, a commit or a PR: the repo is public (rule 9)
 - Embeddings: Ollama for Windows, nomic-embed-text at http://localhost:11434 (768 dims)
 - Alerts and delivery: Slack: BD_SLACK_BOT_TOKEN + SLACK_CHANNEL_ID in .env
 - Scheduler: Windows Task Scheduler, created by a PowerShell script in scripts/ (Register-ScheduledTask); never overlapping runs.

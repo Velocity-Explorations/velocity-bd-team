@@ -57,6 +57,17 @@ def writer_on_its_default(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def made_up_company_facts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Every Writer step reads Velocity's facts from 01 Company Reference on Drive; tests read a made-up one
+    (tests/company_reference.py) and keep its copy in the test's folder."""
+    from drafting import facts
+    from tests import company_reference
+
+    monkeypatch.setattr(facts, "read_drive", company_reference.files)
+    monkeypatch.setattr(facts, "CACHE", tmp_path / "facts" / "company_reference.json")
+
+
+@pytest.fixture(autouse=True)
 def no_real_drive(monkeypatch: pytest.MonkeyPatch) -> None:
     """Tests never reach Google Drive, whatever .env says; a test that needs Drive puts a fake in its place."""
     from drafting import drive

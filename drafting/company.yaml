@@ -1,16 +1,17 @@
-# Company facts the drafting prompts and templates fill in ({company_name}, {cage} and so on).
-# Ported from the retired Yukon profile (reference/yukon/profile.yaml, company_meta).
-# Change them here when they change; they appear on every draft's title page.
+# The fields the drafting prompts and templates fill ({company_name}, {cage} and so on). Velocity's facts are not
+# kept in this repo, which is public: they live in 01 Company Reference on Drive and are edited there (README.md), and
+# every Writer step reads them fresh (drafting/facts.py). So each field names the fact in 00 Company Facts that holds
+# its value, and the Writer fills it from the facts it is given. A field no fact holds is left as [NEEDS FACT: ...].
 company_name: "Velocity Explorations"
-legal_name: "Velocity Explorations, Inc."
 short_name: "Velocity Explorations"
-cage: "9KCQ5"
-uei: "HFEDQFZUJSZ6"
-duns: "11-909-2408"
-business_size: "Small Business (WOSB)"
-poc_name: "Alec Leeseberg"
-poc_title: "President"
-poc_email: "alec@velocityexplorations.com"
-poc_phone: "(888) 780-1888"
-naics_display: "541511, 541512, 541715"
-company_description: "a small defense technology company specializing in AI/ML, command & control (Echo C2), and software modernization"
+legal_name: "[F-01: legal name]"
+uei: "[F-02: UEI]"
+cage: "[F-03: CAGE]"
+duns: "[F-04: DUNS]"
+naics_display: "[F-05: NAICS]"
+business_size: "[F-06: size and status]"
+company_description: "[F-17: what the company does]"
+poc_name: "[F-21: the President's name]"
+poc_title: "[F-21: the President's title]"
+poc_email: "[NEEDS FACT: the point of contact's email]"
+poc_phone: "[NEEDS FACT: the point of contact's phone]"

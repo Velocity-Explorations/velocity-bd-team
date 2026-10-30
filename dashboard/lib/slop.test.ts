@@ -154,6 +154,7 @@ test("placeholders are sorted into the kinds the gate counts", () => {
   assert.equal(placeholderKind("[PERSON WRITES: the opening]"), "PERSON WRITES");
   assert.equal(placeholderKind("[NEED INPUT: rates]"), "NEEDS INPUT");
   assert.equal(placeholderKind("[NEEDS EVIDENCE: the source]"), "NEEDS EVIDENCE");
+  assert.equal(placeholderKind("[NEEDS FACT: the certification date]"), "NEEDS FACT");
   assert.equal(placeholderKind("[TBD]"), "other");
 });
 

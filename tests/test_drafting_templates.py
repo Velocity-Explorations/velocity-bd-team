@@ -1,6 +1,7 @@
 """Response templates and the company profile they are filled from (Writer Plan W0)."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,8 @@ def test_template_map_matches_the_reference() -> None:
 def test_every_mapped_type_selects_its_template(opp_type: str) -> None:
     name, text, is_fallback = templates.select_template(opp_type)
     assert name == templates.TEMPLATE_MAP[opp_type] and not is_fallback
-    assert text.strip() and "{company_name}" not in text and company.profile()["company_name"] in text
+    assert text.strip() and not re.search(r"\{[a-z_]+\}", text)
+    assert company.profile()["legal_name"] in text and company.profile()["cage"] == "[F-03: CAGE]" in text   # filled from Drive
 
 
 def test_an_unknown_type_falls_back_to_the_full_proposal() -> None:

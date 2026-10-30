@@ -32,10 +32,12 @@ SAMPLE = report(placeholders=("[PERSON WRITES: the opening paragraph. Evaluators
 
 def test_open_placeholders_are_counted_by_kind_and_the_draft_is_not_ready() -> None:
     gate = slop_gate.summarize(SAMPLE)
-    assert gate.placeholders == {"PERSON WRITES": 1, "NEEDS INPUT": 2, "NEEDS EVIDENCE": 1, "other": 1}
+    assert gate.placeholders == {"PERSON WRITES": 1, "NEEDS INPUT": 2, "NEEDS FACT": 0, "NEEDS EVIDENCE": 1, "other": 1}
     assert not gate.ready
     assert slop_gate.verdict(gate) == ("Not ready: 1 PERSON WRITES, 2 NEEDS INPUT, 1 NEEDS EVIDENCE, 1 other; "
                                        "band clean (provisional)")
+    fact = slop_gate.summarize(report(placeholders=("[NEEDS FACT: the certification date]",)))
+    assert fact.placeholders["NEEDS FACT"] == 1 and slop_gate.verdict(fact).startswith("Not ready: 1 NEEDS FACT;")
 
 
 def test_a_draft_is_ready_with_nothing_open_and_a_clean_or_light_band() -> None:

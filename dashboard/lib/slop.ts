@@ -51,6 +51,7 @@ const HOT_PARAGRAPHS = 5;
 export const PLACEHOLDER_KINDS: [string, RegExp, string][] = [
   ["PERSON WRITES", /^\[PERSON\s+WRITES/i, "text a person must write"],
   ["NEEDS INPUT", /^\[NEEDS?\s+INPUT/i, "facts only you have"],
+  ["NEEDS FACT", /^\[NEEDS?\s+FACT/i, "company facts 01 Company Reference does not hold"],
   ["NEEDS EVIDENCE", /^\[NEEDS?\s+EVIDENCE/i, "claims that need a source"],
 ];
 

@@ -211,7 +211,7 @@ scanner and saves each scan in `slop_scans`; the page only reads the newest row 
 
 - **The verdict line:** ready or not ready, the verdict as the worker's gate wrote it (for example "Not ready: 1 PERSON WRITES, 2 NEEDS INPUT; band light (provisional)"), the band, its points, the confidence and the words, and the time of the scan and the draft it ran on. Under 150 words there is no band; under 300 the band has low confidence; until the band lines are calibrated, every band is provisional (PW21).
 - **Fixed on its own:** how many fixes the worker made before the scan (dashes, and tracking parameters in links).
-- **Open placeholders** by kind (PERSON WRITES, NEEDS INPUT, NEEDS EVIDENCE, other), each with its section and line.
+- **Open placeholders** by kind (PERSON WRITES, NEEDS INPUT, NEEDS FACT, NEEDS EVIDENCE, other), each with its section and line. NEEDS FACT marks a company fact 01 Company Reference does not hold (docs/RUNBOOK.md, Company facts).
 - **Paragraphs to revise first,** up to five, each with its section, its findings and its line range.
 - **Findings by family,** with the family's tier, hits, rate per 1,000 words, points (or under its line), its fix and each finding by line and column; then the tiers with nothing left. The dated word lists read as one family, Overused words, and no label names a model or a chatbot.
 - **Proposal faults,** listed apart: they do not count toward the band. Findings the solicitation's own words exempt are left out and counted.
