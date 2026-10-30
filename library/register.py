@@ -28,12 +28,14 @@ COLUMNS = ("submission_id", "title", "portal", "agency", "solicitation_id", "typ
            "submitted_date", "due_date", "requested_value", "outcome", "outcome_date", "award_value",
            "strength_rating", "strength_reason", "why_won_or_lost", "use_as_exemplar", "themes", "drive_link")
 PORTALS = ("vulcan-sof", "ssc-front-door", "sam-gov", "nstxl", "diu", "afwerx", "iarpa", "space-force", "doe-sbir",
-           "bidnet-co", "bidnet-fl", "other")
-TYPES = ("sbir_1", "sbir_2", "sbir_3", "sttr", "rfi", "white_paper", "baa", "pitch", "rfp", "ota", "other")
-OUTCOMES = ("won", "lost", "no_award", "pending", "withdrawn", "shortlisted")
+           "bidnet-co", "bidnet-fl", "dsip", "apfit", "xtech", "antx", "tencap", "sofwerx", "sparx", "nasa-sbir", "dhs-sbir",
+           "piee", "tacfi", "other")
+TYPES = ("sbir_1", "sbir_2", "sbir_3", "sttr", "rfi", "white_paper", "baa", "pitch", "rfp", "ota", "exercise", "commercial",
+         "other")
+OUTCOMES = ("won", "lost", "no_award", "pending", "withdrawn", "shortlisted", "not_submitted")
 CHOICES = {"portal": PORTALS, "type": TYPES, "outcome": OUTCOMES}
 DATES = ("submitted_date", "due_date", "outcome_date")
-SUBMISSION_ID = re.compile(r"^\d{4}-\d{2}-\d{2}_[a-z-]+_[a-z0-9-]+$")
+SUBMISSION_ID = re.compile(r"^(\d{4}-\d{2}-\d{2}|nodate)_[a-z-]+_[a-z0-9-]+$")   # nodate_: no known submission date
 TEXT = ("title", "agency", "solicitation_id", "role", "partners", "requested_value", "award_value",
         "strength_reason", "why_won_or_lost", "drive_link")
 
@@ -80,7 +82,8 @@ def _check(cells: dict[str, str]) -> tuple[dict[str, Any], list[str]]:
     reasons: list[str] = []
     rec: dict[str, Any] = {"submission_id": cells.get("submission_id", "")}
     if not SUBMISSION_ID.match(rec["submission_id"]):
-        reasons.append("submission_id must look like YYYY-MM-DD_portal_short-title, lower case")
+        reasons.append("submission_id must look like YYYY-MM-DD_portal_short-title, or nodate_portal_short-title "
+                       "when the submission date is not known, lower case")
     for name, allowed in CHOICES.items():
         value = cells.get(name, "")
         if value and value not in allowed:

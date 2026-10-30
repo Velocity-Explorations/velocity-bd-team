@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS proposals (
   submitted_date    TEXT,
   due_date          TEXT,
   requested_value   TEXT,
-  outcome           TEXT CHECK (outcome IS NULL OR outcome IN ('won', 'lost', 'no_award', 'pending', 'withdrawn', 'shortlisted')),
+  outcome           TEXT CHECK (outcome IS NULL OR outcome IN ('won', 'lost', 'no_award', 'pending', 'withdrawn', 'shortlisted', 'not_submitted')),
   outcome_date      TEXT,
   award_value       TEXT,
   strength_rating   INTEGER CHECK (strength_rating IS NULL OR strength_rating BETWEEN 1 AND 5),
@@ -394,3 +394,5 @@ CREATE TABLE IF NOT EXISTS people (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_people_name ON people (name);
+
+-- 011_not_submitted: proposals.outcome also takes not_submitted (the proposals table above shows the wider check).

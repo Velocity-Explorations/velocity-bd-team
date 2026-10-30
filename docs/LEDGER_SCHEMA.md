@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `010_people.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `011_not_submitted.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -101,18 +101,18 @@ One row per past submission, keyed by the Drive folder name. Filled by the libra
 
 | Column | Type | Values | Written by |
 |---|---|---|---|
-| submission_id | TEXT, primary key | `YYYY-MM-DD_portal_short-title`, equal to the Drive folder name | library sync |
+| submission_id | TEXT, primary key | `YYYY-MM-DD_portal_short-title`, or `nodate_portal_short-title` when the submission date is not known; equal to the Drive folder name | library sync |
 | title | TEXT | | library sync |
 | portal | TEXT | portal or program slug (`sbir`, `vulcan_sof`, `sam`, and so on) | library sync |
 | agency | TEXT | | library sync |
 | solicitation_id | TEXT | the government's identifier | library sync |
 | type | TEXT | response type (SBIR Phase I, white paper, BAA response, and so on) | library sync |
-| role | TEXT | `prime`, `sub`, `team member` or similar | library sync |
+| role | TEXT | `prime`, `sub`, `team member`, `prime (Hoverslam)` or similar | library sync |
 | partners | TEXT | free text or JSON array | library sync |
 | submitted_date | TEXT date | `YYYY-MM-DD` | library sync |
 | due_date | TEXT date | `YYYY-MM-DD` | library sync |
 | requested_value | TEXT | dollar amount as text | library sync |
-| outcome | TEXT | NULL, `won`, `lost`, `no_award`, `pending`, `withdrawn`, `shortlisted` | library sync |
+| outcome | TEXT | NULL, `won`, `lost`, `no_award`, `pending`, `withdrawn`, `shortlisted`, `not_submitted` (since `011_not_submitted.sql`) | library sync |
 | outcome_date | TEXT date | | library sync |
 | award_value | TEXT | dollar amount as text | library sync |
 | strength_rating | INTEGER | 1 to 5, or NULL | library sync (hand-entered) |
@@ -620,8 +620,8 @@ ORDER BY due_date, first_seen_at;
 
 ### Win rate by portal
 
-Counts only decided outcomes (`won` or `lost`); pending, withdrawn, no_award and
-shortlisted are excluded from the denominator.
+Counts only decided outcomes (`won` or `lost`); pending, withdrawn, no_award,
+shortlisted and not_submitted are excluded from the denominator.
 
 ```sql
 SELECT portal,

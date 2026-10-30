@@ -40,7 +40,8 @@ REGISTER = "00 Proposal Register"
 REGISTER_TAB = "Register"
 # The Register's choices, as library/register.py checks them (docs/LIBRARY_CONVENTIONS.md).
 REGISTER_PORTALS = ("vulcan-sof", "ssc-front-door", "sam-gov", "nstxl", "diu", "afwerx", "iarpa", "space-force", "doe-sbir",
-                    "bidnet-co", "bidnet-fl", "other")
+                    "bidnet-co", "bidnet-fl", "dsip", "apfit", "xtech", "antx", "tencap", "sofwerx", "sparx", "nasa-sbir",
+                    "dhs-sbir", "piee", "tacfi", "other")
 REGISTER_OUTCOMES = {"won": "won", "lost": "lost", "withdrawn": "withdrawn", "cancelled_by_agency": "no_award"}
 # A format's volume name in 01_submitted/ and its Register type, where the format settles it.
 VOLUMES = {"White paper": "white-paper", "RFI response": "rfi-response", "SBIR or STTR technical volume": "technical-volume",

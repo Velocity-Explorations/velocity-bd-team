@@ -4,6 +4,8 @@ import re
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from ledger import migrate
 from ledger.db import sqlite_path
 
@@ -16,7 +18,8 @@ def test_migrate_creates_tables_and_is_idempotent(tmp_path: Path) -> None:
     url = f"sqlite:///{(tmp_path / 'm.db').as_posix()}"
     first = migrate.apply(url)
     assert first == ["001_initial.sql", "002_change_requests.sql", "003_judgments.sql", "004_decisions.sql", "005_briefs.sql",
-                     "006_call_tags.sql", "007_tag_list.sql", "008_pursuits.sql", "009_call_summaries.sql", "010_people.sql"]
+                     "006_call_tags.sql", "007_tag_list.sql", "008_pursuits.sql", "009_call_summaries.sql", "010_people.sql",
+                     "011_not_submitted.sql"]
     assert migrate.apply(url) == []
     assert migrate.list_tables(url) == ["briefs", "call_tags", "calls", "change_requests", "checklist_items", "decisions",
                                          "drive_items", "judgments", "people", "profiles", "proposals", "pursuit_events", "pursuit_steps",
@@ -87,3 +90,36 @@ def test_sqlite_url_resolution() -> None:
     assert sqlite_path("sqlite:///:memory:") == ":memory:"
     absolute = sqlite_path("sqlite:///C:/tmp/x.db")
     assert isinstance(absolute, Path) and absolute.as_posix().endswith("tmp/x.db")
+
+
+def test_a_statement_marked_for_one_dialect_runs_only_there() -> None:
+    text = "@@POSTGRES@@ ALTER TABLE t DROP CONSTRAINT c;\n@@SQLITE@@ CREATE TABLE u (\n  id INTEGER\n);\nSELECT 1;"
+    assert migrate.statements(text, "sqlite") == ["CREATE TABLE u (\n  id INTEGER\n)", "SELECT 1"]
+    assert migrate.statements(text, "postgres") == ["ALTER TABLE t DROP CONSTRAINT c", "SELECT 1"]
+
+
+def test_011_keeps_every_proposal_and_lets_one_be_not_submitted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    url = f"sqlite:///{(tmp_path / 'm.db').as_posix()}"
+    every = migrate.migration_files()
+    monkeypatch.setattr(migrate, "migration_files", lambda: [p for p in every if p.name < "011"])
+    migrate.apply(url)
+    insert = "INSERT INTO proposals (submission_id, outcome, updated_at) VALUES (?, ?, 'now')"
+    conn = sqlite3.connect(tmp_path / "m.db")
+    conn.execute("INSERT INTO proposals (submission_id, outcome, strength_rating, use_as_exemplar, updated_at) "
+                 "VALUES ('2026-03-17_vulcan-sof_x', 'won', 4, 1, 'now')")
+    conn.commit()
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(insert, ("nodate_dsip_y", "not_submitted"))
+    conn.close()
+    monkeypatch.setattr(migrate, "migration_files", lambda: every)
+    assert migrate.apply(url) == ["011_not_submitted.sql"]
+    conn = sqlite3.connect(tmp_path / "m.db")
+    try:
+        conn.execute(insert, ("nodate_dsip_y", "not_submitted"))
+        assert conn.execute("SELECT submission_id, outcome, strength_rating, use_as_exemplar FROM proposals "
+                            "ORDER BY submission_id").fetchall() == [("2026-03-17_vulcan-sof_x", "won", 4, 1),
+                                                                     ("nodate_dsip_y", "not_submitted", None, 0)]
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(insert, ("2026-05-01_dsip_z", "maybe"))
+    finally:
+        conn.close()

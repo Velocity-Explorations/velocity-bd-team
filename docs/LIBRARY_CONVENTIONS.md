@@ -7,13 +7,13 @@ The Proposal Library holds every proposal, white paper, RFI response and pitch V
 - `00 README`: this document.
 - `00 Proposal Register`: one row per submission (below).
 - `01 Company Reference/`: what every proposal draws on: capabilities, past performance, bios, boilerplate, win themes.
-- `Submissions/<submission_id>/`: one folder per submission, named `YYYY-MM-DD_portal_short-title`, for example `2026-03-17_vulcan-sof_vigilant-eagle-27`. The date is the day it was submitted. Each holds four folders:
+- `Submissions/<submission_id>/`: one folder per submission, named `YYYY-MM-DD_portal_short-title`, for example `2026-03-17_vulcan-sof_vigilant-eagle-27`. The date is the day it was submitted. When that date is not known, the name starts with `nodate` instead: `nodate_portal_short-title`, for example `nodate_sofwerx_field-sensor`. Each holds four folders:
   - `00_solicitation/`: what we responded to: the call, RFP, BAA or topic, and its attachments.
   - `01_submitted/`: exactly what went in.
   - `02_working/`: drafts and working files. The drafting pipeline writes here.
   - `03_outcome/`: the award letter or rejection, the debrief, evaluator comments.
 
-Portal slugs: vulcan-sof, ssc-front-door, sam-gov, nstxl, diu, afwerx, iarpa, space-force, doe-sbir, bidnet-co, bidnet-fl, other.
+Portal slugs: vulcan-sof, ssc-front-door, sam-gov, nstxl, diu, afwerx, iarpa, space-force, doe-sbir, bidnet-co, bidnet-fl, dsip, apfit, xtech, antx, tencap, sofwerx, sparx, nasa-sbir, dhs-sbir, piee, tacfi, other.
 
 ## Naming files in 01_submitted/
 
@@ -30,13 +30,13 @@ One row per submission folder. Each row starts with submission_id, submitted_dat
 | portal | Where it was submitted (portal slugs above). |
 | agency | The customer: agency, command or office. |
 | solicitation_id | The government's number for the call, RFP, BAA or topic. |
-| type | sbir_1, sbir_2, sbir_3, sttr, rfi, white_paper, baa, pitch, rfp, ota or other. |
-| role | prime, sub or team member. |
+| type | sbir_1, sbir_2, sbir_3, sttr, rfi, white_paper, baa, pitch, rfp, ota, exercise, commercial or other. |
+| role | prime, sub or team member; prime (Hoverslam) when Velocity's sister company Hoverslam was the submitting prime. |
 | partners | Teaming partners, comma separated. |
-| submitted_date | When it went in (YYYY-MM-DD). |
+| submitted_date | When it went in (YYYY-MM-DD). Blank when not known (a `nodate_` submission). |
 | due_date | The deadline it answered (YYYY-MM-DD). |
 | requested_value | What we asked for, in dollars. |
-| outcome | won, lost, no_award, pending, withdrawn or shortlisted. |
+| outcome | won, lost, no_award, pending, withdrawn, shortlisted or not_submitted (prepared but never sent in). |
 | outcome_date | When we heard (YYYY-MM-DD). |
 | award_value | What was awarded, in dollars. |
 | strength_rating | 1 to 5: how strong the submission was, whatever the outcome. |

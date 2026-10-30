@@ -55,6 +55,38 @@ def test_each_bad_value_is_reported_with_its_sheet_row_and_reason() -> None:
     assert "vulcan-sof" in problems[1].reason   # says what the allowed values are
 
 
+NEW_PORTALS = ("dsip", "apfit", "xtech", "antx", "tencap", "sofwerx", "sparx", "nasa-sbir", "dhs-sbir", "piee", "tacfi")
+UNDATED = "nodate_dsip_edge-translation"
+
+
+def test_the_registers_newer_values_are_accepted() -> None:
+    """What the Register's dropdowns hold since 29 Oct: more portals, two types, not_submitted, Hoverslam as the
+    submitting prime, and an undated id for a proposal whose submission date is not known."""
+    assert register.PORTALS[-len(NEW_PORTALS) - 1:] == (*NEW_PORTALS, "other")
+    rows = [row(submission_id=f"2026-05-01_{slug}_edge-sensor", portal=slug) for slug in NEW_PORTALS]
+    rows += [row(submission_id="2026-05-02_other_range-day", type="exercise"),
+             row(submission_id="2026-05-03_other_fleet-app", type="commercial", role="prime (Hoverslam)"),
+             row(submission_id=UNDATED, portal="dsip", outcome="not_submitted")]
+    valid, problems = register.parse_rows(HEADER, rows)
+    assert problems == [] and len(valid) == len(rows)
+    assert (valid[-2]["type"], valid[-2]["role"]) == ("commercial", "prime (Hoverslam)")
+    assert (valid[-1]["submission_id"], valid[-1]["outcome"], valid[-1]["submitted_date"]) == (UNDATED, "not_submitted", None)
+
+
+def test_an_undated_id_still_needs_its_portal_and_title_in_lower_case() -> None:
+    rows = [row(submission_id=sid) for sid in ("nodate_edge-translation", "nodate-dsip-edge-translation",
+                                                "Nodate_dsip_edge-translation", "undated_dsip_edge-translation")]
+    valid, problems = register.parse_rows(HEADER, rows)
+    assert valid == [] and len(problems) == 4
+    assert all("nodate_portal_short-title" in p.reason for p in problems)
+
+
+def test_the_writers_copy_of_the_portal_slugs_matches_the_registers() -> None:
+    from drafting import drive
+
+    assert drive.REGISTER_PORTALS == register.PORTALS
+
+
 def test_a_header_missing_a_register_column_is_refused() -> None:
     with pytest.raises(register.RegisterError, match="submission_id"):
         register.parse_rows(["title", "portal"], [["A", "vulcan-sof"]])
@@ -74,6 +106,16 @@ def test_a_sync_writes_valid_rows_and_leaves_a_broken_rows_ledger_row_alone(ledg
     stored = lq.list_proposals()[0]
     assert (stored["submission_id"], stored["strength_rating"], stored["use_as_exemplar"]) == (VIGILANT, 4, 1)
     assert stored["synced_at"]
+
+
+def test_a_sync_stores_an_undated_proposal_that_was_never_submitted(ledger_db: str) -> None:
+    undated = row(submission_id=UNDATED, title="Edge translation", portal="dsip", type="sbir_1", role="prime (Hoverslam)",
+                  outcome="not_submitted")
+    report = register.sync(HEADER, [undated], [UNDATED])
+    assert (report.synced, report.problems) == (1, [])
+    stored = lq.list_proposals()[0]
+    assert (stored["submission_id"], stored["outcome"], stored["role"], stored["submitted_date"]) == (
+        UNDATED, "not_submitted", "prime (Hoverslam)", None)
 
 
 def test_the_report_names_folders_without_rows_and_rows_without_folders(ledger_db: str) -> None:
