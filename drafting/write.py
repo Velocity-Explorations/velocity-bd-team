@@ -168,9 +168,9 @@ def compliance(ctx: StepContext) -> StepResult:
     d = draft_inputs(ctx.record)
     p = prompts.p675_compliance(company=profile(), knowledge_base=d.company_context, alignment_context=_alignment(ctx),
                                 title=d.title, agency=d.agency, opp_type=d.opp_type, due_date=d.due_date,
-                                requirements=ctx.earlier("requirements.md", 25_000), draft=current[:50_000])
+                                requirements=ctx.earlier("requirements.md", 25_000), draft=current)
     reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, direction=False, placeholders=True)), "compliance check",
-                    pipeline.MAX_TOKENS["6.75"])
+                    pipeline.rewrite_room("6.75", current))
     report, corrected = reply.split(prompts.CORRECTED_DRAFT_SEPARATOR, 1) if prompts.CORRECTED_DRAFT_SEPARATOR in reply else ("", reply)
     files = [ctx.save("compliance_report.md", report.strip(), "Compliance report")] if report.strip() else []
     ctx.save("draft_v2.md", corrected.strip() or current, "Draft v2")
@@ -247,7 +247,7 @@ def reviews(ctx: StepContext) -> StepResult:
     for n, (code, name, role, heading, rates) in enumerate(REVIEWERS, start=1):
         system = system_prompt(role, "Reviews", "proposal-drafting", _review_part(heading), RATED_SPEC if rates else UNRATED_SPEC)
         user = user_prompt(ctx, ("REQUIREMENTS ANALYSIS, FROM STEP 4", ctx.earlier("requirements.md")),
-                           ("THE DRAFT TO REVIEW", current[:60_000]),
+                           ("THE DRAFT TO REVIEW", current),
                            ("CHANGES EARLIER REVIEWERS PROPOSED; DO NOT PROPOSE THEM AGAIN", "\n".join(proposed)))
         try:
             reply = ctx.ask(Prompt(system, user + "\n\n" + PLACEHOLDER_RULE), f"review {n} of 3: {name}", REVIEW_TOKENS)
@@ -387,7 +387,7 @@ def _recheck(ctx: StepContext, text: str) -> tuple[dict[str, Any], dict[str, str
     d = draft_inputs(ctx.record)
     p = prompts.p675_compliance(company=profile(), knowledge_base=d.company_context, alignment_context=_alignment(ctx),
                                 title=d.title, agency=d.agency, opp_type=d.opp_type, due_date=d.due_date,
-                                requirements=ctx.earlier("requirements.md", 25_000), draft=text[:50_000])
+                                requirements=ctx.earlier("requirements.md", 25_000), draft=text)
     try:
         reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, direction=False, placeholders=True) + REPORT_ONLY),
                         "final compliance re-check", RECHECK_TOKENS)

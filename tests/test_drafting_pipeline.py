@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from drafting import llm, opening, pipeline, slop_gate
+from drafting import llm, opening, pipeline, prompts, slop_gate
 from drafting.phases import PHASES, phase
 
 ALL_FILES = ["requirements.md", "alignment.md", "outline.md", "draft.md", "draft_review_pass1.md",
@@ -140,6 +140,30 @@ def test_the_review_passes_chain_and_save_draft_v2(tmp_path: Path) -> None:
     assert "DRAFT TO REVISE:\n# Draft\n" in reviews[0]["prompt"]
     assert "DRAFT TO REVISE:\n# Draft after pass 1" in reviews[1]["prompt"]
     assert (tmp_path / "draft_v2.md").read_text(encoding="utf-8") == "# Draft after pass 4"
+
+
+def test_every_phase_reads_the_whole_draft_and_a_rewrite_has_room_for_all_of_it(tmp_path: Path) -> None:
+    """A draft over 50,000 characters lost its end in the review passes, the compliance check and the formatting
+    pass: in the 29 Oct trial the final version stopped partway through its work plan."""
+    long_draft = "# Draft\n\n" + "A sentence about the work. " * 8_000 + "\n\n## The last section"   # 216,000 characters
+
+    class Long(FakeModel):
+        def __call__(self, prompt: str, system: str = "", **kwargs: Any) -> str:
+            text = super().__call__(prompt, system, **kwargs)
+            label = kwargs["phase_label"]
+            if label in ("drafting response", "formatting document") or label.startswith("review pass"):
+                return long_draft
+            if label == "compliance check":
+                return f"## 1. Keyword Verification\n{prompts.CORRECTED_DRAFT_SEPARATOR}\n{long_draft}"
+            return text
+
+    model = Long()
+    run(tmp_path, model)
+    readers = [c for c in model.calls if c["label"].startswith("review pass")
+               or c["label"] in ("compliance check", "building checklist", "formatting document")]
+    assert len(readers) == 7 and all("## The last section" in c["prompt"] for c in readers)
+    assert all(c["max_tokens"] >= len(long_draft) // 2 for c in readers if c["label"] != "building checklist")
+    assert (tmp_path / "draft_final.md").read_text(encoding="utf-8").endswith("## The last section")
 
 
 def test_compliance_splits_the_report_from_the_corrected_draft(tmp_path: Path) -> None:

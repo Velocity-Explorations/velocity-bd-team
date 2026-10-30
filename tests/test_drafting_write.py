@@ -185,6 +185,29 @@ def test_reviews_propose_changes_one_per_row_and_the_evaluators_rate_the_criteri
                                                  "Review 3, Velocity leadership"]
 
 
+def test_every_step_reads_the_whole_draft_and_a_rewrite_has_room_for_all_of_it(ledger_db: str, tmp_path: Path) -> None:
+    """Compliance, Reviews, Final checks and the re-check read only a draft's first 50,000 or 60,000 characters,
+    so a long draft lost its end; the rewrites now also have output room for the whole draft."""
+    long_draft = "# Edge AI white paper\n\nClaim 1. " + "The approach is sound. " * 6_000 + "\n\n## 9. Glossary"
+
+    class Long(Model):   # the formatting pass gives back the whole draft, so the re-check reads it too
+        def __call__(self, prompt: Prompt, label: str, max_tokens: int) -> str:
+            reply = super().__call__(prompt, label, max_tokens)
+            return long_draft if label == "formatting document" else reply
+
+    model = Long()
+    ctx = _context(tmp_path, model, "compliance", {**EARLIER, "outline.md": "# Outline", "draft_v1.md": long_draft})
+    write.compliance(ctx)
+    (ctx.work_dir / "draft_v2.md").write_text(long_draft, encoding="utf-8")
+    write.reviews(ctx)
+    (ctx.work_dir / "draft_v3.md").write_text(long_draft, encoding="utf-8")
+    write.final(ctx)
+    readers = [(label, p, room) for label, p, room in model.asked
+               if label.startswith(("compliance check", "review ", "building checklist", "formatting document", "final compliance"))]
+    assert len(readers) == 7 and all("## 9. Glossary" in p.user for _, p, _ in readers)
+    assert all(room >= len(long_draft) // 2 for label, _, room in readers if label in ("compliance check", "formatting document"))
+
+
 def test_a_review_cut_off_before_its_changes_fails_rather_than_proposing_none(ledger_db: str, tmp_path: Path) -> None:
     """The 29 Oct trial: every reviewer hit max_tokens inside its json, and the step said "0 changes proposed"."""
     class CutOff(Model):
