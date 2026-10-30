@@ -63,12 +63,14 @@ class Drive(Protocol):
     def upload(self, parent_id: str, path: Path, name: str, mime: str) -> dict[str, Any]: ...
     def move(self, item_id: str, to_parent: str) -> None: ...
     def rename(self, item_id: str, name: str) -> None: ...
+    def export(self, item_id: str, mime: str) -> str: ...
 
 
 class Sheets(Protocol):
-    """The Register's calls: read the tab, add a row, set cells on a row."""
+    """The Register's calls: read the tab, add a row, set cells on a row; and a sheet's tab names."""
 
     def values(self, sheet_id: str, tab: str) -> list[list[str]]: ...
+    def tabs(self, sheet_id: str) -> list[str]: ...
     def append(self, sheet_id: str, tab: str, row: list[str]) -> None: ...
     def update(self, sheet_id: str, tab: str, row_number: int, cells: dict[int, str]) -> None: ...
 
@@ -136,6 +138,10 @@ class GoogleDrive:
     def rename(self, item_id: str, name: str) -> None:
         self._run(self.api.files().update(fileId=item_id, body={"name": name}, supportsAllDrives=True, fields="id"))
 
+    def export(self, item_id: str, mime: str) -> str:
+        """A Google Doc's text in another format, such as text/markdown."""
+        return self._run(self.api.files().export(fileId=item_id, mimeType=mime)).decode("utf-8")
+
 
 def _column(index: int) -> str:
     """0 -> A, 25 -> Z, 26 -> AA."""
@@ -169,6 +175,10 @@ class GoogleSheets:
 
     def values(self, sheet_id: str, tab: str) -> list[list[str]]:
         return self._run(self.api.spreadsheets().values().get(spreadsheetId=sheet_id, range=tab)).get("values", [])
+
+    def tabs(self, sheet_id: str) -> list[str]:
+        found = self._run(self.api.spreadsheets().get(spreadsheetId=sheet_id, fields="sheets.properties.title"))
+        return [s["properties"]["title"] for s in found.get("sheets", [])]
 
     def append(self, sheet_id: str, tab: str, row: list[str]) -> None:
         self._run(self.api.spreadsheets().values().append(spreadsheetId=sheet_id, range=tab, valueInputOption="RAW",

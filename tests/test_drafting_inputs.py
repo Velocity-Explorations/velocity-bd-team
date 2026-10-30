@@ -76,6 +76,20 @@ def test_the_clash_check_finds_reposts_and_pursued_calls_closing_near_the_deadli
     assert clashes["register"] == []
 
 
+def test_every_step_reads_velocity_facts_from_01_company_reference(ledger_db: str) -> None:
+    record = inputs.gather(_pursued())
+    text = inputs.call_facts(record, today=date(2026, 10, 28))
+    assert "VELOCITY FACTS" in text and "F-02 | UEI: TESTUEI00001" in text and "EXAMPLE HOVERSLAM LLC" not in text
+    assert not inputs.hoverslam_bid(record)
+    assert inputs.draft_inputs(record).company_context == record.facts.block(hoverslam=False)
+
+
+def test_a_hoverslam_bid_is_one_whose_direction_names_hoverslam(ledger_db: str) -> None:
+    record = inputs.gather(_pursued(direction="Bid this as Hoverslam, with Alec as PI"))
+    assert inputs.hoverslam_bid(record)
+    assert "EXAMPLE HOVERSLAM LLC" in inputs.call_facts(record, today=date(2026, 10, 28))
+
+
 def test_material_the_team_adds_reaches_every_later_prompt(ledger_db: str) -> None:
     pursuit_id = _pursued()
     lq.add_event(pursuit_id, "Shaun Jones", "material", "The parent BAA is at https://example.invalid/baa.pdf")

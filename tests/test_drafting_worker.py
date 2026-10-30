@@ -61,6 +61,8 @@ class Model:
         if phase_label.startswith("review "):
             change = {"section": "Title", "now": "# White paper v2", "suggested": "# White paper v2, reviewed", "why": "Clearer"}
             return f"# Review\n{FENCE}json\n{json.dumps({'key_points': ['One change'], 'changes': [change] if phase_label.startswith('review 1 ') else []})}\n{FENCE}"
+        if phase_label.startswith("facts used: "):
+            return f'{FENCE}json\n{{"used": [{{"id": "F-02", "claims": ["the UEI"]}}], "unsupported": []}}\n{FENCE}'
         return REPLIES[phase_label]
 
     def labels(self) -> list[str]:

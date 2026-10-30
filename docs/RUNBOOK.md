@@ -253,6 +253,49 @@ When the token expires or loses access, the fault report's result on the Request
 `BD_GITHUB_TOKEN` and says what to fix. Replace the value in `.env`; the next pass files the
 report.
 
+## Company facts
+
+Everything the Writer says about Velocity comes from the BD Proposal Library's `01 Company Reference` folder on
+Drive: 00 Company Facts (F-numbered facts), 01 Past Performance Register (PP-), 02 Products & Capabilities (PR-),
+03 People (PE-), the Brand Guide in 04 Brand, and 05 Conflicts & Open Questions (CF-). Edit the facts there; the
+repo keeps none of them. `.env` names each file by its Drive id:
+
+```
+COMPANY_FACTS_DOC_ID=        PAST_PERFORMANCE_SHEET_ID=    PRODUCTS_SHEET_ID=
+PEOPLE_SHEET_ID=             BRAND_GUIDE_DOC_ID=           FACT_CONFLICTS_SHEET_ID=
+```
+
+The worker reads all six through its service account at the start of every step (`drafting/facts.py`) and puts
+them in every prompt as the only source for claims about the company. It saves what it read to
+`data\drafting\facts\`; when Drive cannot be read, that copy stands in for up to 24 hours and the prompt says
+so. With no copy that recent, or with an id missing from `.env`, the step fails and its card says why.
+
+The files' rules are applied in code before the model sees anything:
+- A person marked FORMER EMPLOYEE in 03 People is left out of bios and key personnel. A partner stays, named as
+  one.
+- An item marked SENSITIVE, and each column marked SENSITIVE (a clearance), is marked [SENSITIVE] and used only
+  when the solicitation requires it.
+- An item naming a 05 Conflicts question that is not resolved is marked [OPEN: CF-nn]. The draft must not state
+  it as settled, and writes [NEEDS FACT: settle CF-nn, ...] where it needs it. An answer "confirmed by David,
+  evidence pending" is marked [EVIDENCE PENDING: CF-nn] and may be used.
+- The proposing company is Velocity Explorations. Hoverslam Designs LLC's facts appear only when the owner's
+  direction (or material the team added) names Hoverslam; then its SAM renewal is flagged for confirmation.
+- Title-page fields come from the fact `drafting/company.yaml` names for each, such as `cage: "[F-03: CAGE]"`.
+  The point of contact's email and phone have no fact yet, so they stay [NEEDS FACT: ...] until one is added
+  to 00 Company Facts and named there.
+
+A company fact the files do not hold is written [NEEDS FACT: what is missing]. It counts as an open item, like
+NEEDS INPUT, at every gate. After the First draft, the Compliance check and Final checks, one more call lists
+the facts the draft rests on. Those steps then save `facts_used_v1.md`, `facts_used_v2.md` and
+`facts_used_final.md`, each with:
+- every id the draft cites, and where;
+- what to review: SENSITIVE items, open or pending questions, and a Hoverslam bid's SAM renewal;
+- claims with no fact behind them;
+- ids the files do not have.
+
+The step's card counts them, for example "Facts used: 24 cited, 3 to review, 1 with no fact". The check costs
+about $0.10 to $0.20 a draft; if it fails, the draft stands and the card says the check did not run.
+
 ## Second judge (Grok)
 
 Every call the Claude review rates is also judged by Grok (`grok-4.7`) with the same prompt,

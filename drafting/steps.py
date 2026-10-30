@@ -26,10 +26,12 @@ JSON_BLOCK = re.compile(r"```json\s*(.*?)```", re.S | re.I)
 EN_DASH, EM_DASH = chr(0x2013), chr(0x2014)
 DASH = f"[{EN_DASH}{EM_DASH}]"
 DRAFTS = ("draft_final.md", "draft_v3.md", "draft_v2.md", "draft_v1.md")   # newest first
-PLACEHOLDER = re.compile(r"\[(PERSON WRITES|NEEDS INPUT|NEEDS EVIDENCE)\b[^\]]*\]", re.I)
+PLACEHOLDER = re.compile(r"\[(PERSON WRITES|NEEDS INPUT|NEEDS FACT|NEEDS EVIDENCE)\b[^\]]*\]", re.I)
 # Any other bracketed note that opens with a capitalized word, such as [CONFIRM ...], [UNVERIFIED] or [DATE]:
 # a model sometimes leaves open items in its own words, and they must not pass a gate as nothing left.
-OTHER_NOTE = re.compile(r"\[(?!(?:PERSON WRITES|NEEDS INPUT|NEEDS EVIDENCE)\b)[A-Z]{2,}(?:[ -][A-Z]{2,})*\b[^\]]{0,1000}\](?!\()")
+OTHER_NOTE = re.compile(r"\[(?!(?:PERSON WRITES|NEEDS INPUT|NEEDS FACT|NEEDS EVIDENCE)\b)[A-Z]{2,}(?:[ -][A-Z]{2,})*\b[^\]]{0,1000}\](?!\()")
+# A title-page field still pointing at its fact, such as [F-03: CAGE] (drafting/company.yaml): left unfilled, it is open.
+FACT_POINTER = re.compile(r"\[F-\d+[a-z]?:[^\]]*\]")
 
 HOW_IT_RUNS = """How this step runs here:
 - You cannot open web pages, sign in to portals or download files. Everything known about the call is in the message. Where a task needs a page, a login or a file you do not have, say so plainly and name what the owner should fetch. Never guess what such a page or file says.
@@ -121,9 +123,8 @@ def system_prompt(role: str, label: str, workflow: str, instructions: str, spec:
     """A workspace step's system prompt: who the model is, the skill's part for the step, how the step runs
     here, and the json block the worker reads."""
     company = profile()
-    return (f"You are {role} at {company.get('company_name', 'Velocity Explorations')}, "
-            f"{company.get('company_description', '')}. You run one step of the proposal workspace on the BD Team "
-            f"dashboard, for a call the team chose to pursue: {label}.\n\n"
+    return (f"You are {role} at {company.get('company_name', 'Velocity Explorations')}. You run one step of the proposal "
+            f"workspace on the BD Team dashboard, for a call the team chose to pursue: {label}.\n\n"
             f"Your instructions for this step, from Velocity's {workflow} workflow:\n\n"
             f"{instructions}\n\n{HOW_IT_RUNS}{JSON_ONLY if json_only else AFTER_DOCUMENT}{spec}")
 
@@ -212,11 +213,11 @@ def latest_draft(work_dir: Path) -> Path | None:
 
 
 def placeholder_counts(text: str) -> dict[str, int]:
-    """Open placeholders by kind: PERSON WRITES, NEEDS INPUT, NEEDS EVIDENCE, and other bracketed notes."""
-    counts = {"PERSON WRITES": 0, "NEEDS INPUT": 0, "NEEDS EVIDENCE": 0, "other": 0}
+    """Open placeholders by kind: PERSON WRITES, NEEDS INPUT, NEEDS FACT, NEEDS EVIDENCE, and other bracketed notes."""
+    counts = {"PERSON WRITES": 0, "NEEDS INPUT": 0, "NEEDS FACT": 0, "NEEDS EVIDENCE": 0, "other": 0}
     for match in PLACEHOLDER.finditer(text):
         counts[match.group(1).upper()] += 1
-    counts["other"] = len(OTHER_NOTE.findall(text))
+    counts["other"] = len(OTHER_NOTE.findall(text)) + len(FACT_POINTER.findall(text))
     return counts
 
 

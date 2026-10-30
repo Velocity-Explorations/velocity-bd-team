@@ -32,6 +32,16 @@ and no shared files. A component writes what it produced to the ledger, records 
 in the `runs` table, and the next component reads from there. The schema is documented in
 docs/LEDGER_SCHEMA.md well enough to build a dashboard from the document alone.
 
+## Velocity's facts live in Drive, not here
+
+Velocity's company facts (registration and codes, past performance, products and their TRL, people and bios,
+the brand's names, and the open questions about any of them) live in the BD Proposal Library's
+`01 Company Reference` folder on Drive, and that is where they are edited. The repo is public, so it keeps
+none of them: `.env` holds only the six files' Drive ids, and `drafting/company.yaml` only says which fact
+fills each title-page field. The Writer reads the files again for every step, uses them as the only source
+for claims about the company, and leaves `[NEEDS FACT: ...]` where they hold nothing (docs/RUNBOOK.md,
+Company facts). Never copy a fact into code, a test, a commit or a pull request.
+
 ## Setup (Windows, PowerShell)
 
 ```powershell

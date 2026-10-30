@@ -30,6 +30,7 @@ NO_BAND = "unscored"   # the scanner's band under 150 words: findings are listed
 OPEN_FAMILY = "prop_open_item"
 PLACEHOLDER_KINDS = [("PERSON WRITES", re.compile(r"^\[PERSON\s+WRITES", re.I)),
                      ("NEEDS INPUT", re.compile(r"^\[NEEDS?\s+INPUT", re.I)),
+                     ("NEEDS FACT", re.compile(r"^\[NEEDS?\s+FACT", re.I)),
                      ("NEEDS EVIDENCE", re.compile(r"^\[NEEDS?\s+EVIDENCE", re.I))]
 HOT_PARAGRAPHS = 5
 

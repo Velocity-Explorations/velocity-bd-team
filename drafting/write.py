@@ -25,10 +25,11 @@ from typing import Any
 
 from drafting import llm, pipeline, prompts, scan, slop_gate
 from drafting.company import profile
-from drafting.inputs import builds_on_text, draft_inputs
+from drafting.inputs import builds_on_text, draft_inputs, hoverslam_bid
 from drafting.phases import Phase
 from drafting.prompts import Prompt
-from drafting.steps import (OTHER_NOTE, PLACEHOLDER, StepContext, StepResult, bullets, count_dashes, fix_dashes, latest_draft,
+from drafting.steps import (FACT_POINTER, OTHER_NOTE, PLACEHOLDER, StepContext, StepResult, bullets, count_dashes, fix_dashes,
+                            latest_draft,
                             placeholder_counts, placeholder_line, points, skill_part, split_reply, strings, system_prompt,
                             user_prompt)
 from ledger import queries as lq
@@ -46,11 +47,12 @@ QUESTIONS = {
               "Mark submitted.",
 }
 CORRECTION, WARNING = "❌", "⚠️"   # the reference compliance report's marks for items fixed and items to check
-PLACEHOLDER_RULE = ("Keep every open item a person must close in one of three forms: [PERSON WRITES: ...] for text a person "
-                    "must write in their own words, [NEEDS INPUT: ...] for facts, files or figures that must come from people, "
-                    "and [NEEDS EVIDENCE: ...] for a claim that needs a source. Do not write other bracketed notes such as "
-                    "[CONFIRM ...], [UNVERIFIED] or [REVIEW NEEDED: ...], and keep notes to the team out of the document: "
-                    "the gates count only these three forms.")
+PLACEHOLDER_RULE = ("Keep every open item a person must close in one of four forms: [PERSON WRITES: ...] for text a person "
+                    "must write in their own words, [NEEDS INPUT: ...] for files, figures or decisions that must come from "
+                    "people, [NEEDS FACT: ...] for a fact about the company that VELOCITY FACTS does not hold, and "
+                    "[NEEDS EVIDENCE: ...] for any other claim that needs a source. Do not write other bracketed notes such "
+                    "as [CONFIRM ...], [UNVERIFIED] or [REVIEW NEEDED: ...], and keep notes to the team out of the document: "
+                    "the gates count only these four forms.")
 PACKET_TOKENS = 6_000
 OUTLINE_SPEC = """{"key_points": ["three to six short points for the step's card"],
  "page_limit": "the page limit, in words, or null when the call sets none",
@@ -106,6 +108,30 @@ def _alignment(ctx: StepContext) -> str:
     return prompts.ALIGNMENT_BLOCK_HEADER + alignment[:15_000] if alignment else ""
 
 
+FACTS_TOKENS = 8_000
+
+
+def _facts_used(ctx: StepContext, text: str, version: str, title: str) -> tuple[dict[str, str] | None, str]:
+    """A draft's Facts used notes (PRO-565): one more call lists each fact id the draft rests on and each claim about
+    the company that rests on none; the notes add what needs a person's review. A failed check leaves the draft as it
+    is and says so on the card."""
+    found = ctx.record.facts
+    if found is None:
+        return None, "Facts used: no facts were read for this step"
+    hoverslam = hoverslam_bid(ctx.record)
+    try:
+        reply = ctx.ask(found.trace_prompt(text, hoverslam), f"facts used: {title}", FACTS_TOKENS)
+    except llm.PhaseError as exc:
+        return None, f"Facts used: the check did not run ({str(exc)[:150]})"
+    _, data = split_reply(reply)
+    used = [u for u in data.get("used") or [] if isinstance(u, dict) and str(u.get("id") or "").strip()]
+    unsupported = strings(data.get("unsupported"))
+    needs = placeholder_counts(text)["NEEDS FACT"]
+    saved = ctx.save(f"facts_used_{version}.md", found.notes(used, unsupported, title, hoverslam, needs), f"Facts used, {title}")
+    return saved, (f"Facts used: {len(used)} cited, {len(found.to_review(used))} to review, "
+                   f"{len(unsupported)} with no fact")
+
+
 # ------------------------------------------------------------------------- Plan and Draft
 
 def _sections(found: Any) -> list[dict[str, Any]]:
@@ -153,8 +179,10 @@ def draft(ctx: StepContext) -> StepResult:
     saved = ctx.entry("draft_v1.md", "Draft v1")
     document = (ctx.work_dir / "draft_v1.md").read_text(encoding="utf-8")
     counts, words = placeholder_counts(document), len(document.split())
-    return StepResult(summary=bullets([f"{words:,} words", placeholder_line(counts), f"AI slop check: {slop['verdict']}"]),
-                      files=[saved],
+    notes, facts_line = _facts_used(ctx, document, "v1", "Draft v1")
+    return StepResult(summary=bullets([f"{words:,} words", placeholder_line(counts), f"AI slop check: {slop['verdict']}",
+                                       facts_line]),
+                      files=[saved, *([notes] if notes else [])],
                       content={"document": document, "words": words, "placeholders": counts, "slop": slop["verdict"],
                                "question": QUESTIONS["draft"]})
 
@@ -182,6 +210,9 @@ def compliance(ctx: StepContext) -> StepResult:
     if not report.strip():
         lines = ["The check gave no report; its corrected text is Draft v2"]
     lines.append(f"AI slop check: {slop['verdict']}")
+    notes, facts_line = _facts_used(ctx, (ctx.work_dir / "draft_v2.md").read_text(encoding="utf-8"), "v2", "Draft v2")
+    files += [notes] if notes else []
+    lines.append(facts_line)
     return StepResult(summary=bullets(lines), files=files,
                       content={"document": fix_dashes(report.strip()), "corrections": corrections, "warnings": warnings,
                                "slop": slop["verdict"], "question": QUESTIONS["compliance"]})
@@ -350,6 +381,8 @@ REPORT_ONLY = ("\n\nThis is the final version, checked once more before submissi
 KIND_TASKS = {"PERSON WRITES": ("Write the place marked PERSON WRITES in the final version, in your own words",
                                 "Write the {n} places marked PERSON WRITES in the final version, in your own words"),
               "NEEDS INPUT": ("Fill the NEEDS INPUT placeholder in the final version", "Fill the {n} NEEDS INPUT placeholders in the final version"),
+              "NEEDS FACT": ("Give the company fact marked NEEDS FACT, and add it to 01 Company Reference",
+                             "Give the {n} company facts marked NEEDS FACT, and add them to 01 Company Reference"),
               "NEEDS EVIDENCE": ("Give a source for the claim marked NEEDS EVIDENCE", "Give sources for the {n} claims marked NEEDS EVIDENCE"),
               "other": ("Clear the other bracketed note in the final version", "Clear the {n} other bracketed notes in the final version")}
 
@@ -363,7 +396,7 @@ def placeholder_list(text: str) -> list[dict[str, Any]]:
             section = line.strip().lstrip("#").strip()
         for match in PLACEHOLDER.finditer(line):
             found.append({"kind": match.group(1).upper(), "text": match.group(0)[:300], "line": n, "section": section})
-        for match in OTHER_NOTE.finditer(line):
+        for match in [*OTHER_NOTE.finditer(line), *FACT_POINTER.finditer(line)]:
             found.append({"kind": "other", "text": match.group(0)[:300], "line": n, "section": section})
     return found
 
@@ -444,6 +477,8 @@ def final(ctx: StepContext) -> StepResult:
         files.append(ctx.entry("slop_report.md", "AI slop check report"))
     if report:
         files.append(report)
+    notes, facts_line = _facts_used(ctx, document, "final", "final version")
+    files += [notes] if notes else []
     counts = placeholder_counts(document)
     _final_checklist(ctx, counts)
     left = sum(counts.values())
@@ -468,6 +503,7 @@ def final(ctx: StepContext) -> StepResult:
                         + (f"; {missed} no longer matched the draft" if missed else ""))
     if dashes:
         lines.append(f"{dashes} {'dash' if dashes == 1 else 'dashes'} replaced")
+    lines.append(facts_line)
     passed = sum(1 for c in checks if c["ok"])
     lines.insert(0, f"{passed} of {len(checks)} final checks passed")
     return StepResult(summary=bullets(lines), files=files,

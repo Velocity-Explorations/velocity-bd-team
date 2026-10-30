@@ -190,6 +190,11 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     the trial each reviewer stopped before its changes, so Reviews recorded none and Draft v3 matched
     v2, and the go or no-go brief and the submission checklist were cut short. A reviewer whose answer
     has no readable list of changes now shows as failed, not as no changes.
+  - Since 2026-10-30 the Writer reads Velocity's facts from 01 Company Reference on Drive for every step, as the
+    only source for company claims; the repo keeps only the files' ids. Former employees, Hoverslam's facts
+    outside a Hoverslam bid, SENSITIVE items and unsettled questions are handled in code, a missing fact is
+    [NEEDS FACT: ...], and the First draft, Compliance check and Final checks each save Facts used notes
+    (docs/RUNBOOK.md, Company facts).
   - Since 2026-10-30 every step reads the whole draft. The compliance check, the review passes, the
     formatting pass and the re-check read only its first 50,000 characters before (the checklist 30,000,
     the reviewers 60,000), so a longer draft lost its end, as Grok's 62,000-character trial draft did. A
