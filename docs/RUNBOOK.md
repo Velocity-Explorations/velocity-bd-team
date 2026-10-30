@@ -321,7 +321,7 @@ python run.py --portal sam_gov
 The "00 Proposal Register" sheet in the BD Proposal Library Drive folder lists past submissions
 (docs/LIBRARY_CONVENTIONS.md). After rows are filled in or changed, or a Submissions folder is added, ask
 Claude to "sync the register". It first appends a starter row for any folder without one (submission_id,
-submitted_date and portal from the folder name, drive_link to the folder) and never changes a row people
+submitted_date and portal from the folder name, no date for a `nodate_` folder, drive_link to the folder) and never changes a row people
 have filled in. Then it reads the sheet and the Submissions folder names through the Google connectors,
 writes them to
 `data/library/register_rows.json` and `data/library/folders.json`, and runs

@@ -36,6 +36,7 @@ const LABELS: Record<string, string> = {
   not_relevant: "not relevant",
   skipped_timeout: "timeout",
   no_award: "no award",
+  not_submitted: "not submitted",
   cancelled_by_agency: "cancelled by the agency",
   proposed: "waiting",
 };

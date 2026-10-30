@@ -65,7 +65,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Proposal Library (2026-10-21): the "00 Proposal Register" sheet and "00 README" are in the BD Proposal
   Library Drive folder, with one row per Submissions folder. `library/register.py` checks the rows and
   syncs them into `proposals`; Claude runs it on request through David's Google connectors, as no
-  scheduled job can read the sheet until gog or a service account exists (PRO-475).
+  scheduled job can read the sheet until gog or a service account exists (PRO-475). Since 2026-10-30 it
+  takes the Register's newer values too: eleven more portals (dsip to tacfi), the exercise and
+  commercial types, the not_submitted outcome (migration 011 widens the ledger's check), the prime
+  (Hoverslam) role and undated `nodate_` ids.
 - Plans (2026-10-18): the Writer Plan, the Draft-Ready Upgrade and the Proposal Library plan were revised
   so the dashboard decides. Drafts are requested with the dashboard's Draft button, an approved
   draft request from the assistant, or the CLI. Offline copies are in docs/plans/.

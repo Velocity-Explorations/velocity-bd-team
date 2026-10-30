@@ -35,3 +35,9 @@ test("a submission reads by its date, portal and title; a reference file by its 
   assert.equal(pastWorkLabel(ITEMS[4]), "Capabilities.pdf");
   assert.equal(pastWorkLabel(item("x", "Submissions/odd-name", FOLDER)), "odd-name");
 });
+
+test("an undated submission reads as having no date and comes after the dated ones", () => {
+  const undated = item("u", "Submissions/nodate_dsip_edge-translation", FOLDER);
+  assert.equal(pastWorkLabel(undated), "Edge translation, DSIP, no date");
+  assert.deepEqual(pastWorkGroups([undated, ...ITEMS], [])[0].items.map((i) => i.id), ["c", "a", "u"]);
+});
