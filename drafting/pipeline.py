@@ -136,7 +136,13 @@ def _read(out_dir: Path, name: str) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
-def _ask(state: State, phase_id: str, prompt: prompts.Prompt, label: str) -> str:
+def rewrite_room(phase_id: str, draft: str) -> int:
+    """Output tokens for a phase that writes the whole draft out again: its own budget, or one token for every
+    two characters of the draft when that is more (Claude writes about 2.4 characters a token)."""
+    return max(MAX_TOKENS[phase_id], len(draft) // 2)
+
+
+def _ask(state: State, phase_id: str, prompt: prompts.Prompt, label: str, max_tokens: int | None = None) -> str:
     """One model call for the running phase, with its characters and tokens added to the phase's stats."""
     stats = state.stats
     calls = stats.setdefault("calls", [])
@@ -147,8 +153,9 @@ def _ask(state: State, phase_id: str, prompt: prompts.Prompt, label: str) -> str
                       "truncated": usage.truncated})
 
     stats["chars_in"] = stats.get("chars_in", 0) + len(prompt.system) + len(prompt.user)
-    text = state.run.generate(prompt.user, prompt.system, model=state.run.model, max_tokens=MAX_TOKENS[phase_id],
-                              timeout=PHASE_TIMEOUT_S, phase_label=label, abort=state.run.abort, on_usage=record)
+    text = state.run.generate(prompt.user, prompt.system, model=state.run.model,
+                              max_tokens=max_tokens or MAX_TOKENS[phase_id], timeout=PHASE_TIMEOUT_S, phase_label=label,
+                              abort=state.run.abort, on_usage=record)
     stats["chars_out"] = stats.get("chars_out", 0) + len(text)
     return text
 
@@ -250,9 +257,9 @@ def phase_65_review(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hoo
                                          rag_context=state.rag_context[:20_000], title=inputs.title,
                                          agency=inputs.agency, opp_type=inputs.opp_type, due_date=inputs.due_date,
                                          requirements=state.requirements[:20_000],
-                                         alignment_block=_alignment_block(state.alignment), draft=current[:50_000])
+                                         alignment_block=_alignment_block(state.alignment), draft=current)
         try:
-            revised = _ask(state, "6.5", prompt, f"review pass {n}/4: {label}")
+            revised = _ask(state, "6.5", prompt, f"review pass {n}/4: {label}", rewrite_room("6.5", current))
         except llm.PhaseError as exc:
             log.error("Review pass %d/4 (%s) failed, keeping the current draft: %s", n, label, exc)
             passes.append({"pass": n, "label": label, "status": "failed", "error": str(exc)[:300]})
@@ -273,8 +280,8 @@ def phase_675_compliance(inputs: DraftInputs, state: State, out_dir: Path, hooks
     prompt = prompts.p675_compliance(company=state.run.company, knowledge_base=inputs.company_context,
                                      alignment_context=_alignment_block(state.alignment), title=inputs.title,
                                      agency=inputs.agency, opp_type=inputs.opp_type, due_date=inputs.due_date,
-                                     requirements=state.requirements[:25_000], draft=state.draft[:50_000])
-    result = _ask(state, "6.75", prompt, "compliance check")
+                                     requirements=state.requirements[:25_000], draft=state.draft)
+    result = _ask(state, "6.75", prompt, "compliance check", rewrite_room("6.75", state.draft))
     if prompts.CORRECTED_DRAFT_SEPARATOR in result:
         report, corrected = result.split(prompts.CORRECTED_DRAFT_SEPARATOR, 1)
         corrected = corrected.strip()
@@ -295,7 +302,7 @@ def phase_675_compliance(inputs: DraftInputs, state: State, out_dir: Path, hooks
 def phase_7_checklist(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hooks) -> State:
     prompt = prompts.p7_checklist(company=state.run.company, title=inputs.title, agency=inputs.agency,
                                   due_date=inputs.due_date, requirements=state.requirements[:20_000],
-                                  outline=state.outline[:15_000], draft=state.draft[:30_000])
+                                  outline=state.outline[:15_000], draft=state.draft)
     _write(out_dir, "checklist.md", _ask(state, "7", prompt, "building checklist"))
     state.stats["needs_input"] = state.draft.count("[NEEDS INPUT")
     return state
@@ -304,7 +311,8 @@ def phase_7_checklist(inputs: DraftInputs, state: State, out_dir: Path, hooks: H
 def phase_75_polish(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hooks) -> State:
     if not state.draft:
         return _skip(state, "Polish: no draft to format")
-    formatted = _ask(state, "7.5", prompts.p75_polish(draft=state.draft[:50_000]), "formatting document")
+    formatted = _ask(state, "7.5", prompts.p75_polish(draft=state.draft), "formatting document",
+                     rewrite_room("7.5", state.draft))
     _write(out_dir, "draft_final.md", formatted)
     state.draft = formatted
     return state
