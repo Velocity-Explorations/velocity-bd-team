@@ -302,6 +302,22 @@ the facts the draft rests on. Those steps then save `facts_used_v1.md`, `facts_u
 The step's card counts them, for example "Facts used: 24 cited, 3 to review, 1 with no fact". The check costs
 about $0.10 to $0.20 a draft; if it fails, the draft stands and the card says the check did not run.
 
+## Past bids in drafts
+
+The Outline and the First draft also read the past bids nearest the call (`drafting/past_bids.py`):
+- **Which:** the first three Register rows in the Writer's ranking whose Submissions folder holds files. The
+  ranking favors the same agency, an exemplar, a win, its strength, and words its title and themes share with
+  the call.
+- **What:** each one's `01_submitted/` and `03_outcome/`, read live through the service account. Volumes and
+  papers come first, then slides; cost files, cover sheets, letters, forms and other paperwork in `01_submitted/`
+  are left out. Text comes from PDFs, Word files, slide decks and Google Docs or Slides, at most 12,000
+  characters a file and 20,000 a bid.
+- **How it's used:** the prompt says to reuse their language, structure and lessons only, and to take every fact
+  from VELOCITY FACTS, never a figure, price or name from an old bid.
+
+The step's card says which bids were read, and `past_bids.md` beside the draft holds the text the Writer saw.
+When Drive cannot be read, the step goes on and the card says so.
+
 ## Second judge (Grok)
 
 Every call the Claude review rates is also judged by Grok (`grok-4.7`) with the same prompt,

@@ -67,6 +67,14 @@ class FakeDrive:
         self._check()
         self.items[item_id]["name"] = name
 
+    def export(self, item_id: str, mime: str) -> str:
+        self._check()
+        return self.items[item_id]["content"].decode("utf-8")
+
+    def download(self, item_id: str) -> bytes:
+        self._check()
+        return self.items[item_id]["content"]
+
     def path_of(self, item_id: str) -> str:
         parts = []
         while item_id != self.library:

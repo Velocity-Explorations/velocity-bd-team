@@ -64,6 +64,7 @@ class Drive(Protocol):
     def move(self, item_id: str, to_parent: str) -> None: ...
     def rename(self, item_id: str, name: str) -> None: ...
     def export(self, item_id: str, mime: str) -> str: ...
+    def download(self, item_id: str) -> bytes: ...
 
 
 class Sheets(Protocol):
@@ -141,6 +142,10 @@ class GoogleDrive:
     def export(self, item_id: str, mime: str) -> str:
         """A Google Doc's text in another format, such as text/markdown."""
         return self._run(self.api.files().export(fileId=item_id, mimeType=mime)).decode("utf-8")
+
+    def download(self, item_id: str) -> bytes:
+        """A stored file's bytes, such as a PDF in a submission's 01_submitted/."""
+        return self._run(self.api.files().get_media(fileId=item_id, supportsAllDrives=True))
 
 
 def _column(index: int) -> str:

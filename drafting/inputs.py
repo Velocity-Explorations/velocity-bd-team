@@ -68,8 +68,8 @@ def _words(text: str) -> set[str]:
 
 
 def _relevance(proposal: dict[str, Any], call: dict[str, Any]) -> float:
-    """How useful a past submission is likely to be: the same agency, an exemplar, a win, its strength,
-    and words its title shares with the call's."""
+    """How useful a past submission is likely to be: the same agency, an exemplar, a win, its strength, words its
+    title shares with the call's, and its themes (topics and products) the call's title or text names."""
     score = 0.0
     agency, department = (proposal.get("agency") or "").lower().strip(), (call.get("department") or "").lower()
     if agency and (agency in department or department and department in agency):
@@ -78,6 +78,8 @@ def _relevance(proposal: dict[str, Any], call: dict[str, Any]) -> float:
     score += 1 if proposal.get("outcome") == "won" else 0
     score += (proposal.get("strength_rating") or 0) / 5
     score += 0.5 * len(_words(proposal.get("title") or "") & _words(call.get("title") or ""))
+    themes = _words(" ".join(str(t) for t in _json_list(proposal.get("themes"))))   # its topics and products
+    score += 0.5 * min(len(themes & _words(f"{call.get('title') or ''} {(call.get('description') or '')[:3000]}")), 4)
     return score
 
 
