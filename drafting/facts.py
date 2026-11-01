@@ -1,7 +1,8 @@
 """Velocity's facts for the Writer, read from 01 Company Reference in the BD Proposal Library on Drive (PRO-565).
 
     found = load()                                  # fresh from Drive; the copy saved here stands in for 24 hours
-    text = found.block(hoverslam=False)             # the prompt section: how to use the facts, then each one by its id
+    first = found.block(hoverslam=False)            # how to use the facts, then each by its id: first in every call
+    line = found.where()                            # what a prompt says in their place, with when they were read
     notes = found.notes(used, unsupported, "Draft v1", hoverslam=False, needs_fact=2)   # a draft's Facts used
 
 The six files are named by their Drive ids in .env (SOURCES, docs/RUNBOOK.md). What they hold is never kept in the
@@ -112,9 +113,15 @@ class Facts:
     def _when(self) -> str:
         return f"Read from 01 Company Reference on Drive at {self.read_at:%Y-%m-%d %H:%M} UTC." + (f" {self.note}" if self.note else "")
 
+    def where(self) -> str:
+        """What a prompt says in place of the facts, which the worker sends first in every call."""
+        return (f"VELOCITY FACTS, read from 01 Company Reference on Drive at {self.read_at:%Y-%m-%d %H:%M} UTC, come first "
+                "in this request: they are the only source for claims about the company." + (f" {self.note}" if self.note else ""))
+
     def block(self, hoverslam: bool) -> str:
-        """The section every Writer step reads: how to use the facts, then each one by its id."""
-        lines = ["VELOCITY FACTS", self._when(), *RULES, HOVERSLAM if hoverslam else VELOCITY]
+        """The facts every call starts with: how to use them, then each one by its id. It holds no read time, so
+        it stays the same from step to step and the API's prompt cache keeps serving it."""
+        lines = ["VELOCITY FACTS", *RULES, HOVERSLAM if hoverslam else VELOCITY]
         for name, (_, title, _) in SOURCES.items():
             shown = [i for i in self.items.values() if i.source == title and (hoverslam or not _hoverslam(i.entity))]
             if shown:
@@ -131,14 +138,15 @@ class Facts:
 
         return fix_dashes("\n".join(lines))   # the files use dashes; no prompt may carry one
 
-    def trace_prompt(self, text: str, hoverslam: bool) -> Prompt:
-        """The check that lists the facts a draft rests on, for its Facts used notes."""
+    def trace_prompt(self, text: str) -> Prompt:
+        """The check that lists the facts a draft rests on, for its Facts used notes. The facts come first in the
+        call, as in every other."""
         system = ("You check a proposal draft against Velocity's facts. List every claim the draft makes about the company "
                   "(the proposing company, its people, past performance, contracts and their values, certifications, "
                   "clearances, products and their TRL, results, customers and capabilities) with the ids of the facts it "
                   "rests on, and every such claim that rests on none. A [NEEDS FACT: ...] placeholder is not a claim. "
                   "Answer with one fenced json block and nothing else:\n" + TRACE_SPEC)
-        return Prompt(system, f"{self.block(hoverslam)}\n\nTHE DRAFT\n{text}")
+        return Prompt(system, f"THE DRAFT\n{text}")
 
     def to_review(self, used: Sequence[Mapping[str, Any]]) -> list[str]:
         """The ids a draft relies on that need a person's look: SENSITIVE, or resting on a question not resolved."""

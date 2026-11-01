@@ -25,9 +25,11 @@ def test_every_item_reaches_the_writer_by_its_id_without_the_source_links() -> N
 
 
 def test_the_writer_is_told_facts_are_the_only_source_and_to_leave_needs_fact() -> None:
-    block = facts.parse(company_reference.files(), NOW).block(hoverslam=False)
-    assert "only source" in block and "[NEEDS FACT:" in block and "2026-10-30 12:00 UTC" in block
-    assert "The proposing company is Velocity Explorations" in block
+    found = facts.parse(company_reference.files(), NOW)
+    block = found.block(hoverslam=False)
+    assert "only source" in block and "[NEEDS FACT:" in block and "The proposing company is Velocity Explorations" in block
+    assert "12:00" not in block                                   # the read time stays out of the cached block
+    assert "VELOCITY FACTS, read from 01 Company Reference on Drive at 2026-10-30 12:00 UTC" in found.where()
 
 
 def test_a_former_employee_is_left_out_of_bios_and_key_personnel() -> None:
@@ -100,10 +102,10 @@ def test_the_facts_used_notes_list_each_id_and_what_needs_review() -> None:
     assert "SAM renewal" in found.notes([], [], "Draft v1", hoverslam=True, needs_fact=0)
 
 
-def test_the_trace_prompt_holds_the_facts_and_the_draft() -> None:
-    prompt = facts.parse(company_reference.files(), NOW).trace_prompt("# Draft\nVelocity is a WOSB.", hoverslam=False)
+def test_the_trace_prompt_holds_the_draft_since_the_facts_come_first_in_every_call() -> None:
+    prompt = facts.parse(company_reference.files(), NOW).trace_prompt("# Draft\nVelocity is a WOSB.")
     assert "rests on none" in prompt.system and '"used"' in prompt.system
-    assert "F-06 [EVIDENCE PENDING: CF-14]" in prompt.user and prompt.user.endswith("# Draft\nVelocity is a WOSB.")
+    assert prompt.user == "THE DRAFT\n# Draft\nVelocity is a WOSB."
 
 
 def test_the_repo_keeps_only_fact_ids_for_the_title_page_fields() -> None:

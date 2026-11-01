@@ -265,10 +265,16 @@ COMPANY_FACTS_DOC_ID=        PAST_PERFORMANCE_SHEET_ID=    PRODUCTS_SHEET_ID=
 PEOPLE_SHEET_ID=             BRAND_GUIDE_DOC_ID=           FACT_CONFLICTS_SHEET_ID=
 ```
 
-The worker reads all six through its service account at the start of every step (`drafting/facts.py`) and puts
-them in every prompt as the only source for claims about the company. It saves what it read to
-`data\drafting\facts\`; when Drive cannot be read, that copy stands in for up to 24 hours and the prompt says
-so. With no copy that recent, or with an id missing from `.env`, the step fails and its card says why.
+The worker reads all six through its service account at the start of every step (`drafting/facts.py`). It sends
+them first in every call, as the only source for claims about the company, and each prompt says where they are
+and when they were read. It saves what it read to `data\drafting\facts\`; when Drive cannot be read, that copy
+stands in for up to 24 hours and the prompt says so. With no copy that recent, or with an id missing from
+`.env`, the step fails and its card says why.
+
+The facts, about 26,000 tokens, are marked for Claude's prompt cache. The first call writes them to the cache
+(about $0.065 on Sonnet 5.5), and each call within five minutes of the last one that used them reads them for
+about $0.003. Steps that run back to back share it, so a pursuit's facts cost about $0.30 rather than $1. The
+worker log shows both counts on each call: "(25947 from the cache, 0 written to it)".
 
 The files' rules are applied in code before the model sees anything:
 - A person marked FORMER EMPLOYEE in 03 People is left out of bios and key personnel. A partner stays, named as

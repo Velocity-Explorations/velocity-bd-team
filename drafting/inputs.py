@@ -9,7 +9,8 @@ team's votes and notes, the owner's choices at Start the draft, and the Proposal
 Register. The worker cannot open portal pages or download attachments yet, so the call's text is
 what the scanner saved. Login-gated text goes to the model and the local files, never to logs.
 Velocity's own facts come from 01 Company Reference on Drive, read again for every step
-(drafting/facts.py); every prompt carries them as the only source for claims about the company.
+(drafting/facts.py). The worker sends them first in every call, as the only source for claims about
+the company, and the prompts say where they are.
 """
 from __future__ import annotations
 
@@ -209,8 +210,13 @@ def call_facts(record: CallRecord, today: date) -> str:
         "PAST SUBMISSIONS IN THE PROPOSAL REGISTER, MOST RELEVANT FIRST",
         past_work_text(record),
         *material_lines(record),
-        *(["", record.facts.block(hoverslam_bid(record))] if record.facts else []),
+        *(["", record.facts.where()] if record.facts else []),
     ])
+
+
+def facts_block(record: CallRecord) -> str:
+    """Velocity's facts for this pursuit's bid, which the worker sends first in every call so the API caches them."""
+    return record.facts.block(hoverslam_bid(record)) if record.facts else ""
 
 
 def hoverslam_bid(record: CallRecord) -> bool:
@@ -243,6 +249,6 @@ def draft_inputs(record: CallRecord) -> DraftInputs:
         "description": call.get("description") or "",
         "listing_text": details_text(record),
         "past_experience": past_work_text(record),
-        "company_context": record.facts.block(hoverslam_bid(record)) if record.facts else "",
+        "company_context": record.facts.where() if record.facts else "",
         "team_notes": notes,
     })

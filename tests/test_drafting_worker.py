@@ -45,10 +45,10 @@ class Model:
 
     def __call__(self, prompt: str, system: str = "", model: str | None = None, max_tokens: int = 8000,
                  timeout: float = 600, phase_label: str = "", *, abort: llm.AbortToken | None = None,
-                 on_usage: Callable[[llm.Usage], None] | None = None, **_: Any) -> str:
+                 on_usage: Callable[[llm.Usage], None] | None = None, prefix: str = "", **_: Any) -> str:
         if abort is not None and abort.is_set():
             raise llm.DraftCancelled(f"{phase_label}: cancelled")
-        self.calls.append({"label": phase_label, "prompt": prompt, "system": system, "model": model})
+        self.calls.append({"label": phase_label, "prompt": prompt, "system": system, "model": model, "prefix": prefix})
         if self.on_call:
             self.on_call(phase_label)
         if phase_label in self.fail:
@@ -143,6 +143,16 @@ def test_the_worker_drafts_with_the_model_WRITER_MODEL_names(ledger_db: str, loc
     model = Model()
     assert worker.work_once(generate=model) is True
     assert model.calls[0]["model"] == "grok-4.7"
+
+
+def test_every_call_sends_velocitys_facts_first_so_the_api_caches_them(ledger_db: str, local: Path) -> None:
+    """The facts, read from Drive for the step, go first and the same in each call; the prompt only says where."""
+    _pursuit()
+    model = Model()
+    assert worker.work_once(generate=model) is True
+    [call] = model.calls
+    assert call["prefix"].startswith("VELOCITY FACTS") and "F-02 | UEI: TESTUEI00001" in call["prefix"]
+    assert "F-02 | UEI" not in call["prompt"] and "VELOCITY FACTS, read from 01 Company Reference" in call["prompt"]
 
 
 def test_a_step_is_saved_ready_with_what_it_cost_and_waits_for_the_owner(ledger_db: str, local: Path) -> None:
