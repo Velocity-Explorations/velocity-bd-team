@@ -363,18 +363,21 @@ def _run(step: dict[str, Any], pursuit: dict[str, Any], label: str, doing: str, 
         return
     abort = llm.AbortToken()
     meter = Meter(float(pursuit["cost_usd"]), float(pursuit["budget_usd"]), abort)
+    first = ""   # Velocity's facts, read for this step: sent first in every call, so the API caches them
 
     def ask(prompt: Prompt, call_label: str, max_tokens: int) -> str:
         if _stopped(pursuit["id"]):
             abort.set()
             raise llm.DraftCancelled(f"{call_label}: the pursuit was closed")
         return generate(prompt.user, prompt.system, model=model, max_tokens=max_tokens, timeout=PHASE_TIMEOUT_S,
-                        phase_label=call_label, abort=abort, on_usage=meter.record)
+                        phase_label=call_label, abort=abort, on_usage=meter.record, prefix=first)
 
     watcher = Watcher(pursuit["id"], doing, abort)
     watcher.start()
     try:
-        ctx = StepContext(pursuit=pursuit, step=step, record=inputs.gather(pursuit["id"]),
+        record = inputs.gather(pursuit["id"])
+        first = inputs.facts_block(record)
+        ctx = StepContext(pursuit=pursuit, step=step, record=record,
                           work_dir=WORK_ROOT / f"pursuit-{pursuit['id']}", ask=ask,
                           progress=lambda states: lq.set_task_states(step["id"], states), previous=_previous(step),
                           today=today, word_format=_word_format(pursuit["id"]))

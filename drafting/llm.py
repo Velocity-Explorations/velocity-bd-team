@@ -164,8 +164,9 @@ def _stream_once(client: Any, kwargs: dict[str, Any], label: str, timeout: float
     if on_usage is not None:
         on_usage(usage)
     text = "".join(parts).strip()
-    log.info("%s: %d chars out, %d tokens in, %d out, %.1fs%s", label, len(text), usage.input_tokens,
-             usage.output_tokens, usage.seconds, " (hit max_tokens, output cut off)" if usage.truncated else "")
+    log.info("%s: %d chars out, %d tokens in (%d from the cache, %d written to it), %d out, %.1fs%s", label, len(text),
+             usage.input_tokens, usage.cache_read_tokens, usage.cache_write_tokens, usage.output_tokens, usage.seconds,
+             " (hit max_tokens, output cut off)" if usage.truncated else "")
     if not text:
         raise _EmptyOutput()
     return text
@@ -247,23 +248,30 @@ def _xai_once(model: str, prompt: str, system: str, max_tokens: int, label: str,
 
 def generate(prompt: str, system: str = "", model: str | None = None, max_tokens: int = 8000,
              timeout: float = 600, phase_label: str = "", *, abort: AbortToken | None = None,
-             on_usage: Callable[[Usage], None] | None = None, client: Any = None) -> str:
-    """The model's answer to one prompt, streamed. Raises PhaseError or DraftCancelled."""
+             on_usage: Callable[[Usage], None] | None = None, client: Any = None, prefix: str = "") -> str:
+    """The model's answer to one prompt, streamed. Raises PhaseError or DraftCancelled. A prefix, Velocity's facts
+    in the worker, goes first and the same in every call, marked for Claude's prompt cache: a call within five
+    minutes of the last one that sent it reads it at a twentieth of the input price."""
     label = phase_label or "generating"
     model = model or writer_model()
     kwargs: dict[str, Any] = {"model": model, "max_tokens": min(max_tokens + THINKING_ROOM, MAX_OUTPUT_TOKENS),
                               "timeout": READ_TIMEOUT_S, "messages": [{"role": "user", "content": prompt}]}
-    if system:
+    if prefix:
+        kwargs["system"] = [{"type": "text", "text": prefix, "cache_control": {"type": "ephemeral"}},
+                            *([{"type": "text", "text": system}] if system else [])]
+    elif system:
         kwargs["system"] = system
-    log.info("%s: prompt %d chars, system %d chars, model %s", label, len(prompt), len(system), model)
+    log.info("%s: prompt %d chars, system %d chars after %d cached first, model %s", label, len(prompt), len(system),
+             len(prefix), model)
     log.debug("%s system prompt:\n%s\n%s user prompt:\n%s", label, system, label, prompt)
     problem = ""
     for attempt in (1, 2):
         if abort is not None and abort.is_set():
             raise DraftCancelled(f"{label}: cancelled")
         try:
-            if is_grok(model):
-                return _xai_once(model, prompt, system, max_tokens, label, timeout, abort, on_usage)
+            if is_grok(model):   # xAI caches a repeated start by itself
+                return _xai_once(model, prompt, "\n\n".join(p for p in (prefix, system) if p), max_tokens, label,
+                                 timeout, abort, on_usage)
             return _stream_once(client or default_client(), kwargs, label, timeout, abort, on_usage)
         except (DraftCancelled, PhaseError):
             raise

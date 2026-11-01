@@ -92,6 +92,26 @@ def test_claude_gets_room_to_think_on_top_of_the_answers_budget_up_to_its_output
     assert [c["max_tokens"] for c in client.calls] == [16_000 + llm.THINKING_ROOM, 128_000]
 
 
+def test_a_prefix_goes_first_in_its_own_block_marked_for_the_cache(caplog: pytest.LogCaptureFixture) -> None:
+    """Velocity's facts go first and the same in every call, so the API caches them (PRO-565)."""
+    cached = SimpleNamespace(stop_reason="end_turn", _request_id="req_test", usage=SimpleNamespace(
+        input_tokens=40, output_tokens=5, cache_read_input_tokens=25_000, cache_creation_input_tokens=0))
+    client = FakeClient([FakeStream(["ok"], final()), FakeStream(["ok"], cached)])
+    seen: list[llm.Usage] = []
+    llm.generate("p", system="SYS", client=client, prefix="FACTS")
+    with caplog.at_level(logging.INFO, logger="drafting.llm"):
+        llm.generate("p", client=client, prefix="FACTS", on_usage=seen.append, phase_label="alignment")
+    first = {"type": "text", "text": "FACTS", "cache_control": {"type": "ephemeral"}}
+    assert client.calls[0]["system"] == [first, {"type": "text", "text": "SYS"}] and client.calls[1]["system"] == [first]
+    assert seen[0].cache_read_tokens == 25_000 and "25000 from the cache" in caplog.text
+
+
+def test_grok_gets_the_prefix_first_in_its_system_message(xai: Any) -> None:
+    fake = xai(FakeResponse(sse(delta("ok"), completed())))
+    llm.generate("p", system="SYS", model="grok-4.7", prefix="FACTS")
+    assert json.loads(fake.requests[0].data)["input"][0] == {"role": "system", "content": "FACTS\n\nSYS"}
+
+
 def test_no_system_prompt_is_sent_when_empty() -> None:
     client = FakeClient([FakeStream(["ok"], final())])
     llm.generate("p", client=client, model="claude-haiku-5-5")

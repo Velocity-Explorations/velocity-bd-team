@@ -161,8 +161,8 @@ def test_each_draft_is_written_from_the_facts_and_gets_its_facts_used_notes(ledg
     model = Model()
     ctx = _context(tmp_path, model, "draft", {**EARLIER, "outline.md": "# Proposal outline\n## 1. Technical Approach"})
     result = write.draft(ctx)
-    sent = "\n".join(model.prompt("drafting response"))
-    assert "VELOCITY FACTS" in sent and "F-02 | UEI: TESTUEI00001" in sent and "[NEEDS FACT:" in sent
+    sent = "\n".join(model.prompt("drafting response"))   # the facts themselves go first in the call (worker)
+    assert ctx.record.facts.where() in sent and "[NEEDS FACT:" in sent
     assert "Velocity built Echo C2" in model.prompt("facts used: Draft v1").user
     notes = (ctx.work_dir / "facts_used_v1.md").read_text(encoding="utf-8")
     assert notes.startswith("# Facts used, Draft v1") and "| F-02 | the UEI on the cover page |" in notes

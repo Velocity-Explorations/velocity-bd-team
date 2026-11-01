@@ -54,7 +54,7 @@ def test_the_draft_inputs_follow_the_chosen_format(ledger_db: str) -> None:
     assert "The Army seeks edge AI" in rfi.listing_text and "W1-26-R-0001" in rfi.listing_text
     assert "2025-03-17_sbir_c2-edge" in rfi.past_experience
     assert "Lead with the Cobra Gold results" in rfi.team_notes
-    assert "Velocity Explorations" in rfi.company_context
+    assert rfi.company_context.startswith("VELOCITY FACTS, read from 01 Company Reference")   # the facts come first in the call
 
 
 def test_without_a_format_the_call_type_picks_the_template(ledger_db: str) -> None:
@@ -77,17 +77,19 @@ def test_the_clash_check_finds_reposts_and_pursued_calls_closing_near_the_deadli
 
 
 def test_every_step_reads_velocity_facts_from_01_company_reference(ledger_db: str) -> None:
+    """The facts go first in every call (the worker sends them, so the API caches them); a prompt says where."""
     record = inputs.gather(_pursued())
+    block = inputs.facts_block(record)
+    assert block == record.facts.block(hoverslam=False) and "F-02 | UEI: TESTUEI00001" in block
+    assert "EXAMPLE HOVERSLAM LLC" not in block and not inputs.hoverslam_bid(record)
     text = inputs.call_facts(record, today=date(2026, 10, 28))
-    assert "VELOCITY FACTS" in text and "F-02 | UEI: TESTUEI00001" in text and "EXAMPLE HOVERSLAM LLC" not in text
-    assert not inputs.hoverslam_bid(record)
-    assert inputs.draft_inputs(record).company_context == record.facts.block(hoverslam=False)
+    assert record.facts.where() in text and "F-02 | UEI" not in text
+    assert inputs.draft_inputs(record).company_context == record.facts.where()
 
 
 def test_a_hoverslam_bid_is_one_whose_direction_names_hoverslam(ledger_db: str) -> None:
     record = inputs.gather(_pursued(direction="Bid this as Hoverslam, with Alec as PI"))
-    assert inputs.hoverslam_bid(record)
-    assert "EXAMPLE HOVERSLAM LLC" in inputs.call_facts(record, today=date(2026, 10, 28))
+    assert inputs.hoverslam_bid(record) and "EXAMPLE HOVERSLAM LLC" in inputs.facts_block(record)
 
 
 def test_material_the_team_adds_reaches_every_later_prompt(ledger_db: str) -> None:

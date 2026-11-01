@@ -120,7 +120,7 @@ def _facts_used(ctx: StepContext, text: str, version: str, title: str) -> tuple[
         return None, "Facts used: no facts were read for this step"
     hoverslam = hoverslam_bid(ctx.record)
     try:
-        reply = ctx.ask(found.trace_prompt(text, hoverslam), f"facts used: {title}", FACTS_TOKENS)
+        reply = ctx.ask(found.trace_prompt(text), f"facts used: {title}", FACTS_TOKENS)
     except llm.PhaseError as exc:
         return None, f"Facts used: the check did not run ({str(exc)[:150]})"
     _, data = split_reply(reply)
