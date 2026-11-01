@@ -23,7 +23,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from drafting import llm, pipeline, prompts, scan, slop_gate
+from drafting import llm, past_bids, pipeline, prompts, scan, slop_gate
 from drafting.company import profile
 from drafting.inputs import builds_on_text, draft_inputs, hoverslam_bid
 from drafting.phases import Phase
@@ -72,15 +72,17 @@ def _skill(heading: str) -> str:
 
 
 def _workspace(ctx: StepContext, instructions: str = "", spec: str = "", direction: bool = True,
-               placeholders: bool = False) -> str:
-    """What goes after a reference prompt in the workspace: the owner's direction and chosen past work, the
-    skill's part for the step, the placeholder and no-dash rules, the json block to add, and on a redo the
-    owner's note."""
+               placeholders: bool = False, past: str = "") -> str:
+    """What goes after a reference prompt in the workspace: the owner's direction and chosen past work, the past
+    bids nearest the call, the skill's part for the step, the placeholder and no-dash rules, the json block to add,
+    and on a redo the owner's note."""
     lines = ["", "", "---", "", "FOR THE PROPOSAL WORKSPACE"]
     if direction:
         lines += ["", "The owner's direction, which the proposal follows:",
                   (ctx.pursuit.get("direction") or "").strip() or "(none given)",
                   "", "Past work the owner chose to build on:", builds_on_text(ctx.record)]
+    if past:
+        lines += ["", past]
     if instructions:
         lines += ["", "Also follow these steps from Velocity's proposal-drafting workflow:", "", instructions]
     if placeholders:
@@ -106,6 +108,12 @@ def _scan(ctx: StepContext, name: str) -> dict[str, Any]:
 def _alignment(ctx: StepContext) -> str:
     alignment = ctx.earlier("alignment.md")
     return prompts.ALIGNMENT_BLOCK_HEADER + alignment[:15_000] if alignment else ""
+
+
+def _past_bids(ctx: StepContext) -> tuple[past_bids.PastBids, list[dict[str, str]]]:
+    """The past bids nearest the call, read for this step, and their file for the card when any were read."""
+    found = past_bids.read(ctx.record)
+    return found, [ctx.save("past_bids.md", found.text, "Past bids read")] if found.read else []
 
 
 FACTS_TOKENS = 8_000
@@ -152,11 +160,13 @@ def outline(ctx: StepContext) -> StepResult:
                            requirements=ctx.earlier("requirements.md"), template=d.template.get("text") or prompts.DEFAULT_SECTIONS,
                            alignment=ctx.earlier("alignment.md", 20_000))
     instructions = _skill("## Phase 1:") + "\n\n" + _skill("## Phase 2:")
-    reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, instructions, OUTLINE_SPEC)), "building outline",
+    bids, bid_files = _past_bids(ctx)
+    reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, instructions, OUTLINE_SPEC, past=bids.text)), "building outline",
                     pipeline.MAX_TOKENS["5"])
     document, data = split_reply(reply)
     saved = ctx.save("outline.md", document or reply, "Outline")
-    return StepResult(summary=points(data, document), files=[saved],
+    summary = "\n".join(part for part in (points(data, document), f"- {bids.line}") if part)
+    return StepResult(summary=summary, files=[saved, *bid_files],
                       content={"document": document, "sections": _sections(data.get("sections")),
                                "page_limit": str(data.get("page_limit") or "").strip() or None,
                                "unmapped_criteria": strings(data.get("unmapped_criteria")), "evidence": strings(data.get("evidence")),
@@ -172,8 +182,9 @@ def draft(ctx: StepContext) -> StepResult:
                          requirements=ctx.earlier("requirements.md"),
                          outline=ctx.earlier("outline.md") or d.template.get("text") or prompts.DEFAULT_SECTIONS,
                          alignment=ctx.earlier("alignment.md", 20_000))
-    text = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, _skill("## Phase 3:"), placeholders=True)), "drafting response",
-                   pipeline.MAX_TOKENS["6"])
+    bids, bid_files = _past_bids(ctx)
+    text = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, _skill("## Phase 3:"), placeholders=True, past=bids.text)),
+                   "drafting response", pipeline.MAX_TOKENS["6"])
     ctx.save("draft_v1.md", text, "Draft v1")
     slop = _scan(ctx, "draft_v1.md")
     saved = ctx.entry("draft_v1.md", "Draft v1")
@@ -181,8 +192,8 @@ def draft(ctx: StepContext) -> StepResult:
     counts, words = placeholder_counts(document), len(document.split())
     notes, facts_line = _facts_used(ctx, document, "v1", "Draft v1")
     return StepResult(summary=bullets([f"{words:,} words", placeholder_line(counts), f"AI slop check: {slop['verdict']}",
-                                       facts_line]),
-                      files=[saved, *([notes] if notes else [])],
+                                       bids.line, facts_line]),
+                      files=[saved, *bid_files, *([notes] if notes else [])],
                       content={"document": document, "words": words, "placeholders": counts, "slop": slop["verdict"],
                                "question": QUESTIONS["draft"]})
 

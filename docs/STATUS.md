@@ -196,6 +196,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     [NEEDS FACT: ...], and the First draft, Compliance check and Final checks each save Facts used notes
     (docs/RUNBOOK.md, Company facts). Since 2026-11-01 the facts go first in every call and Claude's prompt
     cache serves them after the first, at about a twentieth of the input price.
+  - Since 2026-11-01 the Outline and the First draft read the three nearest past bids that have files in the
+    Proposal Library: their submitted volumes and any outcome files. They use them for language and lessons
+    only, never for facts (docs/RUNBOOK.md, Past bids in drafts).
   - Since 2026-10-30 every step reads the whole draft. The compliance check, the review passes, the
     formatting pass and the re-check read only its first 50,000 characters before (the checklist 30,000,
     the reviewers 60,000), so a longer draft lost its end, as Grok's 62,000-character trial draft did. A

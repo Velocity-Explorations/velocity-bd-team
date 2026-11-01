@@ -34,7 +34,9 @@ with its dates, values and outcome (every column is in docs/LIBRARY_CONVENTIONS.
   flagged in the draft rather than stated as settled: `[NEEDS FACT: settle CF-nn, ...]`. An item "confirmed by
   David, evidence pending" may be used, and is listed for review.
 - **Related past bids:** search the Register for the same agency, topic or product. Read their 01_submitted and
-  03_outcome files to reuse the language that won and to avoid repeating the weaknesses that cost a loss.
+  03_outcome files to reuse the language that won and to avoid repeating the weaknesses that cost a loss. The
+  Writer's Outline and First draft do this themselves for the three nearest bids that have files
+  (docs/RUNBOOK.md, Past bids in drafts).
 - **Active projects:** the PP rows whose period of performance is still running, plus Register rows marked won,
   or submitted and still waiting (outcome pending or shortlisted; the Register has no separate status column).
 - **People:** only current staff. Leave out anyone 03 People marks FORMER EMPLOYEE, in bios and key personnel. A
