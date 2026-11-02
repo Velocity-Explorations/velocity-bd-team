@@ -159,7 +159,12 @@ class Budget:
 
 def page_budget(ctx: StepContext) -> Budget | None:
     """The page budget from the newest Outline: its page limit and each section's share, or None when it found none."""
-    found = lq.latest_steps(ctx.pursuit["id"]).get("outline")
+    return budget_for(ctx.pursuit["id"])
+
+
+def budget_for(pursuit_id: int) -> Budget | None:
+    """page_budget for a pursuit, for the worker's Check again, which runs outside a step."""
+    found = lq.latest_steps(pursuit_id).get("outline")
     try:
         content = json.loads(found["content"] or "{}") if found else {}
     except ValueError:
@@ -223,10 +228,10 @@ def _tighten(ctx: StepContext, budget: Budget | None, text: str) -> tuple[str, s
                      f"for the {budget.pages:g}-page limit")
 
 
-def _page_fit(budget: Budget | None, document: str) -> dict[str, Any]:
-    """Page fit (Final checks): the final version's own words, placeholders left out, in pages at WORDS_PER_PAGE,
-    against the limit, with what is left for the placeholders still to fill. A twentieth over still fits: the
-    words-a-page figure is an estimate with a wider margin than that."""
+def page_fit(budget: Budget | None, document: str) -> dict[str, Any]:
+    """Page fit (Final checks, the Submit gate and Check again): the final version's own words, placeholders left out,
+    in pages at WORDS_PER_PAGE, against the limit, with what is left for the placeholders still to fill. A twentieth
+    over still fits: the words-a-page figure is an estimate with a wider margin than that."""
     if budget is None:
         return _check("Page fit", None, "the outline found no page limit to check against", "not run")
     words, open_items = text_words(document), sum(placeholder_counts(document).values())
@@ -639,7 +644,7 @@ def final(ctx: StepContext) -> StepResult:
     found = [f"{n} {kind if kind != 'other' else 'other bracketed notes'}" for kind, n in counts.items() if n]
     checks = [
         _check("Formatting check", True, "the formatting pass ran on the final version", "done"),
-        _page_fit(budget, document),
+        page_fit(budget, document),
         recheck,
         _check("Placeholder sweep", not left, f"{', '.join(found)}, for {ctx.pursuit['owner']}" if left else "none left",
                f"{left} left" if left else "none left"),
@@ -697,7 +702,7 @@ def _gate_checks(ctx: StepContext, final_text: str) -> list[dict[str, Any]]:
     else:
         deadline = _check("Internal submit-by date", None, "not set")
     return [checklist, _check("Placeholders", not any(counts.values()), placeholder_line(counts)),
-            _page_fit(page_budget(ctx), final_text), slop,
+            page_fit(page_budget(ctx), final_text), slop,
             _check("Dashes", dashes == 0, "none in the final version" if dashes == 0 else f"{dashes} in the final version"),
             deadline]
 

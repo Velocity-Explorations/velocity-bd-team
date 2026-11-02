@@ -435,7 +435,9 @@ def run_job(job: dict[str, Any]) -> None:
             lq.finish_job(job["id"], "failed", "There is no draft to check yet.")
             return
         solicitation = slop_gate.solicitation_text(inputs.draft_inputs(inputs.gather(job["pursuit_id"])))
-        found = scan.check(job["pursuit_id"], None, draft, solicitation)
+        fixed, _ = scan.fix_text(draft.read_text(encoding="utf-8"))   # the text as the scan reads it
+        fit = write.page_fit(write.budget_for(job["pursuit_id"]), fixed)   # Final checks shows it once the owner has filled in
+        found = scan.check(job["pursuit_id"], None, draft, solicitation, extra={"page_fit": fit})
         lq.finish_job(job["id"], "done" if found["scan_id"] else "failed", found["verdict"])
     except Exception as exc:   # noqa: BLE001 (the job's failure is said on the page that asked for it)
         lq.finish_job(job["id"], "failed", _why(exc))

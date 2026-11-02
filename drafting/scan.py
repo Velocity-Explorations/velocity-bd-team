@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -55,9 +56,11 @@ def fix_text(text: str) -> tuple[str, int]:
     return fixed, dashes + removed
 
 
-def check(pursuit_id: int, step_id: int | None, draft: Path, solicitation: str) -> dict[str, Any]:
-    """Fix a new draft where the worker can, scan it, and keep the scan. Returns the verdict, whether the draft
-    is Ready (PW21), the band, the fixes made and the scan's id (None when the scanner did not run)."""
+def check(pursuit_id: int, step_id: int | None, draft: Path, solicitation: str,
+          extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Fix a new draft where the worker can, scan it, and keep the scan, with `extra` beside the scanner's report
+    (the page fit Check again measures). Returns the verdict, whether the draft is Ready (PW21), the band, the fixes
+    made and the scan's id (None when the scanner did not run)."""
     text = draft.read_text(encoding="utf-8")
     fixed, count = fix_text(text)
     if count:
@@ -73,9 +76,10 @@ def check(pursuit_id: int, step_id: int | None, draft: Path, solicitation: str) 
         return {"verdict": f"Not checked: {exc}", "ready": False, "band": None, "placeholders": {}, "fixed": count, "scan_id": None}
     gate = slop_gate.summarize(report)
     verdict = slop_gate.verdict(gate)
-    scan_id = lq.save_slop_scan(pursuit_id, step_id, draft.name, report, verdict=verdict, ready=gate.ready, fixed_count=count,
+    kept = {**report, **(extra or {})}
+    scan_id = lq.save_slop_scan(pursuit_id, step_id, draft.name, kept, verdict=verdict, ready=gate.ready, fixed_count=count,
                                 text=fixed)
-    (draft.parent / "slop_scan.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    (draft.parent / "slop_scan.json").write_text(json.dumps(kept, indent=2, ensure_ascii=False), encoding="utf-8")
     (draft.parent / "slop_report.md").write_text(slop_gate.render_report(gate, draft), encoding="utf-8")
     return {"verdict": verdict, "ready": gate.ready, "band": gate.band, "placeholders": dict(gate.placeholders), "fixed": count,
             "scan_id": scan_id}

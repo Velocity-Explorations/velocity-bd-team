@@ -287,6 +287,8 @@ def _reviews(key: str) -> int:
 FINAL_TEXT = "\n".join(["# White paper", "", "Hours: [NEEDS INPUT: hours per task]", "", "Body."])
 FINAL_CHECKS = [
     {"check": "Formatting check", "ok": True, "result": "done", "detail": "the formatting pass ran on the final version"},
+    {"check": "Page fit", "ok": True, "result": "fits", "detail": "about 3 pages of proposal text (900 words at 350 a page) for a limit "
+     "of 5 pages, with about 850 words of room for the 1 placeholder still to fill"},
     {"check": "Final compliance re-check", "ok": True, "result": "passed", "detail": "2 to check; the report is final_compliance.md"},
     {"check": "Placeholder sweep", "ok": False, "result": "1 left", "detail": "1 NEEDS INPUT, for David Wood"},
     {"check": "AI slop check, final pass", "ok": False, "result": "not ready",
@@ -308,6 +310,9 @@ def _scan_final(pursuit_id: int, ready: bool) -> None:
               "families": {}, "hot_paragraphs": [],
               "findings": [] if ready else [{"family": "prop_open_item", "tier": "proposal", "line": 3, "column": 8,
                                              "match": "[NEEDS INPUT: hours per task]", "exempt": ""}]}
+    if ready:   # what the owner filled in ran long; Check again measured it (drafting/worker.py)
+        report["page_fit"] = {"check": "Page fit", "ok": False, "result": "over", "detail": "about 6 pages of proposal text "
+                              "(2,100 words at 350 a page) for a limit of 5 pages: cut about 350 words"}
     lq.save_slop_scan(pursuit_id, None, "draft_final.md", report, ready=ready, fixed_count=0,
                       verdict="Ready: band clean (provisional)" if ready else "Not ready: 1 NEEDS INPUT; band clean (provisional)",
                       text=FINAL_TEXT.replace("[NEEDS INPUT: hours per task]", "40 hours") if ready else FINAL_TEXT)
@@ -908,13 +913,14 @@ def test_check_again_queues_a_scan_and_shows_its_state(page: Any, site: dict[str
 
 # ------------------------------------------------------------------------------ Final checks, Submit and results (phase 9b)
 
-def test_final_checks_show_seven_checks_and_wait_for_a_ready_final_version(page: Any, site: dict[str, int]) -> None:
+def test_final_checks_show_eight_checks_and_wait_for_a_ready_final_version(page: Any, site: dict[str, int]) -> None:
     log_in(page, "David Wood")
     open_workspace(page, "ws-fin-gate", "final")
     card = page.locator(".ws-card")
-    assert "final checks, 4 of 7 passed" in card.inner_text().lower()
+    assert "final checks, 5 of 8 passed" in card.inner_text().lower()
     checks = card.locator(".ws-checks li").all_inner_texts()
-    assert len(checks) == 7 and "Placeholder sweep" in checks[2] and "1 left" in checks[2] and "not ready" in checks[3]
+    assert len(checks) == 8 and "Page fit" in checks[1] and "850 words of room" in checks[1]
+    assert "Placeholder sweep" in checks[3] and "1 left" in checks[3] and "not ready" in checks[4]
     still = card.locator("[aria-label='Final checks'] .ws-spots li").first
     assert "White paper. [NEEDS INPUT: hours per task]" in still.inner_text() and "for David Wood" in still.inner_text()
     assert still.locator("a").get_attribute("href") == "?step=final&view=slop&lines=3"
@@ -928,7 +934,8 @@ def test_final_checks_show_seven_checks_and_wait_for_a_ready_final_version(page:
     open_workspace(page, "ws-fin-gate", "final")
     card = page.locator(".ws-card")
     checks = card.locator(".ws-checks li").all_inner_texts()
-    assert "none left, checked again" in checks[2] and "Ready: band clean (provisional), checked again" in checks[3]
+    assert "cut about 350 words, checked again" in checks[1]
+    assert "none left, checked again" in checks[3] and "Ready: band clean (provisional), checked again" in checks[4]
     act(page, card.get_by_role("button", name="Approve and continue"))
     assert "Approved. Submit is queued for the worker." in notice(page)
     assert steps_of(site["fin-gate"])[-2:] == [("final", 1, "approved"), ("submit", 1, "queued")]

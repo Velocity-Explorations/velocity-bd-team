@@ -335,3 +335,23 @@ def test_check_again_scans_the_newest_draft_when_no_step_is_waiting(ledger_db: s
     while worker.work_once(generate=Model()):
         pass
     assert (lq.get_job(other)["state"], lq.get_job(other)["result"]) == ("failed", "There is no draft to check yet.")
+
+
+def test_check_again_measures_the_page_fit_of_the_version_it_scans(ledger_db: str, local: Path) -> None:
+    """The owner fills placeholders in the pursuit's folder and chooses Check again; the scan carries the page fit that
+    Final checks then shows in place of the step's (on 2 Nov the final version had about 340 words of room for 92)."""
+    from tests.test_drafting_pages import OUTLINE, outline_step
+
+    pursuit_id = _pursuit()
+    worker.work_once(generate=Model())
+    outline_step(pursuit_id, OUTLINE)
+    work = local / "drafting" / "pursuits" / f"pursuit-{pursuit_id}"
+    filled = "# White paper\n\n" + "Words fill the page. " * 1_300 + "A dash " + chr(0x2014) + " replaced before the scan."
+    (work / "draft_final.md").write_text(filled, encoding="utf-8")
+    lq.queue_job("slop_scan", pursuit_id, None, "David Wood")
+    assert worker.work_once(generate=Model()) is True
+    fit = json.loads(lq.latest_slop_scan(pursuit_id)["result_json"])["page_fit"]
+    words = len(filled.split()) - 1                            # the dash goes before the scan, as Final checks counts
+    assert (fit["check"], fit["ok"], fit["result"]) == ("Page fit", False, "over")
+    assert fit["detail"] == (f"about {words / 350:.0f} pages of proposal text ({words:,} words at 350 a page) for a limit "
+                             f"of 13 pages: cut about {words - 4_550:,} words")

@@ -323,12 +323,25 @@ export function finalGate(scan: ScanRow | null): string | null {
 
 export type FinalCheck = { check: string; ok: boolean | null; result?: string; detail: string };
 
-/** The step's eight checks, with the placeholder sweep and the slop check's final pass taken from a newer scan of the
- *  final version when Check again has run since the step was saved. */
+/** The page fit the worker measured on the version Check again scanned, or null for a scan without one. */
+function scanPageFit(scan: ScanRow): FinalCheck | null {
+  try {
+    const fit = JSON.parse(scan.result_json)?.page_fit;
+    if (!fit || typeof fit.detail !== "string") return null;
+    return { check: "Page fit", ok: typeof fit.ok === "boolean" ? fit.ok : null, result: String(fit.result ?? ""), detail: fit.detail };
+  } catch {
+    return null;
+  }
+}
+
+/** The step's eight checks, with the placeholder sweep, the page fit and the slop check's final pass taken from a newer
+ *  scan of the final version when Check again has run since the step was saved. */
 export function finalChecks(checks: FinalCheck[], scan: ScanRow | null, finishedAt: string | null): FinalCheck[] {
   if (!scan || !(scan.draft_name ?? "").startsWith(FINAL) || (finishedAt && scan.scanned_at <= finishedAt)) return checks;
   const open = slopView(scan).open;
+  const fit = scanPageFit(scan);
   return checks.map((c) => {
+    if (c.check === "Page fit" && fit) return { ...c, ok: fit.ok, result: fit.result, detail: `${fit.detail}, checked again` };
     if (c.check === "Placeholder sweep") {
       return open ? { ...c, ok: false, result: `${open} left`, detail: `${open} still open, checked again` }
         : { ...c, ok: true, result: "none left", detail: "none left, checked again" };

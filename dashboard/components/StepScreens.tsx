@@ -681,8 +681,8 @@ type Open = { kind: string; text: string; line: number; section: string };
 
 /**
  * Step 9 (PW13): the eight checks with their result in words, what is still open in the final version with the
- * line it is on, then the checklist to tick. A newer scan from Check again updates the placeholder sweep and the
- * slop check's final pass.
+ * line it is on, then the checklist to tick. A newer scan from Check again updates the placeholder sweep, the page
+ * fit and the slop check's final pass.
  */
 export function FinalView({ callId, row, content, scan, checklist, editable, owner, label }: {
   callId: string;
