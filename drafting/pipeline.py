@@ -124,7 +124,6 @@ class State:
     outline: str = ""
     draft: str = ""                                   # the best draft so far
     stats: dict[str, Any] = field(default_factory=dict)  # the running phase's stats
-    length_note: str = ""   # for the formatting pass, when the draft runs over its page budget (the Writer's Final checks)
 
 
 def _write(out_dir: Path, name: str, text: str) -> None:
@@ -312,10 +311,8 @@ def phase_7_checklist(inputs: DraftInputs, state: State, out_dir: Path, hooks: H
 def phase_75_polish(inputs: DraftInputs, state: State, out_dir: Path, hooks: Hooks) -> State:
     if not state.draft:
         return _skip(state, "Polish: no draft to format")
-    prompt = prompts.p75_polish(draft=state.draft)
-    if state.length_note:
-        prompt = prompts.Prompt(prompt.system, f"{prompt.user}\n\n{state.length_note}")
-    formatted = _ask(state, "7.5", prompt, "formatting document", rewrite_room("7.5", state.draft))
+    formatted = _ask(state, "7.5", prompts.p75_polish(draft=state.draft), "formatting document",
+                     rewrite_room("7.5", state.draft))
     _write(out_dir, "draft_final.md", formatted)
     state.draft = formatted
     return state

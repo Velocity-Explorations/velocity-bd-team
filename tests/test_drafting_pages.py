@@ -1,13 +1,15 @@
 """Drafts held to the call's page limit (PRO-565): the outline's page counts become a word budget at Velocity's own rate,
-the First draft, the Compliance check and the reviewers write to it, and Final checks reports the fit and has the
-formatting pass tighten a draft that runs over."""
+the First draft, the Compliance check and the reviewers write to it, and Final checks cuts a draft that runs over in a
+pass of its own and reports the fit. Placeholders are left out of every count, since filling one replaces its words."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 from typing import Any
 
-from drafting import write
+import pytest
+
+from drafting import steps, write
 from drafting.prompts import Prompt
 from tests.test_drafting_write import EARLIER, Model, _context
 
@@ -64,42 +66,117 @@ def test_the_first_draft_and_the_compliance_check_write_to_the_budget(ledger_db:
     assert "It now runs" in model.prompt("compliance check").user   # the check sees the draft's length too
 
 
-def test_reviewers_see_the_drafts_length_against_the_budget(ledger_db: str, tmp_path: Path) -> None:
-    """In the 1 Nov rerun the reviewers' 56 changes took the draft from 5,067 words to 6,357."""
+def test_reviewers_see_the_drafts_length_and_what_earlier_changes_add(ledger_db: str, tmp_path: Path) -> None:
+    """In the 1 Nov rerun the reviewers' 56 changes took the draft from 5,067 words to 6,357, and on 2 Nov each
+    reviewer saw the same "under" while their 53 changes added 860."""
     model = Model()
     long = "# Draft\n\nClaim 1. Claim 2. Claim 3. " + "word " * 5_000
     ctx = _context(tmp_path, model, "reviews", {**EARLIER, "draft_v2.md": long})
     outline_step(ctx.pursuit["id"], OUTLINE)
     write.reviews(ctx)
-    words = len(long.split())
-    for n, name in enumerate(("External evaluator", "Second independent evaluator", "Velocity leadership"), start=1):
-        user = model.prompt(f"review {n} of 3: {name}").user
-        assert f"It now runs {words:,} words, {words - 4_550:,} over: cut before you add" in user, name
+    words = len(long.split())   # each stand-in reviewer adds two words: "Claim n." becomes "Claim n, with evidence."
+    assert f"It now runs {words:,} words, not counting placeholders, {words - 4_550:,} over: cut before you add" in model.prompt(
+        "review 1 of 3: External evaluator").user
+    assert (f"It now runs {words:,} words, not counting placeholders, and the changes proposed so far would make it "
+            f"{words + 2:,}, {words + 2 - 4_550:,} over: cut before you add") in model.prompt(
+        "review 2 of 3: Second independent evaluator").user
+    assert f"would make it {words + 4:,}" in model.prompt("review 3 of 3: Velocity leadership").user
 
 
-def test_final_checks_tighten_an_overlong_draft_and_report_the_page_fit(ledger_db: str, tmp_path: Path) -> None:
-    # about 5,200 words for 4,550, in paragraphs: Final checks holds the opening paragraph for a person to write
-    long = "# Edge AI white paper v3\n\nThe opening.\n\n" + "\n\n".join(["The approach is sound. " * 10] * 130)
+LONG = "# Edge AI white paper v3\n\nThe opening.\n\n## 1. Approach\n\n" + "\n\n".join(["The approach is sound. " * 10] * 130)
+SHORT = "# Edge AI white paper v3\n\nThe opening.\n\n## 1. Approach\n\n" + "\n\n".join(["The approach is sound. " * 10] * 100)
 
-    class Overlong(Model):   # the formatting pass gives the draft back as long as it came
-        def __call__(self, prompt: Prompt, label: str, max_tokens: int) -> str:
-            reply = super().__call__(prompt, label, max_tokens)
-            return long if label == "formatting document" else reply
 
-    model = Overlong()
-    ctx = _context(tmp_path, model, "final", {**EARLIER, "outline.md": "# Outline", "draft_v3.md": long})
+class Tightening(Model):
+    """A Final checks model whose tightening pass gives back what the test sets, and whose formatting pass keeps it."""
+
+    def __init__(self, cut: str) -> None:
+        super().__init__()
+        self.cut = cut
+
+    def __call__(self, prompt: Prompt, label: str, max_tokens: int) -> str:
+        if label == "tightening to the page budget":
+            self.asked.append((label, prompt, max_tokens))
+            return self.cut
+        reply = super().__call__(prompt, label, max_tokens)
+        return prompt.user.split("DOCUMENT TO FORMAT:\n", 1)[-1] if label == "formatting document" else reply
+
+
+def test_final_checks_cut_an_overlong_draft_to_the_budget_before_formatting(ledger_db: str, tmp_path: Path) -> None:
+    """The formatting pass may not change wording, so on 2 Nov it left a draft 770 words over; a pass of its own cuts."""
+    model = Tightening(SHORT)
+    ctx = _context(tmp_path, model, "final", {**EARLIER, "outline.md": "# Outline", "draft_v3.md": LONG})
     outline_step(ctx.pursuit["id"], OUTLINE)
     result = write.final(ctx)
-    assert "Tighten it to the budget of about 4,550 words" in model.prompt("formatting document").user
+    cut = model.prompt("tightening to the page budget")   # aimed a twentieth under: a pass cuts about half of what it is asked
+    assert "Cut, never add" in cut.system and f"Cut it to about {round(4_550 * 0.95):,} words" in cut.user
+    assert cut.user.endswith(LONG) and model.labels().count("tightening to the page budget") == 1
+    assert "Tighten" not in model.prompt("formatting document").user          # the formatter only formats
     fit = next(c for c in result.content["checks"] if c["check"] == "Page fit")
-    assert (fit["ok"], fit["result"]) == (False, "over") and "cut about" in fit["detail"]
+    assert (fit["ok"], fit["result"]) == (True, "fits")
+    assert f"- Tightened from {len(LONG.split()):,} to " in result.summary and "for the 13-page limit" in result.summary
 
 
-def test_a_draft_within_the_budget_is_formatted_as_it_is_and_fits(ledger_db: str, tmp_path: Path) -> None:
+def test_a_second_pass_follows_when_the_first_cut_falls_short(ledger_db: str, tmp_path: Path) -> None:
+    """On 2 Nov a pass asked to cut 5,243 words to 4,550 stopped at 4,912."""
+    halfway = "# Edge AI white paper v3\n\nThe opening.\n\n## 1. Approach\n\n" + "\n\n".join(["The approach is sound. " * 10] * 122)
+
+    class TwoPasses(Tightening):
+        def __call__(self, prompt: Prompt, label: str, max_tokens: int) -> str:
+            if label == "tightening to the page budget":
+                self.cut = SHORT if self.labels().count(label) else halfway
+            return super().__call__(prompt, label, max_tokens)
+
+    model = TwoPasses(halfway)
+    ctx = _context(tmp_path, model, "final", {**EARLIER, "outline.md": "# Outline", "draft_v3.md": LONG})
+    outline_step(ctx.pursuit["id"], OUTLINE)
+    result = write.final(ctx)
+    passes = [p for label, p, _ in model.asked if label == "tightening to the page budget"]
+    assert len(passes) == 2 and passes[1].user.endswith(halfway.strip())   # the second pass cuts the first one's result
+    assert f"- Tightened from {len(LONG.split()):,} to {len(SHORT.split()):,} words in two passes for the 13-page limit" \
+        in result.summary
+
+
+@pytest.mark.parametrize("draft, cut, why", [
+    (LONG, SHORT.replace("## 1. Approach\n\n", ""), "it dropped a heading"),
+    (LONG + "\n\n[NEEDS INPUT: rates]", SHORT, "it dropped 1 NEEDS INPUT placeholder"),
+    (LONG, LONG + " More.", "it cut nothing"),
+], ids=["heading", "placeholder", "nothing cut"])
+def test_a_cut_that_drops_a_placeholder_or_a_heading_or_cuts_nothing_is_thrown_away(
+        ledger_db: str, tmp_path: Path, draft: str, cut: str, why: str) -> None:
+    ctx = _context(tmp_path, Tightening(cut), "final", {**EARLIER, "outline.md": "# Outline", "draft_v3.md": draft})
+    outline_step(ctx.pursuit["id"], OUTLINE)
+    result = write.final(ctx)
+    assert f"- Tightening kept Draft v3: {why}" in result.summary
+    assert next(c for c in result.content["checks"] if c["check"] == "Page fit")["ok"] is False
+
+
+def test_every_kind_of_placeholder_is_left_out_of_the_count() -> None:
+    assert steps.text_words("Due [NEEDS FACT: the CAGE code] on [CONFIRM the date with the TPOC] by [F-03: CAGE] noon.") == 4
+
+
+def test_placeholders_do_not_count_against_the_budget(ledger_db: str, tmp_path: Path) -> None:
+    """On 2 Nov a final version ran 5,320 words, 1,110 of them inside 92 placeholders: its own text fit 13 pages."""
+    gap = " [NEEDS INPUT: the stakeholder unit, its end user and its TPOC, confirmed with the program office]"
+    draft = SHORT + gap * 60   # 4,011 words of text and 960 inside placeholders
+    assert len(draft.split()) > 4_550 * 1.05 and steps.text_words(draft) == len(SHORT.split())
+    model = Tightening(SHORT)
+    ctx = _context(tmp_path, model, "final", {**EARLIER, "outline.md": "# Outline", "draft_v3.md": draft})
+    outline_step(ctx.pursuit["id"], OUTLINE)
+    result = write.final(ctx)
+    assert "tightening to the page budget" not in model.labels()
+    document = result.content["document"]
+    room, open_items = 4_550 - steps.text_words(document), sum(steps.placeholder_counts(document).values())
+    fit = next(c for c in result.content["checks"] if c["check"] == "Page fit")
+    assert (fit["ok"], fit["result"], open_items >= 60) == (True, "fits", True)
+    assert f"with about {room:,} words of room for the {open_items} placeholders still to fill" in fit["detail"]
+
+
+def test_a_draft_within_the_budget_is_not_cut_and_fits(ledger_db: str, tmp_path: Path) -> None:
     model = Model()
     ctx = _context(tmp_path, model, "final", {**EARLIER, "outline.md": "# Outline", "draft_v3.md": "# Edge AI white paper v3"})
     outline_step(ctx.pursuit["id"], OUTLINE)
     result = write.final(ctx)
-    assert "Tighten it" not in model.prompt("formatting document").user
+    assert "tightening to the page budget" not in model.labels()
     fit = next(c for c in result.content["checks"] if c["check"] == "Page fit")
     assert (fit["ok"], fit["result"]) == (True, "fits") and "for a limit of 13 pages" in fit["detail"]

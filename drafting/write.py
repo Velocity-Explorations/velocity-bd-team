@@ -31,7 +31,7 @@ from drafting.inputs import builds_on_text, draft_inputs, hoverslam_bid
 from drafting.phases import Phase
 from drafting.prompts import Prompt
 from drafting.steps import (FACT_POINTER, OTHER_NOTE, PLACEHOLDER, StepContext, StepResult, bullets, count_dashes, fix_dashes,
-                            latest_draft,
+                            latest_draft, text_words,
                             placeholder_counts, placeholder_line, points, skill_part, split_reply, strings, system_prompt,
                             user_prompt)
 from ledger import queries as lq
@@ -140,24 +140,21 @@ class Budget:
     def words(self) -> int:
         return round(self.pages * WORDS_PER_PAGE)
 
-    def lines(self, words_now: int | None = None) -> str:
-        """The budget as a prompt states it; with the draft's length, once there is a draft."""
+    def lines(self, words_now: int | None = None, with_changes: int | None = None) -> str:
+        """The budget as a prompt states it; with the draft's length once there is a draft, and what the changes
+        reviewers proposed so far would make it."""
         text = [f"PAGE BUDGET: the call allows {self.pages:g} pages. Velocity's submitted volumes run about {WORDS_PER_PAGE} "
                 f"words a page, so the whole document gets about {self.words:,} words, tables and captions included."]
         text += [f"- {title}: {pages:g} {'page' if pages == 1 else 'pages'}, about {round(pages * WORDS_PER_PAGE):,} words"
                  for title, pages in self.sections]
         if words_now is not None:
-            over = words_now - self.words
-            text.append(f"It now runs {words_now:,} words, " + (
+            then = words_now if with_changes is None else with_changes
+            over = then - self.words
+            text.append(f"It now runs {words_now:,} words, not counting placeholders" + (
+                f", and the changes proposed so far would make it {then:,}" if then != words_now else "") + ", " + (
                 f"{over:,} over: cut before you add, and pay for any addition with a cut of the same length." if over > 0
                 else f"{-over:,} under: keep it within the budget."))
         return "\n".join(text)
-
-    def tighten(self, words_now: int) -> str:
-        """What the formatting pass is told when the draft runs over the budget."""
-        return (f"LENGTH: this document runs {words_now:,} words. Tighten it to the budget of about {self.words:,} words "
-                f"({self.pages:g} pages at about {WORDS_PER_PAGE} words a page) while you format it: cut repetition, hedging "
-                "and restated points first. Keep every fact, figure, name, table row and bracketed placeholder.")
 
 
 def page_budget(ctx: StepContext) -> Budget | None:
@@ -175,15 +172,71 @@ def page_budget(ctx: StepContext) -> Budget | None:
     return Budget(pages, tuple((title, share) for title, share in shares if title and share))
 
 
+TIGHTEN_SYSTEM = ("You are an editor at Velocity Explorations, cutting a proposal draft to its page budget. Cut, never add: "
+                  "keep every section and heading in order, every fact, figure, name, date and table row, and every "
+                  "bracketed placeholder exactly as written. Cut first what the draft says twice, then hedges, restated "
+                  "points and filler, then long sentences. Give back the whole draft and nothing else.")
+
+
+def _headings(text: str) -> int:
+    return sum(1 for line in text.splitlines() if line.lstrip().startswith("#"))
+
+
+def _lost(before_text: str, cut: str) -> str:
+    """Why a cut cannot stand: a placeholder or a heading it dropped, or nothing cut; empty when it can."""
+    before, after = placeholder_counts(before_text), placeholder_counts(cut)
+    lost = [f"{before[k] - after[k]} {k if k != 'other' else 'other bracketed'} placeholder{'' if before[k] - after[k] == 1 else 's'}"
+            for k in before if after[k] < before[k]]
+    gone = _headings(before_text) - _headings(cut)
+    return (f"it dropped {' and '.join(lost)}" if lost
+            else ("it dropped a heading" if gone == 1 else f"it dropped {gone} headings") if gone > 0
+            else "it cut nothing" if text_words(cut) >= text_words(before_text) else "")
+
+
+def _tighten(ctx: StepContext, budget: Budget | None, text: str) -> tuple[str, str]:
+    """Draft v3 cut to the page budget when its own words, placeholders left out, run more than a twentieth over
+    (Final checks), in a pass of its own: the formatting pass may not change wording. A pass aims a twentieth under
+    the budget, and a second follows when the first falls short. A cut that loses a placeholder or a heading, or cuts
+    nothing, is thrown away; the card says which."""
+    words = text_words(text)
+    if budget is None or words <= budget.words * 1.05:
+        return text, ""
+    current, passes = text, 0
+    for _ in range(2):
+        try:
+            cut = ctx.ask(Prompt(TIGHTEN_SYSTEM, f"{budget.lines(text_words(current))}\n\nCut it to about "
+                                                 f"{round(budget.words * 0.95):,} words.\n\nTHE DRAFT\n{current}"),
+                          "tightening to the page budget", pipeline.rewrite_room("7.5", current)).strip()
+        except llm.PhaseError as exc:
+            if not passes:
+                return text, f"Tightening did not run ({str(exc)[:150]})"
+            break
+        why = _lost(current, cut)
+        if why:
+            if not passes:
+                return text, f"Tightening kept Draft v3: {why}"
+            break   # the first pass's cut stands
+        current, passes = cut, passes + 1
+        if text_words(current) <= budget.words * 1.05:
+            break
+    return current, (f"Tightened from {words:,} to {text_words(current):,} words{' in two passes' if passes == 2 else ''} "
+                     f"for the {budget.pages:g}-page limit")
+
+
 def _page_fit(budget: Budget | None, document: str) -> dict[str, Any]:
-    """Page fit (Final checks): the final version's length, in pages at WORDS_PER_PAGE, against the limit."""
+    """Page fit (Final checks): the final version's own words, placeholders left out, in pages at WORDS_PER_PAGE,
+    against the limit, with what is left for the placeholders still to fill. A twentieth over still fits: the
+    words-a-page figure is an estimate with a wider margin than that."""
     if budget is None:
         return _check("Page fit", None, "the outline found no page limit to check against", "not run")
-    words = len(document.split())
-    about = (f"about {words / WORDS_PER_PAGE:.0f} pages ({words:,} words at {WORDS_PER_PAGE} a page) for a limit of "
-             f"{budget.pages:g} pages")
-    if words <= budget.words:
-        return _check("Page fit", True, about, "fits")
+    words, open_items = text_words(document), sum(placeholder_counts(document).values())
+    about = (f"about {words / WORDS_PER_PAGE:.0f} pages of proposal text ({words:,} words at {WORDS_PER_PAGE} a page) "
+             f"for a limit of {budget.pages:g} pages")
+    if words <= budget.words * 1.05:
+        room = budget.words - words
+        left = f", with about {room:,} words of room" if room > 0 else ""
+        filling = f" for the {open_items} {'placeholder' if open_items == 1 else 'placeholders'} still to fill" if open_items and room > 0 else ""
+        return _check("Page fit", True, about + left + filling, "fits")
     return _check("Page fit", False, f"{about}: cut about {words - budget.words:,} words", "over")
 
 
@@ -291,7 +344,7 @@ def compliance(ctx: StepContext) -> StepResult:
                                 requirements=ctx.earlier("requirements.md", 25_000), draft=current)
     budget = page_budget(ctx)
     reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, direction=False, placeholders=True,
-                                                         budget=budget.lines(len(current.split())) if budget else "")),
+                                                         budget=budget.lines(text_words(current)) if budget else "")),
                     "compliance check", pipeline.rewrite_room("6.75", current))
     report, corrected = reply.split(prompts.CORRECTED_DRAFT_SEPARATOR, 1) if prompts.CORRECTED_DRAFT_SEPARATOR in reply else ("", reply)
     files = [ctx.save("compliance_report.md", report.strip(), "Compliance report")] if report.strip() else []
@@ -366,13 +419,14 @@ def reviews(ctx: StepContext) -> StepResult:
     reviewer sees what the earlier ones proposed, so it does not repeat them."""
     _, current = _draft(ctx, "Reviews")
     budget = page_budget(ctx)   # reviewers' additions grew the 1 Nov rerun by about 1,300 words, past its limit
-    length = budget.lines(len(current.split())) if budget else ""
+    words_now, added = text_words(current), 0   # what the changes proposed so far add, for the next reviewer
     passes: list[dict[str, Any]] = []
     files: list[dict[str, str]] = []
     documents: list[str] = []
     proposed: list[str] = []
     for n, (code, name, role, heading, rates) in enumerate(REVIEWERS, start=1):
         system = system_prompt(role, "Reviews", "proposal-drafting", _review_part(heading), RATED_SPEC if rates else UNRATED_SPEC)
+        length = budget.lines(words_now, words_now + added) if budget else ""
         user = user_prompt(ctx, ("REQUIREMENTS ANALYSIS, FROM STEP 4", ctx.earlier("requirements.md")),
                            ("THE DRAFT TO REVIEW", current), ("ITS LENGTH AGAINST THE PAGE LIMIT", length),
                            ("CHANGES EARLIER REVIEWERS PROPOSED; DO NOT PROPOSE THEM AGAIN", "\n".join(proposed)))
@@ -388,6 +442,7 @@ def reviews(ctx: StepContext) -> StepResult:
             continue
         changes, dropped = _changes(data.get("changes"), current)
         lq.add_step_changes(ctx.step["id"], code, changes)
+        added += sum(text_words(c["after"]) - text_words(c["before"]) for c in changes)
         proposed += [f"- {c['section'] or 'the draft'}: change {c['before'][:300]!r} to {c['after'][:300]!r}" for c in changes]
         files.append(ctx.save(f"review_{n}.md", document or reply, f"Review {n}, {name}"))
         documents.append(document)
@@ -550,13 +605,12 @@ def final(ctx: StepContext) -> StepResult:
     for a person to write, the dashes replaced, the compliance check once more, and the AI slop check's verdict on
     the final version; then the eight checks in words, the open placeholders, and the checklist updated."""
     current, applied, missed = _apply_changes(ctx)
+    budget = page_budget(ctx)
+    current, tightened = _tighten(ctx, budget, current)
     d, hooks = draft_inputs(ctx.record), _Quiet()
     state = _pipeline_state(ctx, current)
     state.stats = {}
     pipeline.phase_7_checklist(d, state, ctx.work_dir, hooks)
-    budget = page_budget(ctx)
-    if budget and len(current.split()) > budget.words * 1.05:   # over by more than a twentieth: the formatting pass tightens
-        state.length_note = budget.tighten(len(current.split()))
     state.stats = {}
     pipeline.phase_75_polish(d, state, ctx.work_dir, hooks)
     final_path = ctx.work_dir / "draft_final.md"
@@ -603,10 +657,12 @@ def final(ctx: StepContext) -> StepResult:
                         + (f"; {missed} no longer matched the draft" if missed else ""))
     if dashes:
         lines.append(f"{dashes} {'dash' if dashes == 1 else 'dashes'} replaced")
+    if tightened:
+        lines.append(tightened)
     lines.append(facts_line)
     passed = sum(1 for c in checks if c["ok"])
     lines.insert(0, f"{passed} of {len(checks)} final checks passed")
-    return StepResult(summary=bullets(lines), files=files,
+    return StepResult(summary=bullets(lines, limit=8), files=files,
                       content={"document": document, "verdict": verdict, "ready": bool(slop["ready"]), "band": slop["band"],
                                "open_placeholders": slop["placeholders"], "person_writes": person_writes, "dashes_fixed": dashes,
                                "changes_applied": applied, "changes_missed": missed, "checks": checks,

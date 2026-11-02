@@ -309,12 +309,24 @@ counts. Every later step turns them into words at 350 a page (`WORDS_PER_PAGE` i
 about what Velocity's submitted technical volumes run: 39 measured in the library ran a median 303 words a page,
 the technical volumes alone about 380, and a winning 2025 volume 315.
 
+Every count leaves placeholders out (`text_words` in `drafting/steps.py`), since filling one replaces its words.
+On 2 Nov a final version ran 5,320 words, 1,110 of them inside 92 placeholders; its own text, 4,210 words, fit
+13 pages.
+
 - **First draft:** writes to the budget, section by section.
 - **Compliance check:** writes to it too, and sees the draft's length against it.
-- **Reviewers:** see the length too, and must pay for any addition with a cut when the draft is over. In the
-  1 Nov rerun their changes had added about 1,300 words.
-- **Final checks:** reports the page fit as one of its eight checks. When the draft runs more than a twentieth
-  over, it has the formatting pass tighten it, keeping every fact, figure, name, table row and placeholder.
+- **Reviewers:** see the length too, and what the changes earlier reviewers proposed would make it. They must
+  pay for any addition with a cut when the draft is over. In the 1 Nov rerun their changes had added about
+  1,300 words.
+- **Final checks:** when Draft v3's own words run more than a twentieth over, it cuts it to the budget in a pass of
+  its own, before the formatting pass, whose prompt may not change wording. A pass can stop short (on 2 Nov one
+  asked for 4,550 words stopped at 4,912, placeholders counted), so it aims a twentieth under the budget. A second
+  pass follows when the first falls short. The cut keeps every section, fact, figure, name, table row and placeholder.
+  A cut that loses a placeholder or a heading, or cuts nothing, is thrown away and the text before it stands;
+  the card says which.
+- **Page fit:** one of the eight final checks. It passes up to a twentieth over the budget, since 350 words a
+  page is an estimate with a wider margin than that, and says how many words are left for the placeholders still
+  to fill.
 
 A call with no page limit gets no budget, and Page fit reads not run.
 
