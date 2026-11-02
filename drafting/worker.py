@@ -21,7 +21,7 @@ such as Check again on the AI slop check (PW22) or a refresh of the Proposal Lib
 under data/drafting/pursuits/pursuit-<id>/, and once Drive is set up (docs/RUNBOOK.md) each step's Word files also go
 to the pursuit's folder in the Proposal Library, its 02_working/, made the first time a step runs (phase 6b). Drive
 failing never fails a step: the files stay on the PC and the card says so. While idle the worker refreshes the
-library's index every 15 minutes and moves a no-go pursuit's folder to Submissions/_no-go/. The card's text, like
+library's index every 15 minutes and moves a no-go pursuit's folder to 02 Submissions/_no-go/. The card's text, like
 every file, has its dashes replaced. The worker logs ids, states and costs, never a call's text or title.
 
     python -m drafting.worker --drive-check   # can the service account read the library? It only reads
@@ -313,7 +313,7 @@ def _file_results(found: gdrive.Drive, sheets: gdrive.Sheets) -> int:
 
 
 def housekeeping(now: float | None = None) -> dict[str, Any]:
-    """While idle: the library's index every 15 minutes, each no-go pursuit's folder moved to Submissions/_no-go/, and
+    """While idle: the library's index every 15 minutes, each no-go pursuit's folder moved to 02 Submissions/_no-go/, and
     each submitted proposal and recorded result filed in the Proposal Library."""
     found = _drive()
     if found is None:

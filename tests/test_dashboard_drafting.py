@@ -80,7 +80,7 @@ def test_start_the_draft_opens_for_its_call_and_cancel_hands_focus_back(page: An
     assert dialog.locator("select[name=format]").input_value() == format_
     assert dialog.locator("input[name=approval_mode][value=every_step]").is_checked()
     assert dialog.locator("input[name=call_id]").input_value() == call_id
-    assert f"Submissions/{date.today().isoformat()}_" in dialog.locator(".draft-folder").inner_text()
+    assert f"02 Submissions/{date.today().isoformat()}_" in dialog.locator(".draft-folder").inner_text()
     start = dialog.get_by_role("button", name="Start the draft")
     if "Drafting is not set up yet." in dialog.inner_text():
         assert start.is_disabled()   # P8: nothing to spend on until the worker has run

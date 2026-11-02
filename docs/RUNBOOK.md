@@ -336,7 +336,7 @@ A call with no page limit gets no budget, and Page fit reads not run.
 ## Past bids in drafts
 
 The Outline and the First draft also read the past bids nearest the call (`drafting/past_bids.py`):
-- **Which:** the first three Register rows in the Writer's ranking whose Submissions folder holds files. The
+- **Which:** the first three Register rows in the Writer's ranking whose folder in 02 Submissions holds files. The
   ranking favors the same agency, an exemplar, a win, its strength, and words its title and themes share with
   the call.
 - **What:** each one's `01_submitted/` and `03_outcome/`, read live through the service account. Volumes and
@@ -415,10 +415,10 @@ python run.py --portal sam_gov
 ## Proposal Register
 
 The "00 Proposal Register" sheet in the BD Proposal Library Drive folder lists past submissions
-(docs/LIBRARY_CONVENTIONS.md). After rows are filled in or changed, or a Submissions folder is added, ask
+(docs/LIBRARY_CONVENTIONS.md). After rows are filled in or changed, or a folder is added to 02 Submissions, ask
 Claude to "sync the register". It first appends a starter row for any folder without one (submission_id,
 submitted_date and portal from the folder name, no date for a `nodate_` folder, drive_link to the folder) and never changes a row people
-have filled in. Then it reads the sheet and the Submissions folder names through the Google connectors,
+have filled in. Then it reads the sheet and the folder names in 02 Submissions through the Google connectors,
 writes them to
 `data/library/register_rows.json` and `data/library/folders.json`, and runs
 
@@ -487,11 +487,11 @@ stays on this PC.
    `pip install -r requirements.txt` first for Google's libraries.
 
 Once Drive is set up, the worker (docs/RUNBOOK.md, The worker) makes each pursuit's folder,
-`Submissions/<YYYY-MM-DD_portal_short-title>/` with its four folders, the first time one of its steps runs;
+`02 Submissions/<YYYY-MM-DD_portal_short-title>/` with its four folders, the first time one of its steps runs;
 the date is the day the draft started. Each step's Word files go to its `02_working/`, a new version replacing
 the last under the same link, and the step's card links to them. If Drive fails, the files stay on this PC
 and the card says so. While idle the worker refreshes the library's index for Builds on every quarter of an hour
-(`drive_items`), and moves a no-go pursuit's folder to `Submissions/_no-go/`.
+(`drive_items`), and moves a no-go pursuit's folder to `02 Submissions/_no-go/`.
 
 Once a proposal is marked submitted at its Submit gate, the idle worker files it:
 - **The folder** is renamed to the day it went in. The library's submission_id carries that date.

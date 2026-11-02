@@ -352,7 +352,7 @@ def seed_library(found: dict[str, int]) -> None:
     lq.worker_started(lq.WORKER)
     lq.save_drive_items([
         {"id": "lib-ve27", "name": "2026-03-17_vulcan-sof_vigilant-eagle-27", "mime": FOLDER,
-         "path": "Submissions/2026-03-17_vulcan-sof_vigilant-eagle-27", "indexed_at": "2026-10-29T15:00:00Z"},
+         "path": "02 Submissions/2026-03-17_vulcan-sof_vigilant-eagle-27", "indexed_at": "2026-10-29T15:00:00Z"},
         {"id": "lib-bio", "name": "David Wood bio.docx", "mime": "application/msword", "path": "01 Company Reference/Bios/David Wood bio.docx",
          "indexed_at": "2026-10-29T15:00:00Z"}])
     _call("ws-start", "Workspace start with past work")

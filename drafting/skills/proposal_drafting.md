@@ -24,7 +24,7 @@ The people working with the owner can add material and tick checklist items, but
 
 These come from opportunity-assessment:
 
-- **The submission folder,** named by the Library convention: `Submissions/<YYYY-MM-DD_portal_short-title>/`, with `00_solicitation/`, `01_submitted/`, `02_working/` and `03_outcome/`.
+- **The submission folder,** named by the Library convention: `02 Submissions/<YYYY-MM-DD_portal_short-title>/`, with `00_solicitation/`, `01_submitted/`, `02_working/` and `03_outcome/`.
 - **The requirements and submission checklist document** in `02_working/`: the full requirements outline, formatting specs, evaluation criteria, eligibility status, and the checkbox-based submission checklist. Its Section 1.5 is the source of truth for terminology.
 - **The opportunity summary and the alignment assessment,** in `{Code}_Assessment_Summary.docx`, with the past work that is most relevant.
 - **The direction** the owner confirmed at Alignment, and the past work they chose to build on.
@@ -236,5 +236,5 @@ The owner enters the confirmation number and the result expected by date, and ch
 
 1. **File the confirmation.** Save the receipt email, the confirmation number or a screenshot to `01_submitted/`, with the submitted files.
 2. **Write a submission record.** Create `{Code}_Submission_Record.docx` in `01_submitted/`. Give it the date and time submitted, the confirmation number, the files submitted, and the expected decision date: the date Discovery found for when results are announced, or 90 days after the deadline.
-3. **Keep the folder in the Library.** It stays in `Submissions/`, where opportunity-assessment draws on it for alignment evidence. The dashboard records the submission in the Proposal Register.
+3. **Keep the folder in the Library.** It stays in `02 Submissions/`, where opportunity-assessment draws on it for alignment evidence. The dashboard records the submission in the Proposal Register.
 4. **Record the outcome.** When the result arrives, the owner records it from Proposals, Submitted and waiting: won, lost, withdrawn or cancelled by the agency. Add it to the submission record with the evaluator comments or debrief notes, and what to do differently next time, and save the debrief to `03_outcome/`. These notes are some of the most valuable evidence for the next alignment assessment on a similar topic.

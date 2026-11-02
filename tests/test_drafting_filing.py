@@ -86,7 +86,7 @@ def test_a_submitted_proposal_is_filed_in_the_library(ledger_db: str, local: Pat
     assert worker.housekeeping(0.0)["filed"] == 1
     pursuit = lq.get_pursuit(pursuit_id)
     day = "2026-11-24"   # 22:40 UTC is 15:40 in Denver
-    assert pursuit["drive_folder_name"] == f"Submissions/{day}_sam-gov_edge-ai-sam-1"
+    assert pursuit["drive_folder_name"] == f"02 Submissions/{day}_sam-gov_edge-ai-sam-1"
     assert pursuit["submission_id"] == f"{day}_sam-gov_edge-ai-sam-1"
     assert found.path_of(pursuit["drive_folder_id"]) == pursuit["drive_folder_name"]
     submitted = found.find(pursuit["drive_folder_id"], "01_submitted", folder=True)
@@ -155,7 +155,7 @@ def test_a_submission_without_a_folder_or_a_final_version_is_still_filed(ledger_
     _submitted(pursuit_id)
     assert worker.housekeeping(0.0)["filed"] == 1
     pursuit = lq.get_pursuit(pursuit_id)
-    assert pursuit["drive_folder_name"] == "Submissions/2026-11-24_sam-gov_edge-ai-sam-1"
+    assert pursuit["drive_folder_name"] == "02 Submissions/2026-11-24_sam-gov_edge-ai-sam-1"
     assert found.children(found.find(pursuit["drive_folder_id"], "01_submitted", folder=True)["id"]) == []
     assert sheets.rows[-1][0] == "2026-11-24_sam-gov_edge-ai-sam-1"
     assert any("no final version" in e["text"] for e in lq.pursuit_events(pursuit_id) if e["kind"] == "filed")

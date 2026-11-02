@@ -6,7 +6,7 @@
     rows = index_library(found, library_id())          # drive_items, for Builds on
     done = file_submission(found, sheets_client(), library_id(), pursuit, call, final, day, taken)   # once submitted
 
-Each pursuit gets Submissions/<YYYY-MM-DD_portal_short-title>/ in the BD Proposal Library, with the four folders
+Each pursuit gets 02 Submissions/<YYYY-MM-DD_portal_short-title>/ in the BD Proposal Library, with the four folders
 docs/LIBRARY_CONVENTIONS.md names; the date is the day the draft started, as Start the draft says. The service
 account is a member of the library folder on a shared drive: it can list, create, move and trash there but never
 delete for good, so nothing here deletes. Every failure is a DriveError; the worker logs it and keeps the files on
@@ -27,7 +27,7 @@ from config import get
 from drafting.dates import parse_due
 
 FOLDER_MIME = "application/vnd.google-apps.folder"
-SUBMISSIONS = "Submissions"
+SUBMISSIONS = "02 Submissions"
 SUBFOLDERS = ("00_solicitation", "01_submitted", "02_working", "03_outcome")
 WORKING = "02_working"
 NO_GO = "_no-go"
@@ -235,7 +235,7 @@ def _folder(found: Drive, parent_id: str, name: str) -> dict[str, Any]:
 
 
 def pursuit_folder(found: Drive, library: str, name: str, taken: set[str]) -> dict[str, Any]:
-    """The pursuit's folder under Submissions/ with its four folders, made once. A folder of that name that another
+    """The pursuit's folder under 02 Submissions/ with its four folders, made once. A folder of that name that another
     pursuit already has gets a number added; one nobody has is this pursuit's, made before the worker last stopped."""
     submissions = _folder(found, library, SUBMISSIONS)
     for n in range(1, 50):
@@ -258,7 +258,7 @@ def upload(found: Drive, folder_id: str, path: Path) -> dict[str, str]:
 
 
 def move_to_no_go(found: Drive, library: str, folder_id: str) -> None:
-    """A stopped pursuit's folder into Submissions/_no-go/, so the library's submissions stay real ones."""
+    """A stopped pursuit's folder into 02 Submissions/_no-go/, so the library's submissions stay real ones."""
     submissions = _folder(found, library, SUBMISSIONS)
     found.move(folder_id, _folder(found, submissions["id"], NO_GO)["id"])
 

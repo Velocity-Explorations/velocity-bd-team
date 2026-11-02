@@ -63,7 +63,7 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   --draft <file>` reruns it after edits (PRO-510). The scanner must be installed wherever drafts run
   (AI_SLOP_SCAN); its bands stay provisional until calibrated on past Velocity proposals.
 - Proposal Library (2026-10-21): the "00 Proposal Register" sheet and "00 README" are in the BD Proposal
-  Library Drive folder, with one row per Submissions folder. `library/register.py` checks the rows and
+  Library Drive folder, with one row per folder in 02 Submissions. `library/register.py` checks the rows and
   syncs them into `proposals`; Claude runs it on request through David's Google connectors, as no
   scheduled job can read the sheet until gog or a service account exists (PRO-475). Since 2026-10-30 it
   takes the Register's newer values too: eleven more portals (dsip to tacfi), the exercise and
@@ -271,7 +271,7 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     the BD Proposal Library on its shared drive. The worker makes each pursuit's folder with its four
     parts, puts each step's Word files in `02_working/` with their links on the cards, refreshes the
     library's index (`drive_items`) every quarter of an hour and on a Drive refresh job, and moves no-go folders
-    to `Submissions/_no-go/`; `python -m drafting.worker --drive-check` reads only.
+    to `02 Submissions/_no-go/`; `python -m drafting.worker --drive-check` reads only.
   - Phase 6b, part 2 (Builds on from Drive): Start the draft offers past work from the library's
     index, past submissions and company reference files; the Outline adds from it too, and Refresh
     the list queues a re-index.

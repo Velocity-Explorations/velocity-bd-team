@@ -21,7 +21,7 @@ This is a **step-by-step playbook**. Work through each phase in order, pausing a
 
 When David brings an opportunity, he may provide a URL, a PDF, a document, or just a topic number. Whatever the starting point:
 
-1. **Create the submission folder.** As soon as you have the topic/opportunity number and a short title, create a dedicated folder for this submission inside the workspace's **"Submissions"** directory (this is the active/in-progress working folder). Use the naming convention: `{TopicNumber}_{ShortTitle}` (e.g., `DON26BZ01-NV022_Wideband_Digital_Recorder` or `DARPA-PA-25-01_Edge_AI_Mesh`). All documents produced for this submission (requirements docs, drafts, checklists, supporting materials) go in this folder. This keeps each opportunity self-contained and organized. Once a submission is finalized and sent (or a decision is made to pass), the folder gets moved to "Past Submissions" for archival.
+1. **Create the submission folder.** As soon as you have the topic/opportunity number and a short title, create a dedicated folder for this submission inside the workspace's **"02 Submissions"** directory (this is the active/in-progress working folder). Use the naming convention: `{TopicNumber}_{ShortTitle}` (e.g., `DON26BZ01-NV022_Wideband_Digital_Recorder` or `DARPA-PA-25-01_Edge_AI_Mesh`). All documents produced for this submission (requirements docs, drafts, checklists, supporting materials) go in this folder. This keeps each opportunity self-contained and organized. Once a submission is finalized and sent (or a decision is made to pass), the folder gets moved to "Past Submissions" for archival.
 
 2. **Obtain the solicitation.** If David provides a URL, visit it and read the full solicitation/topic description. If he provides a document, read it thoroughly. If he provides just a topic number or name, search for the solicitation online.
 
@@ -29,7 +29,7 @@ When David brings an opportunity, he may provide a URL, a PDF, a document, or ju
 
 4. **Read everything.** Read the full solicitation, all attachments, and any referenced instructions (e.g., DoD SBIR/STTR Program BAA, service-specific instructions). Pay close attention to evaluation criteria; these are the rubric the proposal will be scored against.
 
-**Check in with David:** "I've created the submission folder at Submissions/{folder_name} and gathered the solicitation materials. Is there anything else related to this opportunity I should look at?"
+**Check in with David:** "I've created the submission folder at 02 Submissions/{folder_name} and gathered the solicitation materials. Is there anything else related to this opportunity I should look at?"
 
 ---
 
@@ -134,7 +134,7 @@ Adapt the subsections to the opportunity. An RFI response might need only 2.2, 2
 
 Build the document with the `docx` skill so the tables, checkboxes, and headings come out clean and printable. Before presenting it, re-check Section 1.5 against the solicitation one more time, because everything downstream treats it as the source of truth. Then apply David's writing standards: tables over prose, no filler, and no em dashes or en dashes anywhere in the file.
 
-**Check in with David:** "The requirements and submission checklist is saved at Submissions/{folder_name}/{TopicNumber}_Requirements_and_Submission_Checklist.docx. The items that need your input are in 2.3, and any open eligibility actions are in 1.4. Anything to add or correct before we make the go/no-go call?"
+**Check in with David:** "The requirements and submission checklist is saved at 02 Submissions/{folder_name}/{TopicNumber}_Requirements_and_Submission_Checklist.docx. The items that need your input are in 2.3, and any open eligibility actions are in 1.4. Anything to add or correct before we make the go/no-go call?"
 
 ---
 
@@ -172,4 +172,4 @@ Give a real recommendation, including No-Go when the evidence points there. A cl
 
 4. **Hand off.** Switch to the proposal-drafting skill and begin at its Phase 1. If drafting will happen later or in another conversation, tell David which folder to point it at.
 
-**Check in with David:** "The assessment is complete and saved in Submissions/{folder_name}. Ready to start drafting now, or do you want to pick this up later?"
+**Check in with David:** "The assessment is complete and saved in 02 Submissions/{folder_name}. Ready to start drafting now, or do you want to pick this up later?"

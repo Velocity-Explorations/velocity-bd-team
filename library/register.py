@@ -5,8 +5,8 @@
     python -m library.register sync --rows data/library/register_rows.json --folders data/library/folders.json
 
 The sheet "00 Proposal Register" lives in the BD Proposal Library Drive folder (LIBRARY_DRIVE_FOLDER_ID).
-Until gog or a service account can read it from here, Claude reads the sheet and the Submissions folder
-names through David's Google connectors and writes them to the two files above; read_rows_file() and
+Until gog or a service account can read it from here, Claude reads the sheet and the folder names in
+02 Submissions through David's Google connectors and writes them to the two files above; read_rows_file() and
 read_folders_file() are the only places that know where the data comes from. A row with a problem is
 skipped, so its ledger row keeps its last good values. Conventions: docs/LIBRARY_CONVENTIONS.md.
 """
@@ -63,8 +63,8 @@ class Report:
         out = [f"{self.synced} row{'' if self.synced == 1 else 's'} synced ({self.new} new), "
                f"{len(self.problems)} problem{'' if len(self.problems) == 1 else 's'}"]
         out += [f"  row {p.row} ({p.submission_id or 'no id'}): {p.reason}" for p in self.problems]
-        out += [f"Submissions folder with no Register row: {name}" for name in self.folders_without_rows]
-        out += [f"Register row with no Submissions folder: {sid}" for sid in self.rows_without_folders]
+        out += [f"Folder in 02 Submissions with no Register row: {name}" for name in self.folders_without_rows]
+        out += [f"Register row with no folder in 02 Submissions: {sid}" for sid in self.rows_without_folders]
         return out
 
 
@@ -135,7 +135,7 @@ def parse_rows(header: Sequence[str], rows: Sequence[Sequence[str]]) -> tuple[li
 
 
 def sync(header: Sequence[str], rows: Sequence[Sequence[str]], folders: Sequence[str]) -> Report:
-    """Upsert every valid row into proposals and reconcile the Register with the Submissions folders."""
+    """Upsert every valid row into proposals and reconcile the Register with the folders in 02 Submissions."""
     valid, problems = parse_rows(header, rows)
     report = Report(problems=problems)
     for rec in valid:
@@ -156,7 +156,7 @@ def read_rows_file(path: Path) -> tuple[list[str], list[list[str]]]:
 
 
 def read_folders_file(path: Path) -> list[str]:
-    """The Submissions folder names: {"folders": [name, ...]}."""
+    """The folder names in 02 Submissions: {"folders": [name, ...]}."""
     return [str(name) for name in json.loads(path.read_text(encoding="utf-8")).get("folders") or []]
 
 
@@ -165,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("sync", help="validate the Register and upsert its rows into the ledger")
     run.add_argument("--rows", required=True, type=Path, help='the sheet as JSON: {"values": [header, row, ...]}')
-    run.add_argument("--folders", required=True, type=Path, help='Submissions folder names as JSON: {"folders": [...]}')
+    run.add_argument("--folders", required=True, type=Path, help='the folder names in 02 Submissions as JSON: {"folders": [...]}')
     args = parser.parse_args(argv)
     try:
         header, rows = read_rows_file(args.rows)

@@ -13,7 +13,7 @@ The core insight behind this workflow: a first draft is never good enough for go
 
 Before starting this skill, the following should be available (typically produced by the **opportunity-assessment** skill, but could also come from prior conversation):
 
-- **Submission folder**: a dedicated folder in the active **Submissions** directory for this opportunity (e.g., `Submissions/DON26BZ01-NV022_Wideband_Digital_Recorder/`). All drafts and supporting documents go here.
+- **Submission folder**: a dedicated folder in the active **02 Submissions** directory for this opportunity (e.g., `02 Submissions/DON26BZ01-NV022_Wideband_Digital_Recorder/`). All drafts and supporting documents go here.
 - **Requirements & Submission Checklist document**: a `.docx` file in the submission folder with the full requirements outline, formatting specs, evaluation criteria, eligibility status, and checkbox-based submission checklist
 - **Opportunity summary**: what the solicitation is asking for
 - **Alignment assessment**: how Velocity's capabilities map to the requirements, and which past work/reference documents are most relevant
@@ -190,7 +190,7 @@ Present findings, then make final revisions.
 
 7. **Save the final version**: save the document as `{TopicNumber}_Technical_Volume_FINAL.docx` (plus the PDF, if one is required) in the submission folder. Keep the numbered drafts; they are the revision history.
 
-**Check in with David:** "The final version is saved in Submissions/{folder_name}. Here's the updated checklist, with what's complete and what's still open (and who owns it). Do you want to review the final before we go through the submission steps?"
+**Check in with David:** "The final version is saved in 02 Submissions/{folder_name}. Here's the updated checklist, with what's complete and what's still open (and who owns it). Do you want to review the final before we go through the submission steps?"
 
 ---
 

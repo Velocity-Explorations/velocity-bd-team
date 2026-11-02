@@ -24,7 +24,7 @@ a past session remembered.
 BD history is the 00 Proposal Register: one row per proposal, white paper, RFI, pitch, exercise or commercial job,
 with its dates, values and outcome (every column is in docs/LIBRARY_CONVENTIONS.md). Each row's submission_id,
 `YYYY-MM-DD_portal_short-title` (or `nodate_portal_short-title` when the date is not known), names its folder in
-`Submissions/`, which holds 00_solicitation, 01_submitted, 02_working and 03_outcome.
+`02 Submissions/`, which holds 00_solicitation, 01_submitted, 02_working and 03_outcome.
 
 ## Using them in a draft
 

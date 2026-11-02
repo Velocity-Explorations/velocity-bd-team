@@ -1310,7 +1310,7 @@ def drive_items() -> list[dict[str, Any]]:
 
 
 def pursuits_to_tidy() -> list[dict[str, Any]]:
-    """Pursuits stopped with a no-go whose Drive folder has not moved to Submissions/_no-go/ yet."""
+    """Pursuits stopped with a no-go whose Drive folder has not moved to 02 Submissions/_no-go/ yet."""
     with tx() as conn:
         return rows(q(conn, "SELECT * FROM pursuits p WHERE p.state = 'no_go' AND p.drive_folder_id IS NOT NULL "
                             "AND NOT EXISTS (SELECT 1 FROM pursuit_events e WHERE e.pursuit_id = p.id AND e.kind = 'folder_moved') "
