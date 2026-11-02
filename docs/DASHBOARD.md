@@ -137,7 +137,7 @@ the draft. It shows the call, its portal and deadline, and asks for:
   library is indexed the dialog says so. Only items the index holds are kept.
 
 The dialog also names the Drive folder the worker will create,
-`Submissions/YYYY-MM-DD_portal_short-title/` as in docs/LIBRARY_CONVENTIONS.md. Start is the
+`02 Submissions/YYYY-MM-DD_portal_short-title/` as in docs/LIBRARY_CONVENTIONS.md. Start is the
 person's approval to spend: it writes
 the pursuit, its Discovery step queued for the worker, and the first line of its history, in one
 transaction that locks the call. Proposals' Drafting view opens next.

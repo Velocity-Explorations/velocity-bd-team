@@ -165,7 +165,7 @@
           <tr><td><code>claude -p</code> subprocess with a Popen keepalive loop</td><td>Anthropic API with streaming and a per-phase timeout</td></tr>
           <tr><td><code>--opp-json</code> argument</td><td>The call, read from the ledger by id</td></tr>
           <tr><td>ChromaDB via <code>_query_chroma</code></td><td>The Librarian's <code>library.exemplars.drafting_context()</code></td></tr>
-          <tr><td>An ad-hoc Drive folder</td><td><code>Submissions/&lt;submission_id&gt;/02_working/</code> in the Proposal Library, plus a <code>proposals</code> row</td></tr>
+          <tr><td>An ad-hoc Drive folder</td><td><code>02 Submissions/&lt;submission_id&gt;/02_working/</code> in the Proposal Library, plus a <code>proposals</code> row</td></tr>
           <tr><td>Progress posted to the Prospector API</td><td>Progress written to the draft's ledger row</td></tr>
           <tr><td><code>unmapped_types.log</code></td><td>A warning in the draft's phase log when no template matches</td></tr>
         </tbody>
@@ -373,7 +373,7 @@ Slack informs. A draft's progress shows in its call card's thread, but nothing i
 
 ## Context
 
-Proposal Library conventions: each submission has a Drive folder `Submissions/&lt;submission_id&gt;/{00_solicitation,01_submitted,02_working,03_outcome}/` where submission_id = `YYYY-MM-DD_portal_short-title`, plus a row in the Register sheet and the ledger's `proposals` table. The Writer's drafts are working documents, so they go in 02_working/. The Librarian's `library/register.py` can create a Register row (`create_register_row(fields)`), `ledger.queries.upsert_proposal` writes the table, and `proposals.source_call_id` links a proposal to its call. Only documents generated for this call go on Drive; nothing from the retired Yukon project does.
+Proposal Library conventions: each submission has a Drive folder `02 Submissions/&lt;submission_id&gt;/{00_solicitation,01_submitted,02_working,03_outcome}/` where submission_id = `YYYY-MM-DD_portal_short-title`, plus a row in the Register sheet and the ledger's `proposals` table. The Writer's drafts are working documents, so they go in 02_working/. The Librarian's `library/register.py` can create a Register row (`create_register_row(fields)`), `ledger.queries.upsert_proposal` writes the table, and `proposals.source_call_id` links a proposal to its call. Only documents generated for this call go on Drive; nothing from the retired Yukon project does.
 
 ## Tasks
 

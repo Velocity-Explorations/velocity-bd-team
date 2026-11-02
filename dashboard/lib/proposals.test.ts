@@ -156,8 +156,8 @@ test("a draft's format starts from the call's type, and its folder follows the L
   assert.equal(draftFormat("Solicitation"), "Full proposal");
   assert.equal(draftFormat(null), "White paper");
   assert.equal(folderName("2026-10-28", "SAM.gov", "RFI-FY27-SI Powered Communications and Video Intelligence"),
-    "Submissions/2026-10-28_sam-gov_rfi-fy27-si-powered-communications/");
-  assert.equal(folderName("2026-10-28", "SSC Front Door", "A"), "Submissions/2026-10-28_ssc-front-door_a/");
+    "02 Submissions/2026-10-28_sam-gov_rfi-fy27-si-powered-communications/");
+  assert.equal(folderName("2026-10-28", "SSC Front Door", "A"), "02 Submissions/2026-10-28_ssc-front-door_a/");
 });
 
 

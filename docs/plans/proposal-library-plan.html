@@ -136,7 +136,7 @@
   00 README                         conventions (Google Doc)
   00 Proposal Register              the hand-built sheet (columns below)
   01 Company Reference/             reusable: capabilities, boilerplate, past-performance write-ups, bios, win themes
-  Submissions/
+  02 Submissions/
     2026-05-13_vulcan-sof_jatf-26-collective-autonomy/
       00_solicitation/              the call / RFI / BAA text, attachments, amendments, Q&amp;A
       01_submitted/                 final as-submitted files only (technical-volume.pdf, cost-volume.xlsx, quad-chart.pptx …)
@@ -175,9 +175,9 @@
       <h3>1. Build the Drive folder (before Phase A)</h3>
       <ol>
         <li>In Google Drive (Velocity account), create a folder named <code>BD Proposal Library</code>. Don't put it inside another shared folder; a top-level My Drive or Shared Drive folder is easiest to find.</li>
-        <li>Inside it create two folders: <code>01 Company Reference</code> and <code>Submissions</code>. Leave the README and Register for the bot to create in Phase A.</li>
+        <li>Inside it create two folders: <code>01 Company Reference</code> and <code>02 Submissions</code>. Leave the README and Register for the bot to create in Phase A.</li>
         <li>Into <code>01 Company Reference</code>, upload the reusable material: capabilities statement, boilerplate, past-performance write-ups, personnel bios, win themes. Use current, curated versions of these; nothing from the old Yukon project goes on the work Drive. (The repo keeps its own copy of the old knowledge-base files under <code>reference/yukon/knowledge-base/</code> purely as the Writer's fallback until this folder is populated.)</li>
-        <li>For each past submission, inside <code>Submissions</code> create one folder named <code>YYYY-MM-DD_portal_short-title</code> using the date you submitted and a slug from the list above (e.g. <code>2026-05-13_vulcan-sof_jatf-26-collective-autonomy</code>). Lowercase, hyphens, no spaces.</li>
+        <li>For each past submission, inside <code>02 Submissions</code> create one folder named <code>YYYY-MM-DD_portal_short-title</code> using the date you submitted and a slug from the list above (e.g. <code>2026-05-13_vulcan-sof_jatf-26-collective-autonomy</code>). Lowercase, hyphens, no spaces.</li>
         <li>Inside each, create <code>00_solicitation</code>, <code>01_submitted</code>, <code>02_working</code>, <code>03_outcome</code>. Empty subfolders are fine.</li>
         <li>Put the as-submitted files in <code>01_submitted</code>, renamed to describe the volume (<code>technical-volume.pdf</code>, <code>cost-volume.xlsx</code>, <code>quad-chart.pptx</code>, <code>white-paper.pdf</code>). For Vulcan, export or screenshot the on-portal submission to PDF and include it; the narrative text otherwise never reaches the Proposal Library.</li>
         <li>Put the call/RFI/BAA text and attachments in <code>00_solicitation</code>, anything the government sent back in <code>03_outcome</code>, drafts in <code>02_working</code> if you want to keep them.</li>
@@ -220,7 +220,7 @@
 
 Velocity Explorations has submitted proposals, white papers, RFI responses and pitches to several government portals (Vulcan SOF, SAM.gov, NSTXL, DIU, AFWERX, and others). The documents are being curated by hand into a Google Drive folder, "BD Proposal Library", with this structure:
 
-  00 README · 00 Proposal Register (sheet) · 01 Company Reference/ · Submissions/&lt;YYYY-MM-DD_portal_short-title&gt;/{00_solicitation, 01_submitted, 02_working, 03_outcome}/
+  00 README · 00 Proposal Register (sheet) · 01 Company Reference/ · 02 Submissions/&lt;YYYY-MM-DD_portal_short-title&gt;/{00_solicitation, 01_submitted, 02_working, 03_outcome}/
 
 Portal slugs: vulcan-sof, sam-gov, nstxl, diu, afwerx, iarpa, space-force, doe-sbir, bidnet-co, bidnet-fl, other.
 Type values: sbir_1, sbir_2, sbir_3, sttr, rfi, white_paper, baa, pitch, rfp, ota, other.
@@ -231,14 +231,14 @@ No record of outcomes or strength ratings exists anywhere today. A human will ty
 ## Tasks
 
 1. Create the Register sheet "00 Proposal Register" in the Proposal Library folder (skip if it exists) with a header row of exactly these columns, in order: submission_id, title, portal, agency, solicitation_id, type, role, partners, submitted_date, due_date, requested_value, outcome, outcome_date, award_value, strength_rating, strength_reason, why_won_or_lost, use_as_exemplar, themes, drive_link. Add data validation dropdowns for portal, type, outcome (values above), strength_rating (1 to 5), use_as_exemplar (yes/no). Freeze the header row.
-2. Pre-populate one row per folder found under Submissions/: parse submission_id, submitted_date, and portal from the folder name, set drive_link to the folder, and leave everything else blank for the human. Never overwrite a row that already has a submission_id.
+2. Pre-populate one row per folder found under 02 Submissions/: parse submission_id, submitted_date, and portal from the folder name, set drive_link to the folder, and leave everything else blank for the human. Never overwrite a row that already has a submission_id.
 3. Create "00 README" (Google Doc) describing the folder conventions, file-naming rule inside 01_submitted/ (describe the volume, not the version: technical-volume.pdf, cost-volume.xlsx, cover-letter.pdf, quad-chart.pptx, white-paper.pdf), and what each Register column means and why outcome, strength_rating and use_as_exemplar matter most. Mirror the same text into `docs/LIBRARY_CONVENTIONS.md` in the repo.
-4. `library/register.py` (`sync_register()`): read the sheet, validate each row (submission_id matches `^\d{4}-\d{2}-\d{2}_[a-z-]+_[a-z0-9-]+$`; enum columns within their value sets; strength_rating 1 to 5 or blank; dates parse), `upsert_proposal` each valid row with synced_at = now, and print a report: rows synced, rows skipped with the reason and row number, Submissions/ folders with no Register row, Register rows with no folder.
+4. `library/register.py` (`sync_register()`): read the sheet, validate each row (submission_id matches `^\d{4}-\d{2}-\d{2}_[a-z-]+_[a-z0-9-]+$`; enum columns within their value sets; strength_rating 1 to 5 or blank; dates parse), `upsert_proposal` each valid row with synced_at = now, and print a report: rows synced, rows skipped with the reason and row number, 02 Submissions/ folders with no Register row, Register rows with no folder.
 5. Add `--sync-register` to `run.py` (or a `library/cli.py`) so this can be run on demand and in the daily job.
 
 ## Done when
 
-- The Register exists with the header, dropdowns, and one pre-filled row per Submissions/ folder; you show a screenshot or the first five rows.
+- The Register exists with the header, dropdowns, and one pre-filled row per 02 Submissions/ folder; you show a screenshot or the first five rows.
 - `sync_register()` on the pre-filled sheet reports every row synced and zero mismatches; `SELECT submission_id, portal, outcome FROM proposals` shows them.
 - Deliberately break one row (bad portal slug, strength_rating 7) and re-sync: the report names the row and the reason, and the ledger row is unchanged.
 - `docs/LIBRARY_CONVENTIONS.md` exists and matches the README.</pre>
@@ -263,7 +263,7 @@ No record of outcomes or strength ratings exists anywhere today. A human will ty
       </div>
       <div class="prompt">
         <div class="prompt-bar"><span class="label">Prompt · Phase B</span><button class="copy" type="button" data-copy="cb">Copy prompt</button></div>
-<pre class="body" id="cb">You are working in the `velocity-bd-team` repository. Phase A created `library/register.py` (syncs the "00 Proposal Register" sheet into the ledger's `proposals` table) and `docs/LIBRARY_CONVENTIONS.md` (folder layout: Submissions/&lt;submission_id&gt;/{00_solicitation,01_submitted,02_working,03_outcome}/ plus 01 Company Reference/). This is Phase B: mirror the Proposal Library on Drive to local disk and record every document in the ledger.
+<pre class="body" id="cb">You are working in the `velocity-bd-team` repository. Phase A created `library/register.py` (syncs the "00 Proposal Register" sheet into the ledger's `proposals` table) and `docs/LIBRARY_CONVENTIONS.md` (folder layout: 02 Submissions/&lt;submission_id&gt;/{00_solicitation,01_submitted,02_working,03_outcome}/ plus 01 Company Reference/). This is Phase B: mirror the Proposal Library on Drive to local disk and record every document in the ledger.
 
 ## Context
 
@@ -449,7 +449,7 @@ The register was built by hand once; it must not go stale. Two things keep it al
 
 ## Tasks
 
-1. Submitted step, run first in the daily library job and on demand with `python -m library.cli --submitted [--dry-run]`: for every call with human_status 'submitted' and no proposals row whose source_call_id is that call, create a Register row (and the `proposals` row) with submission_id = `&lt;today&gt;_&lt;portal-slug&gt;_&lt;slugified title, ≤40 chars&gt;`, title, portal, solicitation_id (for Vulcan: the collectionUuid from the call id), due_date, type = 'other', outcome = 'pending', drive_link blank. Post a thread reply on the Slack card: "Added to the Proposal Register as &lt;submission_id&gt;. Create the folder Submissions/&lt;submission_id&gt;/ in the Proposal Library and drop the submitted files in 01_submitted/." Never create a second row for a call: match on `proposals.source_call_id`, which the Draft-Ready Upgrade U1 adds (add it here if it's missing, and update `docs/LEDGER_SCHEMA.md`). If a row already exists for the call with submitted_date empty, because the Writer created it while drafting, set submitted_date to today and reply "Marked submitted. Put the final as-submitted files in Submissions/&lt;submission_id&gt;/01_submitted/." instead. With --dry-run, print what would happen and change nothing.
+1. Submitted step, run first in the daily library job and on demand with `python -m library.cli --submitted [--dry-run]`: for every call with human_status 'submitted' and no proposals row whose source_call_id is that call, create a Register row (and the `proposals` row) with submission_id = `&lt;today&gt;_&lt;portal-slug&gt;_&lt;slugified title, ≤40 chars&gt;`, title, portal, solicitation_id (for Vulcan: the collectionUuid from the call id), due_date, type = 'other', outcome = 'pending', drive_link blank. Post a thread reply on the Slack card: "Added to the Proposal Register as &lt;submission_id&gt;. Create the folder 02 Submissions/&lt;submission_id&gt;/ in the Proposal Library and drop the submitted files in 01_submitted/." Never create a second row for a call: match on `proposals.source_call_id`, which the Draft-Ready Upgrade U1 adds (add it here if it's missing, and update `docs/LEDGER_SCHEMA.md`). If a row already exists for the call with submitted_date empty, because the Writer created it while drafting, set submitted_date to today and reply "Marked submitted. Put the final as-submitted files in 02 Submissions/&lt;submission_id&gt;/01_submitted/." instead. With --dry-run, print what would happen and change nothing.
 2. Monthly reminder (first Monday): list Register rows with outcome 'pending' and submitted_date older than 60 days, and rows whose folder exists but has an empty 01_submitted/, as one Slack message with direct links to the sheet rows. Skip the message when there is nothing to report.
 3. Daily library job: `--submitted --sync-register --sync-drive --ingest` (the submitted step first so new rows sync, then the register, so new metadata is on the chunks). Add to the scheduler from the playbook. Log a one-line summary to the `runs` table with portal = 'library'.
 4. Dashboard: on the `/proposals` page add an "Outcomes pending" tile and, on a call's detail, the "similar past proposals" from `calls.review_context`.
@@ -467,7 +467,7 @@ The register was built by hand once; it must not go stale. Two things keep it al
           <li>Before the first real run, read the dry-run list: each call on it should be a real submission.</li>
           <li>Test: mark any call Submitted on the dashboard, tell the agent to run the submitted step, and confirm a new row appeared at the bottom of the Register and a thread reply named it.</li>
           <li>Reminder test: in the Register, set one pending row's <code>submitted_date</code> to 90 days ago, ask the agent to run the reminder, confirm the Slack message, then set the date back.</li>
-          <li>Ongoing, every time you submit something: create the <code>Submissions/&lt;submission_id&gt;/</code> folder the thread reply names, drop the files in <code>01_submitted</code>, and fill the row's judgment columns.</li>
+          <li>Ongoing, every time you submit something: create the <code>02 Submissions/&lt;submission_id&gt;/</code> folder the thread reply names, drop the files in <code>01_submitted</code>, and fill the row's judgment columns.</li>
           <li>Ongoing, when the reminder arrives: update <code>outcome</code> on the rows it lists. That's the whole maintenance burden.</li>
         </ol>
       </div>
@@ -476,7 +476,7 @@ The register was built by hand once; it must not go stale. Two things keep it al
     <div class="checklist" id="done">
       <h2>Acceptance checklist for the Proposal Library</h2>
       <ol>
-        <li>The Register sheet has a row per Submissions/ folder and the ledger's <code>proposals</code> table mirrors it, with validation errors reported by row.</li>
+        <li>The Register sheet has a row per 02 Submissions/ folder and the ledger's <code>proposals</code> table mirrors it, with validation errors reported by row.</li>
         <li>Every document in Drive is mirrored, extracted, chunked and embedded, with register metadata on every chunk; re-runs touch only what changed.</li>
         <li>Every proposal has a one-paragraph brief that reads as an accurate summary.</li>
         <li>The reviewer's prompt shows similar past submissions with outcome and strength, plus portal history, and verdict changes are explainable by what was shown.</li>

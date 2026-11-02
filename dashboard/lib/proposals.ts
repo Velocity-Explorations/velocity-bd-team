@@ -217,10 +217,10 @@ function slug(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-/** The draft's folder in the Proposal Library (docs/LIBRARY_CONVENTIONS.md): Submissions/YYYY-MM-DD_portal_short-title/. */
+/** The draft's folder in the Proposal Library (docs/LIBRARY_CONVENTIONS.md): 02 Submissions/YYYY-MM-DD_portal_short-title/. */
 export function folderName(date: string, portal: string, title: string): string {
   const short = slug(title.trim().split(/\s+/).slice(0, 3).join(" ")) || "untitled";
-  return `Submissions/${date}_${slug(portal)}_${short}/`;
+  return `02 Submissions/${date}_${slug(portal)}_${short}/`;
 }
 
 /** Minutes without a heartbeat after which the worker counts as offline. */

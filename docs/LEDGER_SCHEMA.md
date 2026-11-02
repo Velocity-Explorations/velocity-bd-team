@@ -285,7 +285,7 @@ and its heartbeat in `workers`, not `runs`.
 | approval_mode | TEXT, not null, default `every_step` | `every_step`, or `key_gates`: the owner approves only Go or no-go, Outline and Submit (PW5) | same |
 | direction | TEXT | the owner's direction; after Alignment, the one that carries forward (PW8). Locked once the Outline is approved | Start the draft, Alignment |
 | builds_on | TEXT JSON | list of past work to build on, each `{"id": <drive_items.id>, "name": ...}`; locked once the Outline is approved (PW11) | Start the draft; the owner and the people working with them |
-| drive_folder_id | TEXT | the pursuit's folder on the shared drive, `Submissions/<YYYY-MM-DD_portal_short-title>/` | the worker, after Start |
+| drive_folder_id | TEXT | the pursuit's folder on the shared drive, `02 Submissions/<YYYY-MM-DD_portal_short-title>/` | the worker, after Start |
 | drive_folder_name | TEXT | that folder's path, as the header shows it | same |
 | current_step | TEXT, not null | the step the pursuit is on: the step of its newest attempt in `pursuit_steps` | every helper that queues an attempt |
 | state | TEXT, not null, default `working` | `working`; `no_go` (stopped by a no-go); `submitted` (Mark submitted: waiting for the result, then holding it in `result`); `closed` (closed without a no-go) | see the lifecycle below |
@@ -422,7 +422,7 @@ added. Added by `008_pursuits.sql`.
 | step_id | INTEGER | the `pursuit_steps.id` the line is about, when there is one | same |
 | at | TEXT timestamp, not null | | same |
 | who | TEXT, not null | a person's name, `worker`, or `worker (key gates only)` | same |
-| kind | TEXT, not null | one of `EVENT_KINDS` in `ledger/queries.py`: `started`, `step_saved`, `approved`, `auto_approved`, `go`, `go_with_conditions`, `changes_asked`, `retried`, `failed`, `blocked`, `stopped`, `no_go`, `closed`, `material`, `collaborators`, `builds_on`, `direction`, `checklist`, `budget`, `submitted`, `result`, `result_date`, `check_again` (Check again, PW22), `no_news` (No news yet, P4), `slack_ready` and `slack_behind` (a step's notice posted to Slack, PW18; who is `slack`), `drive` (the worker made the pursuit's Drive folder), `folder_moved` (a no-go pursuit's folder moved to `Submissions/_no-go/`), `filed` (a submitted proposal filed in the Proposal Library) and `outcome_filed` (its result filed with it) | same |
+| kind | TEXT, not null | one of `EVENT_KINDS` in `ledger/queries.py`: `started`, `step_saved`, `approved`, `auto_approved`, `go`, `go_with_conditions`, `changes_asked`, `retried`, `failed`, `blocked`, `stopped`, `no_go`, `closed`, `material`, `collaborators`, `builds_on`, `direction`, `checklist`, `budget`, `submitted`, `result`, `result_date`, `check_again` (Check again, PW22), `no_news` (No news yet, P4), `slack_ready` and `slack_behind` (a step's notice posted to Slack, PW18; who is `slack`), `drive` (the worker made the pursuit's Drive folder), `folder_moved` (a no-go pursuit's folder moved to `02 Submissions/_no-go/`), `filed` (a submitted proposal filed in the Proposal Library) and `outcome_filed` (its result filed with it) | same |
 | text | TEXT, not null | the line in words, for example `Discovery approved`, or the link someone added | same |
 
 Index: `(pursuit_id, id)`. Add material (PW4: a link or a note) writes a `material` row; the
@@ -464,7 +464,7 @@ Added by `008_pursuits.sql`.
 | id | TEXT, primary key | the Drive file or folder id | the worker's Drive refresh |
 | name | TEXT, not null | the file or folder name | same |
 | mime | TEXT | Drive's MIME type, for example `application/vnd.google-apps.folder` | same |
-| path | TEXT | the folders above it, from the top of the shared drive, for example `Submissions/2025-01-15_sbir_c2` | same |
+| path | TEXT | the folders above it, from the top of the shared drive, for example `02 Submissions/2025-01-15_sbir_c2` | same |
 | parent_id | TEXT | the folder it is in | same |
 | web_link | TEXT | the link that opens it in Drive | same |
 | modified_at | TEXT timestamp | when it last changed in Drive | same |
@@ -472,7 +472,7 @@ Added by `008_pursuits.sql`.
 
 Index: `(parent_id)`. The worker refreshes the index every 15 minutes and when someone chooses
 Refresh (a `drive_refresh` job); a file gone from Drive leaves the index. It holds each submission's
-folder under `Submissions/` with the files in its `01_submitted/`, and the files in `01 Company Reference/`,
+folder under `02 Submissions/` with the files in its `01_submitted/`, and the files in `01 Company Reference/`,
 two folders deep; no-go folders and working files are left out (phase 6b).
 
 ## Table: slop_scans

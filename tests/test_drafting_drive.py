@@ -25,7 +25,7 @@ class FakeDrive:
         self.ids = (f"id{n}" for n in itertools.count(1))
         self.fail = False
         self.library = self.add("BD Proposal Library", FOLDER, None)["id"]
-        self.submissions = self.add("Submissions", FOLDER, self.library)["id"]
+        self.submissions = self.add("02 Submissions", FOLDER, self.library)["id"]
 
     def add(self, name: str, mime: str, parent: str | None, modified: str = "2026-10-01T00:00:00Z") -> dict[str, Any]:
         item_id = next(self.ids)
@@ -112,7 +112,7 @@ def test_a_pursuits_folder_is_named_for_the_library() -> None:
 
 def test_the_folder_and_its_four_parts_are_made_once(fake: FakeDrive) -> None:
     made = drive.pursuit_folder(fake, fake.library, "2026-10-29_sam-gov_edge-ai-for", taken=set())
-    assert fake.path_of(made["id"]) == "Submissions/2026-10-29_sam-gov_edge-ai-for"
+    assert fake.path_of(made["id"]) == "02 Submissions/2026-10-29_sam-gov_edge-ai-for"
     assert sorted(i["name"] for i in fake.children(made["id"])) == ["00_solicitation", "01_submitted", "02_working", "03_outcome"]
     again = drive.pursuit_folder(fake, fake.library, "2026-10-29_sam-gov_edge-ai-for", taken=set())
     assert again["id"] == made["id"] and len(fake.children(made["id"])) == 4
@@ -128,7 +128,7 @@ def test_a_file_goes_into_02_working_and_a_second_save_replaces_it(fake: FakeDri
     page.write_bytes(b"two")
     second = drive.upload(fake, folder["id"], page)
     assert first == second == {"id": first["id"], "link": f"https://drive.example.invalid/{first['id']}"}
-    assert fake.path_of(first["id"]) == "Submissions/2026-10-29_sam-gov_edge-ai-for/02_working/draft_v1.docx"
+    assert fake.path_of(first["id"]) == "02 Submissions/2026-10-29_sam-gov_edge-ai-for/02_working/draft_v1.docx"
     assert fake.items[first["id"]]["mimeType"] == DOCX and fake.items[first["id"]]["content"] == b"two"
 
 
@@ -147,7 +147,7 @@ def test_the_library_is_indexed_for_builds_on(fake: FakeDrive) -> None:
     rows = drive.index_library(fake, fake.library)
     assert sorted(r["path"] for r in rows) == [
         "01 Company Reference/Bios/David Wood bio.docx", "01 Company Reference/Capabilities.pdf",
-        "Submissions/2026-03-17_vulcan-sof_vigilant-eagle-27", "Submissions/2026-03-17_vulcan-sof_vigilant-eagle-27/01_submitted/white-paper.pdf"]
+        "02 Submissions/2026-03-17_vulcan-sof_vigilant-eagle-27", "02 Submissions/2026-03-17_vulcan-sof_vigilant-eagle-27/01_submitted/white-paper.pdf"]
     folder = next(r for r in rows if r["name"] == "2026-03-17_vulcan-sof_vigilant-eagle-27")
     assert (folder["mime"], folder["web_link"], folder["modified_at"]) == (FOLDER, past["webViewLink"], "2026-03-17T12:00:00Z")
 
@@ -158,7 +158,7 @@ def test_the_worker_makes_the_folder_and_saves_each_steps_word_file_there(ledger
     pursuit_id = _pursuit()
     assert worker.work_once(generate=Model()) is True
     pursuit = lq.get_pursuit(pursuit_id)
-    assert pursuit["drive_folder_name"].startswith("Submissions/") and pursuit["drive_folder_name"].endswith("_sam-gov_edge-ai-sam-1")
+    assert pursuit["drive_folder_name"].startswith("02 Submissions/") and pursuit["drive_folder_name"].endswith("_sam-gov_edge-ai-sam-1")
     assert fake.path_of(pursuit["drive_folder_id"]) == pursuit["drive_folder_name"]
     entry = json.loads(lq.pursuit_steps(pursuit_id)[0]["files"])[0]
     assert entry["link"].startswith("https://drive.example.invalid/")
@@ -203,7 +203,7 @@ def test_the_idle_worker_refreshes_every_15_minutes_and_moves_no_go_folders(ledg
     clock = iter([0.0, 60.0, 16 * 60.0])
     refreshed = [worker.housekeeping(next(clock)) for _ in range(3)]
     assert [r["refreshed"] for r in refreshed] == [True, False, True]
-    assert fake.path_of(folder_id).startswith("Submissions/_no-go/")
+    assert fake.path_of(folder_id).startswith("02 Submissions/_no-go/")
     assert [r["moved"] for r in refreshed] == [1, 0, 0]
     assert any(e["kind"] == "folder_moved" for e in lq.pursuit_events(pursuit_id))
 

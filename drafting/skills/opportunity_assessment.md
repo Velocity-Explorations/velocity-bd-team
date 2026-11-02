@@ -29,7 +29,7 @@ Save every document you produce to that folder.
 
 **Goal:** Get the full picture of what this opportunity asks for.
 
-The submission folder already exists. The worker created it when the owner chose Start the draft, using the Library convention: `Submissions/<YYYY-MM-DD_portal_short-title>/`, dated the day the draft started, with these subfolders:
+The submission folder already exists. The worker created it when the owner chose Start the draft, using the Library convention: `02 Submissions/<YYYY-MM-DD_portal_short-title>/`, dated the day the draft started, with these subfolders:
 - `00_solicitation/`
 - `01_submitted/`
 - `02_working/`
@@ -190,7 +190,7 @@ Give a real recommendation, including No-go when the evidence points there. A cl
 **Ask the owner:** "Here is the decision brief and my recommendation. Do we go, go with conditions, or pass?"
 - **Go:** continue to Phase 6.
 - **Go with conditions:** each condition becomes an item in the submission checklist, with its owner and due date, then continue to Phase 6.
-- **No-go:** the owner writes the reason. Save a short decision note to the folder as `{Code}_No-Go_Decision.docx` with the date, the reasons, and anything that would change the answer (a teaming partner, a better-matched future topic). The dashboard marks the call Not relevant with the reason as its note, and the worker moves the folder to `Submissions/_no-go/`. These notes make the next assessment of a similar topic faster.
+- **No-go:** the owner writes the reason. Save a short decision note to the folder as `{Code}_No-Go_Decision.docx` with the date, the reasons, and anything that would change the answer (a teaming partner, a better-matched future topic). The dashboard marks the call Not relevant with the reason as its note, and the worker moves the folder to `02 Submissions/_no-go/`. These notes make the next assessment of a similar topic faster.
 
 ---
 

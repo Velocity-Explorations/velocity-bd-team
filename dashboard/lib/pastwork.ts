@@ -11,7 +11,7 @@ export type PastWorkItem = {
 };
 
 const FOLDER = "application/vnd.google-apps.folder";
-const SUBMISSION = /^Submissions\/[^/]+$/;
+const SUBMISSION = /^02 Submissions\/[^/]+$/;
 const REFERENCE = /^01 Company Reference\//;
 
 /** The library's portal slugs (docs/LIBRARY_CONVENTIONS.md) as the dashboard names the portals. */
