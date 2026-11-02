@@ -172,6 +172,27 @@ def test_placeholders_do_not_count_against_the_budget(ledger_db: str, tmp_path: 
     assert f"with about {room:,} words of room for the {open_items} placeholders still to fill" in fit["detail"]
 
 
+@pytest.mark.parametrize("final, outline, found", [
+    (LONG, OUTLINE, (False, "over", f"cut about {len(LONG.split()) - 4_550:,} words")),
+    (SHORT, OUTLINE, (True, "fits", f"with about {4_550 - len(SHORT.split()):,} words of room")),
+    (LONG, None, (None, "not run", "the outline found no page limit to check against")),
+], ids=["over", "fits", "no limit"])
+def test_the_submit_gate_checks_the_filled_final_version_against_the_budget(
+        ledger_db: str, tmp_path: Path, final: str, outline: dict[str, Any] | None, found: tuple[bool | None, str, str]) -> None:
+    """Filling placeholders adds words: on 2 Nov the final version had about 340 words of room for its 92. The owner
+    fills them in the pursuit's folder, so the gate measures the version they left."""
+    ctx = _context(tmp_path, Model(), "submit", {**EARLIER, "draft_final.md": final})
+    if outline:
+        outline_step(ctx.pursuit["id"], outline)
+    result = write.submit(ctx)
+    checks = result.content["checks"]
+    assert [c["check"] for c in checks] == ["Checklist", "Placeholders", "Page fit", "AI slop check", "Dashes",
+                                            "Internal submit-by date"]
+    ok, word, detail = found
+    assert (checks[2]["ok"], checks[2]["result"]) == (ok, word) and checks[2]["detail"].endswith(detail)
+    assert ("- Page fit: " in result.summary) is (ok is False)   # the card lists what fails
+
+
 def test_a_draft_within_the_budget_is_not_cut_and_fits(ledger_db: str, tmp_path: Path) -> None:
     model = Model()
     ctx = _context(tmp_path, model, "final", {**EARLIER, "outline.md": "# Outline", "draft_v3.md": "# Edge AI white paper v3"})

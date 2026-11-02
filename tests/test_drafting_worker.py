@@ -288,7 +288,7 @@ def test_with_key_gates_a_pursuit_runs_from_discovery_to_the_submit_gate(ledger_
     assert "# White paper v2, reviewed" in (work / "draft_v3.md").read_text(encoding="utf-8")
     assert [s["draft_name"] for s in _scans(pursuit_id)] == ["draft_v1.md", "draft_v2.md", "draft_final.md"]
     submit = json.loads(lq.pursuit_steps(pursuit_id)[-1]["content"])
-    assert [c["check"] for c in submit["checks"]] == ["Checklist", "Placeholders", "AI slop check", "Dashes",
+    assert [c["check"] for c in submit["checks"]] == ["Checklist", "Placeholders", "Page fit", "AI slop check", "Dashes",
                                                       "Internal submit-by date"]
     assert submit["files"] == [{"file": "PDF", "slot": "email"}]
     from docx import Document
