@@ -263,3 +263,16 @@ test("a newer scan of the final version updates the placeholder sweep and the sl
   assert.deepEqual(finalChecks(checks, ready, "2026-11-21T10:00:00Z"), checks);   // the step is newer than the scan
   assert.deepEqual(finalChecks(checks, scan({ draft_name: "draft_v2.md", scanned_at: "2026-11-20T10:00:00Z" }), "2026-11-19T10:00:00Z"), checks);
 });
+
+test("a newer scan of the final version carries its page fit, measured by the worker as the owner left it", () => {
+  const fits = { check: "Page fit", ok: true, result: "fits", detail: "about 12 pages of proposal text (4,210 words at 350 a page) for a limit of 13 pages" };
+  const over = { check: "Page fit", ok: false, result: "over",
+                 detail: "about 15 pages of proposal text (5,203 words at 350 a page) for a limit of 13 pages: cut about 653 words" };
+  const filled = scan({ draft_name: "draft_final.md", scanned_at: "2026-11-20T10:00:00Z",
+                        result_json: JSON.stringify({ ...REPORT, findings: [], page_fit: over }) });
+  assert.deepEqual(finalChecks([fits], filled, "2026-11-19T10:00:00Z"), [{ ...over, detail: `${over.detail}, checked again` }]);
+  const before = scan({ draft_name: "draft_final.md", scanned_at: "2026-11-20T10:00:00Z", result_json: JSON.stringify(REPORT) });
+  assert.deepEqual(finalChecks([fits], before, "2026-11-19T10:00:00Z"), [fits]);   // a scan from before the worker measured it
+  assert.deepEqual(finalChecks([fits], scan({ draft_name: "draft_final.md", scanned_at: "2026-11-20T10:00:00Z", result_json: "{" }),
+                               "2026-11-19T10:00:00Z"), [fits]);
+});
