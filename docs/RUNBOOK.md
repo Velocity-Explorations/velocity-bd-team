@@ -302,6 +302,22 @@ the facts the draft rests on. Those steps then save `facts_used_v1.md`, `facts_u
 The step's card counts them, for example "Facts used: 24 cited, 3 to review, 1 with no fact". The check costs
 about $0.10 to $0.20 a draft; if it fails, the draft stands and the card says the check did not run.
 
+## Page budget
+
+Drafts are held to the call's page limit. The Outline records the limit and each section's share as page
+counts. Every later step turns them into words at 350 a page (`WORDS_PER_PAGE` in `drafting/write.py`). That is
+about what Velocity's submitted technical volumes run: 39 measured in the library ran a median 303 words a page,
+the technical volumes alone about 380, and a winning 2025 volume 315.
+
+- **First draft:** writes to the budget, section by section.
+- **Compliance check:** writes to it too, and sees the draft's length against it.
+- **Reviewers:** see the length too, and must pay for any addition with a cut when the draft is over. In the
+  1 Nov rerun their changes had added about 1,300 words.
+- **Final checks:** reports the page fit as one of its eight checks. When the draft runs more than a twentieth
+  over, it has the formatting pass tighten it, keeping every fact, figure, name, table row and placeholder.
+
+A call with no page limit gets no budget, and Page fit reads not run.
+
 ## Past bids in drafts
 
 The Outline and the First draft also read the past bids nearest the call (`drafting/past_bids.py`):

@@ -10,7 +10,7 @@ owner's note. Reviews runs three reviewers in turn, who propose changes the owne
 (PW12). Final checks puts the decided changes into Draft v3, then runs the reference's last phases: the
 readiness checklist, the formatting pass, the opening held for a person to write (PRO-494), the
 compliance check once more as a report only, and the AI slop check (PRO-510), with the dashes replaced
-before the scan. It reports seven checks in words and adds what is left to fill to the checklist (PW13).
+before the scan. It reports eight checks in words and adds what is left to fill to the checklist (PW13).
 The Submit gate checks what the skill asks before the owner submits and writes the packet: each file's
 portal slot and the portal's steps (PW14). The owner submits on the portal, then chooses Mark submitted.
 
@@ -20,6 +20,8 @@ draft_v3 (the reviewers' decided changes) and draft_final (Final checks).
 from __future__ import annotations
 
 import json
+import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -56,8 +58,10 @@ PLACEHOLDER_RULE = ("Keep every open item a person must close in one of four for
 PACKET_TOKENS = 6_000
 OUTLINE_SPEC = """{"key_points": ["three to six short points for the step's card"],
  "page_limit": "the page limit, in words, or null when the call sets none",
+ "pages": "the page limit as a number of pages, such as 13, or null when the call sets none",
  "sections": [{"title": "the section's number and title", "criteria": ["each evaluation criterion it answers"],
-               "share": "its share of the page limit, for example 4 pages, about 1,800 words",
+               "share": "its share of the page limit, for example 4 pages, about 1,400 words",
+               "pages": "that share as a number of pages, such as 4, or null for a part outside the limit",
                "evidence": ["the past work and evidence it draws on"]}],
  "unmapped_criteria": ["each evaluation criterion with no natural home"],
  "evidence": ["the past work and evidence the proposal draws on, for the owner to add to or drop"]}"""
@@ -72,10 +76,10 @@ def _skill(heading: str) -> str:
 
 
 def _workspace(ctx: StepContext, instructions: str = "", spec: str = "", direction: bool = True,
-               placeholders: bool = False, past: str = "") -> str:
+               placeholders: bool = False, past: str = "", budget: str = "") -> str:
     """What goes after a reference prompt in the workspace: the owner's direction and chosen past work, the past
-    bids nearest the call, the skill's part for the step, the placeholder and no-dash rules, the json block to add,
-    and on a redo the owner's note."""
+    bids nearest the call, the page budget, the skill's part for the step, the placeholder and no-dash rules, the
+    json block to add, and on a redo the owner's note."""
     lines = ["", "", "---", "", "FOR THE PROPOSAL WORKSPACE"]
     if direction:
         lines += ["", "The owner's direction, which the proposal follows:",
@@ -83,6 +87,8 @@ def _workspace(ctx: StepContext, instructions: str = "", spec: str = "", directi
                   "", "Past work the owner chose to build on:", builds_on_text(ctx.record)]
     if past:
         lines += ["", past]
+    if budget:
+        lines += ["", budget]
     if instructions:
         lines += ["", "Also follow these steps from Velocity's proposal-drafting workflow:", "", instructions]
     if placeholders:
@@ -108,6 +114,77 @@ def _scan(ctx: StepContext, name: str) -> dict[str, Any]:
 def _alignment(ctx: StepContext) -> str:
     alignment = ctx.earlier("alignment.md")
     return prompts.ALIGNMENT_BLOCK_HEADER + alignment[:15_000] if alignment else ""
+
+
+WORDS_PER_PAGE = 350   # Velocity's submitted technical volumes run about 380 words a page, a winning one 315 (PRO-565)
+PAGE_RATE = (f"Count about {WORDS_PER_PAGE} words a page when you share out the page limit: Velocity's submitted volumes "
+             "run about that, tables and figures included.")
+PAGES = re.compile(r"(\d+(?:\.\d+)?)\s*(?:[a-z]+\s+)?pages?\b", re.I)
+
+
+def _pages(value: Any) -> float | None:
+    """A page count given as a number, or the first one written in words such as "no more than 5 pages"."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value) if value > 0 else None
+    found = PAGES.search(str(value or ""))
+    return float(found.group(1)) if found and float(found.group(1)) > 0 else None
+
+
+@dataclass(frozen=True)
+class Budget:
+    """The page limit the outline found, in words at WORDS_PER_PAGE, with each section's share of it."""
+    pages: float
+    sections: tuple[tuple[str, float], ...]
+
+    @property
+    def words(self) -> int:
+        return round(self.pages * WORDS_PER_PAGE)
+
+    def lines(self, words_now: int | None = None) -> str:
+        """The budget as a prompt states it; with the draft's length, once there is a draft."""
+        text = [f"PAGE BUDGET: the call allows {self.pages:g} pages. Velocity's submitted volumes run about {WORDS_PER_PAGE} "
+                f"words a page, so the whole document gets about {self.words:,} words, tables and captions included."]
+        text += [f"- {title}: {pages:g} {'page' if pages == 1 else 'pages'}, about {round(pages * WORDS_PER_PAGE):,} words"
+                 for title, pages in self.sections]
+        if words_now is not None:
+            over = words_now - self.words
+            text.append(f"It now runs {words_now:,} words, " + (
+                f"{over:,} over: cut before you add, and pay for any addition with a cut of the same length." if over > 0
+                else f"{-over:,} under: keep it within the budget."))
+        return "\n".join(text)
+
+    def tighten(self, words_now: int) -> str:
+        """What the formatting pass is told when the draft runs over the budget."""
+        return (f"LENGTH: this document runs {words_now:,} words. Tighten it to the budget of about {self.words:,} words "
+                f"({self.pages:g} pages at about {WORDS_PER_PAGE} words a page) while you format it: cut repetition, hedging "
+                "and restated points first. Keep every fact, figure, name, table row and bracketed placeholder.")
+
+
+def page_budget(ctx: StepContext) -> Budget | None:
+    """The page budget from the newest Outline: its page limit and each section's share, or None when it found none."""
+    found = lq.latest_steps(ctx.pursuit["id"]).get("outline")
+    try:
+        content = json.loads(found["content"] or "{}") if found else {}
+    except ValueError:
+        content = {}
+    pages = _pages(content.get("pages")) or _pages(content.get("page_limit"))
+    if not pages:
+        return None
+    shares = [(str(s.get("title") or "").strip(), _pages(s.get("pages")) or _pages(s.get("share")))
+              for s in content.get("sections") or [] if isinstance(s, dict)]
+    return Budget(pages, tuple((title, share) for title, share in shares if title and share))
+
+
+def _page_fit(budget: Budget | None, document: str) -> dict[str, Any]:
+    """Page fit (Final checks): the final version's length, in pages at WORDS_PER_PAGE, against the limit."""
+    if budget is None:
+        return _check("Page fit", None, "the outline found no page limit to check against", "not run")
+    words = len(document.split())
+    about = (f"about {words / WORDS_PER_PAGE:.0f} pages ({words:,} words at {WORDS_PER_PAGE} a page) for a limit of "
+             f"{budget.pages:g} pages")
+    if words <= budget.words:
+        return _check("Page fit", True, about, "fits")
+    return _check("Page fit", False, f"{about}: cut about {words - budget.words:,} words", "over")
 
 
 def _past_bids(ctx: StepContext) -> tuple[past_bids.PastBids, list[dict[str, str]]]:
@@ -146,8 +223,10 @@ def _sections(found: Any) -> list[dict[str, Any]]:
     sections = []
     for item in found if isinstance(found, list) else []:
         if isinstance(item, dict) and str(item.get("title") or "").strip():
+            pages = _pages(item.get("pages"))
             sections.append({"title": str(item["title"]).strip(), "criteria": strings(item.get("criteria")),
-                             "share": str(item.get("share") or "").strip() or None, "evidence": strings(item.get("evidence"))})
+                             "share": str(item.get("share") or "").strip() or None, "evidence": strings(item.get("evidence")),
+                             **({"pages": pages} if pages else {})})
     return sections
 
 
@@ -159,7 +238,7 @@ def outline(ctx: StepContext) -> StepResult:
                            title=d.title, agency=d.agency, portal=d.portal, opp_type=d.opp_type, due_date=d.due_date,
                            requirements=ctx.earlier("requirements.md"), template=d.template.get("text") or prompts.DEFAULT_SECTIONS,
                            alignment=ctx.earlier("alignment.md", 20_000))
-    instructions = _skill("## Phase 1:") + "\n\n" + _skill("## Phase 2:")
+    instructions = _skill("## Phase 1:") + "\n\n" + _skill("## Phase 2:") + "\n\n" + PAGE_RATE
     bids, bid_files = _past_bids(ctx)
     reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, instructions, OUTLINE_SPEC, past=bids.text)), "building outline",
                     pipeline.MAX_TOKENS["5"])
@@ -168,7 +247,7 @@ def outline(ctx: StepContext) -> StepResult:
     summary = "\n".join(part for part in (points(data, document), f"- {bids.line}") if part)
     return StepResult(summary=summary, files=[saved, *bid_files],
                       content={"document": document, "sections": _sections(data.get("sections")),
-                               "page_limit": str(data.get("page_limit") or "").strip() or None,
+                               "page_limit": str(data.get("page_limit") or "").strip() or None, "pages": _pages(data.get("pages")),
                                "unmapped_criteria": strings(data.get("unmapped_criteria")), "evidence": strings(data.get("evidence")),
                                "direction": (ctx.pursuit.get("direction") or "").strip() or None, "question": QUESTIONS["outline"]})
 
@@ -183,7 +262,9 @@ def draft(ctx: StepContext) -> StepResult:
                          outline=ctx.earlier("outline.md") or d.template.get("text") or prompts.DEFAULT_SECTIONS,
                          alignment=ctx.earlier("alignment.md", 20_000))
     bids, bid_files = _past_bids(ctx)
-    text = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, _skill("## Phase 3:"), placeholders=True, past=bids.text)),
+    budget = page_budget(ctx)
+    text = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, _skill("## Phase 3:"), placeholders=True, past=bids.text,
+                                                        budget=budget.lines() if budget else "")),
                    "drafting response", pipeline.MAX_TOKENS["6"])
     ctx.save("draft_v1.md", text, "Draft v1")
     slop = _scan(ctx, "draft_v1.md")
@@ -208,8 +289,10 @@ def compliance(ctx: StepContext) -> StepResult:
     p = prompts.p675_compliance(company=profile(), knowledge_base=d.company_context, alignment_context=_alignment(ctx),
                                 title=d.title, agency=d.agency, opp_type=d.opp_type, due_date=d.due_date,
                                 requirements=ctx.earlier("requirements.md", 25_000), draft=current)
-    reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, direction=False, placeholders=True)), "compliance check",
-                    pipeline.rewrite_room("6.75", current))
+    budget = page_budget(ctx)
+    reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, direction=False, placeholders=True,
+                                                         budget=budget.lines(len(current.split())) if budget else "")),
+                    "compliance check", pipeline.rewrite_room("6.75", current))
     report, corrected = reply.split(prompts.CORRECTED_DRAFT_SEPARATOR, 1) if prompts.CORRECTED_DRAFT_SEPARATOR in reply else ("", reply)
     files = [ctx.save("compliance_report.md", report.strip(), "Compliance report")] if report.strip() else []
     ctx.save("draft_v2.md", corrected.strip() or current, "Draft v2")
@@ -282,6 +365,8 @@ def reviews(ctx: StepContext) -> StepResult:
     The draft changes once the owner has decided; Final checks applies the accepted changes as Draft v3. A
     reviewer sees what the earlier ones proposed, so it does not repeat them."""
     _, current = _draft(ctx, "Reviews")
+    budget = page_budget(ctx)   # reviewers' additions grew the 1 Nov rerun by about 1,300 words, past its limit
+    length = budget.lines(len(current.split())) if budget else ""
     passes: list[dict[str, Any]] = []
     files: list[dict[str, str]] = []
     documents: list[str] = []
@@ -289,7 +374,7 @@ def reviews(ctx: StepContext) -> StepResult:
     for n, (code, name, role, heading, rates) in enumerate(REVIEWERS, start=1):
         system = system_prompt(role, "Reviews", "proposal-drafting", _review_part(heading), RATED_SPEC if rates else UNRATED_SPEC)
         user = user_prompt(ctx, ("REQUIREMENTS ANALYSIS, FROM STEP 4", ctx.earlier("requirements.md")),
-                           ("THE DRAFT TO REVIEW", current),
+                           ("THE DRAFT TO REVIEW", current), ("ITS LENGTH AGAINST THE PAGE LIMIT", length),
                            ("CHANGES EARLIER REVIEWERS PROPOSED; DO NOT PROPOSE THEM AGAIN", "\n".join(proposed)))
         try:
             reply = ctx.ask(Prompt(system, user + "\n\n" + PLACEHOLDER_RULE), f"review {n} of 3: {name}", REVIEW_TOKENS)
@@ -463,12 +548,15 @@ def _final_checklist(ctx: StepContext, counts: dict[str, int]) -> None:
 def final(ctx: StepContext) -> StepResult:
     """Step 9 (PW13): Draft v3 with the decided changes, the readiness checklist, the formatting pass, the opening held
     for a person to write, the dashes replaced, the compliance check once more, and the AI slop check's verdict on
-    the final version; then the seven checks in words, the open placeholders, and the checklist updated."""
+    the final version; then the eight checks in words, the open placeholders, and the checklist updated."""
     current, applied, missed = _apply_changes(ctx)
     d, hooks = draft_inputs(ctx.record), _Quiet()
     state = _pipeline_state(ctx, current)
     state.stats = {}
     pipeline.phase_7_checklist(d, state, ctx.work_dir, hooks)
+    budget = page_budget(ctx)
+    if budget and len(current.split()) > budget.words * 1.05:   # over by more than a twentieth: the formatting pass tightens
+        state.length_note = budget.tighten(len(current.split()))
     state.stats = {}
     pipeline.phase_75_polish(d, state, ctx.work_dir, hooks)
     final_path = ctx.work_dir / "draft_final.md"
@@ -497,6 +585,7 @@ def final(ctx: StepContext) -> StepResult:
     found = [f"{n} {kind if kind != 'other' else 'other bracketed notes'}" for kind, n in counts.items() if n]
     checks = [
         _check("Formatting check", True, "the formatting pass ran on the final version", "done"),
+        _page_fit(budget, document),
         recheck,
         _check("Placeholder sweep", not left, f"{', '.join(found)}, for {ctx.pursuit['owner']}" if left else "none left",
                f"{left} left" if left else "none left"),
