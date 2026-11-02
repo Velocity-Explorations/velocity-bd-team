@@ -371,7 +371,7 @@ def test_a_company_fact_the_files_lack_is_a_counted_placeholder() -> None:
     assert [(p["kind"], p["line"]) for p in write.placeholder_list(text)] == [("NEEDS FACT", 1), ("NEEDS INPUT", 1), ("other", 2)]
 
 
-def test_final_checks_report_seven_checks_in_words(ledger_db: str, tmp_path: Path) -> None:
+def test_final_checks_report_eight_checks_in_words(ledger_db: str, tmp_path: Path) -> None:
     model = Model()
     ctx = _context(tmp_path, model, "final", {**EARLIER, "outline.md": "# Outline", "draft_v3.md": "# Edge AI white paper v3"},
                    target_dates={"submit_by": "2026-11-30"})
@@ -381,6 +381,7 @@ def test_final_checks_report_seven_checks_in_words(ledger_db: str, tmp_path: Pat
     result = write.final(ctx)
     assert [(c["check"], c["result"], c["ok"]) for c in result.content["checks"]] == [
         ("Formatting check", "done", True),
+        ("Page fit", "not run", None),   # no outline with a page limit
         ("Final compliance re-check", "1 to fix", False),
         ("Placeholder sweep", "1 left", False),
         ("AI slop check, final pass", "not ready", False),
@@ -418,7 +419,7 @@ def test_a_failed_compliance_re_check_says_so_and_the_other_checks_stand(ledger_
     recheck = next(c for c in result.content["checks"] if c["check"] == "Final compliance re-check")
     assert (recheck["result"], recheck["ok"]) == ("not run", None)
     assert recheck["detail"] == "did not run: final compliance re-check: the model refused this request"
-    assert len(result.content["checks"]) == 7
+    assert len(result.content["checks"]) == 8
 
 
 def test_the_checklist_check_names_open_items_without_an_owner_or_a_date() -> None:

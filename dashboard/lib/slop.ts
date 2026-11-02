@@ -323,7 +323,7 @@ export function finalGate(scan: ScanRow | null): string | null {
 
 export type FinalCheck = { check: string; ok: boolean | null; result?: string; detail: string };
 
-/** The step's seven checks, with the placeholder sweep and the slop check's final pass taken from a newer scan of the
+/** The step's eight checks, with the placeholder sweep and the slop check's final pass taken from a newer scan of the
  *  final version when Check again has run since the step was saved. */
 export function finalChecks(checks: FinalCheck[], scan: ScanRow | null, finishedAt: string | null): FinalCheck[] {
   if (!scan || !(scan.draft_name ?? "").startsWith(FINAL) || (finishedAt && scan.scanned_at <= finishedAt)) return checks;

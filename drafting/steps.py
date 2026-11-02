@@ -221,6 +221,14 @@ def placeholder_counts(text: str) -> dict[str, int]:
     return counts
 
 
+def text_words(text: str) -> int:
+    """The proposal's own words: placeholders, the instructions in them, are left out of the count, since filling one
+    replaces its words (on 2 Nov, 92 placeholders held 1,110 of a final version's 5,320 words)."""
+    for pattern in (PLACEHOLDER, OTHER_NOTE, FACT_POINTER):
+        text = pattern.sub(" ", text)
+    return len(text.split())
+
+
 def placeholder_line(counts: Mapping[str, int]) -> str:
     found = [f"{n} {kind}" if kind != "other" else f"{n} other bracketed {'note' if n == 1 else 'notes'}"
              for kind, n in counts.items() if n]
