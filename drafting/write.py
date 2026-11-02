@@ -672,7 +672,8 @@ def final(ctx: StepContext) -> StepResult:
 # --------------------------------------------------------------------------------- Submit
 
 def _gate_checks(ctx: StepContext, final_text: str) -> list[dict[str, Any]]:
-    """What the skill confirms before the owner submits, each passing, failing, or not known yet."""
+    """What the skill confirms before the owner submits, each passing, failing, or not known yet; and the page fit
+    once more, since filling the placeholders in the pursuit's folder adds words."""
     items = lq.checklist(ctx.pursuit["id"])
     still_open = sum(1 for item in items if not item["done"])
     checklist = (_check("Checklist", None, "no checklist yet") if not items
@@ -695,7 +696,8 @@ def _gate_checks(ctx: StepContext, final_text: str) -> list[dict[str, Any]]:
         deadline = _check("Internal submit-by date", not passed, f"{submit_by} has passed" if passed else f"by {submit_by}")
     else:
         deadline = _check("Internal submit-by date", None, "not set")
-    return [checklist, _check("Placeholders", not any(counts.values()), placeholder_line(counts)), slop,
+    return [checklist, _check("Placeholders", not any(counts.values()), placeholder_line(counts)),
+            _page_fit(page_budget(ctx), final_text), slop,
             _check("Dashes", dashes == 0, "none in the final version" if dashes == 0 else f"{dashes} in the final version"),
             deadline]
 

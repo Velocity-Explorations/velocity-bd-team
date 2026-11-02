@@ -327,6 +327,9 @@ On 2 Nov a final version ran 5,320 words, 1,110 of them inside 92 placeholders; 
 - **Page fit:** one of the eight final checks. It passes up to a twentieth over the budget, since 350 words a
   page is an estimate with a wider margin than that, and says how many words are left for the placeholders still
   to fill.
+- **Submit gate:** checks the page fit again on the final version as the owner left it in the pursuit's folder,
+  since filling the placeholders adds words. A version over the budget shows on the gate's card with how much to
+  cut.
 
 A call with no page limit gets no budget, and Page fit reads not run.
 
