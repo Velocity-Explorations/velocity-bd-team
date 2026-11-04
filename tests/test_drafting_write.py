@@ -3,6 +3,8 @@ and the Submit gate, each run with a stand-in model. The slop scanner is the sta
 from __future__ import annotations
 
 import json
+import re
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -390,7 +392,8 @@ def test_final_checks_report_eight_checks_in_words(ledger_db: str, tmp_path: Pat
         ("Final version saved", "saved", True),
     ]
     detail = {c["check"]: c["detail"] for c in result.content["checks"]}
-    assert detail["Final compliance re-check"] == "1 to fix, 1 to check; the report is final_compliance.md"
+    assert detail["Final compliance re-check"] == ("1 to fix, 1 to check; it gave no corrected version; "
+                                                   "the report is final_compliance.md")
     assert detail["Placeholder sweep"] == "1 PERSON WRITES, for David Wood"
     assert detail["AI slop check, final pass"] == ("Not ready: 1 PERSON WRITES; band clean (provisional). "
                                                    "Dash check passed: no en or em dashes")
@@ -402,9 +405,10 @@ def test_final_checks_report_eight_checks_in_words(ledger_db: str, tmp_path: Pat
     [placeholder] = result.content["placeholders"]
     assert (placeholder["kind"], placeholder["line"], placeholder["section"]) == ("PERSON WRITES", line, "Edge AI white paper")
     assert placeholder["text"].startswith("[PERSON WRITES")
-    # The re-check reads the final version, asks for its report only, and leaves the final version as it is.
+    # The re-check reads the final version and asks for what it can fix in place; with no corrected version back,
+    # the final version stays as it is.
     recheck = model.prompt("final compliance re-check")
-    assert final[line - 1][:60] in recheck.user and "Give only the report" in recheck.user
+    assert final[line - 1][:60] in recheck.user and "fix only what can be fixed where it stands" in recheck.user
     assert (ctx.work_dir / "final_compliance.md").read_text(encoding="utf-8").startswith("## 1. Keyword Verification")
     assert "Final compliance re-check" in [f["name"] for f in result.files]
     # What is left to fill joins the checklist for the owner, due by the internal submit-by date.
@@ -420,6 +424,72 @@ def test_a_failed_compliance_re_check_says_so_and_the_other_checks_stand(ledger_
     assert (recheck["result"], recheck["ok"]) == ("not run", None)
     assert recheck["detail"] == "did not run: final compliance re-check: the model refused this request"
     assert len(result.content["checks"]) == 8
+
+
+BODY = "# Edge AI white paper v3\n\nThe opening.\n\n## 1. Approach\n\n" + "\n\n".join(["The approach is sound. " * 10] * 20)
+
+
+class Fixing(Model):
+    """A Final checks model: the formatting pass keeps the draft as it is, and the re-check gives its report and a
+    corrected version made from the final version as it stands, changed by `fix` (no corrected version without one)."""
+
+    def __init__(self, fix: Callable[[str], str] | None) -> None:
+        super().__init__()
+        self.fix, self.final, self.seen = fix, Path(), ""
+
+    def __call__(self, prompt: Prompt, label: str, max_tokens: int) -> str:
+        reply = super().__call__(prompt, label, max_tokens)
+        if label == "formatting document":
+            return prompt.user.split("DOCUMENT TO FORMAT:\n", 1)[-1]
+        if label == "final compliance re-check":
+            self.seen = self.final.read_text(encoding="utf-8")
+            if self.fix is not None:
+                return f"{reply}\n---CORRECTED DRAFT---\n{self.fix(self.seen)}"
+        return reply
+
+
+def _final_with(tmp_path: Path, model: Fixing, outline: dict[str, Any] | None = None) -> tuple[steps.StepContext, dict[str, Any]]:
+    ctx = _context(tmp_path, model, "final", {**EARLIER, "outline.md": "# Outline", "draft_v3.md": BODY})
+    model.final = ctx.work_dir / "draft_final.md"
+    if outline:
+        from tests.test_drafting_pages import outline_step   # here: that module imports this one
+
+        outline_step(ctx.pursuit["id"], outline)
+    result = write.final(ctx)
+    return ctx, {"result": result, "check": next(c for c in result.content["checks"] if c["check"] == "Final compliance re-check")}
+
+
+def test_final_checks_put_what_the_re_check_can_fix_into_the_final_version(ledger_db: str, tmp_path: Path) -> None:
+    """On 4 Nov the re-check found 13 small misses on the final version (two keywords, three references the template
+    names, glossary terms) and only reported them; what it can fix where it stands now goes in."""
+    model = Fixing(lambda text: text + "\n\nThe approach is disruptive at the edge.")
+    ctx, found = _final_with(tmp_path, model)
+    assert (found["check"]["ok"], found["check"]["result"]) == (True, "1 fixed")
+    assert found["check"]["detail"] == "1 fixed in the final version, 1 to check; the report is final_compliance.md"
+    assert "The approach is disruptive at the edge." in (ctx.work_dir / "draft_final.md").read_text(encoding="utf-8")
+    assert "The approach is disruptive at the edge." in found["result"].content["document"]
+    asked = model.prompt("final compliance re-check")
+    assert "fix only what can be fixed where it stands" in asked.user and "Give only the report" not in asked.user
+    assert "---CORRECTED DRAFT---" not in (ctx.work_dir / "final_compliance.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("fix, outline, why", [
+    (None, None, "it gave no corrected version"),
+    (lambda text: re.sub(r"\[PERSON WRITES[^\]]*\]", "", text), None,
+     "its corrected version was not used: it dropped 1 PERSON WRITES placeholder"),
+    (lambda text: text.replace("## 1. Approach", "1. Approach"), None, "its corrected version was not used: it dropped a heading"),
+    (lambda text: text.replace("The approach is sound. " * 10, "", 19), None,   # a reply cut short, every placeholder kept
+     "its corrected version was not used: it lost text"),
+    (lambda text: text + " word" * 2_000, {"pages": 5, "sections": []},
+     "its corrected version was not used: it would run over the page budget"),
+], ids=["none given", "placeholder", "heading", "text lost", "page budget"])
+def test_a_corrected_final_version_that_loses_anything_is_not_used(ledger_db: str, tmp_path: Path, fix: Callable[[str], str] | None,
+                                                                    outline: dict[str, Any] | None, why: str) -> None:
+    model = Fixing(fix)
+    ctx, found = _final_with(tmp_path, model, outline)
+    assert (found["check"]["ok"], found["check"]["result"]) == (False, "1 to fix")
+    assert found["check"]["detail"] == f"1 to fix, 1 to check; {why}; the report is final_compliance.md"
+    assert (ctx.work_dir / "draft_final.md").read_text(encoding="utf-8") == model.seen   # the final version as it was
 
 
 def test_the_checklist_check_names_open_items_without_an_owner_or_a_date() -> None:
