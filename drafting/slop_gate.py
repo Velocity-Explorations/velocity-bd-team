@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any
 
 from config import get
-from drafting.steps import FACT_POINTER, OTHER_NOTE, PLACEHOLDER
 
 SCANNER_ENV = "AI_SLOP_SCAN"
 DEFAULT_SCANNER = Path.home() / ".claude" / "skills" / "ai-slop-detection" / "scripts" / "slop_scan.py"
@@ -94,6 +93,9 @@ def with_missed(report: Mapping[str, Any], text: str) -> dict[str, Any]:
     2026-11-04_slop-scanner-long-placeholders.md). The sweep uses the patterns the Submit gate counts with. A finding
     covers a placeholder on its line when one starts the other, since the scanner cuts its matches at 120 characters.
     """
+    # Imported here: drafting.steps imports drafting.inputs, which imports drafting.pipeline, which imports this module.
+    from drafting.steps import FACT_POINTER, OTHER_NOTE, PLACEHOLDER
+
     findings = list(report.get("findings") or [])
     reported: dict[int, list[str]] = {}
     for finding in findings:
