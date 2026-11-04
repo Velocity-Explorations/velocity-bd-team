@@ -9,6 +9,7 @@
     python run.py --fetch-timeout 10       # override every portal's fetch budget (testing)
     python run.py --feedback-only          # Slack thread notes in, decisions out to the cards, nothing else
     python run.py --deliver-run 12         # re-post run 12's cards after a Slack failure
+    python run.py --hold-slack             # judge and save as usual, post no cards; --deliver-run posts them later
     python run.py --wait-lock 30           # if another run holds the lock, wait up to 30 minutes for it
 
 The portal assistant's scheduled jobs (docs/ASSISTANT.md) also run from here, because this
@@ -863,7 +864,11 @@ def run_portal(portal: Portal, args: argparse.Namespace, log_path: Path) -> dict
         print_digest(portal.name, fresh)
 
         t0 = time.time()
-        posted = deliver(portal, fresh, counts, time.time() - started, args.dry_run)
+        if args.hold_slack:   # the cards stay unposted (no slack_ts), so --deliver-run finds them
+            print(f"Slack held: {len(fresh)} card(s) wait for run.py --deliver-run {run_id}")
+            posted = 0
+        else:
+            posted = deliver(portal, fresh, counts, time.time() - started, args.dry_run)
         log.info("DELIVER: %d card(s) (%.1fs)", posted, time.time() - t0)
     except Exception as exc:
         status, error = "error", f"{type(exc).__name__}: {str(exc)[:200]}"
@@ -893,6 +898,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--feedback-only", action="store_true", help="only sync Slack: thread notes in, decisions out to the cards")
     parser.add_argument("--debug", action="store_true", help="DEBUG logging (includes the first review prompt)")
     parser.add_argument("--deliver-run", type=int, metavar="N", help="re-post run N's new calls that never reached Slack, then exit")
+    parser.add_argument("--hold-slack", action="store_true",
+                        help="judge and save as usual but post no cards; run.py --deliver-run N posts them later")
     parser.add_argument("--wait-lock", type=int, default=0, metavar="MINUTES",
                         help="if another run holds the lock, wait up to this many minutes for it")
     parser.add_argument("--remind", action="store_true", help="post Slack reminders for Pursue calls due soon, then exit")
