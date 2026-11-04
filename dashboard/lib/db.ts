@@ -7,6 +7,14 @@ type Sql = ReturnType<typeof postgres>;
 
 const holder = globalThis as unknown as { __ledgerSql?: Sql };
 
+/**
+ * Three connections, each kept ten minutes after its last query: opening one through Supabase's pooler takes about
+ * 0.7 s, which a 20-second idle timeout made nearly every click pay. After ten idle minutes they close, so a dashboard
+ * nobody is using holds none of the pooler's connections. prepare: false works through Supabase's transaction pooler
+ * as well as the session pooler.
+ */
+export const POOL = { max: 3, idle_timeout: 600, connect_timeout: 10, prepare: false } as const;
+
 export function sql(): Sql {
   if (holder.__ledgerSql) return holder.__ledgerSql;
   const url = process.env.DATABASE_URL;
@@ -16,11 +24,6 @@ export function sql(): Sql {
   if (!/^postgres(ql)?:\/\//i.test(url)) {
     throw new Error("DATABASE_URL must be a postgres:// URL. The dashboard does not read the SQLite dev ledger.");
   }
-  holder.__ledgerSql = postgres(url, {
-    max: 3,
-    idle_timeout: 20,
-    connect_timeout: 10,
-    prepare: false, // works through Supabase's transaction pooler as well as the session pooler
-  });
+  holder.__ledgerSql = postgres(url, POOL);
   return holder.__ledgerSql;
 }

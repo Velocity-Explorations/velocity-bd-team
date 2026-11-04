@@ -764,6 +764,20 @@ dialog.settings .lead {
   color: var(--ink-3);
 }
 
+/* Previous and Next under a table that runs to more than one page. */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.pager-where {
+  font: 400 12px/1.3 var(--font-label);
+  color: var(--ink-3);
+}
+
 /* A menu that opens 4px below its trigger: the bar's Portals and Tag, and each header's filter. */
 details.menu {
   position: relative;

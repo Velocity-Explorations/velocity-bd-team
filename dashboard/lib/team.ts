@@ -5,12 +5,15 @@ import { sql } from "./db";
 import { parseUsers } from "./people";
 import { teamName } from "./signin";
 import { isoNow } from "./format";
+import { present } from "./schema";
 
 export type KnownPerson = { email: string; name: string };
 
 async function hasPeople(): Promise<boolean> {
-  const [row] = await sql()<{ present: boolean }[]>`SELECT to_regclass('people') IS NOT NULL AS present`;
-  return Boolean(row?.present);
+  return present("people", async () => {
+    const [row] = await sql()<{ present: boolean }[]>`SELECT to_regclass('people') IS NOT NULL AS present`;
+    return Boolean(row?.present);
+  });
 }
 
 /** Everyone who has signed in, by name. Empty before migration 010. */

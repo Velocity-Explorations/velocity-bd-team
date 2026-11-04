@@ -3,6 +3,7 @@
 import { ExternalLink } from "lucide-react";
 import { Notice } from "@/components/Notice";
 import type { Detail } from "@/lib/details";
+import { PAGE_SIZE, type Pager } from "@/lib/filters";
 
 const TONES: Record<string, string> = {
   yes: "good",
@@ -73,6 +74,18 @@ export function Flash({ notice, error, link }: { notice?: string; error?: string
     );
   }
   return null;
+}
+
+/** Links to the pages either side of this one (lib/filters.ts pager), under a table that runs to more than a page. */
+export function PageLinks({ pager }: { pager: Pager }) {
+  if (pager.pages <= 1) return null;
+  return (
+    <nav className="pager" aria-label="Pages">
+      {pager.prev ? <a className="btn" href={pager.prev} rel="prev">Previous {PAGE_SIZE}</a> : null}
+      <span className="pager-where">Page {pager.page} of {pager.pages}</span>
+      {pager.next ? <a className="btn" href={pager.next} rel="next">Next {pager.nextCount}</a> : null}
+    </nav>
+  );
 }
 
 /** A call's title, linked to its page on the portal in a new tab, with the external-link icon. */

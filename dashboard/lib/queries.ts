@@ -3,7 +3,7 @@
 
 import type { TransactionSql } from "postgres";
 import { sql } from "./db";
-import { CLOSED_PATTERN, portalOptions, type CallState, type PortalOption, type Sort } from "./filters";
+import { CLOSED_PATTERN, PAGE_SIZE, portalOptions, type CallState, type PortalOption, type Sort } from "./filters";
 import type { JudgeFilter, Judgment } from "./judges";
 import type { TagOption, TagRow } from "./tags";
 import { isoNow } from "./format";
@@ -19,6 +19,7 @@ import { STALE_MS } from "./runs";
 import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
 import { finalGate, type ScanJob, type ScanRow } from "./slop";
 import type { PastWorkItem } from "./pastwork";
+import { present } from "./schema";
 import {
   changeCounts,
   decidedLine,
@@ -123,12 +124,14 @@ function panelOrder(db: Db, f: { sort: Sort; judges: JudgeFilter }) {
   }
 }
 
-/** True when a column exists; a migration may not be applied to this database yet. */
+/** True when a column exists; a migration may not be applied to this database yet. Once found, remembered (schema.ts). */
 async function hasColumn(db: Db, table: string, column: string): Promise<boolean> {
-  const [row] = await db<{ present: boolean }[]>`
-    SELECT EXISTS (SELECT 1 FROM information_schema.columns
-                   WHERE table_schema = current_schema() AND table_name = ${table} AND column_name = ${column}) AS present`;
-  return Boolean(row?.present);
+  return present(`${table}.${column}`, async () => {
+    const [row] = await db<{ present: boolean }[]>`
+      SELECT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = current_schema() AND table_name = ${table} AND column_name = ${column}) AS present`;
+    return Boolean(row?.present);
+  });
 }
 
 /** Claude's executive summary of each call (migration 009), or NULL before the migration is applied. A fragment, so
@@ -137,10 +140,12 @@ function summaryColumn(db: Db, present: boolean) {
   return present ? db`ai_summary` : db`NULL::text AS ai_summary`;
 }
 
-/** True when a ledger table exists; a migration may not be applied to this database yet. */
+/** True when a ledger table exists; a migration may not be applied to this database yet. Once found, remembered. */
 async function hasTable(db: Db, name: string): Promise<boolean> {
-  const [row] = await db<{ present: boolean }[]>`SELECT to_regclass(${name}::text) IS NOT NULL AS present`;
-  return Boolean(row?.present);
+  return present(name, async () => {
+    const [row] = await db<{ present: boolean }[]>`SELECT to_regclass(${name}::text) IS NOT NULL AS present`;
+    return Boolean(row?.present);
+  });
 }
 
 /**
@@ -185,31 +190,37 @@ function keywordWhere(db: Db, f: Keywords) {
  * the "Triage backlog" query in LEDGER_SCHEMA.md. A call a later keyword change dropped leaves it.
  * Views narrow it (PRO-571): Due soon to those closing within DUE_SOON_DAYS, New this week to those
  * first seen in the last NEW_DAYS; the judges views through `judges`. Top 10 lists `ids`, decided or
- * not, in the database's order: the page puts them in the brief's.
+ * not, in the database's order: the page puts them in the brief's. One page of `limit` rows from
+ * `offset`, with the view's total.
  */
 export async function reviewQueue(
   f: PanelFilters & Keywords & { verdict: string; tier: string; view?: CallView; ids?: string[] },
   waitingFor: string[] | null,
-): Promise<{ rows: QueueRow[]; perPerson: boolean }> {
+  page: { limit: number; offset: number } = { limit: PAGE_SIZE, offset: 0 },
+): Promise<{ rows: QueueRow[]; total: number; perPerson: boolean }> {
   const db = sql();
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
-  if (f.view === "top10" && !f.ids?.length) return { rows: [], perPerson };
+  if (f.view === "top10" && !f.ids?.length) return { rows: [], total: 0, perPerson };
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
-  const rows = await db<QueueRow[]>`
-    SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, ${summary}, due_date,
-           (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
-           match_tier, first_seen_at, extra, human_status, human_notes
-    FROM calls
+  const where = () => db`
     WHERE ${f.view === "top10" ? db`id IN ${db(f.ids ?? [])}` : waitingWhere(db, perPerson, waitingFor)}
       ${f.view === "due-soon" ? db`AND ${dueSoon(db)}` : db``}
       ${f.view === "new" ? db`AND first_seen_at >= ${newSince()}` : db``}
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
       ${f.tier ? db`AND match_tier = ${f.tier}` : db``}
       ${keywordWhere(db, f)}
-      ${panelWhere(db, f)}
-    ${panelOrder(db, f)}
-    LIMIT 500`;
-  return { rows: [...rows], perPerson };
+      ${panelWhere(db, f)}`;
+  const [count, rows] = await Promise.all([
+    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${where()}`,
+    db<QueueRow[]>`
+      SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, ${summary}, due_date,
+             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
+             match_tier, first_seen_at, extra, human_status, human_notes
+      FROM calls ${where()}
+      ${panelOrder(db, f)}
+      LIMIT ${page.limit} OFFSET ${page.offset}`,
+  ]);
+  return { rows: [...rows], total: count[0]?.n ?? 0, perPerson };
 }
 
 /** The first-seen time from which a call is New this week. */
@@ -408,7 +419,8 @@ export type CallRow = {
   extra: string | null;
 };
 
-export async function listCalls(f: CallFilters, limit = 200): Promise<{ rows: CallRow[]; total: number }> {
+/** One page of All calls: `limit` rows from `offset`, and how many calls the filters leave. */
+export async function listCalls(f: CallFilters, limit = PAGE_SIZE, offset = 0): Promise<{ rows: CallRow[]; total: number }> {
   const db = sql();
   const where = () => db`
     WHERE TRUE
@@ -427,7 +439,7 @@ export async function listCalls(f: CallFilters, limit = 200): Promise<{ rows: Ca
              ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra
       FROM calls ${where()}
       ${panelOrder(db, f)}
-      LIMIT ${limit}`,
+      LIMIT ${limit} OFFSET ${offset}`,
   ]);
   return { rows: [...rows], total: count[0]?.n ?? 0 };
 }

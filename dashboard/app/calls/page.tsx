@@ -8,13 +8,16 @@ import { HeaderCell } from "@/components/HeaderCell";
 import { NotesPanel, ReasonsPanel } from "@/components/RowPanels";
 import { Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
-import { Badge, Flash } from "@/components/bits";
+import { Badge, Flash, PageLinks } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
 import { shows } from "@/lib/columns";
 import { yourVote } from "@/lib/decide";
 import { callDetails, deadlineNote } from "@/lib/details";
 import { detailSources } from "@/lib/description";
-import { choiceLinks, filterHref, JUDGE_CHOICES, pickMany, pickSort, pickState, sortChoices, sortLink, sortParams, type Params } from "@/lib/filters";
+import {
+  choiceLinks, JUDGE_CHOICES, PAGE_SIZE, pageHref, pager, pickMany, pickPage, pickSort, pickState, showing, sortChoices, sortLink, sortParams,
+  type Params,
+} from "@/lib/filters";
 import { formatDue, formatTime } from "@/lib/format";
 import { dayMonth } from "@/lib/home";
 import { pickJudgeFilter, verdictsFor } from "@/lib/judges";
@@ -48,7 +51,6 @@ export const metadata: Metadata = { title: "All calls" };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-const LIMIT = 200;
 const FILTER_CHOICES = [{ value: "", label: "Any" }, ...FILTER_RESULTS.map((v) => ({ value: v, label: v }))];
 const VERDICT_CHOICES = [{ value: "", label: "Any" }, ...VERDICTS.map((v) => ({ value: v, label: v })), { value: "none", label: "not reviewed" }];
 const STATUS_CHOICES = [
@@ -59,7 +61,7 @@ const STATUS_CHOICES = [
 
 /**
  * All calls (PRO-571, PRO-572): every call the scanner has seen, the filter's rejects included, newest
- * first, 200 at a time. Its columns: Call, Filter, Votes, Description, AI reason, Due, First seen,
+ * first, PAGE_SIZE at a time. Its columns: Call, Filter, Votes, Description, AI reason, Due, First seen,
  * Decide. A decision here changes the call's (the newest wins), and every person's is kept.
  */
 export default async function CallsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -83,20 +85,6 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
   const viewer = await currentViewer();
   const users = allowlist();
   const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
-  const [{ rows, total }, counts, topCount, agreement] = await Promise.all([
-    listCalls(filters, LIMIT),
-    queueCounts(filters, waitingFor),
-    countAmong(top.ids, filters),
-    judgeAgreement(),
-  ]);
-  const ids = rows.map((r) => r.id);
-  const [judged, decisions, tagRows, drafts, { readiness }] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids), draftsFor(ids), drafting()]);
-  const tagsFor = tagsByCall(tagRows);
-  const tz = await timeZone();
-  const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Table settings
-  const label = await labeler();
-  const nameOf = (by: string | null) => label(displayPerson(by, users));
-  const votes = votesByCall(decisions, (by) => displayPerson(by, users));   // by the name decisions are recorded under
   // The view as link params: every bar control, header and decision keeps the rest of it.
   const barParams: Params = { portal: filters.portals, state: filters.state, tag: filters.tag };
   const params: Params = {
@@ -110,9 +98,29 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
     status: filters.status,
     ...sortParams(filters.sort),
   };
+  const page = pickPage(sp.page);
+  const [{ rows, total }, counts, topCount, agreement] = await Promise.all([
+    listCalls(filters, PAGE_SIZE, (page - 1) * PAGE_SIZE),
+    queueCounts(filters, waitingFor),
+    countAmong(top.ids, filters),
+    judgeAgreement(),
+  ]);
+  const pages = pager("/calls", params, page, total);
+  // A page past the last (the list shrank since the link was made) opens the last, keeping the notice.
+  if (page > pages.pages) {
+    redirect(pageHref("/calls", { ...params, notice: firstParam(sp.notice, 300), error: firstParam(sp.error, 300) }, pages.pages));
+  }
+  const ids = rows.map((r) => r.id);
+  const [judged, decisions, tagRows, drafts, { readiness }] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids), draftsFor(ids), drafting()]);
+  const tagsFor = tagsByCall(tagRows);
+  const tz = await timeZone();
+  const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Table settings
+  const label = await labeler();
+  const nameOf = (by: string | null) => label(displayPerson(by, users));
+  const votes = votesByCall(decisions, (by) => displayPerson(by, users));   // by the name decisions are recorded under
   const filtered = Object.values(params).some((value) => value.length > 0);
   const columnFilter = Boolean(filters.q || filters.desc || filters.why || filters.judges || filters.filterResult || filters.verdict || filters.status);
-  const returnTo = filterHref("/calls", params);
+  const returnTo = pageHref("/calls", params, page);   // a decision comes back to this page
   const now = Date.now();
   const colSpan = 2 + ["filter", "votes", "description", "reason", "due", "seen"].filter((key) => show(key)).length;
   const search = (name: "q" | "desc" | "why", placeholder: string) => ({ action: "/calls", name, value: filters[name] ?? "", params, placeholder });
@@ -154,7 +162,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
         state={filters.state}
         search={filters.q}
         filtered={filtered}
-        summary={`Showing ${rows.length} of ${total}${total > rows.length ? ", narrow the filters to see the rest" : ""}`}
+        summary={showing(pages)}
       />
 
       <section>
@@ -308,6 +316,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
             </table>
           </div>
         )}
+        <PageLinks pager={pages} />
       </section>
     </Shell>
   );
