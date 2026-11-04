@@ -365,6 +365,21 @@ def test_drafting_and_review_prompts_keep_open_items_in_the_four_counted_forms(l
     assert "[NEEDS FACT: ...]" in write.PLACEHOLDER_RULE and "four forms" in write.PLACEHOLDER_RULE
 
 
+def test_the_first_draft_proposes_targets_for_the_owner_to_confirm(ledger_db: str, tmp_path: Path) -> None:
+    """On 4 Nov the trial left every Phase I threshold to the stakeholder, while the winner set its own (at least 90%
+    word accuracy, at most 500 ms); drafts now propose a target for each measure, confirmed by the owner."""
+    model = Model()
+    ctx = _context(tmp_path, model, "draft", {**EARLIER, "outline.md": "# Outline", "draft_v1.md": "# D1", "draft_v2.md": "# D2"})
+    write.draft(ctx)
+    write.compliance(ctx)
+    write.reviews(ctx)
+    assert write.TARGETS_RULE in model.prompt("drafting response").user
+    assert "[NEEDS INPUT: confirm the proposed targets" in write.TARGETS_RULE and "DO NOT USE" in write.TARGETS_RULE
+    assert "never as a result already achieved" in write.TARGETS_RULE
+    later = [label for label, prompt, _ in model.asked if write.TARGETS_RULE in prompt.user and label != "drafting response"]
+    assert later == []   # the later steps keep the targets the draft set; only the owner changes them
+
+
 def test_a_company_fact_the_files_lack_is_a_counted_placeholder() -> None:
     text = "Velocity is certified. [NEEDS FACT: the certification date] [NEEDS INPUT: rates]\n**CAGE**: [F-03: CAGE]"
     counts = steps.placeholder_counts(text)

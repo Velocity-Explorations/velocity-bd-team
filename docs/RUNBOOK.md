@@ -289,8 +289,13 @@ The files' rules are applied in code before the model sees anything:
 - The proposing company is Velocity Explorations. Hoverslam Designs LLC's facts appear only when the owner's
   direction (or material the team added) names Hoverslam; then its SAM renewal is flagged for confirmation.
 - Title-page fields come from the fact `drafting/company.yaml` names for each, such as `cage: "[F-03: CAGE]"`.
-  The point of contact's email and phone have no fact yet, so they stay [NEEDS FACT: ...] until one is added
-  to 00 Company Facts and named there.
+  00 Company Facts leaves contact emails and phones out on purpose, so they stay [NEEDS FACT: ...] and are
+  filled in at submission.
+
+Since 2026-11-04 the First draft gives each success measure a starting target: a figure drawn from the
+solicitation, the published literature or the system's own measured record, stated as a target the work will
+test, never as a result. One [NEEDS INPUT: confirm the proposed targets with the stakeholder] follows for the
+owner. No target rests on a figure the Company Reference marks DO NOT USE.
 
 A company fact the files do not hold is written [NEEDS FACT: what is missing]. It counts as an open item, like
 NEEDS INPUT, at every gate. After the First draft, the Compliance check and Final checks, one more call lists

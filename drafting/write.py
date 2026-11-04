@@ -55,6 +55,12 @@ PLACEHOLDER_RULE = ("Keep every open item a person must close in one of four for
                     "[NEEDS EVIDENCE: ...] for any other claim that needs a source. Do not write other bracketed notes such "
                     "as [CONFIRM ...], [UNVERIFIED] or [REVIEW NEEDED: ...], and keep notes to the team out of the document: "
                     "the gates count only these four forms.")
+# The 4 Nov trial left every Phase I threshold to the stakeholder; the winner it was scored against set its own.
+TARGETS_RULE = ("Give each success measure a starting target the proposal commits to, such as a word error rate, a latency "
+                "or a translation-quality score, drawn from the solicitation, the published literature or the system's own "
+                "measured record. State it as a target the work will test, never as a result already achieved, and never "
+                "base one on a figure VELOCITY FACTS marks DO NOT USE. After the targets, add one [NEEDS INPUT: confirm the "
+                "proposed targets with the stakeholder] for the owner, rather than leaving each target blank.")
 PACKET_TOKENS = 6_000
 OUTLINE_SPEC = """{"key_points": ["three to six short points for the step's card"],
  "page_limit": "the page limit, in words, or null when the call sets none",
@@ -76,10 +82,10 @@ def _skill(heading: str) -> str:
 
 
 def _workspace(ctx: StepContext, instructions: str = "", spec: str = "", direction: bool = True,
-               placeholders: bool = False, past: str = "", budget: str = "") -> str:
+               placeholders: bool = False, past: str = "", budget: str = "", targets: bool = False) -> str:
     """What goes after a reference prompt in the workspace: the owner's direction and chosen past work, the past
-    bids nearest the call, the page budget, the skill's part for the step, the placeholder and no-dash rules, the
-    json block to add, and on a redo the owner's note."""
+    bids nearest the call, the page budget, the skill's part for the step, the placeholder, targets and no-dash
+    rules, the json block to add, and on a redo the owner's note."""
     lines = ["", "", "---", "", "FOR THE PROPOSAL WORKSPACE"]
     if direction:
         lines += ["", "The owner's direction, which the proposal follows:",
@@ -93,6 +99,8 @@ def _workspace(ctx: StepContext, instructions: str = "", spec: str = "", directi
         lines += ["", "Also follow these steps from Velocity's proposal-drafting workflow:", "", instructions]
     if placeholders:
         lines += ["", PLACEHOLDER_RULE]
+    if targets:
+        lines += ["", TARGETS_RULE]
     lines += ["", "Never use an em dash or an en dash."]
     if spec:
         lines += ["After the document, add one fenced json block with these fields, and nothing after it:", spec]
@@ -333,8 +341,8 @@ def draft(ctx: StepContext) -> StepResult:
                          alignment=ctx.earlier("alignment.md", 20_000))
     bids, bid_files = _past_bids(ctx)
     budget = page_budget(ctx)
-    text = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, _skill("## Phase 3:"), placeholders=True, past=bids.text,
-                                                        budget=budget.lines() if budget else "")),
+    text = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, _skill("## Phase 3:"), placeholders=True, targets=True,
+                                                        past=bids.text, budget=budget.lines() if budget else "")),
                    "drafting response", pipeline.MAX_TOKENS["6"])
     ctx.save("draft_v1.md", text, "Draft v1")
     slop = _scan(ctx, "draft_v1.md")
