@@ -174,12 +174,15 @@ def test_a_top_10_row_on_home_opens_calls_with_that_call_focused(page: Any) -> N
     assert page.locator(f"[id='reasons-{call_id}']").is_visible()
 
 
+PAGE = 100   # calls a page on All calls and Needs review (dashboard/lib/filters.ts PAGE_SIZE)
+
+
 def call_rows(page: Any) -> int:
     return page.locator("table.calls-table tbody tr[data-call-id]").count()
 
 
 def listed(page: Any) -> int:
-    """How many calls the bar's count says the view holds: "Showing 50 of 412", "Showing 51 to 100 of 412", "12 calls"."""
+    """How many calls the bar's count says the view holds: "Showing 100 of 412", "Showing 101 to 200 of 412", "12 calls"."""
     text = page.locator(".bar-count").first.inner_text()
     found = re.search(r"of (\d+)", text) or re.match(r"\s*(\d+) call", text)
     assert found, text
@@ -187,16 +190,16 @@ def listed(page: Any) -> int:
 
 
 @pytest.mark.parametrize("path", ["/calls", "/review"])
-def test_a_table_shows_fifty_calls_a_page_with_links_either_side(page: Any, path: str) -> None:
+def test_a_table_shows_a_page_of_calls_with_links_either_side(page: Any, path: str) -> None:
     open_page(page, path)
-    if page.locator("table.calls-table").count() == 0 or listed(page) <= 50:
+    if page.locator("table.calls-table").count() == 0 or listed(page) <= PAGE:
         pytest.skip("one page holds every call")
-    assert call_rows(page) == 50
+    assert call_rows(page) == PAGE
     assert page.locator("nav.pager a[rel=prev]").count() == 0
     page.locator("nav.pager a[rel=next]").click()
     page.wait_for_url(re.compile(r"[?&]page=2"), timeout=60_000)
-    assert 0 < call_rows(page) <= 50
-    assert "51 to " in page.locator(".bar-count").first.inner_text()
+    assert 0 < call_rows(page) <= PAGE
+    assert f"{PAGE + 1} to " in page.locator(".bar-count").first.inner_text()
     assert page.locator("nav.pager a[rel=prev]").count() == 1
 
 
@@ -211,7 +214,8 @@ def test_a_page_past_the_last_opens_the_last(page: Any) -> None:
 
 @pytest.mark.parametrize("path", ["/calls", "/review"])
 def test_a_table_page_stays_light(page: Any, path: str) -> None:
-    # 200 rows a page made All calls 4 MB of HTML, two to three seconds on the server and more in the browser.
+    # 200 rows a page made All calls 4 MB of HTML, two to three seconds on the server and more in the browser;
+    # 100 make about 2 MB.
     response = page.request.get(URL + path)
     assert response.ok
-    assert len(response.body()) < 2_000_000
+    assert len(response.body()) < 3_000_000

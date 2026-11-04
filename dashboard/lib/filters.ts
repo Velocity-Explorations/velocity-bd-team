@@ -135,10 +135,10 @@ export function filterHref(base: string, params: Record<string, string | readonl
 }
 
 /**
- * Calls on one page of All calls and Needs review. 200 rows made a 4 MB page that took the server two to three
- * seconds to build and the browser more to read; 50 keep a page near a second.
+ * Calls on one page of All calls and Needs review (David's choice, 4 Nov 2026). 200 rows made a 4 MB page that took
+ * the server two to three seconds to build and the browser more to read; 100 make about 2 MB.
  */
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 100;
 
 /** ?page= as a whole number from 1; anything else is the first page. */
 export function pickPage(raw: string | string[] | undefined): number {
