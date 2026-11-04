@@ -114,8 +114,9 @@ test("a header menu offers the column's two sorts in words, the one in force mar
   assert.deepEqual(sortChoices("/review", {}, { key: "seen", dir: "desc" }, "seen").map((i) => i.label), ["Sort newest first", "Sort oldest first"]);
 });
 
-test("a page holds 50 calls, so a table loads in about a second instead of four", () => {
-  assert.equal(PAGE_SIZE, 50);
+test("a page holds 100 calls (David, 4 Nov), half the 200 that made a 4 MB page", () => {
+  assert.equal(PAGE_SIZE, 100);
+  assert.deepEqual(pager("/calls", {}, 1, 250), { page: 1, pages: 3, from: 1, to: 100, total: 250, prev: null, next: "/calls?page=2", nextCount: 100 });
 });
 
 test("pickPage reads a whole page number from 1; anything else is the first page", () => {
@@ -132,14 +133,14 @@ test("pageHref keeps the view and leaves the page out on the first page", () => 
 });
 
 test("pager says which calls a page holds and links the pages either side, keeping the view", () => {
-  assert.deepEqual(pager("/calls", { tag: "C2" }, 2, 120), {
+  assert.deepEqual(pager("/calls", { tag: "C2" }, 2, 120, 50), {
     page: 2, pages: 3, from: 51, to: 100, total: 120, prev: "/calls?tag=C2", next: "/calls?tag=C2&page=3", nextCount: 20,
   });
 });
 
 test("pager has no link before the first page or after the last", () => {
-  assert.deepEqual(pager("/review", {}, 1, 120), { page: 1, pages: 3, from: 1, to: 50, total: 120, prev: null, next: "/review?page=2", nextCount: 50 });
-  assert.deepEqual(pager("/review", {}, 3, 120), { page: 3, pages: 3, from: 101, to: 120, total: 120, prev: "/review?page=2", next: null, nextCount: 0 });
+  assert.deepEqual(pager("/review", {}, 1, 120, 50), { page: 1, pages: 3, from: 1, to: 50, total: 120, prev: null, next: "/review?page=2", nextCount: 50 });
+  assert.deepEqual(pager("/review", {}, 3, 120, 50), { page: 3, pages: 3, from: 101, to: 120, total: 120, prev: "/review?page=2", next: null, nextCount: 0 });
 });
 
 test("pager on a list that fits one page, or an empty one, has no links", () => {
@@ -148,7 +149,7 @@ test("pager on a list that fits one page, or an empty one, has no links", () => 
 });
 
 test("showing gives the bar's count, with the page's span once there is more than one page", () => {
-  assert.equal(showing(pager("/calls", {}, 2, 120)), "Showing 51 to 100 of 120");
+  assert.equal(showing(pager("/calls", {}, 2, 120, 50)), "Showing 51 to 100 of 120");
   assert.equal(showing(pager("/calls", {}, 1, 12)), "Showing 12 of 12");
   assert.equal(showing(pager("/calls", {}, 1, 0)), "Showing 0 of 0");
 });
