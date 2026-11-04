@@ -7,7 +7,8 @@
 The scanner lives outside this repo, in the skill's folder (or wherever AI_SLOP_SCAN points);
 nothing of it is copied here. A draft is ready when no placeholder is open and the band is clean
 or light. The bands stay provisional until the scanner is calibrated on 20 or more past
-Velocity proposals.
+Velocity proposals. Open placeholders are also swept with this repo's own patterns (with_missed),
+since the scanner misses the longest.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from config import get
+from drafting.steps import FACT_POINTER, OTHER_NOTE, PLACEHOLDER
 
 SCANNER_ENV = "AI_SLOP_SCAN"
 DEFAULT_SCANNER = Path.home() / ".claude" / "skills" / "ai-slop-detection" / "scripts" / "slop_scan.py"
@@ -84,9 +86,40 @@ def scan_file(draft: Path, solicitation: Path | None, scanner: Path | None = Non
         raise ScanError("slop scanner did not return its JSON report") from exc
 
 
+def with_missed(report: Mapping[str, Any], text: str) -> dict[str, Any]:
+    """The report with each open placeholder its findings missed added as one, marked as the placeholder sweep's.
+
+    The scanner's open-item pattern stops at about 210 characters (on 4 Nov it found 77 of a final version's 81), so a
+    draft whose only open items were long could read Ready (docs/research/investigations/
+    2026-11-04_slop-scanner-long-placeholders.md). The sweep uses the patterns the Submit gate counts with. A finding
+    covers a placeholder on its line when one starts the other, since the scanner cuts its matches at 120 characters.
+    """
+    findings = list(report.get("findings") or [])
+    reported: dict[int, list[str]] = {}
+    for finding in findings:
+        if finding.get("family") == OPEN_FAMILY:
+            reported.setdefault(int(finding.get("line") or 0), []).append(str(finding.get("match") or ""))
+    added = []
+    for pattern in (PLACEHOLDER, OTHER_NOTE, FACT_POINTER):
+        for found in pattern.finditer(text):
+            line = text.count("\n", 0, found.start()) + 1
+            same_line = reported.get(line, [])
+            cover = next((m for m in same_line if m and (found.group(0).startswith(m) or m.startswith(found.group(0)))), None)
+            if cover is not None:
+                same_line.remove(cover)   # one finding covers one placeholder
+                continue
+            added.append({"family": OPEN_FAMILY, "tier": "proposal", "line": line,
+                          "column": found.start() - text.rfind("\n", 0, found.start()), "match": found.group(0),
+                          "source": "placeholder sweep"})
+    if not added:
+        return dict(report)
+    return {**report, "findings": findings + sorted(added, key=lambda f: (f["line"], f["column"]))}
+
+
 def run_scan(draft: Path, solicitation: Path | None, scanner: Path | None = None) -> dict[str, Any]:
-    """The scan the pipeline and the check command run; tests stand in for it (tests/conftest.py)."""
-    return scan_file(draft, solicitation, scanner)
+    """The scan the pipeline and the check command run, with what the scanner missed (with_missed); tests stand in for
+    it (tests/conftest.py)."""
+    return with_missed(scan_file(draft, solicitation, scanner), draft.read_text(encoding="utf-8"))
 
 
 def _kind(match: str) -> str:
