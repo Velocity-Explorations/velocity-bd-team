@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from drafting import slop_gate
+from drafting.slop_gate import run_scan as real_run_scan   # taken before tests/conftest.py stands in for it
 
 
 def report(band: str = "clean", placeholders: tuple[str, ...] = (), fired: dict[str, str] | None = None,
@@ -80,6 +81,41 @@ def test_scan_file_runs_the_skills_scanner_with_the_proposal_profile(tmp_path: P
     assert seen["command"] == [sys.executable, str(scanner), str(tmp_path / "draft.md"), "--profile", "proposal",
                                "--json", "--solicitation", str(tmp_path / "solicitation.txt")]
     assert seen["timeout"] == slop_gate.SCAN_TIMEOUT_S
+
+
+def found_open(*items: tuple[int, str]) -> dict[str, Any]:
+    """A light-band report whose open placeholders are these (line, match) pairs, the line as text, as the scanner writes it."""
+    base = report(band="light")
+    base["findings"] = [{"family": "prop_open_item", "tier": "proposal", "line": str(line), "match": match} for line, match in items]
+    return base
+
+
+LONG = "[NEEDS EVIDENCE: " + "the measured accuracy on the government's own test set, " * 4 + "]"   # 242 characters
+DRAFT = f"# Technical volume\n\nThe system works. [NEEDS INPUT: rates]\n\nIt was tested. {LONG}\n\n| CAGE | [F-03: CAGE] |\n"
+
+
+def test_open_placeholders_the_scanner_missed_are_added_and_the_draft_is_not_ready() -> None:
+    # The scanner stops at about 210 characters (docs/research/investigations/2026-11-04_slop-scanner-long-placeholders.md).
+    swept = slop_gate.with_missed(found_open((3, "[NEEDS INPUT: rates]")), DRAFT)
+    added = [(f["line"], f["match"]) for f in swept["findings"] if f.get("source") == "placeholder sweep"]
+    assert added == [(5, LONG), (7, "[F-03: CAGE]")]
+    gate = slop_gate.summarize(swept)
+    assert gate.placeholders == {"PERSON WRITES": 0, "NEEDS INPUT": 1, "NEEDS FACT": 0, "NEEDS EVIDENCE": 1, "other": 1}
+    assert not gate.ready
+
+
+def test_a_scanner_match_cut_short_still_covers_its_placeholder() -> None:
+    covered = found_open((3, "[NEEDS INPUT: rates]"), (5, LONG[:120]), (7, "[F-03: CAGE]"))
+    assert slop_gate.with_missed(covered, DRAFT) == covered
+    assert slop_gate.summarize(slop_gate.with_missed(found_open(), "Nothing is open here.\n")).ready
+
+
+def test_every_scan_adds_what_the_scanner_missed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    draft = tmp_path / "draft_final.md"
+    draft.write_text(DRAFT, encoding="utf-8")
+    monkeypatch.setattr(slop_gate, "scan_file", lambda *args, **kwargs: found_open((3, "[NEEDS INPUT: rates]")))
+    gate = slop_gate.summarize(real_run_scan(draft, None))
+    assert gate.placeholders["NEEDS EVIDENCE"] == 1 and gate.placeholders["other"] == 1
 
 
 def test_a_missing_scanner_says_how_to_point_at_it(tmp_path: Path) -> None:

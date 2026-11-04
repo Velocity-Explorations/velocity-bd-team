@@ -22,3 +22,13 @@ step late.
 1. Count open items in drafting/slop_gate.py with the repo's own placeholder pattern on the scanned text, and
    require zero for Ready. The gate's rule then lives in this repo.
 2. Raise the length limit in the private scanner.
+
+## Resolution
+
+Option 1, on 4 Nov (David's choice). `slop_gate.with_missed` sweeps the scanned text with the patterns the Submit gate
+counts with (PLACEHOLDER, OTHER_NOTE and FACT_POINTER in drafting/steps.py) and adds each placeholder no open-item
+finding covers as a finding of its own, marked `"source": "placeholder sweep"`. `run_scan` applies it, so the worker's
+scans, the pipeline, the check command and the saved slop_scan.json all carry it, and the dashboard lists the added
+items with the rest. A finding covers a placeholder on its line when one starts the other: the scanner reports its
+line as text and cuts its matches at 120 characters. On the 4 Nov final version the sweep added exactly the four
+missed placeholders, and the verdict went from 77 open items to 81.
