@@ -8,6 +8,7 @@ columns show. Name a serving dashboard in DASHBOARD_TEST_URL; without it they ar
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 import pytest
@@ -171,3 +172,46 @@ def test_a_top_10_row_on_home_opens_calls_with_that_call_focused(page: Any) -> N
     assert focused.evaluate("r => r === document.activeElement")
     call_id = focused.get_attribute("data-call-id")
     assert page.locator(f"[id='reasons-{call_id}']").is_visible()
+
+
+def call_rows(page: Any) -> int:
+    return page.locator("table.calls-table tbody tr[data-call-id]").count()
+
+
+def listed(page: Any) -> int:
+    """How many calls the bar's count says the view holds: "Showing 50 of 412", "Showing 51 to 100 of 412", "12 calls"."""
+    text = page.locator(".bar-count").first.inner_text()
+    found = re.search(r"of (\d+)", text) or re.match(r"\s*(\d+) call", text)
+    assert found, text
+    return int(found.group(1))
+
+
+@pytest.mark.parametrize("path", ["/calls", "/review"])
+def test_a_table_shows_fifty_calls_a_page_with_links_either_side(page: Any, path: str) -> None:
+    open_page(page, path)
+    if page.locator("table.calls-table").count() == 0 or listed(page) <= 50:
+        pytest.skip("one page holds every call")
+    assert call_rows(page) == 50
+    assert page.locator("nav.pager a[rel=prev]").count() == 0
+    page.locator("nav.pager a[rel=next]").click()
+    page.wait_for_url(re.compile(r"[?&]page=2"), timeout=60_000)
+    assert 0 < call_rows(page) <= 50
+    assert "51 to " in page.locator(".bar-count").first.inner_text()
+    assert page.locator("nav.pager a[rel=prev]").count() == 1
+
+
+def test_a_page_past_the_last_opens_the_last(page: Any) -> None:
+    open_page(page, "/calls?page=9999")
+    if page.locator("table.calls-table").count() == 0 and "page=" not in page.url:
+        pytest.skip("the ledger has no calls")
+    assert "page=9999" not in page.url
+    assert call_rows(page) > 0
+    assert page.locator("nav.pager a[rel=next]").count() == 0
+
+
+@pytest.mark.parametrize("path", ["/calls", "/review"])
+def test_a_table_page_stays_light(page: Any, path: str) -> None:
+    # 200 rows a page made All calls 4 MB of HTML, two to three seconds on the server and more in the browser.
+    response = page.request.get(URL + path)
+    assert response.ok
+    assert len(response.body()) < 2_000_000

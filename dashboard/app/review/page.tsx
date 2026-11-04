@@ -8,13 +8,16 @@ import { HeaderCell } from "@/components/HeaderCell";
 import { NotesPanel, ReasonsPanel } from "@/components/RowPanels";
 import { Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
-import { Flash } from "@/components/bits";
+import { Flash, PageLinks } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
 import { shows } from "@/lib/columns";
 import { yourVote } from "@/lib/decide";
 import { callDetails, deadlineNote } from "@/lib/details";
 import { detailSources } from "@/lib/description";
-import { choiceLinks, filterHref, JUDGE_CHOICES, pickMany, pickSort, pickState, sortChoices, sortLink, sortParams, type Params, type Sort } from "@/lib/filters";
+import {
+  choiceLinks, JUDGE_CHOICES, PAGE_SIZE, pageHref, pager, pickMany, pickPage, pickSort, pickState, sortChoices, sortLink, sortParams,
+  type Params, type Sort,
+} from "@/lib/filters";
 import { formatDue, formatTime } from "@/lib/format";
 import { dayMonth } from "@/lib/home";
 import { pickJudgeFilter, verdictsFor, type JudgeFilter } from "@/lib/judges";
@@ -122,14 +125,20 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
   const users = allowlist();
   const viewer = await currentViewer();
   const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
+  const page = view === "top10" ? 1 : pickPage(sp.page);
   const [queue, counts, total, topCount, agreement] = await Promise.all([
-    reviewQueue(filters, waitingFor),
+    reviewQueue(filters, waitingFor, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
     queueCounts(filters, waitingFor),
     countCalls(filters),
     countAmong(top.ids, filters),
     judgeAgreement(),
   ]);
   const { perPerson } = queue;
+  const pages = pager("/review", params, page, queue.total);
+  // A page past the last (decisions emptied it since the link was made) opens the last, keeping the notice.
+  if (page > pages.pages) {
+    redirect(pageHref("/review", { ...params, notice: firstParam(sp.notice, 300), error: firstParam(sp.error, 300), voted }, pages.pages));
+  }
   // Top 10 keeps the brief's order unless a header sorts it.
   const rows = view === "top10" && sp.sort === undefined
     ? [...queue.rows].sort((a, b) => top.ids.indexOf(a.id) - top.ids.indexOf(b.id))
@@ -142,7 +151,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
   const nameOf = (by: string | null) => label(displayPerson(by, users));
   const tz = await timeZone();
   const show = shows(await hiddenColumns(), "queue");   // the columns chosen in Table settings
-  const returnTo = filterHref("/review", params);
+  const returnTo = pageHref("/review", params, page);   // a decision comes back to this page
   const filtered = Object.values({ ...barParams, ...columnParams }).some((value) => value.length > 0);
   const order = sp.sort !== undefined ? "" : view === "due-soon" ? ", closing soonest first" : view === "top10" ? ", in the brief's order" : ", newest first";
   const viewHome = view === "needs-review" ? "/review" : `/review?view=${view}`;
@@ -190,7 +199,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
         state={filters.state}
         filtered={filtered}
         clearHref={viewHome}
-        summary={`${rows.length} ${rows.length === 1 ? "call" : "calls"}${order}`}
+        summary={`${pages.pages > 1 ? `${pages.from} to ${pages.to} of ${pages.total} calls` : `${pages.total} ${pages.total === 1 ? "call" : "calls"}`}${order}`}
       />
 
       <section>
@@ -334,6 +343,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
             </table>
           </div>
         )}
+        <PageLinks pager={pages} />
       </section>
     </Shell>
   );

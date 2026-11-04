@@ -133,3 +133,53 @@ export function filterHref(base: string, params: Record<string, string | readonl
   const text = query.toString();
   return text ? `${base}?${text}` : base;
 }
+
+/**
+ * Calls on one page of All calls and Needs review. 200 rows made a 4 MB page that took the server two to three
+ * seconds to build and the browser more to read; 50 keep a page near a second.
+ */
+export const PAGE_SIZE = 50;
+
+/** ?page= as a whole number from 1; anything else is the first page. */
+export function pickPage(raw: string | string[] | undefined): number {
+  const value = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
+  const page = /^[0-9]{1,5}$/.test(value) ? Number(value) : 1;
+  return page >= 1 && page <= 10000 ? page : 1;
+}
+
+/** A link to one page of this view; the first page carries no page param. */
+export function pageHref(base: string, params: Params, page: number): string {
+  return filterHref(base, page > 1 ? { ...params, page: String(page) } : params);
+}
+
+/** Where one page sits in its list: rows `from` to `to` of `total`, and links to the pages either side. */
+export type Pager = {
+  page: number;
+  pages: number;
+  from: number;
+  to: number;
+  total: number;
+  prev: string | null;
+  next: string | null;
+  nextCount: number;
+};
+
+export function pager(base: string, params: Params, page: number, total: number, size = PAGE_SIZE): Pager {
+  const pages = Math.max(1, Math.ceil(total / size));
+  const to = Math.min(total, page * size);
+  return {
+    page,
+    pages,
+    from: total === 0 ? 0 : Math.min(total, (page - 1) * size + 1),
+    to,
+    total,
+    prev: page > 1 ? pageHref(base, params, Math.min(page - 1, pages)) : null,
+    next: page < pages ? pageHref(base, params, page + 1) : null,
+    nextCount: page < pages ? Math.min(size, total - to) : 0,
+  };
+}
+
+/** The bar's count: "Showing 51 to 100 of 412", or "Showing 12 of 12" when one page holds them all. */
+export function showing(p: Pager): string {
+  return p.pages > 1 ? `Showing ${p.from} to ${p.to} of ${p.total}` : `Showing ${p.total} of ${p.total}`;
+}

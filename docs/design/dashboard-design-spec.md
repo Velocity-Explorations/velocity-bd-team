@@ -40,7 +40,7 @@ Four sections share one top bar: Home, Calls, Proposals and Automation. Pages ha
 | Calls | Due soon | /review?view=due-soon | Waiting calls closing within 14 days, soonest first |
 | Calls | Judges agree, Judges disagree | /review?view=judges-agree, /review?view=judges-disagree | Waiting calls where Claude and Grok agree, or disagree |
 | Calls | New this week | /review?view=new | Waiting calls first seen this week |
-| Calls | All calls | /calls | Every call scanned, rejected ones too, up to 200 rows, with Showing N of M |
+| Calls | All calls | /calls | Every call scanned, rejected ones too, 50 rows a page with Previous and Next, and Showing N of M |
 | Proposals | Closing in 14 days | /proposals?view=closing | Pursued and drafting calls closing within 14 days |
 | Proposals | To draft | /proposals | Pursued calls with no draft yet |
 | Proposals | Drafting | /proposals?view=drafting | Pursuits under way, with their current step |
@@ -115,7 +115,7 @@ Needs review (/review) is the queue. It lists the calls Claude rated yes or mayb
 
 ## Calls: All
 
-All calls (/calls) lists every call the scanner has seen, the filter's rejects included, newest first, 200 at a time. Its columns, in order: Call, Filter, Votes, Description, AI reason, Due, First seen (hidden by default), Decide.
+All calls (/calls) lists every call the scanner has seen, the filter's rejects included, newest first, 50 at a time with Previous and Next under the table (200 at a time made a 4 MB page; changed 4 Nov 2026). Its columns, in order: Call, Filter, Votes, Description, AI reason, Due, First seen (hidden by default), Decide.
 
 | ID | Requirement |
 | --- | --- |

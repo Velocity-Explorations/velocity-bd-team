@@ -72,7 +72,8 @@ On GKE behind Google's Identity-Aware Proxy (IAP):
 5. DATABASE_URL must be Supabase's **session pooler** URL (Connect, Session pooler, port 5432).
    The direct `db.<ref>.supabase.co` host has only an IPv6 address, which GKE clusters usually
    cannot reach. The client turns prepared statements off, so the transaction pooler (port 6543)
-   works too.
+   works too. It keeps up to three connections, each for ten minutes after its last query
+   (`lib/db.ts`), because opening one through the pooler takes about 0.7 s.
 6. Once it is live, set DASHBOARD_URL in the scan PC's `.env` to its address, so Slack cards
    and summaries link to it.
 
