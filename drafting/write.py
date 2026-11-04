@@ -187,15 +187,27 @@ def _headings(text: str) -> int:
     return sum(1 for line in text.splitlines() if line.lstrip().startswith("#"))
 
 
-def _lost(before_text: str, cut: str) -> str:
-    """Why a cut cannot stand: a placeholder or a heading it dropped, or nothing cut; empty when it can."""
-    before, after = placeholder_counts(before_text), placeholder_counts(cut)
+def _dropped(before_text: str, after_text: str) -> str:
+    """A placeholder or a heading a rewrite of the draft dropped, in words; empty when it kept them all."""
+    before, after = placeholder_counts(before_text), placeholder_counts(after_text)
     lost = [f"{before[k] - after[k]} {k if k != 'other' else 'other bracketed'} placeholder{'' if before[k] - after[k] == 1 else 's'}"
             for k in before if after[k] < before[k]]
-    gone = _headings(before_text) - _headings(cut)
+    gone = _headings(before_text) - _headings(after_text)
     return (f"it dropped {' and '.join(lost)}" if lost
-            else ("it dropped a heading" if gone == 1 else f"it dropped {gone} headings") if gone > 0
-            else "it cut nothing" if text_words(cut) >= text_words(before_text) else "")
+            else ("it dropped a heading" if gone == 1 else f"it dropped {gone} headings") if gone > 0 else "")
+
+
+def _lost(before_text: str, cut: str) -> str:
+    """Why a cut cannot stand: a placeholder or a heading it dropped, or nothing cut; empty when it can."""
+    return _dropped(before_text, cut) or ("it cut nothing" if text_words(cut) >= text_words(before_text) else "")
+
+
+def _unfit(before_text: str, fixed: str, budget: Budget | None) -> str:
+    """Why the re-check's corrected final version cannot stand: a placeholder or a heading it dropped, text it lost (a
+    reply cut short, or a rewrite), or a page budget it would break; empty when it can."""
+    words, now = text_words(before_text), text_words(fixed)
+    return (_dropped(before_text, fixed) or ("it lost text" if now < words * 0.9 else "")
+            or ("it would run over the page budget" if budget and now > budget.words * 1.05 >= words else ""))
 
 
 def _tighten(ctx: StepContext, budget: Budget | None, text: str) -> tuple[str, str]:
@@ -531,9 +543,12 @@ def _check(name: str, ok: bool | None, detail: str, result: str | None = None) -
     return found | {"result": result} if result is not None else found
 
 
-RECHECK_TOKENS = pipeline.MAX_TOKENS["6.75"]   # the model thinks first; a small ceiling leaves no room for the report
-REPORT_ONLY = ("\n\nThis is the final version, checked once more before submission. Give only the report, with the same "
-               "marks; do not write the corrected draft. The owner fixes what the report finds.")
+FIX_IN_PLACE = ("\n\nThis is the final version, checked once more before submission. In the corrected draft, fix only what "
+                "can be fixed where it stands: a keyword, term or threshold missing or misquoted, a reference the "
+                "solicitation names, a glossary entry, two sections that disagree. Keep every section and heading, every "
+                "bracketed placeholder exactly as written, and the points held for a person to write. Add no facts and no "
+                f"claims. Mark an item {CORRECTION} only when the corrected draft fixes it, and mark {WARNING} what you leave "
+                "for the owner.")
 KIND_TASKS = {"PERSON WRITES": ("Write the place marked PERSON WRITES in the final version, in your own words",
                                 "Write the {n} places marked PERSON WRITES in the final version, in your own words"),
               "NEEDS INPUT": ("Fill the NEEDS INPUT placeholder in the final version", "Fill the {n} NEEDS INPUT placeholders in the final version"),
@@ -570,25 +585,34 @@ def checklist_check(items: list[dict[str, Any]]) -> dict[str, Any]:
                   "updated")
 
 
-def _recheck(ctx: StepContext, text: str) -> tuple[dict[str, Any], dict[str, str] | None]:
-    """The compliance check once more on the final version (PW13): its report only; the final version stays as it is."""
+def _recheck(ctx: StepContext, path: Path, budget: Budget | None) -> tuple[dict[str, Any], dict[str, str] | None]:
+    """The compliance check once more on the final version (PW13). What it can fix where it stands, such as a keyword, a
+    reference the solicitation names or a glossary entry, goes into the final version; a corrected version that drops
+    a placeholder or a heading, loses text or breaks the page budget is not used. The rest stays in its report."""
     name = "Final compliance re-check"
+    text = path.read_text(encoding="utf-8")
     d = draft_inputs(ctx.record)
     p = prompts.p675_compliance(company=profile(), knowledge_base=d.company_context, alignment_context=_alignment(ctx),
                                 title=d.title, agency=d.agency, opp_type=d.opp_type, due_date=d.due_date,
                                 requirements=ctx.earlier("requirements.md", 25_000), draft=text)
     try:
-        reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, direction=False, placeholders=True) + REPORT_ONLY),
-                        "final compliance re-check", RECHECK_TOKENS)
+        reply = ctx.ask(Prompt(p.system, p.user + _workspace(ctx, direction=False, placeholders=True) + FIX_IN_PLACE),
+                        "final compliance re-check", pipeline.rewrite_room("6.75", text))
     except llm.PhaseError as exc:
         return _check(name, None, f"did not run: {str(exc)[:200]}", "not run"), None
-    report = reply.split(prompts.CORRECTED_DRAFT_SEPARATOR, 1)[0].strip()
+    report, _, corrected = (part.strip() for part in reply.partition(prompts.CORRECTED_DRAFT_SEPARATOR))
     if not report:
         return _check(name, None, "the check gave no report", "not run"), None
     saved = ctx.save("final_compliance.md", report, name)
     fix, warn = report.count(CORRECTION), report.count(WARNING)
     if fix:
-        return _check(name, False, f"{fix} to fix, {warn} to check; the report is final_compliance.md", f"{fix} to fix"), saved
+        reason = _unfit(text, corrected, budget) if corrected else ""
+        if corrected and not reason:
+            path.write_text(corrected + "\n", encoding="utf-8")   # Final checks replaces its dashes next
+            return _check(name, True, f"{fix} fixed in the final version, {warn} to check; the report is final_compliance.md",
+                          f"{fix} fixed"), saved
+        why = f"its corrected version was not used: {reason}" if corrected else "it gave no corrected version"
+        return _check(name, False, f"{fix} to fix, {warn} to check; {why}; the report is final_compliance.md", f"{fix} to fix"), saved
     if warn:
         return _check(name, True, f"{warn} to check; the report is final_compliance.md", "passed"), saved
     return _check(name, True, "every check from step 7 passes on the final version", "passed"), saved
@@ -626,7 +650,8 @@ def final(ctx: StepContext) -> StepResult:
     person_writes = int(state.stats.get("person_writes") or 0)
     dashes += _undash(final_path)
     _undash(ctx.work_dir / "checklist.md")
-    recheck, report = _recheck(ctx, final_path.read_text(encoding="utf-8"))
+    recheck, report = _recheck(ctx, final_path, budget)
+    dashes += _undash(final_path)   # a corrected version from the re-check may bring dashes back
     slop = _scan(ctx, "draft_final.md")
     verdict = slop["verdict"]
     document = final_path.read_text(encoding="utf-8")

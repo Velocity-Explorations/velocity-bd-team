@@ -200,6 +200,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
     volumes run: the First draft, the Compliance check and the reviewers write to that budget, Final checks cuts a
     draft that runs over and reports the page fit, and the Submit gate checks the fit again on the filled version
     (docs/RUNBOOK.md, Page budget).
+  - Since 2026-11-04 Final checks puts what its compliance re-check can fix in place (a keyword, a reference the
+    solicitation names, a glossary entry) into the final version, unless the corrected version would drop a
+    placeholder or a heading, lose text or run over the page budget; the rest stays in its report.
   - Since 2026-11-01 the Outline and the First draft read the three nearest past bids that have files in the
     Proposal Library: their submitted volumes and any outcome files. They use them for language and lessons
     only, never for facts (docs/RUNBOOK.md, Past bids in drafts).
