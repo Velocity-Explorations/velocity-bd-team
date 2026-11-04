@@ -9,6 +9,39 @@ portal content.
 
 ## Current Session
 
+**Date**: 2026-11-04 (covers 30 Oct to 4 Nov)
+**Focus**: The Writer on Claude with Velocity's facts read live from Drive, the page budget, the 02 Submissions rename, and a drafting trial against a past winner
+
+### What Was Done
+- Writer: back on Claude (#95), room to think (#96), the whole draft read at every step (#98).
+- Facts: read live from 01 Company Reference at every step, with NEEDS FACT and Facts used notes (#99), sent first in every call from the prompt cache (#101); CLAUDE.md and docs/velocity-knowledge.md point sessions at them (#100). The three nearest past bids feed the Outline and First draft (#102).
+- Page budget at 350 words a page, placeholders not counted (#103), checked again at the Submit gate (#104) and on Check again (#106).
+- Final checks applies what its compliance re-check can fix in place (#107); the First draft proposes a target for each success measure (#108).
+- Library: newer Register values (#97, migration 011 applied) and the submissions folder renamed 02 Submissions (#105); the Register synced to the live ledger on 30 Oct (74 rows) and 4 Nov (78).
+- Trial on a past winning SBIR topic, scored on eleven criteria: 36 (29 Oct), 39 (1 Nov), then 41 and 42 (4 Nov) against the winner's 42. Scores and drafts are in a private Claude Doc.
+
+### Key Decisions
+- The Writer drafts with Claude Sonnet 5.5 (David, 29 Oct).
+- No fact value enters the repo; Drive file ids may (David, 1 Nov).
+- Placeholders do not count against the page budget, and a twentieth over still fits.
+
+### Key Files Modified
+| File | Change |
+|------|--------|
+| `drafting/write.py` | Page budget, tightening, Page fit, in-place re-check fixes, targets rule |
+| `drafting/facts.py`, `drafting/past_bids.py`, `drafting/llm.py` | Facts from Drive, past bids, prompt cache |
+| `drafting/drive.py`, `dashboard/lib/pastwork.ts`, `dashboard/lib/proposals.ts` | 02 Submissions |
+| `library/register.py`, `ledger/migrations/011_not_submitted.sql` | Register values |
+
+### In Progress
+- Five Company Reference items are still open in Drive (private gaps doc). Linear catch-up notes for #95 to #108 are kept locally in data/linear/catchup.md until Linear writes resume.
+
+### Blockers
+- The SAM.gov key allows 10 requests a day until its account gets a role in Velocity's registration (CF-38, PRO-529).
+- The AI slop scanner misses placeholders longer than about 210 characters; the placeholder sweep catches them ([investigation](../../research/investigations/2026-11-04_slop-scanner-long-placeholders.md)).
+
+## Session: 2026-10-25
+
 **Date**: 2026-10-25
 **Focus**: Dashboard redesign brief for Claude Design: spec, snapshot, build prompts and the Velocity Theme, in the repo
 

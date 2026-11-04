@@ -14,6 +14,7 @@ instead of restating it.
 
 | Date | Document | Summary | Tags |
 |---|---|---|---|
+| 2026-11-04 | [The AI slop scanner misses long placeholders](investigations/2026-11-04_slop-scanner-long-placeholders.md) | Open items over about 210 characters go uncounted, so Ready can read early; the sweep catches them | drafting, slop-check, placeholders |
 
 ## Analysis
 
