@@ -25,6 +25,7 @@ LLM review of any new kept rows, then the digest on stdout.
 | `--feedback-only` | Only sync Slack: thread replies into notes, decisions onto the cards. This is what the daily task runs. |
 | `--debug` | DEBUG logging, which includes the first rendered review prompt. |
 | `--deliver-run N` | Re-post run N's new calls that never reached Slack (for example after `not_in_channel`), then exit. |
+| `--hold-slack` | Judge and save as usual, but post no cards and no run summary. The run prints its number, and `--deliver-run N` posts the held cards once someone has looked at them on the dashboard. |
 
 Exit codes: 0 all portals completed, 1 at least one portal did not complete, 2 unknown
 portal slug, 3 another pipeline holds the lock.

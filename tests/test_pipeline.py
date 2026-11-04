@@ -183,6 +183,19 @@ def test_deliver_run_reposts_only_undelivered(isolated, monkeypatch: pytest.Monk
     assert pipeline.main(["--deliver-run", "99"]) == 2
 
 
+def test_hold_slack_saves_the_run_and_leaves_its_cards_for_deliver_run(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    """The first full SAM.gov run with the entity key (4 Nov) could post a large batch at once. Held, the run is judged
+    and saved as usual, and its cards wait until someone posts them."""
+    monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
+    assert pipeline.main(["--no-review", "--hold-slack"]) == 0
+    out = capsys.readouterr().out
+    assert "DIGEST: Fake: 1 new call(s)" in out and "Slack held: 1 card(s) wait for run.py --deliver-run 1" in out
+    assert pipeline._test_capture["posted"] == [] and pipeline._test_capture["summaries"] == []   # type: ignore[attr-defined]
+    assert lq.get_call("fake-0")["slack_ts"] is None and lq.get_run(1)["status"] == "completed"   # type: ignore[index]
+    assert pipeline.main(["--deliver-run", "1"]) == 0
+    assert pipeline._test_capture["posted"] == ["fake-0"]   # type: ignore[attr-defined]
+
+
 def test_watch_alerts_when_a_scan_reads_pages_badly(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
     def fetch(page, run_id, limit=None):
         for n in range(4):
