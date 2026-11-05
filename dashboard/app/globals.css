@@ -324,6 +324,51 @@ details.account .menu-body {
   border-top: 1px solid var(--line-subtle);
 }
 
+/* Not relevant on a call Claude liked opens its reasons (lib/decide.ts NOT_RELEVANT_REASONS) inside the Decide menu. */
+.menu-body .reason-menu > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--menu-item-height);
+  padding: 0 8px;
+  border-radius: var(--radius-chip);
+  list-style: none;
+  cursor: pointer;
+}
+
+.menu-body .reason-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.menu-body .reason-menu > summary:hover {
+  background: var(--surface-raised);
+}
+
+.menu-body .reason-menu > summary svg {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+}
+
+.reason-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 6px 16px;
+}
+
+.reason-body .hint {
+  margin: 2px 8px 4px;
+}
+
+.menu-body .reason-body input[type="text"] {   /* over td.decide's full-width inputs */
+  box-sizing: border-box;
+  width: calc(100% - 8px);
+  height: var(--control-height-small);
+  margin: 4px 0 2px 8px;
+  font-size: 12.5px;
+}
+
 /* A menu item that acts (Table settings, a name, Log out): 28px, full width, like a link item. */
 .menu-body button.menu-item {
   justify-content: flex-start;

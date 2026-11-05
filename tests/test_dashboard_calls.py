@@ -98,13 +98,33 @@ def test_the_decide_menu_lists_the_four_decisions_and_the_draft_waits_for_the_wo
     if page.locator("table.calls-table").count() == 0:
         pytest.skip("nothing is waiting, so the queue has no table")
     menu = first_row(page).locator("details.decide-menu")
-    menu.locator("summary").click()
-    items = [t.strip() for t in menu.locator(".menu-body button").all_inner_texts()]
+    menu.locator(":scope > summary").click()
+    items = [t.strip() for t in menu.locator(".menu-body > button, .menu-body > details > summary").all_inner_texts()]
     assert items == ["Pursue", "Not relevant", "Submitted", "Dismiss", "Pursue and start the draft"]
-    waiting = "Drafting is not set up yet" in menu.locator(".menu-body .hint").inner_text()
-    assert menu.locator(".menu-body button", has_text="Pursue and start the draft").is_disabled() == waiting
+    waiting = "Drafting is not set up yet" in menu.locator(":scope > .menu-body > .hint").inner_text()
+    assert menu.locator(":scope > .menu-body > button", has_text="Pursue and start the draft").is_disabled() == waiting
     page.keyboard.press("Escape")   # closes the menu without deciding
     assert not menu.evaluate("m => m.open")
+
+
+def test_not_relevant_on_a_call_claude_liked_asks_why(page: Any) -> None:
+    """David, 5 Nov: the reason a Not relevant call carries is what the judges learn from (review/feedback.py)."""
+    open_page(page, "/review")
+    if page.locator("table.calls-table").count() == 0:
+        pytest.skip("nothing is waiting, so the queue has no table")
+    menu = first_row(page).locator("details.decide-menu")
+    menu.locator(":scope > summary").click()
+    reasons = menu.locator("details.reason-menu")
+    assert reasons.count() == 1
+    reasons.locator("summary").click()
+    picks = reasons.locator(".reason-body button")
+    assert [t.strip() for t in picks.all_inner_texts()] == [
+        "Mostly hardware", "Staffing or IT support", "Wrong customer or eligibility", "Too broad, no clear fit",
+        "Award or sole-source notice", "Save another reason"]
+    assert picks.first.get_attribute("value") == "not_relevant:hardware"
+    assert reasons.locator("input[name=reason_text]").is_visible()
+    assert menu.evaluate("m => m.open")   # the reasons open inside the Decide menu, which stays open
+    page.keyboard.press("Escape")
 
 
 def test_a_note_button_opens_the_reasons_panel_and_close_hands_focus_back(page: Any) -> None:
