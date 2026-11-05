@@ -21,9 +21,10 @@ export type DecideMode = "waiting" | "mixed" | "all";
  * view mixes calls you have and have not decided, the cell says which: needs your decision (with
  * when it is due, within 14 days) or You: and your decision. The button carries the accent border
  * on a call waiting for you, and reads Decide, Change or Add yours. A pursued call with no draft shows
- * Start the draft; one with a draft, Open workspace with its current step (Q17, PRO-576).
+ * Start the draft; one with a draft, Open workspace with its current step (Q17, PRO-576). On a page without the Start
+ * the draft dialog (Home), `startIn` names the page that has it, and Start the draft opens it there.
  */
-export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, returnTo, keep, note, tz, draft, drafting, start }: {
+export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, returnTo, keep, note, tz, draft, drafting, start, startIn }: {
   call: { id: string; title: string | null; human_status: string | null; human_at?: string | null; days_left: number | null };
   mode: DecideMode;
   viewer: string | null;
@@ -37,6 +38,7 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
   draft?: DraftInfo | null;
   drafting: boolean;
   start: { portal: string; due: string; format: string; block: string | null };
+  startIn?: string;
 }) {
   const label = mode === "waiting" ? "Decide" : decideLabel({ yours, callStatus: call.human_status });
   const waitingForYou = mode === "waiting" || (Boolean(viewer) && eligible && !yours);
@@ -108,6 +110,12 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
           </div>
         ) : call.human_status === "pursue" && start.block ? (
           <div className="draft-action meta">Cannot draft: {start.block}</div>
+        ) : call.human_status === "pursue" && startIn ? (
+          <div className="draft-action">
+            <a className="btn fn-approve" href={`${startIn}?start=${encodeURIComponent(call.id)}`}>
+              Start the draft
+            </a>
+          </div>
         ) : call.human_status === "pursue" ? (
           <div className="draft-action">
             <button

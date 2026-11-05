@@ -294,6 +294,8 @@ export type TopTenRow = {
   ai_reasoning: string | null;
   human_status: string | null;
   human_by: string | null;
+  human_at: string | null;
+  type: string | null;
 };
 
 /** Home's Top 10 rows for these calls, as the ledger has them now; the caller keeps the order. */
@@ -303,7 +305,7 @@ export async function topTenRows(ids: string[]): Promise<TopTenRow[]> {
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
   const rows = await db<TopTenRow[]>`
     SELECT id, portal, title, url, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, description, ${summary},
-           extra, ai_verdict, ai_reasoning, human_status, human_by
+           extra, ai_verdict, ai_reasoning, human_status, human_by, human_at, type
     FROM calls WHERE id IN ${db(ids)}`;
   return [...rows];
 }

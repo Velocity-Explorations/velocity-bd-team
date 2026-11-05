@@ -19,7 +19,7 @@ import {
   topTenIds,
   waitingRequests,
 } from "@/lib/queries";
-import { labeler, openingRedirect, timeZone } from "@/lib/me";
+import { drafting, labeler, openingRedirect, timeZone } from "@/lib/me";
 import { queueMode } from "@/lib/settings";
 import { firstParam } from "@/lib/text";
 import { DUE_SOON_DAYS, type ViewCard } from "@/lib/views";
@@ -40,7 +40,7 @@ function topSource(week: string | null): string {
 
 /**
  * Home (H1 to H5, PRO-570): five link cards, the Top 10, a status line and the briefs. It reads the
- * ledger live and records nothing.
+ * ledger live; the only thing it records is a decision from the Top 10's Decide menus (H5, David 5 Nov).
  */
 export default async function HomePage({ searchParams }: { searchParams: SearchParams }) {
   preloadShell("home");   // the frame's queries run beside this page's
@@ -52,7 +52,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
   const tz = await timeZone();
   const label = await labeler();
-  const [queue, requests, proposals, top, latest, lastRun, agreement] = await Promise.all([
+  const [queue, requests, proposals, top, latest, lastRun, agreement, worker] = await Promise.all([
     queueCounts({ portals: [], state: "", tag: "" }, waitingFor),
     waitingRequests(),
     proposalCalls({ portals: [], state: "", tag: "" }).then(sortIntoViews),
@@ -63,6 +63,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     listRuns(1),
     lastCompletedRun(),
     judgeAgreement(),
+    drafting(),
   ]);
   const run = latest[0];
   const overdue = overdueCount(proposals.submitted, new Date().toISOString().slice(0, 10));
@@ -118,7 +119,8 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
           <h2 id="top-ten-title">Top 10</h2>
           <p className="muted">{topSource(top.week)}</p>
         </div>
-        <TopTenTable ids={top.ids} description tz={tz} nameOf={(by) => label(displayPerson(by, users))} />
+        <TopTenTable ids={top.ids} description tz={tz} nameOf={(by) => label(displayPerson(by, users))}
+          decide={{ viewer, keep: Boolean(waitingFor?.length), drafting: worker.readiness !== "not set up" }} />
       </section>
 
       <p className="status-line">

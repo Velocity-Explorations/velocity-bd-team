@@ -1,21 +1,34 @@
 import { ArrowRight } from "lucide-react";
 import { cache } from "react";
+import { DecideCell } from "@/components/DecideCell";
 import { DraftBadge } from "@/components/DraftBadge";
 import { PortalLogo } from "@/components/PortalLogo";
 import { Badge, TitleLink } from "@/components/bits";
+import { yourVote } from "@/lib/decide";
 import { descriptionCell } from "@/lib/description";
 import { formatDue } from "@/lib/format";
 import { daysLeftText, topTenOrder } from "@/lib/home";
 import { verdictsFor } from "@/lib/judges";
-import { draftsFor, latestJudgments, topTenRows } from "@/lib/queries";
+import { displayPerson } from "@/lib/people";
+import { draftBlock, draftFormat } from "@/lib/proposals";
+import { decisionsOn, draftsFor, latestJudgments, topTenRows } from "@/lib/queries";
+import { votesByCall } from "@/lib/scoreboard";
+import { allowlist } from "@/lib/viewer";
 
-/** The calls' rows, both judges and their drafts, read together once per request (the ids as JSON, the cache key). */
+/** The calls' rows, both judges, their drafts and everyone's votes, read together once per request (the ids as JSON,
+ *  the cache key). */
 const topTenData = cache(async (key: string) => {
   const ids = JSON.parse(key) as string[];
-  const [rows, judged, drafts] = await Promise.all([topTenRows(ids), latestJudgments(ids), draftsFor(ids)]);
+  const [rows, judged, drafts, decisions] = await Promise.all([topTenRows(ids), latestJudgments(ids), draftsFor(ids), decisionsOn(ids)]);
   const byId = new Map(rows.map((r) => [r.id, r]));
-  return { byId, order: topTenOrder(ids, new Set(byId.keys())), judged, drafts };
+  const users = allowlist();
+  const votes = votesByCall(decisions, (by) => displayPerson(by, users));   // by the name decisions are recorded under
+  return { byId, order: topTenOrder(ids, new Set(byId.keys())), judged, drafts, votes };
 });
+
+/** What deciding from the table needs (Home, David 5 Nov): who is deciding, whether everyone decides every call
+ *  (the queue's "keep"), and whether drafting is set up. */
+export type TopTenDecide = { viewer: string | null; keep: boolean; drafting: boolean };
 
 /** Start reading the Top 10 as soon as its ids are known, beside the page's other queries. */
 export function preloadTopTen(ids: string[]): void {
@@ -27,15 +40,17 @@ export function preloadTopTen(ids: string[]): void {
  * and portal, the deadline and days left, both verdicts, the decision now, the description (Home only:
  * Claude's executive summary where there is one, the portal's words on hover) and Claude's reason, each
  * as the ledger has them now; a call with a draft shows its badge
- * (DB1). A row opens Calls, Top 10 with that call focused.
+ * (DB1). A row opens Calls, Top 10 with that call focused. With `decide` (Home), each row also has the Decide menu,
+ * and a decision comes back to Home.
  */
-export async function TopTenTable({ ids, description, tz, nameOf }: {
+export async function TopTenTable({ ids, description, tz, nameOf, decide }: {
   ids: string[];
   description: boolean;
   tz: string;
   nameOf: (by: string | null) => string;
+  decide?: TopTenDecide;
 }) {
-  const { byId, order, judged, drafts } = await topTenData(JSON.stringify(ids));
+  const { byId, order, judged, drafts, votes } = await topTenData(JSON.stringify(ids));
   if (order.length === 0) {
     return (
       <div className="empty">
@@ -57,6 +72,7 @@ export async function TopTenTable({ ids, description, tz, nameOf }: {
             <th>Decision now</th>
             {description ? <th className="wide">Summary description</th> : null}
             <th className="wide">Claude&apos;s reason</th>
+            {decide ? <th className="decide">Decide</th> : null}
             <th className="row-arrow">
               <span className="sr-only">Open</span>
             </th>
@@ -124,6 +140,24 @@ export async function TopTenTable({ ids, description, tz, nameOf }: {
                 <td className="wide reason">
                   <p className="clamp">{call.ai_reasoning ?? ""}</p>
                 </td>
+                {decide ? (
+                  <DecideCell
+                    call={call}
+                    mode="mixed"
+                    viewer={decide.viewer}
+                    yours={yourVote(votes.get(id) ?? [], decide.viewer)}
+                    eligible={call.ai_verdict === "yes" || call.ai_verdict === "maybe"}
+                    decidedBy=""
+                    returnTo="/"
+                    keep={decide.keep || Boolean(call.human_status)}
+                    note
+                    tz={tz}
+                    draft={draft}
+                    drafting={decide.drafting}
+                    start={{ portal: call.portal, due: formatDue(call.due_date, tz), format: draftFormat(call.type), block: draftBlock(call) }}
+                    startIn="/proposals"
+                  />
+                ) : null}
                 <td className="row-arrow" aria-hidden="true">
                   <ArrowRight />
                 </td>
