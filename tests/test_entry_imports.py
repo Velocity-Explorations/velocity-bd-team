@@ -11,7 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize("module", ["drafting.worker", "drafting.cli", "drafting.pipeline", "drafting.slop_gate", "drafting.scan", "run"])
+@pytest.mark.parametrize("module", ["drafting.worker", "drafting.cli", "drafting.pipeline", "drafting.slop_gate", "drafting.scan", "linear.pursuits", "run"])
 def test_an_entry_point_imports_in_a_fresh_interpreter(module: str) -> None:
     done = subprocess.run([sys.executable, "-c", f"import {module}"], cwd=ROOT, capture_output=True, text=True,
                           encoding="utf-8", timeout=180)

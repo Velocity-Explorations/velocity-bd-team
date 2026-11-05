@@ -26,6 +26,7 @@ LLM review of any new kept rows, then the digest on stdout.
 | `--debug` | DEBUG logging, which includes the first rendered review prompt. |
 | `--deliver-run N` | Post run N's Slack summary, held by `--hold-slack` or lost to a Slack failure (for example after `not_in_channel`), then exit. |
 | `--hold-slack` | Judge and save as usual, but post no run summary. The run prints its number, and `--deliver-run N` posts the summary once someone has looked at the calls on the dashboard. |
+| `--linear-sync` | Open and move issues in Linear's Pursuits project to match the calls the team pursues, then exit. The "velocity-bd-team linear" task runs it every 5 minutes (Linear's Pursuits project, below). |
 
 Exit codes: 0 all portals completed, 1 at least one portal did not complete, 2 unknown
 portal slug, 3 another pipeline holds the lock.
@@ -65,6 +66,35 @@ in the pursuit's history (`slack_ready`, `slack_behind`), and the digest's day i
 `data/slack/workspace_digest.txt`. To mention people, copy DASHBOARD_USERS (`Name=<Slack id>`, comma
 separated) from `dashboard/.env.local` into `.env`; a name without a Slack id is written out. Rerun
 `scripts/install-schedule.ps1` once to register the two tasks.
+
+## Linear's Pursuits project
+
+Each call the team marks Pursue on the dashboard gets an issue in the Pursuits project of Velocity's
+Operations team on Linear (David, 4 Nov 2026). The "velocity-bd-team linear" task runs
+`run.py --linear-sync` every 5 minutes, without the pipeline's lock (linear/pursuits.py):
+
+- A newly pursued call gets an issue in Backlog titled "Submit (the call) by (its day)", due on the
+  deadline, assigned to whoever marked Pursue (their address in DASHBOARD_USERS, else their dashboard
+  sign-in, matched to a Linear user by email), Urgent within 7 days of the deadline, High within 14,
+  Medium after that. The description holds Claude's summary and reason, Grok's verdict, the portal's
+  details and links to the call on its portal and on the dashboard (DASHBOARD_URL).
+- The issue moves to In Progress when drafting starts and to Done when the call is marked Submitted,
+  with a comment saying who and when; a recorded result adds a comment; a withdrawn Pursue, a no-go or
+  a closed draft moves it to Canceled with the reason. A call pursued again gets a new issue, since a
+  canceled one is never reopened.
+- `linear_issues` (migration 012) keeps each call's issue and the stage it last showed, so the sync
+  acts only when the call moves on, and a person may move an issue by hand meanwhile. A call already
+  submitted when the sync first runs, or whose deadline has passed, gets no issue.
+
+To set it up, once:
+
+1. In Linear, open Settings, then Account, Security & access, Personal API keys, and create a key named
+   "BD pipeline" with Read and Write on the Operations team. Linear shows it once.
+2. Add it to the repo's `.env` as `BD_LINEAR_API_KEY=...`, and nowhere else.
+3. Apply the migration: `python -m ledger.migrate`.
+4. Rerun `scripts/install-schedule.ps1`, or run one sync by hand: `python run.py --linear-sync`.
+
+Without the key the task prints that it is not set and writes nothing.
 
 ## Logs
 

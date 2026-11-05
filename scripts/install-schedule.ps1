@@ -28,6 +28,7 @@ param(
     [string]$WorkerTaskName = "velocity-bd-team worker",
     [int]$WorkerCheckMinutes = 5,
     [int]$WorkspaceSlackMinutes = 5,
+    [int]$LinearSyncMinutes = 5,
     [string]$WorkspaceMorningAt = "08:00"
 )
 
@@ -135,3 +136,10 @@ Write-Host "  trigger:  every $WorkspaceSlackMinutes minutes"
 Register-Job "velocity-bd-team workspace morning" "run.py --workspace-morning" (New-ScheduledTaskTrigger -Daily -At $WorkspaceMorningAt) 10 `
     "velocity-bd-team: post the workspace's behind-target notices and each owner's digest to Slack (off until WORKSPACE_SLACK=on)."
 Write-Host "  trigger:  daily at $WorkspaceMorningAt"
+
+# Linear's Pursuits project (docs/RUNBOOK.md, "Linear's Pursuits project"): every few minutes, an issue for each call
+# newly marked Pursue, moved as its call moves. It exits at once, writing nothing, until BD_LINEAR_API_KEY is in .env.
+Register-Job "velocity-bd-team linear" "run.py --linear-sync" `
+    (New-ScheduledTaskTrigger -Once -At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Minutes $LinearSyncMinutes)) 5 `
+    "velocity-bd-team: keep Linear's Pursuits project in step with the calls the team pursues (off until BD_LINEAR_API_KEY is set)."
+Write-Host "  trigger:  every $LinearSyncMinutes minutes"

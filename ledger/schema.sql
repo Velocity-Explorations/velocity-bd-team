@@ -396,3 +396,16 @@ CREATE TABLE IF NOT EXISTS people (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_people_name ON people (name);
 
 -- 011_not_submitted: proposals.outcome also takes not_submitted (the proposals table above shows the wider check).
+
+-- 012_linear_issues: the Linear issue the pipeline opens for each call the team pursues, in the Pursuits project
+-- of Velocity's Operations team, and the stage of the call it last showed (linear/pursuits.py).
+
+CREATE TABLE IF NOT EXISTS linear_issues (
+  call_id     TEXT PRIMARY KEY REFERENCES calls (id),
+  issue_id    TEXT NOT NULL,
+  identifier  TEXT NOT NULL,
+  url         TEXT NOT NULL,
+  stage       TEXT NOT NULL CHECK (stage IN ('pursued', 'drafting', 'submitted', 'result', 'withdrawn')),
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
