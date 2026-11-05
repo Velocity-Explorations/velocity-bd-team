@@ -189,6 +189,21 @@ function keywordWhere(db: Db, f: Keywords) {
     ${f.why ? db`AND ai_reasoning ILIKE ${`%${escapeLike(f.why)}%`}` : db``}`;
 }
 
+/** A piece of SQL from the tagged template, spliced into another query. */
+type Fragment = ReturnType<typeof keywordWhere>;
+
+/**
+ * The calls a per-row read covers: their ids, or one page of a list as a subquery (callsPage, queuePage), so the read
+ * runs beside the page's own query instead of waiting for its rows, a round trip of about 60 ms saved.
+ */
+export type CallIds = string[] | { page: (db: Db) => Fragment };
+
+/** What follows `call_id IN`: the ids, or the page's subquery; null when there is nothing to read. */
+function idsIn(db: Db, ids: CallIds) {
+  if (Array.isArray(ids)) return ids.length ? db(ids) : null;
+  return ids.page(db);
+}
+
 /**
  * The triage backlog, newest first unless sorted otherwise. With `waitingFor` (the names one
  * person's decisions are recorded under, while everyone decides every call): the calls that
@@ -200,7 +215,7 @@ function keywordWhere(db: Db, f: Keywords) {
  * `offset`, with the view's total.
  */
 export async function reviewQueue(
-  f: PanelFilters & Keywords & { verdict: string; tier: string; view?: CallView; ids?: string[] },
+  f: QueueFilters,
   waitingFor: string[] | null,
   page: { limit: number; offset: number } = { limit: PAGE_SIZE, offset: 0 },
 ): Promise<{ rows: QueueRow[]; total: number; perPerson: boolean }> {
@@ -208,7 +223,24 @@ export async function reviewQueue(
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
   if (f.view === "top10" && !f.ids?.length) return { rows: [], total: 0, perPerson };
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
-  const where = () => db`
+  const [count, rows] = await Promise.all([
+    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${queueWhere(db, f, perPerson, waitingFor)}`,
+    db<QueueRow[]>`
+      SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, ${summary}, due_date,
+             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
+             match_tier, first_seen_at, extra, human_status, human_notes
+      FROM calls ${queueWhere(db, f, perPerson, waitingFor)}
+      ${panelOrder(db, f)}
+      LIMIT ${page.limit} OFFSET ${page.offset}`,
+  ]);
+  return { rows: [...rows], total: count[0]?.n ?? 0, perPerson };
+}
+
+export type QueueFilters = PanelFilters & Keywords & { verdict: string; tier: string; view?: CallView; ids?: string[] };
+
+/** The queue's WHERE: the view's calls under the bar's and the headers' filters. */
+function queueWhere(db: Db, f: QueueFilters, perPerson: boolean, waitingFor: string[] | null) {
+  return db`
     WHERE ${f.view === "top10" ? db`id IN ${db(f.ids ?? [])}` : waitingWhere(db, perPerson, waitingFor)}
       ${f.view === "due-soon" ? db`AND ${dueSoon(db)}` : db``}
       ${f.view === "new" ? db`AND first_seen_at >= ${newSince()}` : db``}
@@ -216,17 +248,16 @@ export async function reviewQueue(
       ${f.tier ? db`AND match_tier = ${f.tier}` : db``}
       ${keywordWhere(db, f)}
       ${panelWhere(db, f)}`;
-  const [count, rows] = await Promise.all([
-    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${where()}`,
-    db<QueueRow[]>`
-      SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, ${summary}, due_date,
-             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
-             match_tier, first_seen_at, extra, human_status, human_notes
-      FROM calls ${where()}
-      ${panelOrder(db, f)}
-      LIMIT ${page.limit} OFFSET ${page.offset}`,
-  ]);
-  return { rows: [...rows], total: count[0]?.n ?? 0, perPerson };
+}
+
+/** The ids on one page of the queue, as reviewQueue orders and cuts it, for the per-row reads beside it (CallIds). */
+export async function queuePage(f: QueueFilters, waitingFor: string[] | null, page: { limit: number; offset: number }): Promise<CallIds> {
+  if (f.view === "top10") return f.ids ?? [];
+  const perPerson = Boolean(waitingFor?.length) && (await hasTable(sql(), "decisions"));
+  return {
+    page: (db) => db`(SELECT id FROM calls ${queueWhere(db, f, perPerson, waitingFor)} ${panelOrder(db, f)}
+                      LIMIT ${page.limit} OFFSET ${page.offset})`,
+  };
 }
 
 /** The first-seen time from which a call is New this week. */
@@ -376,15 +407,16 @@ async function readPortals(): Promise<PortalOption[]> {
  * Each judge's newest judgment on these calls, by call id. Empty when the judgments table is not
  * there yet (migration 003): the pages then show the review's verdict alone.
  */
-export async function latestJudgments(callIds: string[]): Promise<Map<string, Judgment[]>> {
+export async function latestJudgments(callIds: CallIds): Promise<Map<string, Judgment[]>> {
   const byCall = new Map<string, Judgment[]>();
-  if (callIds.length === 0) return byCall;
   try {
     const db = sql();
+    const ids = idsIn(db, callIds);
+    if (!ids) return byCall;
     const found = await db<(Judgment & { call_id: string })[]>`
       SELECT DISTINCT ON (call_id, judge) call_id, judge, model, verdict, reasoning, rated_at
       FROM judgments
-      WHERE call_id IN ${db(callIds)}
+      WHERE call_id IN ${ids}
       ORDER BY call_id, judge, id DESC`;
     for (const { call_id, ...judgment } of found) {
       byCall.set(call_id, [...(byCall.get(call_id) ?? []), judgment]);
@@ -447,26 +479,35 @@ export type CallRow = {
 /** One page of All calls: `limit` rows from `offset`, and how many calls the filters leave. */
 export async function listCalls(f: CallFilters, limit = PAGE_SIZE, offset = 0): Promise<{ rows: CallRow[]; total: number }> {
   const db = sql();
-  const where = () => db`
+  const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
+  const [count, rows] = await Promise.all([
+    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${callsWhere(db, f)}`,
+    db<CallRow[]>`
+      SELECT id, portal, title, url, type, department, naics_code, set_aside, ${summary}, due_date,
+             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
+             filter_result, filter_reason, match_tier,
+             ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra
+      FROM calls ${callsWhere(db, f)}
+      ${panelOrder(db, f)}
+      LIMIT ${limit} OFFSET ${offset}`,
+  ]);
+  return { rows: [...rows], total: count[0]?.n ?? 0 };
+}
+
+/** All calls' WHERE: the bar's and the headers' filters. */
+function callsWhere(db: Db, f: CallFilters) {
+  return db`
     WHERE TRUE
       ${f.filterResult ? db`AND filter_result = ${f.filterResult}` : db``}
       ${f.verdict === "none" ? db`AND ai_verdict IS NULL` : f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
       ${f.status === "none" ? db`AND human_status IS NULL` : f.status ? db`AND human_status = ${f.status}` : db``}
       ${keywordWhere(db, f)}
       ${panelWhere(db, f)}`;
-  const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
-  const [count, rows] = await Promise.all([
-    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${where()}`,
-    db<CallRow[]>`
-      SELECT id, portal, title, url, type, department, naics_code, set_aside, ${summary}, due_date,
-             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
-             filter_result, filter_reason, match_tier,
-             ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra
-      FROM calls ${where()}
-      ${panelOrder(db, f)}
-      LIMIT ${limit} OFFSET ${offset}`,
-  ]);
-  return { rows: [...rows], total: count[0]?.n ?? 0 };
+}
+
+/** The ids on one page of All calls, as listCalls orders and cuts it, for the per-row reads beside it (CallIds). */
+export function callsPage(f: CallFilters, limit = PAGE_SIZE, offset = 0): CallIds {
+  return { page: (db) => db`(SELECT id FROM calls ${callsWhere(db, f)} ${panelOrder(db, f)} LIMIT ${limit} OFFSET ${offset})` };
 }
 
 export type DecideResult =
@@ -552,14 +593,15 @@ export async function decideCall(input: {
 
 /** Every tag on these calls, with who set it and its group and place in the list (call_tags and
  *  tag_list, migrations 006 and 007); empty before those tables exist. */
-export async function tagsOn(callIds: string[]): Promise<TagRow[]> {
-  if (callIds.length === 0) return [];
+export async function tagsOn(callIds: CallIds): Promise<TagRow[]> {
   try {
     const db = sql();
+    const ids = idsIn(db, callIds);
+    if (!ids) return [];
     const rows = await db<TagRow[]>`
       SELECT t.call_id, t.tag, t.source, l.tag_group, l.position
       FROM call_tags AS t LEFT JOIN tag_list AS l ON l.name = t.tag
-      WHERE t.call_id IN ${db(callIds)}
+      WHERE t.call_id IN ${ids}
       ORDER BY t.id`;
     return [...rows];
   } catch {
@@ -584,12 +626,13 @@ async function readTagOptions(): Promise<TagOption[]> {
 // ------------------------------------------------------------------ decisions, judges
 
 /** Every decision on these calls, oldest first (migration 004); empty before that table exists. */
-export async function decisionsOn(callIds: string[]): Promise<DecisionRow[]> {
-  if (callIds.length === 0) return [];
+export async function decisionsOn(callIds: CallIds): Promise<DecisionRow[]> {
   try {
     const db = sql();
+    const ids = idsIn(db, callIds);
+    if (!ids) return [];
     const rows = await db<DecisionRow[]>`
-      SELECT call_id, decided_by, status, decided_at FROM decisions WHERE call_id IN ${db(callIds)} ORDER BY id`;
+      SELECT call_id, decided_by, status, decided_at FROM decisions WHERE call_id IN ${ids} ORDER BY id`;
     return [...rows];
   } catch {
     return [];   // decisions table missing (migration 004)
@@ -971,18 +1014,18 @@ export type DraftInfo = {
 };
 
 /** The drafts of these calls, by call id; empty before migration 008. */
-export async function draftsFor(callIds: string[]): Promise<Map<string, DraftInfo>> {
+export async function draftsFor(callIds: CallIds): Promise<Map<string, DraftInfo>> {
   const found = new Map<string, DraftInfo>();
-  if (callIds.length === 0) return found;
   const db = sql();
-  if (!(await hasTable(db, "pursuits"))) return found;
+  const ids = idsIn(db, callIds);
+  if (!ids || !(await hasTable(db, "pursuits"))) return found;
   const rows = await db<DraftInfo[]>`
     SELECT p.call_id, p.owner, p.state AS pursuit_state, p.current_step, s.state AS step_state, p.drive_folder_id,
            p.submitted_at, p.submitted_by, p.result_expected_by
     FROM pursuits AS p
     LEFT JOIN pursuit_steps AS s
       ON s.id = (SELECT MAX(x.id) FROM pursuit_steps AS x WHERE x.pursuit_id = p.id AND x.step = p.current_step)
-    WHERE p.call_id IN ${db(callIds)}`;
+    WHERE p.call_id IN ${ids}`;
   for (const row of rows) found.set(row.call_id, row);
   return found;
 }
