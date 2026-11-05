@@ -10,6 +10,7 @@
     python run.py --feedback-only          # Slack thread notes in, decisions out to the cards, nothing else
     python run.py --deliver-run 12         # post run 12's Slack summary, held or lost to a Slack failure
     python run.py --hold-slack             # judge and save as usual, post no summary; --deliver-run posts it later
+    python run.py --linear-sync            # issues in Linear's Pursuits project for the calls the team pursues
     python run.py --wait-lock 30           # if another run holds the lock, wait up to 30 minutes for it
 
 The portal assistant's scheduled jobs (docs/ASSISTANT.md) also run from here, because this
@@ -889,6 +890,24 @@ def run_all(portals_to_run: list[Portal], args: argparse.Namespace, log_path: Pa
 
 # ------------------------------------------------------------------------------- main
 
+def linear_sync() -> int:
+    """`--linear-sync`: an issue in Linear's Pursuits project for each call the team pursues, moved as the call moves
+    (linear/pursuits.py). Every five minutes, without the pipeline's lock; nothing happens without BD_LINEAR_API_KEY."""
+    from linear.board import LinearBoard
+    from linear.client import LinearClient
+    from linear.pursuits import sync
+
+    client = LinearClient()
+    if not client.key:
+        print("BD_LINEAR_API_KEY is not set: nothing synced to Linear (docs/RUNBOOK.md, Linear's Pursuits project).")
+        return 0
+    changes = sync(LinearBoard(client))
+    for line in changes:
+        print(line)
+    print(f"linear-sync: {len(changes)} change(s)")
+    return 0
+
+
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="velocity-bd-team pipeline")
     parser.add_argument("--portal", help="run a single portal by slug")
@@ -918,6 +937,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="post workspace notices to Slack: cards for pursued calls without one, steps ready; then exit")
     parser.add_argument("--workspace-morning", action="store_true",
                         help="post the morning's workspace notices to Slack: steps behind target, the digest per owner; then exit")
+    parser.add_argument("--linear-sync", action="store_true",
+                        help="open and move issues in Linear's Pursuits project to match the pursued calls, then exit")
     parser.add_argument("--backfill-summaries", action="store_true",
                         help="have Claude summarize each open, reviewed call that has no summary, then exit; "
                              "with --dry-run, count the calls and price the run instead")
@@ -942,6 +963,8 @@ def main(argv: list[str] | None = None) -> int:
         return backfill_summaries(dry_run=args.dry_run)
     if args.workspace_slack or args.workspace_morning:
         return workspace_notices(morning=args.workspace_morning)
+    if args.linear_sync:
+        return linear_sync()
     try:
         acquire_lock(wait_s=args.wait_lock * 60)
     except LockHeld as exc:

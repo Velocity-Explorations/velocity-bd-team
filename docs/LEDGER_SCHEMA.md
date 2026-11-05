@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `011_not_submitted.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `012_linear_issues.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -569,6 +569,23 @@ worker was last seen. Added by `008_pursuits.sql`.
 
 No row means drafting is not set up yet. A `seen_at` more than ten minutes old means the
 worker is not running (the dashboard says offline), and queued steps wait for it.
+
+## Table: linear_issues
+
+The Linear issue the pipeline opened for each call the team pursues, in the Pursuits project of
+Velocity's Operations team (David, 4 Nov 2026; docs/RUNBOOK.md, "Linear's Pursuits project"), and the
+stage of the call it last showed, so `run.py --linear-sync` moves an issue only when its call moves on.
+Added by `012_linear_issues.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| call_id | TEXT, primary key, references calls | the pursued call | `run.py --linear-sync` |
+| issue_id | TEXT, not null | Linear's id for the issue | same |
+| identifier | TEXT, not null | the issue's key, such as OPS-120 | same |
+| url | TEXT, not null | the issue's page on Linear | same |
+| stage | TEXT, not null | `pursued`, `drafting`, `submitted`, `result` or `withdrawn`: where the call stood when the issue last moved | same |
+| created_at | TEXT timestamp, not null | when the issue was opened; a call pursued again gets a new issue in its row | same |
+| updated_at | TEXT timestamp, not null | the last change | same |
 
 ## Table: schema_migrations
 

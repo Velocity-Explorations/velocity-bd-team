@@ -18,6 +18,12 @@ def ledger_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
 
 
 @pytest.fixture(autouse=True)
+def no_real_linear(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never reach Linear, even with BD_LINEAR_API_KEY in the real .env: the key reads as unset."""
+    monkeypatch.setenv("BD_LINEAR_API_KEY", "")
+
+
+@pytest.fixture(autouse=True)
 def no_real_grok(monkeypatch: pytest.MonkeyPatch) -> None:
     """Tests never reach xAI, even with BD_XAI_API_KEY in the real .env: the second judge is
     off unless a test turns it on with a scripted model."""

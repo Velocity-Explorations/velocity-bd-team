@@ -1338,3 +1338,47 @@ def set_filed(pursuit_id: int, folder_id: str, path: str, submission_id: str) ->
     with tx() as conn:
         q(conn, "UPDATE pursuits SET drive_folder_id = ?, drive_folder_name = ?, submission_id = ?, updated_at = ? WHERE id = ?",
           (folder_id, path, submission_id, now_iso(), pursuit_id))
+
+
+# ------------------------------------------------------------------------- Linear's Pursuits project
+
+def pursuit_issue_rows() -> list[dict[str, Any]]:
+    """Every call pursued, being drafted, submitted, or with a Linear issue: its decision, its draft (if any), Grok's
+    newest judgment and its issue (if any), for the Pursuits sync (linear/pursuits.py)."""
+    with tx() as conn:
+        return rows(q(conn, """
+            SELECT c.id, c.portal, c.title, c.url, c.type, c.department, c.naics_code, c.set_aside, c.due_date, c.extra,
+                   c.ai_verdict, c.ai_reasoning, c.ai_summary, c.human_status, c.human_by, c.human_at,
+                   p.state AS pursuit_state, p.submitted_by, p.submitted_at, p.confirmation_number,
+                   p.result, p.result_by, p.result_at, p.debrief,
+                   (SELECT j.verdict FROM judgments j WHERE j.call_id = c.id AND j.judge = 'grok' ORDER BY j.id DESC LIMIT 1)
+                     AS grok_verdict,
+                   (SELECT j.reasoning FROM judgments j WHERE j.call_id = c.id AND j.judge = 'grok' ORDER BY j.id DESC LIMIT 1)
+                     AS grok_reasoning,
+                   li.issue_id, li.identifier, li.url AS issue_url, li.stage AS synced
+            FROM calls c
+            LEFT JOIN pursuits p ON p.call_id = c.id
+            LEFT JOIN linear_issues li ON li.call_id = c.id
+            WHERE c.human_status IN ('pursue', 'submitted') OR p.id IS NOT NULL OR li.call_id IS NOT NULL
+            ORDER BY c.human_at, c.id"""))
+
+
+def save_linear_issue(call_id: str, issue: Mapping[str, str], stage: str) -> None:
+    """The issue opened for a call, replacing one it had before (a canceled issue is never reopened)."""
+    now = now_iso()
+    with tx() as conn:
+        q(conn, "DELETE FROM linear_issues WHERE call_id = ?", (call_id,))
+        q(conn, "INSERT INTO linear_issues (call_id, issue_id, identifier, url, stage, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)", (call_id, issue["id"], issue["identifier"], issue["url"], stage, now, now))
+
+
+def set_linear_stage(call_id: str, stage: str) -> None:
+    with tx() as conn:
+        q(conn, "UPDATE linear_issues SET stage = ?, updated_at = ? WHERE call_id = ?", (stage, now_iso(), call_id))
+
+
+def email_of_person(name: str) -> str | None:
+    """The address a person signed in to the dashboard with (people, migration 010), or None."""
+    with tx() as conn:
+        found = one(q(conn, "SELECT email FROM people WHERE name = ?", (name,)))
+    return found["email"] if found else None

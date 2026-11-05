@@ -19,10 +19,10 @@ def test_migrate_creates_tables_and_is_idempotent(tmp_path: Path) -> None:
     first = migrate.apply(url)
     assert first == ["001_initial.sql", "002_change_requests.sql", "003_judgments.sql", "004_decisions.sql", "005_briefs.sql",
                      "006_call_tags.sql", "007_tag_list.sql", "008_pursuits.sql", "009_call_summaries.sql", "010_people.sql",
-                     "011_not_submitted.sql"]
+                     "011_not_submitted.sql", "012_linear_issues.sql"]
     assert migrate.apply(url) == []
     assert migrate.list_tables(url) == ["briefs", "call_tags", "calls", "change_requests", "checklist_items", "decisions",
-                                         "drive_items", "judgments", "people", "profiles", "proposals", "pursuit_events", "pursuit_steps",
+                                         "drive_items", "judgments", "linear_issues", "people", "profiles", "proposals", "pursuit_events", "pursuit_steps",
                                          "pursuits", "runs", "schema_migrations", "slop_scans", "step_changes", "tag_list",
                                          "worker_jobs", "workers"]
 
@@ -111,7 +111,7 @@ def test_011_keeps_every_proposal_and_lets_one_be_not_submitted(tmp_path: Path, 
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(insert, ("nodate_dsip_y", "not_submitted"))
     conn.close()
-    monkeypatch.setattr(migrate, "migration_files", lambda: every)
+    monkeypatch.setattr(migrate, "migration_files", lambda: [p for p in every if p.name < "012"])
     assert migrate.apply(url) == ["011_not_submitted.sql"]
     conn = sqlite3.connect(tmp_path / "m.db")
     try:
