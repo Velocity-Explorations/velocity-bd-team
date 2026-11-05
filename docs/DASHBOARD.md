@@ -329,8 +329,9 @@ dashboard.
 
 Slack informs; it does not decide.
 
-- Each run posts one card per new yes or maybe call, then a summary that says to decide on
-  the dashboard. With DASHBOARD_URL set in the repo's `.env`, both link to it.
+- Each run posts a summary that says to decide on the dashboard, linked to it with DASHBOARD_URL
+  set in the repo's `.env`. Until 4 Nov 2026 each run also posted one card per new yes or maybe
+  call; since then it posts none (David).
 - Reactions on cards are not read.
 - Every reply in a card's thread becomes a note on that call, before or after a decision.
 - Each feedback pass (at the start of every pipeline run, and the daily 18:00 task) edits any

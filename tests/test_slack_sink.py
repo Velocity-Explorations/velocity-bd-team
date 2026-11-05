@@ -100,7 +100,8 @@ def test_summary_points_to_the_dashboard(monkeypatch: pytest.MonkeyPatch) -> Non
     summary = {"portal": "Vulcan SOF", "scanned": 60, "new": 3, "yes": 1, "maybe": 2, "elapsed": 171.4}
     text = sink.summary_text(summary)
     assert text.startswith("*Vulcan SOF scan*: 60 calls scanned, 3 new (1 yes, 2 maybe), 171s.")
-    assert "Decide on the dashboard" in text and "thread" in text and "React" not in text
+    # No card per call since 4 Nov (David), so the summary sends people to the dashboard, not to a card's thread.
+    assert text.endswith("Decide on the dashboard.") and "thread" not in text and "React" not in text
     monkeypatch.setattr(sink, "dashboard_url", lambda: "https://bd.example.invalid")
     assert "<https://bd.example.invalid|the dashboard>" in sink.summary_text(summary)
 

@@ -74,7 +74,8 @@ def test_full_run_then_rerun(isolated, monkeypatch: pytest.MonkeyPatch, capsys) 
     edge = lq.get_call("fake-0")
     assert edge and edge["ai_verdict"] == "maybe" and edge["ai_reasoning"] == pipeline.NO_REVIEW_REASON
 
-    assert pipeline._test_capture["posted"] == ["fake-0"]   # type: ignore[attr-defined]
+    # Slack gets the run's summary and no card per call (David, 4 Nov): calls are decided on the dashboard.
+    assert pipeline._test_capture["posted"] == []   # type: ignore[attr-defined]
     assert pipeline._test_capture["summaries"][0]["new"] == 1   # type: ignore[attr-defined]
 
     assert pipeline.main(["--no-review"]) == 0
@@ -82,7 +83,7 @@ def test_full_run_then_rerun(isolated, monkeypatch: pytest.MonkeyPatch, capsys) 
     assert "0 new call(s)" in out and "(nothing new)" in out
     run2 = lq.get_run(2)
     assert run2 and '"new": 0' in run2["stage_counts"]
-    assert pipeline._test_capture["posted"] == ["fake-0"] and pipeline._test_capture["summaries"][1]["new"] == 0   # type: ignore[attr-defined]
+    assert pipeline._test_capture["posted"] == [] and pipeline._test_capture["summaries"][1]["new"] == 0   # type: ignore[attr-defined]
 
 
 def test_dry_run_leaves_ledger_unchanged(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
@@ -91,7 +92,7 @@ def test_dry_run_leaves_ledger_unchanged(isolated, monkeypatch: pytest.MonkeyPat
     assert pipeline.main(["--dry-run", "--no-review"]) == 0
     out = capsys.readouterr().out
     assert "DRY RUN: nothing was committed" in out and "DIGEST: Fake: 1 new call(s)" in out
-    assert "would post 1 card(s)" in out and "[MAYBE] Edge AI thing" in out
+    assert "would post this summary" in out and "*Fake scan*: 2 calls scanned, 1 new (0 yes, 1 maybe)" in out
     assert pipeline._test_capture["posted"] == [] and pipeline._test_capture["summaries"] == []   # type: ignore[attr-defined]
     assert _counts() == before
 
@@ -170,30 +171,20 @@ def test_feedback_only_runs_collect_and_exits(isolated, monkeypatch: pytest.Monk
     assert lq.latest_run_id() is None   # no runs row for a feedback pass
 
 
-def test_deliver_run_reposts_only_undelivered(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
-    monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
-    import slack.sink as sink
-    monkeypatch.setattr(sink, "post_call", lambda row, client=None: None)   # Slack down
-    assert pipeline.main(["--no-review"]) == 0
-    assert lq.get_call("fake-0")["slack_ts"] is None   # type: ignore[index]
-    monkeypatch.setattr(sink, "post_call", lambda row, client=None: pipeline._test_capture["posted"].append(row["id"]) or "9.9")   # type: ignore[attr-defined]
-    assert pipeline.main(["--deliver-run", "1"]) == 0
-    assert "deliver-run 1: 1 of 1 card(s) posted" in capsys.readouterr().out
-    assert pipeline._test_capture["posted"] == ["fake-0"]   # type: ignore[attr-defined]
-    assert pipeline.main(["--deliver-run", "99"]) == 2
-
-
-def test_hold_slack_saves_the_run_and_leaves_its_cards_for_deliver_run(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
-    """The first full SAM.gov run with the entity key (4 Nov) could post a large batch at once. Held, the run is judged
-    and saved as usual, and its cards wait until someone posts them."""
+def test_hold_slack_saves_the_run_and_keeps_its_summary_for_deliver_run(isolated, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    """The first full SAM.gov run with the entity key (4 Nov) found 119 new calls. Held, the run is judged and saved as
+    usual, and its summary waits until someone posts it; no card goes out for any call."""
     monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
     assert pipeline.main(["--no-review", "--hold-slack"]) == 0
     out = capsys.readouterr().out
-    assert "DIGEST: Fake: 1 new call(s)" in out and "Slack held: 1 card(s) wait for run.py --deliver-run 1" in out
+    assert "DIGEST: Fake: 1 new call(s)" in out and "Slack held: the summary waits for run.py --deliver-run 1" in out
     assert pipeline._test_capture["posted"] == [] and pipeline._test_capture["summaries"] == []   # type: ignore[attr-defined]
-    assert lq.get_call("fake-0")["slack_ts"] is None and lq.get_run(1)["status"] == "completed"   # type: ignore[index]
+    assert lq.get_run(1)["status"] == "completed"   # type: ignore[index]
     assert pipeline.main(["--deliver-run", "1"]) == 0
-    assert pipeline._test_capture["posted"] == ["fake-0"]   # type: ignore[attr-defined]
+    assert "deliver-run 1: summary posted" in capsys.readouterr().out
+    assert pipeline._test_capture["posted"] == []   # type: ignore[attr-defined]
+    assert [(s["portal"], s["new"], s["maybe"]) for s in pipeline._test_capture["summaries"]] == [("Fake", 1, 1)]   # type: ignore[attr-defined]
+    assert pipeline.main(["--deliver-run", "99"]) == 2
 
 
 def test_watch_alerts_when_a_scan_reads_pages_badly(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -391,7 +382,7 @@ def test_apply_scan_runs_the_portal_now(isolated, slack_posts, monkeypatch: pyte
     run_id = lq.latest_run_id(component="fake")
     assert req["status"] == "applied" and req["result"].startswith(f"Run #{run_id} completed")
     assert lq.get_run(run_id)["status"] == "completed" and lq.get_call("fake-0")["ai_verdict"] == "yes"
-    assert pipeline._test_capture["posted"] == ["fake-0"]   # type: ignore[attr-defined]
+    assert pipeline._test_capture["posted"] == [] and pipeline._test_capture["summaries"][-1]["yes"] == 1   # type: ignore[attr-defined]
 
 
 def test_apply_rereview_asks_again_with_the_teams_context(isolated, slack_posts, monkeypatch: pytest.MonkeyPatch) -> None:
