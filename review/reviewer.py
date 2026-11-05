@@ -29,6 +29,9 @@ log = logging.getLogger("review")
 
 MODEL_ID = "claude-haiku-5-5"
 CALL_TIMEOUT_S = 35.0
+# Room for adaptive thinking and the answer, which share it. At 1,024 the first full SAM.gov scan (4 Nov) had 4 of 262
+# reviews spend it all thinking (no answer: "Review error") and 24 more cut off mid-reason.
+REVIEW_TOKENS = 4096
 RETRY_DELAY_S = 1.0
 BETWEEN_CALLS_S = 0.5
 VERDICTS = ("yes", "no", "maybe")
@@ -141,12 +144,14 @@ class AnthropicModel:
     def complete(self, prompt: str, timeout: float) -> str:
         response = self._client.with_options(timeout=timeout).messages.create(
             model=self.model,
-            max_tokens=1024,   # adaptive thinking shares this budget; 256 truncated reasons
+            max_tokens=REVIEW_TOKENS,
             output_config={"effort": "low"},
             messages=[{"role": "user", "content": prompt}],
         )
         if response.stop_reason == "refusal":
             raise RuntimeError("model refused the request")
+        if response.stop_reason == "max_tokens":   # a cut answer would be stored with half a reason; try again
+            raise RuntimeError("answer cut off at the token limit")
         return "".join(block.text for block in response.content if block.type == "text")
 
 
