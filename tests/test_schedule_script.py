@@ -69,3 +69,15 @@ def test_workspace_notices_check_every_few_minutes_and_the_morning_job_runs_at_e
     assert '[string]$WorkspaceMorningAt = "08:00"' in SCRIPT and "[int]$WorkspaceSlackMinutes = 5" in SCRIPT
     uninstall = (REPO / "scripts" / "uninstall-schedule.ps1").read_text(encoding="utf-8")
     assert '"velocity-bd-team workspace slack"' in uninstall and '"velocity-bd-team workspace morning"' in uninstall
+
+
+def test_the_linear_sync_runs_twice_a_day_and_uninstall_removes_it() -> None:
+    """David, 5 Nov: Linear's Pursuits issues need not follow the dashboard within minutes."""
+    match = re.search(r"\[string\[\]\]\$LinearSyncAt\s*=\s*@\(([^)]*)\)", SCRIPT)
+    assert match and re.findall(r'"(\d\d:\d\d)"', match.group(1)) == ["08:07", "13:07"]
+    block = SCRIPT.split("# Linear's Pursuits project", 1)[1]
+    assert '$linearTriggers = $LinearSyncAt | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }' in block
+    assert 'Register-Job "velocity-bd-team linear" "run.py --linear-sync" $linearTriggers' in block
+    assert "RepetitionInterval" not in block
+    uninstall = (REPO / "scripts" / "uninstall-schedule.ps1").read_text(encoding="utf-8")
+    assert '"velocity-bd-team linear"' in uninstall

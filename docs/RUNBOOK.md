@@ -26,7 +26,7 @@ LLM review of any new kept rows, then the digest on stdout.
 | `--debug` | DEBUG logging, which includes the first rendered review prompt. |
 | `--deliver-run N` | Post run N's Slack summary, held by `--hold-slack` or lost to a Slack failure (for example after `not_in_channel`), then exit. |
 | `--hold-slack` | Judge and save as usual, but post no run summary. The run prints its number, and `--deliver-run N` posts the summary once someone has looked at the calls on the dashboard. |
-| `--linear-sync` | Open and move issues in Linear's Pursuits project to match the calls the team pursues, then exit. The "velocity-bd-team linear" task runs it every 5 minutes (Linear's Pursuits project, below). |
+| `--linear-sync` | Open and move issues in Linear's Pursuits project to match the calls the team pursues, then exit. The "velocity-bd-team linear" task runs it at 08:07 and 13:07 (Linear's Pursuits project, below). |
 
 Exit codes: 0 all portals completed, 1 at least one portal did not complete, 2 unknown
 portal slug, 3 another pipeline holds the lock.
@@ -71,7 +71,8 @@ separated) from `dashboard/.env.local` into `.env`; a name without a Slack id is
 
 Each call the team marks Pursue on the dashboard gets an issue in the Pursuits project of Velocity's
 Operations team on Linear (David, 4 Nov 2026). The "velocity-bd-team linear" task runs
-`run.py --linear-sync` every 5 minutes, without the pipeline's lock (linear/pursuits.py):
+`run.py --linear-sync` at 08:07 and 13:07 (David, 5 Nov), without the pipeline's lock, in a hidden
+console like every task here (linear/pursuits.py):
 
 - A newly pursued call gets an issue in Backlog titled "Submit (the call) by (its day)", due on the
   deadline, assigned to whoever marked Pursue (their address in DASHBOARD_USERS, else their dashboard

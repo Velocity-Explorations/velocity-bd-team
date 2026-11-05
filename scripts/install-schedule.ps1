@@ -28,7 +28,7 @@ param(
     [string]$WorkerTaskName = "velocity-bd-team worker",
     [int]$WorkerCheckMinutes = 5,
     [int]$WorkspaceSlackMinutes = 5,
-    [int]$LinearSyncMinutes = 5,
+    [string[]]$LinearSyncAt = @("08:07", "13:07"),
     [string]$WorkspaceMorningAt = "08:00"
 )
 
@@ -137,9 +137,10 @@ Register-Job "velocity-bd-team workspace morning" "run.py --workspace-morning" (
     "velocity-bd-team: post the workspace's behind-target notices and each owner's digest to Slack (off until WORKSPACE_SLACK=on)."
 Write-Host "  trigger:  daily at $WorkspaceMorningAt"
 
-# Linear's Pursuits project (docs/RUNBOOK.md, "Linear's Pursuits project"): every few minutes, an issue for each call
-# newly marked Pursue, moved as its call moves. It exits at once, writing nothing, until BD_LINEAR_API_KEY is in .env.
-Register-Job "velocity-bd-team linear" "run.py --linear-sync" `
-    (New-ScheduledTaskTrigger -Once -At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Minutes $LinearSyncMinutes)) 5 `
+# Linear's Pursuits project (docs/RUNBOOK.md, "Linear's Pursuits project"): twice a day (David, 5 Nov), an issue for
+# each call newly marked Pursue, moved as its call moves. It exits at once, writing nothing, until BD_LINEAR_API_KEY is
+# in .env. The odd start minute keeps it off the 08:00 jobs.
+$linearTriggers = $LinearSyncAt | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }
+Register-Job "velocity-bd-team linear" "run.py --linear-sync" $linearTriggers 5 `
     "velocity-bd-team: keep Linear's Pursuits project in step with the calls the team pursues (off until BD_LINEAR_API_KEY is set)."
-Write-Host "  trigger:  every $LinearSyncMinutes minutes"
+Write-Host "  trigger:  daily at $($LinearSyncAt -join ' and ')"
