@@ -47,6 +47,8 @@ when a scan runs, someone signs in or a setting is saved (the portal list, tags,
 the library list, profiles, people, the worker's state, requests waiting) are kept for a minute in the server
 (`lib/remember.ts`; DASHBOARD_CACHE_SECONDS, 0 to keep none), and the writes that change them drop them at once.
 Decisions, queues and drafts are always read fresh.
+Needs review and All calls read each row's votes, judges, tags and drafts in the same round as the rows, from a
+subquery of the page's ids (`callsPage`, `queuePage`), rather than after them.
 
 Each section opens on a row of view cards in place of a page title. The open view's card is marked,
 and switching cards keeps the portal, tag and open or closed filters while dropping the sort and the

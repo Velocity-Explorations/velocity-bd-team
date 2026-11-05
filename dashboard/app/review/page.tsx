@@ -31,6 +31,7 @@ import {
   latestJudgments,
   portals,
   queueCounts,
+  queuePage,
   reviewQueue,
   tagOptions,
   tagsOn,
@@ -127,12 +128,19 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
   const viewer = await currentViewer();
   const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
   const page = view === "top10" ? 1 : pickPage(sp.page);
-  const [queue, counts, total, topCount, agreement] = await Promise.all([
-    reviewQueue(filters, waitingFor, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
+  const limits = { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE };
+  const onPage = await queuePage(filters, waitingFor, limits);   // the per-row reads run beside the rows, not after them
+  const [queue, counts, total, topCount, agreement, judged, decisions, tagRows, drafts, { readiness }] = await Promise.all([
+    reviewQueue(filters, waitingFor, limits),
     queueCounts(filters, waitingFor),
     countCalls(filters),
     countAmong(top.ids, filters),
     judgeAgreement(),
+    latestJudgments(onPage),
+    decisionsOn(onPage),
+    tagsOn(onPage),
+    draftsFor(onPage),
+    drafting(),
   ]);
   const { perPerson } = queue;
   const pages = pager("/review", params, page, queue.total);
@@ -144,8 +152,6 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
   const rows = view === "top10" && sp.sort === undefined
     ? [...queue.rows].sort((a, b) => top.ids.indexOf(a.id) - top.ids.indexOf(b.id))
     : queue.rows;
-  const ids = rows.map((r) => r.id);
-  const [judged, decisions, tagRows, drafts, { readiness }] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids), draftsFor(ids), drafting()]);
   const tagsFor = tagsByCall(tagRows);
   const votes = votesByCall(decisions, (by) => displayPerson(by, users));   // by the name decisions are recorded under
   const label = await labeler();

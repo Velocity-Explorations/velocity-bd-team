@@ -23,6 +23,7 @@ import { dayMonth } from "@/lib/home";
 import { pickJudgeFilter, verdictsFor } from "@/lib/judges";
 import { aliasesFor, displayPerson } from "@/lib/people";
 import {
+  callsPage,
   countAmong,
   decisionsOn,
   draftsFor,
@@ -100,19 +101,24 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
     ...sortParams(filters.sort),
   };
   const page = pickPage(sp.page);
-  const [{ rows, total }, counts, topCount, agreement] = await Promise.all([
-    listCalls(filters, PAGE_SIZE, (page - 1) * PAGE_SIZE),
+  const offset = (page - 1) * PAGE_SIZE;
+  const onPage = callsPage(filters, PAGE_SIZE, offset);   // the per-row reads run beside the rows, not after them
+  const [{ rows, total }, counts, topCount, agreement, judged, decisions, tagRows, drafts, { readiness }] = await Promise.all([
+    listCalls(filters, PAGE_SIZE, offset),
     queueCounts(filters, waitingFor),
     countAmong(top.ids, filters),
     judgeAgreement(),
+    latestJudgments(onPage),
+    decisionsOn(onPage),
+    tagsOn(onPage),
+    draftsFor(onPage),
+    drafting(),
   ]);
   const pages = pager("/calls", params, page, total);
   // A page past the last (the list shrank since the link was made) opens the last, keeping the notice.
   if (page > pages.pages) {
     redirect(pageHref("/calls", { ...params, notice: firstParam(sp.notice, 300), error: firstParam(sp.error, 300) }, pages.pages));
   }
-  const ids = rows.map((r) => r.id);
-  const [judged, decisions, tagRows, drafts, { readiness }] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids), draftsFor(ids), drafting()]);
   const tagsFor = tagsByCall(tagRows);
   const tz = await timeZone();
   const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Table settings
