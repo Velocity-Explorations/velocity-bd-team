@@ -6,7 +6,7 @@ import { DraftBadge } from "@/components/DraftBadge";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
 import { NotesPanel, ReasonsPanel } from "@/components/RowPanels";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
 import { Flash, PageLinks } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
@@ -85,6 +85,7 @@ function emptyTitle(view: CallView, filtered: boolean, perPerson: boolean): stri
  * not. Opened from Home's Top 10, the chosen call is marked and focused with its reasons open.
  */
 export default async function NeedsReviewPage({ searchParams }: { searchParams: SearchParams }) {
+  preloadShell("calls");   // the frame's queries run beside this page's
   const sp = await searchParams;
   const withDefaults = await defaultsRedirect("/review", sp);
   if (withDefaults) redirect(withDefaults);

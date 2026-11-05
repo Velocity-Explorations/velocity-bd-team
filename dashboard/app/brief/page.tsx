@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { TopTenTable } from "@/components/TopTenTable";
 import { Badge, TitleLink } from "@/components/bits";
 import { boardHref, closesText, judgesSentence, parseBrief, parseTop, weekLabel, type BriefCall, type PortalBrief } from "@/lib/brief";
@@ -67,6 +67,7 @@ function Empty({ title, children }: { title: string; children: ReactNode }) {
  * calls. Earlier weeks are linked at the top. Monday's Slack post links here.
  */
 export default async function BriefPage({ searchParams }: { searchParams: SearchParams }) {
+  preloadShell("home");   // the frame's queries run beside this page's
   const sp = await searchParams;
   const weeks = await briefWeeks();
   if (weeks === null) {

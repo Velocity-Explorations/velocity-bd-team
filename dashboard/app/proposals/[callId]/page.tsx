@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { SlopResult } from "@/components/SlopResult";
 import { StageStrip, StepCard, StepList, WorkspaceHeader, WorkspacePanels } from "@/components/Workspace";
 import { Flash } from "@/components/bits";
@@ -30,6 +30,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
  * check's result in the card (PW20), and `&lines=` the scanned text beside it at those lines.
  */
 export default async function WorkspacePage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
+  preloadShell("proposals");   // the frame's queries run beside this page's
   const callId = decodeURIComponent((await params).callId);
   const sp = await searchParams;
   const found = await workspace(callId);

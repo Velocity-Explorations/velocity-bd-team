@@ -51,7 +51,7 @@ CARD_PAGES = {
     "/runs?view=problems": "Scan problems",
     "/judges": "Judges agree",
 }
-COUNT_LABEL = re.compile(r"^\d+ (waiting for you|to draft or ready for you|requests? waiting)$")
+COUNT_LABEL = re.compile(r"^\d+ (waiting for you|to draft, ready for you or overdue|requests? waiting)$")
 
 
 @pytest.fixture(scope="module")
@@ -125,3 +125,14 @@ def test_home_top_10_heads_its_summaries_summary_description(page: Any) -> None:
     heads = [t.strip().lower() for t in table.locator("thead th").all_inner_texts()]
     assert "summary description" in heads and "description" not in heads
     assert "summary" not in [t.strip().lower() for t in table.locator(".desc-label").all_inner_texts()]
+
+
+@pytest.mark.parametrize("path", ["/", "/review", "/calls"])
+def test_a_page_streams_its_loading_screen_before_its_content(path: str) -> None:
+    """A page takes a second or so to read the ledger; its loading screen goes out first, so a click shows at once."""
+    import urllib.request
+
+    with urllib.request.urlopen(URL + path, timeout=120) as response:
+        html = response.read().decode("utf-8", "replace")
+    assert html.index('class="loading-page"') < html.index("<main>")
+

@@ -161,6 +161,35 @@ main {
   padding: 16px 24px 32px;
 }
 
+/* While a page's data loads (app/loading.tsx): placeholder rows that pulse, still where motion is reduced. */
+.loading-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 24px 32px;   /* where main's content starts */
+}
+
+.loading-word {
+  margin: 0 0 4px;
+  font: 400 12px/1.3 var(--font-label);
+  color: var(--ink-3);
+}
+
+.loading-bar {
+  height: 44px;
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  animation: loading-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-bar { animation: none; }
+}
+
 /* Read by screen readers, not shown: each page's title, since the pressed view card names it. */
 .sr-only {
   position: absolute;

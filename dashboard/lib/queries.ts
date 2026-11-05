@@ -324,14 +324,19 @@ export async function liveTopTen(): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-/** This week's Top 10: the newest Monday brief's, in its order, or the live ranking before the first brief (H2). */
+/** This week's Top 10: the newest Monday brief's, in its order, or the live ranking before the first brief (H2). One
+ *  query for the newest week's ranking, where there were two in turn. */
 export async function topTenIds(): Promise<{ ids: string[]; week: string | null }> {
-  const weeks = await briefWeeks();
-  if (weeks && weeks.length) {
-    const rows = await briefRows(weeks[0]);
-    const top = parseTop(rows.find((r) => r.portal === null)?.body);
-    if (top) return { ids: top.top.map((c) => c.id), week: weeks[0] };
+  let newest: { week_of: string; body: string | null } | undefined;
+  try {
+    [newest] = await sql()<{ week_of: string; body: string | null }[]>`
+      SELECT week_of, body FROM briefs WHERE portal IS NULL AND week_of = (SELECT MAX(week_of) FROM briefs)
+      ORDER BY id DESC LIMIT 1`;
+  } catch {
+    newest = undefined;   // briefs table missing (migration 005)
   }
+  const top = newest ? parseTop(newest.body) : null;
+  if (newest && top) return { ids: top.top.map((c) => c.id), week: newest.week_of };
   return { ids: await liveTopTen(), week: null };
 }
 
