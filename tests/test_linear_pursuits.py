@@ -155,6 +155,19 @@ def test_titles_fit_and_no_text_carries_a_dash(team: FakeBoard) -> None:
     assert issue["due"] == "2026-11-27" and issue["priority"] == 3   # 23 days out: Medium
 
 
+def test_a_deadline_without_a_time_zone_says_so_and_spacing_is_tidied(team: FakeBoard) -> None:
+    # OPS-97 (5 Nov): SAM.gov gave "2026-11-13T17:00:00" with no zone, and the issue showed it as 10:00 MST.
+    a_call("c5", due="2026-11-13T17:00:00")
+    with tx() as conn:
+        q(conn, "UPDATE calls SET department = ? WHERE id = ?", ("DEPT OF DEFENSE / DEFENSE ADVANCED RESEARCH PROJECTS AGENCY  (DARPA)", "c5"))
+    lq.set_human("c5", "pursue", "David Wood")
+    pursuits.sync(team, now=NOW)
+    body = team.opened[0]["body"]
+    assert "- Deadline: 13 Nov 2026 17:00 (no time zone given)" in body
+    assert "- Agency: DEPT OF DEFENSE / DEFENSE ADVANCED RESEARCH PROJECTS AGENCY (DARPA)" in body
+    assert team.opened[0]["due"] == "2026-11-13"
+
+
 def test_priority_follows_the_deadline() -> None:
     assert pursuits.priority_for(NOW + timedelta(days=3), NOW) == 1
     assert pursuits.priority_for(NOW + timedelta(days=10), NOW) == 2
