@@ -87,7 +87,7 @@ Home is the landing page: five link cards, the Top 10 table and a status line (2
 | H2 | Top 10 is the only table: this week's Top 10 from the Monday brief (the `briefs` table), with each call's decision as of now; before the first brief exists, the live ranking (yes before maybe, then the nearest deadline, then the newest). Each row: rank, logo, the title linked to its portal page, the portal, the deadline and days left, both verdicts, the decision now, the description and Claude's reason (up to six lines each). Below 1280px the description and the reason are hidden. |
 | H3 | A status line under the table: requests waiting, the last scan's result in words and when it ran, and how often Claude and Grok agree, each linked to its view. |
 | H4 | A link to this week's brief and the past weekly briefs (/brief). |
-| H5 | Home records nothing. Was H7. |
+| H5 | Home records only the Top 10's decisions, through the Decide menu on each row (David, 5 Nov 2026). Until then Home recorded nothing. Was H7. |
 
 ## Calls: To review
 

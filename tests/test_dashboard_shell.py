@@ -110,7 +110,8 @@ def test_home_shows_five_link_cards_then_the_top_10(page: Any) -> None:
     labels = [t.strip().lower() for t in page.locator(".view-cards .vt-card .vt-card__label").all_inner_texts()]
     assert labels == ["needs review", "due soon", "agent update requests", "proposals to draft", "submitted and waiting"]
     assert page.locator(".view-cards .vt-card[aria-current]").count() == 0
-    assert page.locator("main form").count() == 0   # Home records nothing (H5)
+    # Home records only the Top 10's decisions (H5, David 5 Nov)
+    assert page.locator("main form").count() == page.locator("section.top-ten form.decide-form").count()
     top = page.locator("section.top-ten")
     assert top.count() == 1
     assert top.locator("table").count() == 1 or top.locator(".empty").count() == 1
@@ -135,4 +136,21 @@ def test_a_page_streams_its_loading_screen_before_its_content(path: str) -> None
     with urllib.request.urlopen(URL + path, timeout=120) as response:
         html = response.read().decode("utf-8", "replace")
     assert html.index('class="loading-page"') < html.index("<main>")
+
+
+def test_each_top_10_call_on_home_can_be_decided_there(page: Any) -> None:
+    """David, 5 Nov: a Top 10 call is decided from Home, without going to Calls first."""
+    open_page(page, "/")
+    rows = page.locator("section.top-ten tbody tr")
+    if rows.count() == 0:
+        pytest.skip("there is no Top 10 yet")
+    assert "decide" in [t.strip().lower() for t in page.locator("section.top-ten thead th").all_inner_texts()]
+    assert page.locator("section.top-ten tbody td.decide").count() == rows.count()
+    first = rows.first
+    first.locator("details.decide-menu summary").click()
+    items = [t.strip() for t in first.locator("details.decide-menu .menu-body button").all_inner_texts()]
+    assert items[:4] == ["Pursue", "Not relevant", "Submitted", "Dismiss"]
+    assert page.url.rstrip("/") == URL   # opening the menu stays on Home; the row's link is not followed
+    assert first.locator("input[name=return_to]").get_attribute("value") == "/"
+    page.keyboard.press("Escape")   # closes the menu without deciding
 
