@@ -1,8 +1,12 @@
 """Slack informs; the dashboard decides (docs/DASHBOARD.md).
 
-    ts = post_call(row)                  # one Block Kit card per new call, then set_slack()
+    ts = post_call(row)                  # one Block Kit card for a call, then set_slack()
     post_run_summary(summary)            # one line per run, pointing to the dashboard
     changes = collect_feedback()         # thread replies into notes; cards show decisions
+
+Since 4 Nov 2026 scans post only their summary, no card per call (David): calls are decided on
+the dashboard. post_call is left for the workspace's notices (slack/workspace.py) and the
+cards posted before then.
 
 Reactions on cards are not read: decisions are recorded on the dashboard. Every human reply
 in a card's thread is appended to the call's human_notes (a leading "note:" is stripped);
@@ -212,7 +216,7 @@ def summary_text(summary: dict[str, Any]) -> str:
     return (
         f"*{summary.get('portal', 'Pipeline')} scan*: {summary.get('scanned', 0)} calls scanned, "
         f"{summary.get('new', 0)} new ({summary.get('yes', 0)} yes, {summary.get('maybe', 0)} maybe), "
-        f"{summary.get('elapsed', 0):.0f}s. Decide on {where}; reply in a card's thread to add a note."
+        f"{summary.get('elapsed', 0):.0f}s. Decide on {where}."
     )
 
 

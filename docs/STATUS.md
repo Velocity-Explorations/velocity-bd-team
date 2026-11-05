@@ -22,6 +22,7 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 8 (Slack delivery and feedback): cards and a summary per run; thread replies polled into
   notes and cards edited to show decisions (`run.py --feedback-only`, daily task). Live on
   2026-10-16. Since 2026-10-17 reactions are not read: decisions are made on the dashboard.
+  Since 2026-11-04 a run posts only its summary, no card per call (David).
 - Phase 9 (dashboard): Next.js 16.4 app in dashboard/, run locally with `npm run dev`. The only
   place decisions are made: review queue buttons, plus a change control on all calls. Several
   people can decide (DASHBOARD_USERS lists David and Shaun since 2026-10-20); each person's

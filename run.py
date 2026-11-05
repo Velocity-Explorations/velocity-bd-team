@@ -8,8 +8,8 @@
     python run.py --limit 5                # cap scraped and reviewed rows
     python run.py --fetch-timeout 10       # override every portal's fetch budget (testing)
     python run.py --feedback-only          # Slack thread notes in, decisions out to the cards, nothing else
-    python run.py --deliver-run 12         # re-post run 12's cards after a Slack failure
-    python run.py --hold-slack             # judge and save as usual, post no cards; --deliver-run posts them later
+    python run.py --deliver-run 12         # post run 12's Slack summary, held or lost to a Slack failure
+    python run.py --hold-slack             # judge and save as usual, post no summary; --deliver-run posts it later
     python run.py --wait-lock 30           # if another run holds the lock, wait up to 30 minutes for it
 
 The portal assistant's scheduled jobs (docs/ASSISTANT.md) also run from here, because this
@@ -403,49 +403,51 @@ def backfill_judgments() -> int:
     return 0
 
 
-def deliver(portal: Portal, fresh: list[dict[str, Any]], counts: dict[str, int], elapsed: float, dry_run: bool) -> int:
-    """Post one card per new call and a run summary. In dry-run, print the cards instead."""
-    from slack.sink import card_text, post_call, post_run_summary
-
-    if dry_run:
-        print(f"\n===== DRY RUN: would post {len(fresh)} card(s) to Slack =====")
-        for row in fresh:
-            print(card_text(row))
-            print()
-        return 0
-    posted = sum(1 for row in fresh if post_call(row))
-    post_run_summary({
-        "portal": portal.name,
+def run_summary(portal: str, fresh: list[dict[str, Any]], counts: dict[str, Any], elapsed: float) -> dict[str, Any]:
+    """The run's one line for Slack: calls scanned, and the new ones by verdict."""
+    return {
+        "portal": portal,
         "scanned": counts.get("fetched", 0),
         "new": len(fresh),
         "yes": sum(1 for r in fresh if r.get("ai_verdict") == "yes"),
         "maybe": sum(1 for r in fresh if r.get("ai_verdict") == "maybe"),
         "elapsed": elapsed,
-    })
-    return posted
+    }
+
+
+def deliver(portal: Portal, fresh: list[dict[str, Any]], counts: dict[str, int], elapsed: float, dry_run: bool) -> bool:
+    """Post the run's summary to Slack, or print it in dry-run; True once posted. Since 4 Nov no card goes out per call
+    (David): the new calls wait on the dashboard, where they are decided."""
+    from slack.sink import post_run_summary, summary_text
+
+    summary = run_summary(portal.name, fresh, counts, elapsed)
+    if dry_run:
+        print("\n===== DRY RUN: would post this summary to Slack =====")
+        print(summary_text(summary))
+        return False
+    return post_run_summary(summary) is not None
+
+
+def _run_seconds(run: dict[str, Any]) -> float:
+    try:
+        started, finished = (datetime.fromisoformat(str(run[k]).replace("Z", "+00:00")) for k in ("started_at", "finished_at"))
+    except (KeyError, TypeError, ValueError):
+        return 0.0
+    return max(0.0, (finished - started).total_seconds())
 
 
 def redeliver(run_id: int) -> int:
-    """Post the cards of a run whose Slack delivery failed (rows still without slack_ts)."""
-    from slack.sink import post_call, post_run_summary
+    """`--deliver-run N`: post run N's summary, held by --hold-slack or lost to a Slack failure."""
+    from slack.sink import post_run_summary
 
     run = get_run(run_id)
     if run is None:
         print(f"no run {run_id}")
         return 2
-    pending = [r for r in new_calls(run_id) if not r.get("slack_ts")]
-    posted = sum(1 for row in pending if post_call(row))
     counts = json.loads(run.get("stage_counts") or "{}")
-    post_run_summary({
-        "portal": run.get("portal") or "Pipeline",
-        "scanned": counts.get("fetched", 0),
-        "new": len(pending),
-        "yes": sum(1 for r in pending if r.get("ai_verdict") == "yes"),
-        "maybe": sum(1 for r in pending if r.get("ai_verdict") == "maybe"),
-        "elapsed": 0.0,
-    })
-    print(f"deliver-run {run_id}: {posted} of {len(pending)} card(s) posted")
-    return 0 if posted == len(pending) else 1
+    posted = post_run_summary(run_summary(run.get("portal") or "Pipeline", new_calls(run_id), counts, _run_seconds(run)))
+    print(f"deliver-run {run_id}: summary {'posted' if posted else 'not posted'}")
+    return 0 if posted else 1
 
 
 def feedback_pass(dry_run: bool) -> list[dict[str, Any]]:
@@ -864,12 +866,12 @@ def run_portal(portal: Portal, args: argparse.Namespace, log_path: Path) -> dict
         print_digest(portal.name, fresh)
 
         t0 = time.time()
-        if args.hold_slack:   # the cards stay unposted (no slack_ts), so --deliver-run finds them
-            print(f"Slack held: {len(fresh)} card(s) wait for run.py --deliver-run {run_id}")
-            posted = 0
+        if args.hold_slack:
+            print(f"Slack held: the summary waits for run.py --deliver-run {run_id}")
+            posted = False
         else:
             posted = deliver(portal, fresh, counts, time.time() - started, args.dry_run)
-        log.info("DELIVER: %d card(s) (%.1fs)", posted, time.time() - t0)
+        log.info("DELIVER: summary %s (%.1fs)", "posted" if posted else "not posted", time.time() - t0)
     except Exception as exc:
         status, error = "error", f"{type(exc).__name__}: {str(exc)[:200]}"
         log.error("PIPELINE ERROR in %s: %s", portal.name, error)
@@ -897,9 +899,9 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--fetch-timeout", type=int, help="override the per-portal fetch timeout in seconds")
     parser.add_argument("--feedback-only", action="store_true", help="only sync Slack: thread notes in, decisions out to the cards")
     parser.add_argument("--debug", action="store_true", help="DEBUG logging (includes the first review prompt)")
-    parser.add_argument("--deliver-run", type=int, metavar="N", help="re-post run N's new calls that never reached Slack, then exit")
+    parser.add_argument("--deliver-run", type=int, metavar="N", help="post run N's Slack summary (held, or lost to a Slack failure), then exit")
     parser.add_argument("--hold-slack", action="store_true",
-                        help="judge and save as usual but post no cards; run.py --deliver-run N posts them later")
+                        help="judge and save as usual but post no summary; run.py --deliver-run N posts it later")
     parser.add_argument("--wait-lock", type=int, default=0, metavar="MINUTES",
                         help="if another run holds the lock, wait up to this many minutes for it")
     parser.add_argument("--remind", action="store_true", help="post Slack reminders for Pursue calls due soon, then exit")
