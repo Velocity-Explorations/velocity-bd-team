@@ -18,9 +18,9 @@ npm run dev                          # http://localhost:8000
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Development server with live reload, on port 8000 (3000 is taken by another app on this machine). |
+| `npm run dev` | Development server with live reload, on 127.0.0.1:8000, so only this PC reaches it (3000 is taken by another app on this machine). The team uses the hosted container below. |
 | `npm run build` | Production build, including the TypeScript check. |
-| `npm start` | Serves the production build, also on port 8000. (Next warns that the build is standalone; the container runs its `server.js` instead.) |
+| `npm start` | Serves the production build, also on 127.0.0.1:8000. (Next warns that the build is standalone; the container runs its `server.js` instead.) |
 | `npm test` | Unit tests for the helpers in `lib/`, on Node's built-in test runner. |
 
 Next.js sends anonymous usage telemetry by default. `npx next telemetry disable` turns it off
