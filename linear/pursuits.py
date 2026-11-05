@@ -1,5 +1,5 @@
 """Each call the team pursues gets an issue in the Pursuits project of Velocity's Operations team on Linear, kept in
-step with the call (David, 4 Nov 2026). `run.py --linear-sync` runs this every five minutes.
+step with the call (David, 4 Nov 2026). `run.py --linear-sync` runs this at 08:07 and 13:07 (David, 5 Nov).
 
     changes = sync(LinearBoard(LinearClient()))   # ["c1: opened OPS-101", "c2: OPS-99 moved to Done", ...]
 

@@ -23,9 +23,10 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   notes and cards edited to show decisions (`run.py --feedback-only`, daily task). Live on
   2026-10-16. Since 2026-10-17 reactions are not read: decisions are made on the dashboard.
   Since 2026-11-04 a run posts only its summary, no card per call (David).
-- Linear's Pursuits project (4 Nov 2026): every 5 minutes `run.py --linear-sync` opens an issue in the
-  Operations team's Pursuits project for each call marked Pursue and moves it as the call moves. Waits on
-  BD_LINEAR_API_KEY in .env, migration 012 on the live ledger, and the task installed.
+- Linear's Pursuits project (4 Nov 2026): at 08:07 and 13:07 `run.py --linear-sync` opens an issue in the
+  Operations team's Pursuits project for each call marked Pursue and moves it as the call moves. Live on
+  5 Nov: BD_LINEAR_API_KEY in .env, migration 012 applied, the task installed; the first sync found no
+  open pursued call.
 - Phase 9 (dashboard): Next.js 16.4 app in dashboard/, run locally with `npm run dev`. The only
   place decisions are made: review queue buttons, plus a change control on all calls. Several
   people can decide (DASHBOARD_USERS lists David and Shaun since 2026-10-20); each person's

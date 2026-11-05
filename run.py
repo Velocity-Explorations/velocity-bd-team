@@ -892,7 +892,7 @@ def run_all(portals_to_run: list[Portal], args: argparse.Namespace, log_path: Pa
 
 def linear_sync() -> int:
     """`--linear-sync`: an issue in Linear's Pursuits project for each call the team pursues, moved as the call moves
-    (linear/pursuits.py). Every five minutes, without the pipeline's lock; nothing happens without BD_LINEAR_API_KEY."""
+    (linear/pursuits.py). At 08:07 and 13:07, without the pipeline's lock; nothing happens without BD_LINEAR_API_KEY."""
     from linear.board import LinearBoard
     from linear.client import LinearClient
     from linear.pursuits import sync
