@@ -11,7 +11,7 @@ const TONES: Record<string, string> = {
   no: "bad",
   pursue: "good",
   submitted: "info",
-  not_relevant: "grey",
+  not_relevant: "bad",   // the same red as a judge's no (David, 5 Nov)
   dismissed: "grey",
   completed: "good",
   running: "info",

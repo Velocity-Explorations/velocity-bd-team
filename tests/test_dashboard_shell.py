@@ -154,3 +154,15 @@ def test_each_top_10_call_on_home_can_be_decided_there(page: Any) -> None:
     assert first.locator("input[name=return_to]").get_attribute("value") == "/"
     page.keyboard.press("Escape")   # closes the menu without deciding
 
+
+def test_a_not_relevant_decision_wears_the_red_of_a_judges_no(page: Any) -> None:
+    """David, 5 Nov: the team's not relevant chip looks like the judges' no chip."""
+    open_page(page, "/")
+    chips = page.locator("section.top-ten tbody .badge", has_text="not relevant")
+    if chips.count() == 0:
+        pytest.skip("no Top 10 call is marked not relevant")
+    no = page.locator("section.top-ten tbody .badge", has_text=re.compile(r"^no$"))
+    assert "tone-bad" in (chips.first.get_attribute("class") or "")
+    if no.count():
+        assert chips.first.get_attribute("class") == no.first.get_attribute("class")
+
