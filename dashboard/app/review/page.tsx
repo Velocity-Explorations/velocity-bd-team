@@ -11,7 +11,7 @@ import { ViewCards } from "@/components/ViewCards";
 import { Flash, PageLinks } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
 import { shows } from "@/lib/columns";
-import { yourVote } from "@/lib/decide";
+import { asksReason, yourVote } from "@/lib/decide";
 import { callDetails, deadlineNote } from "@/lib/details";
 import { detailSources } from "@/lib/description";
 import {
@@ -333,6 +333,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
                         draft={draft}
                         drafting={readiness !== "not set up"}
                         start={{ portal: r.portal, due: formatDue(r.due_date, tz), format: draftFormat(r.type), block: draftBlock(r) }}
+                        askReason={asksReason(r.ai_verdict)}
                       />
                     </tr>,
                     <ReasonsPanel

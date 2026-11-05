@@ -147,8 +147,8 @@ def test_each_top_10_call_on_home_can_be_decided_there(page: Any) -> None:
     assert "decide" in [t.strip().lower() for t in page.locator("section.top-ten thead th").all_inner_texts()]
     assert page.locator("section.top-ten tbody td.decide").count() == rows.count()
     first = rows.first
-    first.locator("details.decide-menu summary").click()
-    items = [t.strip() for t in first.locator("details.decide-menu .menu-body button").all_inner_texts()]
+    first.locator("details.decide-menu > summary").click()
+    items = [t.strip() for t in first.locator("details.decide-menu > .menu-body > button, details.decide-menu > .menu-body > details > summary").all_inner_texts()]
     assert items[:4] == ["Pursue", "Not relevant", "Submitted", "Dismiss"]
     assert page.url.rstrip("/") == URL   # opening the menu stays on Home; the row's link is not followed
     assert first.locator("input[name=return_to]").get_attribute("value") == "/"

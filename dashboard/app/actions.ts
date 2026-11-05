@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
 import { signIn, signOut } from "@/auth";
+import { readChoice, reasonNote } from "@/lib/decide";
 import { isoNow, zonedToIso } from "@/lib/format";
 import { safeFrom, SIGNED_IN_COOKIE } from "@/lib/signin";
 import { timeZone } from "@/lib/me";
@@ -74,11 +75,13 @@ function backTo(returnTo: string, key: "notice" | "error", message: string, vote
 export async function decide(formData: FormData): Promise<void> {
   const returnTo = safeReturnTo(formData.get("return_to"));
   const id = String(formData.get("id") ?? "").trim();
-  const asked = formData.get("status");
-  const thenDraft = asked === "pursue_draft";   // the Decide menu's Pursue and start the draft (Q9)
-  const status = thenDraft ? "pursue" : asked;
+  const choice = readChoice(formData.get("status"));   // Not relevant may carry its reason ("not_relevant:hardware")
+  const thenDraft = choice.status === "pursue_draft";   // the Decide menu's Pursue and start the draft (Q9)
+  const status = thenDraft ? "pursue" : choice.status;
   const expectedField = String(formData.get("expected") ?? "");
-  const note = String(formData.get("note") ?? "").slice(0, MAX_NOTE_CHARS);
+  const typed = String(formData.get("note") ?? "");
+  const words = choice.reason === "other" ? String(formData.get("reason_text") ?? "").trim() || typed : typed;
+  const note = reasonNote(choice.reason, words).slice(0, MAX_NOTE_CHARS);   // the reason is the note the judges learn from
   if (!id || !isDecision(status)) backTo(returnTo, "error", "Choose a decision first.");
   if (expectedField && !isDecision(expectedField)) backTo(returnTo, "error", "That form is out of date. Reload and try again.");
   const expected = isDecision(expectedField) ? expectedField : null;

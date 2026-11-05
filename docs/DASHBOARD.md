@@ -292,6 +292,12 @@ who decided, what, when and the note, so every person's decision is kept. On `ca
 - `human_notes`: when a note is typed, one line appended in the pipeline's `[at by] text`
   format, the same as `append_note()` and Slack thread replies
 
+On a call Claude rated yes or maybe, Not relevant opens its reasons (David, 5 Nov 2026): Mostly hardware, Staffing or
+IT support, Wrong customer or eligibility, Too broad with no clear fit, Award or sole-source notice, or another reason
+typed in (`lib/decide.ts` NOT_RELEVANT_REASONS). The reason, with any note typed after it, is the decision's note.
+The judges' examples of recent decisions (`review/feedback.py`) show the team's note in place of Claude's own
+reasoning, so the reason is what tells both judges which part made the whole call wrong for Velocity.
+
 Choosing the decision a call already has, when someone else made it, adds your row in
 `decisions` and leaves the call's decision, its author and its time alone (a note is still
 appended). Saving your own current decision again with a note only appends the note; with no

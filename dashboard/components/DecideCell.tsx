@@ -1,7 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { decide } from "@/app/actions";
 import { Badge, toneOf } from "@/components/bits";
-import { decideLabel, dueLine, type VoteLike } from "@/lib/decide";
+import { decideLabel, dueLine, NOT_RELEVANT_REASONS, type VoteLike } from "@/lib/decide";
 import { formatTime } from "@/lib/format";
 import { stepLabel } from "@/lib/proposals";
 import type { DraftInfo } from "@/lib/queries";
@@ -22,9 +22,11 @@ export type DecideMode = "waiting" | "mixed" | "all";
  * when it is due, within 14 days) or You: and your decision. The button carries the accent border
  * on a call waiting for you, and reads Decide, Change or Add yours. A pursued call with no draft shows
  * Start the draft; one with a draft, Open workspace with its current step (Q17, PRO-576). On a page without the Start
- * the draft dialog (Home), `startIn` names the page that has it, and Start the draft opens it there.
+ * the draft dialog (Home), `startIn` names the page that has it, and Start the draft opens it there. With `askReason`
+ * (a call Claude rated yes or maybe), Not relevant opens its reasons, and the one chosen becomes the decision's note,
+ * which the judges learn from (David, 5 Nov).
  */
-export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, returnTo, keep, note, tz, draft, drafting, start, startIn }: {
+export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, returnTo, keep, note, tz, draft, drafting, start, startIn, askReason }: {
   call: { id: string; title: string | null; human_status: string | null; human_at?: string | null; days_left: number | null };
   mode: DecideMode;
   viewer: string | null;
@@ -39,6 +41,7 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
   drafting: boolean;
   start: { portal: string; due: string; format: string; block: string | null };
   startIn?: string;
+  askReason?: boolean;
 }) {
   const label = mode === "waiting" ? "Decide" : decideLabel({ yours, callStatus: call.human_status });
   const waitingForYou = mode === "waiting" || (Boolean(viewer) && eligible && !yours);
@@ -80,12 +83,34 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
             <ChevronDown aria-hidden="true" />
           </summary>
           <div className="menu-body">
-            {DECISIONS.map((d) => (
-              <button key={d.value} type="submit" name="status" value={d.value} className={`menu-item tone-${toneOf(d.value)}`}>
-                <span className="sq" aria-hidden="true" />
-                {d.label}
-              </button>
-            ))}
+            {DECISIONS.map((d) =>
+              d.value === "not_relevant" && askReason ? (
+                <details key={d.value} className="reason-menu">
+                  <summary className={`menu-item tone-${toneOf(d.value)}`}>
+                    <span className="sq" aria-hidden="true" />
+                    {d.label}
+                    <ChevronDown aria-hidden="true" />
+                  </summary>
+                  <div className="reason-body">
+                    <p className="hint">Why is it not for Velocity? The judges learn from it.</p>
+                    {NOT_RELEVANT_REASONS.map((r) => (
+                      <button key={r.key} type="submit" name="status" value={`not_relevant:${r.key}`} className="menu-item">
+                        {r.label}
+                      </button>
+                    ))}
+                    <input type="text" name="reason_text" maxLength={300} placeholder="Another reason" aria-label={`Another reason ${call.title || call.id} is not relevant`} />
+                    <button type="submit" name="status" value="not_relevant:other" className="menu-item">
+                      Save another reason
+                    </button>
+                  </div>
+                </details>
+              ) : (
+                <button key={d.value} type="submit" name="status" value={d.value} className={`menu-item tone-${toneOf(d.value)}`}>
+                  <span className="sq" aria-hidden="true" />
+                  {d.label}
+                </button>
+              ),
+            )}
             {draft ? null : (
               <button type="submit" name="status" value="pursue_draft" className="menu-item tone-good" disabled={!drafting || Boolean(start.block)}>
                 <span className="sq" aria-hidden="true" />

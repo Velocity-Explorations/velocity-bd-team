@@ -4,7 +4,7 @@ import { DecideCell } from "@/components/DecideCell";
 import { DraftBadge } from "@/components/DraftBadge";
 import { PortalLogo } from "@/components/PortalLogo";
 import { Badge, TitleLink } from "@/components/bits";
-import { yourVote } from "@/lib/decide";
+import { asksReason, yourVote } from "@/lib/decide";
 import { descriptionCell } from "@/lib/description";
 import { formatDue } from "@/lib/format";
 import { daysLeftText, topTenOrder } from "@/lib/home";
@@ -156,6 +156,7 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide }: {
                     drafting={decide.drafting}
                     start={{ portal: call.portal, due: formatDue(call.due_date, tz), format: draftFormat(call.type), block: draftBlock(call) }}
                     startIn="/proposals"
+                    askReason={asksReason(call.ai_verdict)}
                   />
                 ) : null}
                 <td className="row-arrow" aria-hidden="true">
