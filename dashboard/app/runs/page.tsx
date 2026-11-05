@@ -3,7 +3,7 @@ import { ArrowRight, ChevronDown } from "lucide-react";
 import { AutomationCards } from "@/components/AutomationCards";
 import { HeaderCell } from "@/components/HeaderCell";
 import { PortalLogo } from "@/components/PortalLogo";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { Badge, toneOf } from "@/components/bits";
 import { filterHref, pickMany } from "@/lib/filters";
 import { formatAgo, formatDuration, formatTime, parseStageCounts } from "@/lib/format";
@@ -37,6 +37,7 @@ function Counts({ text }: { text: string | null }) {
  * sortable Started column.
  */
 export default async function ScansPage({ searchParams }: { searchParams: SearchParams }) {
+  preloadShell("automation");   // the frame's queries run beside this page's
   const sp = await searchParams;
   const view = firstParam(sp.view, 20) === "problems" ? "problems" : "runs";
   const known = await runPortals();

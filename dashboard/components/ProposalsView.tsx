@@ -4,7 +4,7 @@ import { CallCell, DueCell } from "@/components/CallCells";
 import { DraftBadge } from "@/components/DraftBadge";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
 import { Badge, Flash } from "@/components/bits";
 import { filterHref, pickMany, pickState, type Params } from "@/lib/filters";
@@ -118,6 +118,7 @@ function Empty({ view, filtered, clearHref }: { view: ProposalView; filtered: bo
  * draft shows its badge (DB1 to DB3).
  */
 export async function ProposalsView({ view, sp }: { view: ProposalView; sp: SearchParams }) {
+  preloadShell("proposals");   // the frame's queries run beside this page's
   const [portalList, tagChoices] = await Promise.all([portals(), tagOptions()]);
   const bar = {
     portals: pickMany(sp.portal, portalList.map((p) => p.name)),

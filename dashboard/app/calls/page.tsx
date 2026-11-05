@@ -6,7 +6,7 @@ import { DraftBadge } from "@/components/DraftBadge";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
 import { NotesPanel, ReasonsPanel } from "@/components/RowPanels";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
 import { Badge, Flash, PageLinks } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
@@ -65,6 +65,7 @@ const STATUS_CHOICES = [
  * Decide. A decision here changes the call's (the newest wins), and every person's is kept.
  */
 export default async function CallsPage({ searchParams }: { searchParams: SearchParams }) {
+  preloadShell("calls");   // the frame's queries run beside this page's
   const sp = await searchParams;
   const withDefaults = await defaultsRedirect("/calls", sp);
   if (withDefaults) redirect(withDefaults);

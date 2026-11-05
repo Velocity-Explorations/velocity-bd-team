@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import { cache } from "react";
 import { auth } from "@/auth";
 import { googleKeys, IAP_HEADER, verifyIapToken } from "./iap";
 import { parseUsers, pickViewer, type Person } from "./people";
@@ -30,9 +31,9 @@ export function sessionMode(): boolean {
 /**
  * With Google sign-in, the session's email, checked on every call (Server Actions included, so they never rely on
  * proxy.ts alone); the picker's cookie counts for nothing then. Behind IAP, the email in its signed header. Behind
- * another proxy, its header. Otherwise the picker.
+ * another proxy, its header. Otherwise the picker. Worked out once per request.
  */
-export async function currentViewer(): Promise<string | null> {
+export const currentViewer = cache(async (): Promise<string | null> => {
   if (sessionMode()) {
     const email = (await auth())?.user?.email?.trim().toLowerCase();
     if (!email) return null;
@@ -51,7 +52,7 @@ export async function currentViewer(): Promise<string | null> {
     headerValue: header ? (await headers()).get(header) : null,
     cookieValue: (await cookies()).get(VIEWER_COOKIE)?.value ?? null,
   });
-}
+});
 
 /**
  * The team for Working with and the people panels: DASHBOARD_USERS, and with Google sign-in everyone who has signed in

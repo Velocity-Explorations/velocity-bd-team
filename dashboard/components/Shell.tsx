@@ -1,6 +1,6 @@
 import { FileText, House, Inbox, Workflow, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { cache, type ReactNode } from "react";
 import { AccountMenu, type ViewerMode } from "@/components/AccountMenu";
 import { MenuController } from "@/components/MenuController";
 import { StartDraftDialog } from "@/components/StartDraftDialog";
@@ -53,20 +53,36 @@ function viewerMode(): { mode: ViewerMode; why: string } {
  * Table settings is offered in the account menu and the filter bar. Calls and Proposals carry the
  * Start the draft dialog (P6). Pages outside the sections (Profile settings) mark none.
  */
-export async function Shell({ section, children }: { section: Section | null; children: ReactNode }) {
+/**
+ * What the frame shows, once per request. A page starts it first (preloadShell), so its queries run beside the page's
+ * own instead of after them: the frame renders only once the page's data is in, and each query is a round trip of
+ * about 60 ms to the ledger.
+ */
+const shellData = cache(async (section: Section | null) => {
   const { viewer } = await me();
-  const tableSettings = section === "calls";
   const startsDrafts = section === "calls" || section === "proposals";
-  const [counts, hidden, label, filters, draft, tz, past] = await Promise.all([
+  const [counts, hidden, label, filters, draft, tz, past, members] = await Promise.all([
     sectionCounts(viewer),
-    tableSettings ? hiddenColumns() : null,
+    section === "calls" ? hiddenColumns() : null,
     labeler(),
     defaultFilters(),
     startsDrafts ? drafting() : null,
     timeZone(),
     startsDrafts ? pastWork() : null,
+    team(),
   ]);
-  const people = await Promise.all((await team()).map(async (p) => ({ name: p.name, label: label(p.name), initials: await initialsOf(p.name) })));
+  const people = await Promise.all(members.map(async (p) => ({ name: p.name, label: label(p.name), initials: await initialsOf(p.name) })));
+  return { viewer, counts, hidden, label, filters, draft, tz, past, people };
+});
+
+/** Start loading the frame's data at the top of a page; the Shell picks it up when it renders. */
+export function preloadShell(section: Section | null): void {
+  shellData(section).catch(() => undefined);   // a page that redirects first never renders the Shell
+}
+
+export async function Shell({ section, children }: { section: Section | null; children: ReactNode }) {
+  const { viewer, counts, hidden, label, filters, draft, tz, past, people } = await shellData(section);
+  const tableSettings = section === "calls";
   const { mode, why } = viewerMode();
   return (
     <>

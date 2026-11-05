@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { AutomationCards } from "@/components/AutomationCards";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { TitleLink } from "@/components/bits";
 import { agreementText, JUDGES } from "@/lib/judges";
 import { displayPerson } from "@/lib/people";
@@ -24,6 +24,7 @@ function count(n: number, one: string, many: string): string {
 }
 
 export default async function JudgesPage() {
+  preloadShell("automation");   // the frame's queries run beside this page's
   const [records, rows, agreement] = await Promise.all([judgeRecords(), scoreboardRows(), judgeAgreement()]);
   const users = allowlist();
   const name = (by: string) => displayPerson(by, users);

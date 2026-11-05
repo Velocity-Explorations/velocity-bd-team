@@ -8,6 +8,33 @@ import pytest
 from ledger import migrate
 
 
+@pytest.fixture(autouse=True)
+def pages_wait_for_their_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A dashboard page streams its loading screen first (dashboard/app/loading.tsx), and React swaps the page in up to
+    300 ms after the load event, so opening a page in a browser test also waits until the loading screen has gone."""
+    try:
+        from playwright.sync_api import Error, Page
+    except ImportError:
+        return
+
+    def settled(original):   # type: ignore[no-untyped-def]
+        def wait(self, *args, **kwargs):   # type: ignore[no-untyped-def]
+            result = original(self, *args, **kwargs)
+            for _ in range(3):   # a page that redirects in the browser replaces the document once more
+                try:
+                    self.wait_for_function("!document.querySelector('.loading-page')", timeout=60_000)
+                    break
+                except Error as exc:
+                    if "context was destroyed" not in str(exc) and "navigat" not in str(exc):
+                        raise
+                    self.wait_for_load_state("load")
+            return result
+        return wait
+
+    for name in ("goto", "reload", "wait_for_url"):
+        monkeypatch.setattr(Page, name, settled(getattr(Page, name)))
+
+
 @pytest.fixture
 def ledger_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     """Fresh, migrated SQLite ledger per test. Returns the DATABASE_URL in use."""

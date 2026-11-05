@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Shell } from "@/components/Shell";
-import { TopTenTable } from "@/components/TopTenTable";
+import { preloadShell, Shell } from "@/components/Shell";
+import { preloadTopTen, TopTenTable } from "@/components/TopTenTable";
 import { ViewCards } from "@/components/ViewCards";
 import { Flash } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
@@ -43,6 +43,7 @@ function topSource(week: string | null): string {
  * ledger live and records nothing.
  */
 export default async function HomePage({ searchParams }: { searchParams: SearchParams }) {
+  preloadShell("home");   // the frame's queries run beside this page's
   const sp = await searchParams;
   const opening = await openingRedirect();
   if (opening) redirect(opening);
@@ -55,7 +56,10 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     queueCounts({ portals: [], state: "", tag: "" }, waitingFor),
     waitingRequests(),
     proposalCalls({ portals: [], state: "", tag: "" }).then(sortIntoViews),
-    topTenIds(),
+    topTenIds().then((top) => {
+      preloadTopTen(top.ids);   // its rows, judges and drafts, beside the rest
+      return top;
+    }),
     listRuns(1),
     lastCompletedRun(),
     judgeAgreement(),

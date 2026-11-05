@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react";
+import { cache } from "react";
 import { DraftBadge } from "@/components/DraftBadge";
 import { PortalLogo } from "@/components/PortalLogo";
 import { Badge, TitleLink } from "@/components/bits";
@@ -7,6 +8,19 @@ import { formatDue } from "@/lib/format";
 import { daysLeftText, topTenOrder } from "@/lib/home";
 import { verdictsFor } from "@/lib/judges";
 import { draftsFor, latestJudgments, topTenRows } from "@/lib/queries";
+
+/** The calls' rows, both judges and their drafts, read together once per request (the ids as JSON, the cache key). */
+const topTenData = cache(async (key: string) => {
+  const ids = JSON.parse(key) as string[];
+  const [rows, judged, drafts] = await Promise.all([topTenRows(ids), latestJudgments(ids), draftsFor(ids)]);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return { byId, order: topTenOrder(ids, new Set(byId.keys())), judged, drafts };
+});
+
+/** Start reading the Top 10 as soon as its ids are known, beside the page's other queries. */
+export function preloadTopTen(ids: string[]): void {
+  topTenData(JSON.stringify(ids)).catch(() => undefined);
+}
 
 /**
  * The Top 10 table Home and the past weekly briefs share (H2, PRO-570, PRO-573): rank, logo, title
@@ -21,10 +35,7 @@ export async function TopTenTable({ ids, description, tz, nameOf }: {
   tz: string;
   nameOf: (by: string | null) => string;
 }) {
-  const rows = await topTenRows(ids);
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  const order = topTenOrder(ids, new Set(byId.keys()));
-  const [judged, drafts] = await Promise.all([latestJudgments(order), draftsFor(order)]);
+  const { byId, order, judged, drafts } = await topTenData(JSON.stringify(ids));
   if (order.length === 0) {
     return (
       <div className="empty">

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { resetProfileAction, saveProfileAction } from "@/app/actions";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { Flash } from "@/components/bits";
 import { me } from "@/lib/me";
 import { initials } from "@/lib/nav";
@@ -40,6 +40,7 @@ function Setting({ name, help, children }: { name: string; help: string; childre
  * them to any device. Each person edits their own row.
  */
 export default async function ProfilePage({ searchParams }: { searchParams: SearchParams }) {
+  preloadShell(null);   // the frame's queries run beside this page's
   const sp = await searchParams;
   const { viewer, profile } = await me();
   const [portalList, tagChoices] = await Promise.all([portals(), tagOptions()]);

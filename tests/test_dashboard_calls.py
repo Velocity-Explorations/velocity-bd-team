@@ -205,6 +205,7 @@ def test_a_table_shows_a_page_of_calls_with_links_either_side(page: Any, path: s
 
 def test_a_page_past_the_last_opens_the_last(page: Any) -> None:
     open_page(page, "/calls?page=9999")
+    page.wait_for_url(lambda url: "page=9999" not in url, timeout=60_000)   # the page has streamed, so the browser redirects
     if page.locator("table.calls-table").count() == 0 and "page=" not in page.url:
         pytest.skip("the ledger has no calls")
     assert "page=9999" not in page.url

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { decideRequestAction } from "@/app/actions";
 import { AutomationCards } from "@/components/AutomationCards";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { Badge, Flash } from "@/components/bits";
 import { formatTime } from "@/lib/format";
 import { decidedRequests, waitingRequests, type RequestRow } from "@/lib/queries";
@@ -49,6 +49,7 @@ function WaitingCard({ req, tz }: { req: RequestRow; tz: string }) {
  * oldest first, or (`?view=decided`) the last 50 decided, newest first, with their result.
  */
 export default async function RequestsPage({ searchParams }: { searchParams: SearchParams }) {
+  preloadShell("automation");   // the frame's queries run beside this page's
   const sp = await searchParams;
   const view = firstParam(sp.view, 20) === "decided" ? "decided" : "requests";
   const [waiting, decided] = await Promise.all([waitingRequests(), view === "decided" ? decidedRequests(50) : Promise.resolve([])]);

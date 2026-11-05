@@ -22,7 +22,8 @@ services:
       retries: 3
 
   tunnel:
-    image: cloudflare/cloudflared:2026.9.3
+    # 2026.10.7: the version its own log recommended on 5 Nov, after a few QUIC reconnects a day
+    image: cloudflare/cloudflared:2026.10.7
     command: tunnel --no-autoupdate run   # reads TUNNEL_TOKEN
     env_file: .env.tunnel
     depends_on:
