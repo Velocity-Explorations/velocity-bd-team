@@ -20,6 +20,7 @@ import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
 import { finalGate, type ScanJob, type ScanRow } from "./slop";
 import type { PastWorkItem } from "./pastwork";
 import { present } from "./schema";
+import { cacheMs, forget, remember } from "./remember";
 import {
   changeCounts,
   decidedLine,
@@ -64,6 +65,11 @@ export type PanelFilters = { portals: string[]; state: CallState; sort: Sort; ju
 type Db = ReturnType<typeof sql>;
 /** A transaction from db.begin, for the helpers that write inside one. */
 type Tx = TransactionSql<Record<string, never>>;
+
+/** How long the slow-changing reads below are kept (remember.ts). */
+function keepFor(): number {
+  return cacheMs(process.env);
+}
 
 /** The panel's portal and open-or-closed conditions, appended after a WHERE. */
 function panelWhere(db: Db, f: PanelFilters) {
@@ -328,7 +334,11 @@ export async function liveTopTen(): Promise<string[]> {
 
 /** This week's Top 10: the newest Monday brief's, in its order, or the live ranking before the first brief (H2). One
  *  query for the newest week's ranking, where there were two in turn. */
-export async function topTenIds(): Promise<{ ids: string[]; week: string | null }> {
+export function topTenIds(): Promise<{ ids: string[]; week: string | null }> {
+  return remember("top10", keepFor(), readTopTenIds);
+}
+
+async function readTopTenIds(): Promise<{ ids: string[]; week: string | null }> {
   let newest: { week_of: string; body: string | null } | undefined;
   try {
     [newest] = await sql()<{ week_of: string; body: string | null }[]>`
@@ -350,7 +360,11 @@ export async function newThisWeek(): Promise<number> {
 }
 
 /** Every portal that has completed a real scan or has calls, with its number of stored calls (PRO-563). */
-export async function portals(): Promise<PortalOption[]> {
+export function portals(): Promise<PortalOption[]> {
+  return remember("portals", keepFor(), readPortals);
+}
+
+async function readPortals(): Promise<PortalOption[]> {
   const [scanned, counts] = await Promise.all([
     sql()<{ portal: string }[]>`SELECT DISTINCT portal FROM runs WHERE portal IS NOT NULL AND dry_run = 0`,
     sql()<{ portal: string; calls: number }[]>`SELECT portal, COUNT(*)::int AS calls FROM calls WHERE portal IS NOT NULL GROUP BY portal`,
@@ -382,7 +396,11 @@ export async function latestJudgments(callIds: string[]): Promise<Map<string, Ju
 }
 
 /** "Judge agreement" from LEDGER_SCHEMA.md: calls both judges rated, and how many verdicts match. */
-export async function judgeAgreement(): Promise<{ both: number; agree: number } | null> {
+export function judgeAgreement(): Promise<{ both: number; agree: number } | null> {
+  return remember("agreement", keepFor(), readJudgeAgreement);
+}
+
+async function readJudgeAgreement(): Promise<{ both: number; agree: number } | null> {
   try {
     const [row] = await sql()<{ both_judged: number; agree: number }[]>`
       SELECT COUNT(*)::int AS both_judged,
@@ -489,7 +507,7 @@ export async function decideCall(input: {
   const mine = history ? await latestDecisionBy(db, input.id, input.aliases) : null;
   const now = isoNow();
   const line = noteLine(now, input.by, input.note) || null;
-  return db.begin(async (tx): Promise<DecideResult> => {
+  const result = await db.begin(async (tx): Promise<DecideResult> => {
     const [call] = await tx<{ title: string | null; human_status: string | null; human_by: string | null }[]>`
       SELECT title, human_status, human_by FROM calls WHERE id = ${input.id} FOR UPDATE`;
     if (!call) return { ok: false, reason: "That call is no longer in the ledger." };
@@ -526,6 +544,8 @@ export async function decideCall(input: {
     }
     return { ok: true, title: call.title ?? input.id, plan, callStatus: plan === "decide" ? input.status : current };
   });
+  if (result.ok) forget("top10");   // before the first brief, the live Top 10 leaves out decided calls
+  return result;
 }
 
 // ------------------------------------------------------------------ tags
@@ -548,7 +568,11 @@ export async function tagsOn(callIds: string[]): Promise<TagRow[]> {
 }
 
 /** The tag list, in order, for the Tag filter; empty before migration 007. */
-export async function tagOptions(): Promise<TagOption[]> {
+export function tagOptions(): Promise<TagOption[]> {
+  return remember("tags", keepFor(), readTagOptions);
+}
+
+async function readTagOptions(): Promise<TagOption[]> {
   try {
     const rows = await sql()<TagOption[]>`SELECT name, tag_group, covers FROM tag_list ORDER BY position`;
     return [...rows];
@@ -718,7 +742,11 @@ export async function countDecidedRequests(): Promise<number> {
 }
 
 /** How many requests wait for a decision; null when the table is not there yet (migration 002 not applied). */
-export async function countWaitingRequests(): Promise<number | null> {
+export function countWaitingRequests(): Promise<number | null> {
+  return remember("requests", keepFor(), readCountWaitingRequests);
+}
+
+async function readCountWaitingRequests(): Promise<number | null> {
   try {
     const [row] = await sql()<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM change_requests WHERE status = 'proposed'`;
     return row?.n ?? 0;
@@ -749,7 +777,10 @@ export async function decideRequest(input: {
         decision_note = ${input.note.trim() || null}, updated_at = ${now}
     WHERE id = ${input.id} AND status = 'proposed'
     RETURNING summary`;
-  if (updated.length === 1) return { ok: true, summary: updated[0].summary };
+  if (updated.length === 1) {
+    forget("requests");   // the Automation chip counts the requests waiting
+    return { ok: true, summary: updated[0].summary };
+  }
   const [existing] = await db<{ status: string; decided_by: string | null }[]>`
     SELECT status, decided_by FROM change_requests WHERE id = ${input.id}`;
   if (!existing) return { ok: false, reason: `There is no request #${input.id}.` };
@@ -914,7 +945,11 @@ export async function proposalCalls(f: BarFilters): Promise<ProposalCall[]> {
 }
 
 /** The worker's newest heartbeat (PRO-576), or null when it has never run or migration 008 is missing. */
-export async function workerStatus(): Promise<{ name: string; seen_at: string; state: string } | null> {
+export function workerStatus(): Promise<{ name: string; seen_at: string; state: string } | null> {
+  return remember("worker", keepFor(), readWorkerStatus);
+}
+
+async function readWorkerStatus(): Promise<{ name: string; seen_at: string; state: string } | null> {
   const db = sql();
   if (!(await hasTable(db, "workers"))) return null;
   const [row] = await db<{ name: string; seen_at: string; state: string }[]>`
@@ -1015,7 +1050,11 @@ export type ProfileRow = {
 };
 
 /** Every saved profile, by name (PRO-574); empty before migration 008. */
-export async function allProfiles(): Promise<Map<string, ProfileRow>> {
+export function allProfiles(): Promise<Map<string, ProfileRow>> {
+  return remember("profiles", keepFor(), readAllProfiles);
+}
+
+async function readAllProfiles(): Promise<Map<string, ProfileRow>> {
   const db = sql();
   if (!(await hasTable(db, "profiles"))) return new Map();
   const rows = await db<ProfileRow[]>`
@@ -1033,11 +1072,13 @@ export async function saveProfile(name: string, f: ProfileFields): Promise<void>
     ON CONFLICT (name) DO UPDATE SET
       display_name = EXCLUDED.display_name, initials = EXCLUDED.initials, opens = EXCLUDED.opens,
       default_filters = EXCLUDED.default_filters, time_zone = EXCLUDED.time_zone, updated_at = EXCLUDED.updated_at`;
+  forget("profiles");
 }
 
 /** Profile settings' Reset to defaults: the person's row goes, so every default applies. */
 export async function deleteProfile(name: string): Promise<void> {
   await sql()`DELETE FROM profiles WHERE name = ${name}`;
+  forget("profiles");
 }
 
 // ----------------------------------------------------------------- the proposal workspace
@@ -1650,7 +1691,11 @@ export async function recordResult(input: { callId: string; by: string; result: 
 // ----------------------------------------------------------------- the Proposal Library's index (phase 6b)
 
 /** Past work the worker indexed from the Proposal Library (drive_items), and when it last did. */
-export async function pastWork(): Promise<{ items: PastWorkItem[]; indexedAt: string | null }> {
+export function pastWork(): Promise<{ items: PastWorkItem[]; indexedAt: string | null }> {
+  return remember("pastwork", keepFor(), readPastWork);
+}
+
+async function readPastWork(): Promise<{ items: PastWorkItem[]; indexedAt: string | null }> {
   const db = sql();
   if (!(await hasTable(db, "drive_items"))) return { items: [], indexedAt: null };
   const items = await db<PastWorkItem[]>`SELECT id, name, path, mime, web_link, modified_at FROM drive_items ORDER BY path, id`;
