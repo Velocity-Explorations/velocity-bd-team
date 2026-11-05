@@ -91,6 +91,51 @@ def test_ask_model_empty_then_failure_is_maybe_with_review_error() -> None:
     assert len(reason) <= len("Review error: ") + 80
 
 
+class FakeAnthropic:
+    """Stands in for the Anthropic SDK's client: keeps each request and answers with the next scripted response."""
+
+    def __init__(self, responses: list[object]) -> None:
+        self.responses = list(responses)
+        self.requests: list[dict] = []
+        self.messages = self
+
+    def with_options(self, **kwargs: object) -> FakeAnthropic:
+        return self
+
+    def create(self, **kwargs: object) -> object:
+        self.requests.append(kwargs)
+        return self.responses.pop(0)
+
+
+def answer(stop_reason: str, *blocks: tuple[str, str]) -> object:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(stop_reason=stop_reason, content=[SimpleNamespace(type=kind, text=text) for kind, text in blocks])
+
+
+def claude(*responses: object) -> reviewer.AnthropicModel:
+    model = object.__new__(reviewer.AnthropicModel)
+    model.model, model._client = reviewer.MODEL_ID, FakeAnthropic(list(responses))
+    return model
+
+
+def test_the_review_has_room_to_think_and_still_answer() -> None:
+    # 4 Nov: at 1,024 tokens, 4 of 262 SAM.gov reviews spent them all thinking and 24 more were cut mid-reason.
+    model = claude(answer("end_turn", ("thinking", ""), ("text", "VERDICT: yes\nREASON: Fits.")))
+    assert model.complete("p", timeout=5) == "VERDICT: yes\nREASON: Fits."
+    assert model._client.requests[0]["max_tokens"] >= 4096
+
+
+def test_an_answer_cut_off_at_the_token_limit_is_a_failed_try_never_a_review() -> None:
+    cut = answer("max_tokens", ("thinking", ""), ("text", "VERDICT: no\nREASON: The work is hardw"))
+    with pytest.raises(RuntimeError, match="token limit"):
+        claude(cut).complete("p", timeout=5)
+    verdict, reason = reviewer.ask_model("p", claude(answer("max_tokens", ("thinking", "")), cut), sleep=lambda s: None)
+    assert verdict == "maybe" and reason.startswith("Review error: RuntimeError: answer cut off at the token limit")
+    assert reviewer.ask_model("p", claude(cut, answer("end_turn", ("text", "VERDICT: no\nREASON: Hardware."))),
+                              sleep=lambda s: None) == ("no", "Hardware.")
+
+
 def test_review_calls_writes_ledger_and_splits(ledger_db: str) -> None:
     run = lq.start_run("Vulcan SOF")
     for n, title in enumerate(["AI thing", "Hose kit", "Odd one"]):
