@@ -42,7 +42,11 @@ While a page reads the ledger it shows a loading screen (`app/loading.tsx`): the
 placeholder rows, streamed before anything else, so a click shows at once. Each page starts its frame's queries (the
 counts, the people, the library list) at the same time as its own (`preloadShell`), and the client keeps up to eight
 connections to the ledger, each query a round trip of about 60 ms to Supabase. Measured on 5 Nov against the live
-ledger, Needs review fell from 1.2 to 1.7 s to about 0.8 s, Home from 0.7 to 0.9 s to 0.4 s.
+ledger, Needs review fell from 1.2 to 1.7 s to about 0.8 s, Home from 0.7 to 0.9 s to 0.4 s. Reads that change only
+when a scan runs, someone signs in or a setting is saved (the portal list, tags, this week's Top 10, judge agreement,
+the library list, profiles, people, the worker's state, requests waiting) are kept for a minute in the server
+(`lib/remember.ts`; DASHBOARD_CACHE_SECONDS, 0 to keep none), and the writes that change them drop them at once.
+Decisions, queues and drafts are always read fresh.
 
 Each section opens on a row of view cards in place of a page title. The open view's card is marked,
 and switching cards keeps the portal, tag and open or closed filters while dropping the sort and the

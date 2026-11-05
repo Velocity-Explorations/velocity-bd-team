@@ -6,6 +6,7 @@ import { parseUsers } from "./people";
 import { teamName } from "./signin";
 import { isoNow } from "./format";
 import { present } from "./schema";
+import { cacheMs, forget, remember } from "./remember";
 
 export type KnownPerson = { email: string; name: string };
 
@@ -16,17 +17,22 @@ async function hasPeople(): Promise<boolean> {
   });
 }
 
-/** Everyone who has signed in, by name. Empty before migration 010. */
-export async function knownPeople(): Promise<KnownPerson[]> {
-  if (!(await hasPeople())) return [];
-  return [...(await sql()<KnownPerson[]>`SELECT email, name FROM people ORDER BY name`)];
+/** Everyone who has signed in, by name. Empty before migration 010. Kept for a minute (remember.ts). */
+export function knownPeople(): Promise<KnownPerson[]> {
+  return remember("people", cacheMs(process.env), async () => {
+    if (!(await hasPeople())) return [];
+    return [...(await sql()<KnownPerson[]>`SELECT email, name FROM people ORDER BY name`)];
+  });
 }
 
-/** The name a signed-in person decides under, as recorded at their first sign-in. */
-export async function personByEmail(email: string): Promise<string | null> {
-  if (!(await hasPeople())) return null;
-  const [row] = await sql()<{ name: string }[]>`SELECT name FROM people WHERE email = ${email.trim().toLowerCase()}`;
-  return row?.name ?? null;
+/** The name a signed-in person decides under, as recorded at their first sign-in. Kept for a minute. */
+export function personByEmail(email: string): Promise<string | null> {
+  const lower = email.trim().toLowerCase();
+  return remember(`person:${lower}`, cacheMs(process.env), async () => {
+    if (!(await hasPeople())) return null;
+    const [row] = await sql()<{ name: string }[]>`SELECT name FROM people WHERE email = ${lower}`;
+    return row?.name ?? null;
+  });
 }
 
 /** A sign-in, recorded: a new person gets their name (lib/signin.ts teamName), anyone else just their latest sign-in. */
@@ -38,4 +44,6 @@ export async function recordSignIn(email: string, googleName: string | null): Pr
   await sql()`
     INSERT INTO people (email, name, first_seen_at, last_seen_at) VALUES (${lower}, ${name}, ${now}, ${now})
     ON CONFLICT (email) DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at`;
+  forget("people");
+  forget("person");
 }
