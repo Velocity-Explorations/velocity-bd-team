@@ -55,7 +55,7 @@ def test_top_calls_ranks_open_undecided_calls_across_portals(ledger_db: str) -> 
     assert [c["id"] for c in tools.top_calls(limit=2)] == ["v-yes-soon", "f-yes-later"]
 
 
-def scored(call_id: str, claude: str, grok: str | None, fit: int | None, days: float = 20.5) -> None:
+def scored(call_id: str, claude: str, grok: str | None, fit: int | None, days: float | None = 20.5) -> None:
     seed(call_id, "Vulcan SOF", claude, days)
     if grok:
         lq.add_judgment(call_id, "grok", "grok-test", grok, "Grok's reason.")
@@ -78,6 +78,26 @@ def test_top_calls_put_a_yes_from_both_judges_first_then_a_yes_from_one_then_the
         "yes-from-both", "yes-from-both-no-score",
         "same-fit-sooner", "yes-from-claude", "yes-from-grok",
         "listing-hides-its-scope", "one-judge-no", "grok-changed-its-mind",
+    ]
+
+
+def test_inside_each_group_a_call_due_within_60_days_comes_before_one_open_far_longer(ledger_db: str) -> None:
+    """David, 6 Nov: a call open for years should not hold a slot ahead of a yes that closes next month."""
+    scored("both-long-open", "yes", "yes", 90, days=400.5)
+    scored("both-soon", "yes", "yes", 60, days=30.5)
+    scored("one-long-open", "yes", "no", 95, days=400.5)
+    scored("one-undated", "maybe", "yes", 99, days=None)
+    scored("one-past-the-window", "yes", "no", 85, days=61.5)
+    scored("one-soon-better-fit", "yes", "no", 80, days=50.5)
+    scored("one-soon-worse-fit", "yes", "no", 70, days=5.5)
+    scored("one-inside-the-window", "yes", "no", 65, days=59.5)
+    scored("none-soon", "maybe", "maybe", 50, days=10.5)
+    scored("none-long-open", "maybe", "maybe", 95, days=400.5)
+    assert [c["id"] for c in tools.top_calls(limit=20)] == [
+        "both-soon", "both-long-open",
+        "one-soon-better-fit", "one-soon-worse-fit", "one-inside-the-window",
+        "one-undated", "one-long-open", "one-past-the-window",
+        "none-soon", "none-long-open",
     ]
 
 

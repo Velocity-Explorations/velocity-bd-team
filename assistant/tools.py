@@ -33,8 +33,9 @@ NEGATIVE = {"not_relevant", "dismissed"}
 VERDICTS = ("yes", "maybe", "no")
 OVERDUE_DAYS = 8          # scans run weekly; more than this without a completed one is worth saying
 CLOSING_WINDOW_DAYS = 14
+SOON_DAYS = 60            # top picks: inside each yes group, what closes this soon comes before what stays open for years
 TOP_PICKS = 5   # open, undecided calls the weekly summary ranks
-RANKING = "yes from both judges, then yes from one, then the highest fit score, the nearest deadline and the newest"   # how top picks are ordered
+RANKING = "yes from both judges, then yes from one; inside each, what closes within 60 days, then the highest fit score, the nearest deadline and the newest"   # how top picks are ordered
 NOTE_LINE = re.compile(r"^\[(\S+) ([^\]]+)\] ?(.*)$")
 STOPWORDS = {
     "with", "from", "into", "that", "this", "their", "they", "have", "will", "your", "call", "calls",
@@ -436,12 +437,14 @@ def _waiting(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[st
     # broad listing can score 95 with no yes from anyone: the yeses count first (David, 6 Nov). No score comes after a score.
     waiting.sort(key=lambda pair: pair[0].get("first_seen_at") or "", reverse=True)
     verdicts = verdicts_by_call()
+    soon = (moment + timedelta(days=SOON_DAYS)).date()
 
-    def rank(pair: tuple[dict[str, Any], datetime | None]) -> tuple[int, bool, int, bool, datetime]:
+    def rank(pair: tuple[dict[str, Any], datetime | None]) -> tuple[int, bool, bool, int, bool, datetime]:
         row, due = pair
         score = row.get("fit_score")
         judges = {**verdicts.get(row["id"], {}), "claude": row["ai_verdict"]}   # the call's own verdict is Claude's newest
-        return (-sum(verdict == "yes" for verdict in judges.values()), score is None, -(score or 0), due is None, due or moment)
+        yeses = sum(verdict == "yes" for verdict in judges.values())
+        return (-yeses, due is None or due.date() > soon, score is None, -(score or 0), due is None, due or moment)
 
     waiting.sort(key=rank)
     return waiting
