@@ -67,8 +67,13 @@ def test_tags_are_read_from_the_answer_s_tags_line(text: str, expected: list[str
 
 
 @pytest.mark.parametrize(("row", "expected"), [
-    (call(portal="Vulcan SOF", type="OTA Prototype", department="USSOCOM / SOF Enterprise"), ["OTA", "SOCOM"]),
-    (call(portal="Vulcan SOF", type="Tech Experimentation"), ["Demo or exercise", "SOCOM"]),
+    (call(portal="Vulcan SOF", type="OTA Prototype", department="USSOCOM / SOF Enterprise"), ["OTA"]),   # the office is on every call
+    (call(portal="Vulcan SOF", type="Tech Experimentation"), ["Demo or exercise"]),
+    (call(portal="Vulcan SOF", type="Tech Experimentation", title="Balikatan 2027"), ["Demo or exercise", "INDOPACOM"]),
+    (call(portal="Vulcan SOF", title="U.S. PACOM FY27 Experiment Calling Message"), ["INDOPACOM"]),
+    (call(portal="SAM.gov", type="RFI", department="DEPT OF DEFENSE / USSOCOM / SOF AT&L"), ["RFI", "SOCOM"]),
+    (call(portal="SAM.gov", type="RFI", department="DEPT OF DEFENSE / USINDOPACOM"), ["RFI", "INDOPACOM"]),
+    (call(portal="SAM.gov", type="RFI", title="Pacomp sensor resin"), ["RFI"]),
     (call(portal="NASA Forecast", type="Forecast", department="NASA KSC", set_aside="Small Business Set Aside - Total"),
      ["Forecast", "NASA", "Small business set-aside"]),
     (call(portal="NASA Forecast", type="Forecast", set_aside="No set aside used"), ["Forecast", "NASA"]),
@@ -130,7 +135,7 @@ def test_a_failed_or_tagless_answer_leaves_the_tags_alone(ledger_db: str) -> Non
 def test_the_pipeline_tags_every_call_a_run_saw_by_its_rules(ledger_db: str) -> None:
     row = seed()
     assert run.tag_by_rules(row["last_run_id"]) == 1
-    assert lq.tags_on("c-1") == {"rule": ["OTA", "SOCOM"]}
+    assert lq.tags_on("c-1") == {"rule": ["OTA"]}
 
 
 def test_the_backfill_tags_every_call_by_rules_and_reviewed_calls_by_both_judges(
@@ -142,8 +147,8 @@ def test_the_backfill_tags_every_call_by_rules_and_reviewed_calls_by_both_judges
     monkeypatch.setattr(run, "grok_model", lambda: FakeModel(["TAGS: OTA, AI and ML"]))
     monkeypatch.setattr(run, "grok_enabled", lambda: True)
     assert run.backfill_tags() == 0
-    assert lq.tags_on("k-1") == {"rule": ["OTA", "SOCOM"], "claude": ["OTA", "Software"], "grok": ["OTA", "AI and ML"]}
-    assert lq.tags_on("r-1") == {"rule": ["OTA", "SOCOM"]}
+    assert lq.tags_on("k-1") == {"rule": ["OTA"], "claude": ["OTA", "Software"], "grok": ["OTA", "AI and ML"]}
+    assert lq.tags_on("r-1") == {"rule": ["OTA"]}
     assert run.backfill_tags() == 0   # a second pass finds nothing left to ask the judges
 
 

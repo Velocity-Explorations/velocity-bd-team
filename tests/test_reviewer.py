@@ -29,7 +29,7 @@ ROW = {"id": "vulcan-1", "title": "AI Digital Scribe", "portal": "Vulcan SOF", "
 def test_build_prompt_has_context_fields_and_truncates_description() -> None:
     p = reviewer.build_prompt(ROW)
     assert p.startswith("Velocity Explorations is a small defense technology company")
-    assert "Title: AI Digital Scribe" in p and "Agency: USSOCOM / SOF Enterprise" in p
+    assert "Title: AI Digital Scribe" in p and "Agency: Not stated" in p
     assert "Description: " + "x" * 1500 + "\n" in p and "x" * 1501 not in p
     assert "weight that positively.\n\nTags: choose only from this list." in p   # the tag list comes last (PRO-556)
     with_blocks = reviewer.build_prompt(ROW, "PAST\n", "FEEDBACK\n")
@@ -40,6 +40,13 @@ def test_the_prompt_asks_for_the_main_work_and_to_rate_the_call_on_it() -> None:
     p = reviewer.build_prompt(ROW)
     assert "MAIN WORK: [the one Work tag" in p and "Rate the call on its main work." in p
     assert p.index("TAGS: [") < p.index("MAIN WORK: [") < p.index("SUMMARY: [")
+
+
+def test_a_portal_that_writes_one_office_on_every_call_does_not_name_the_buyer_in_the_prompt() -> None:
+    vulcan = reviewer.build_prompt({**ROW, "department": "USSOCOM / SOF Enterprise"})
+    assert "USSOCOM / SOF Enterprise" not in vulcan and "Agency: Not stated; Vulcan SOF lists calls for SOCOM and for other commands" in vulcan
+    other = reviewer.build_prompt({**ROW, "portal": "SAM.gov", "department": "DEPT OF THE NAVY"})
+    assert "Agency: DEPT OF THE NAVY" in other
 
 
 def test_the_profile_says_what_the_record_shows() -> None:

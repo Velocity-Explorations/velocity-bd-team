@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from ledger.queries import add_judgment, set_main_work, set_review, set_summary, set_tags
-from review.tags import parse_main_work, parse_tags, prompt_block, tag_list
+from review.tags import OFFICE_SAYS_NOTHING, parse_main_work, parse_tags, prompt_block, tag_list
 
 log = logging.getLogger("review")
 
@@ -194,6 +194,14 @@ class Reviewed:
     match_tier: str | None = None
 
 
+def agency_line(row: Mapping[str, Any]) -> str:
+    """The prompt's Agency line. Where a portal writes the same office on every call, it would tell the judges the wrong
+    buyer: they tagged nearly every Vulcan SOF call SOCOM, whoever it was for."""
+    if row.get("portal") in OFFICE_SAYS_NOTHING:
+        return f"Not stated; {row['portal']} lists calls for SOCOM and for other commands, so read the description"
+    return row.get("department") or ""
+
+
 def build_prompt(
     row: Mapping[str, Any],
     past_experience_block: str = "",
@@ -213,7 +221,7 @@ def build_prompt(
         portal=row.get("portal") or "",
         type=row.get("type") or "",
         naics_code=row.get("naics_code") or "",
-        department=row.get("department") or "",
+        department=agency_line(row),
         description=(row.get("description") or "")[:DESCRIPTION_CHARS],
         tags_block=prompt_block(tag_list()),
         summary_ask=SUMMARY_ASK,
@@ -226,7 +234,7 @@ def build_tag_prompt(row: Mapping[str, Any]) -> str:
         portal=row.get("portal") or "",
         type=row.get("type") or "",
         naics_code=row.get("naics_code") or "",
-        department=row.get("department") or "",
+        department=agency_line(row),
         description=(row.get("description") or "")[:DESCRIPTION_CHARS],
         tags_block=prompt_block(tag_list()),
     )
