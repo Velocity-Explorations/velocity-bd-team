@@ -192,6 +192,34 @@ def test_a_score_takes_the_judges_newest_verdicts(ledger_db: str) -> None:
     assert lq.get_call("named")["fit_band"] == "strong"
 
 
+def test_the_worker_scores_every_call_again_when_a_rating_changes(ledger_db: str) -> None:
+    from drafting import worker
+
+    lq.save_fit_ratings([{"key": "work.software", "section": "work", "name": "Software", "rating": "core", "note": ""}])
+    seed("named")
+    lq.add_judgment("named", "claude", "m", "yes", "ok")
+    lq.set_main_work("named", "claude", "Software")
+    job_id = lq.queue_job("fit_scores", None, None, "David Wood")
+    worker.run_job(lq.claim_next_job())
+    done = lq.get_job(job_id)
+    assert done["state"] == "done" and done["result"] == "Scored: 1 strong."
+    assert lq.get_call("named")["fit_band"] == "strong"
+
+
+def test_a_call_whose_score_has_not_moved_is_not_written_again(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    lq.save_fit_ratings([{"key": "work.software", "section": "work", "name": "Software", "rating": "core", "note": ""}])
+    seed("named")
+    lq.add_judgment("named", "claude", "m", "yes", "ok")
+    lq.set_main_work("named", "claude", "Software")
+    assert run.fit_scores() == 0
+
+    def no_write(*_args: object) -> None:
+        raise AssertionError("nothing changed, so nothing should be written")
+
+    monkeypatch.setattr(fit, "set_fit", no_write)
+    assert run.fit_scores() == 0
+
+
 def test_a_dry_run_of_the_scores_writes_nothing(ledger_db: str, capsys: pytest.CaptureFixture[str]) -> None:
     lq.save_fit_ratings([{"key": "work.software", "section": "work", "name": "Software", "rating": "core", "note": ""}])
     seed("named")

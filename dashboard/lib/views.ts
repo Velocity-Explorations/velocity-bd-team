@@ -4,7 +4,7 @@
 
 export type CallView = "needs-review" | "top10" | "due-soon" | "judges-agree" | "judges-disagree" | "new";
 export type CallCard = CallView | "all";
-export type AutomationPage = "requests" | "decided" | "runs" | "problems" | "judges";
+export type AutomationPage = "requests" | "decided" | "runs" | "problems" | "judges" | "fit";
 
 /** One card: its band, number and line, where it goes, and whether it is the open view. */
 export type ViewCard = {
@@ -122,6 +122,7 @@ export function automationCards(input: {
   lastRun: string;
   problems: number;
   agree: { both: number; agree: number } | null;
+  ratings: number | null;
 }): ViewCard[] {
   const { agree } = input;
   const card = (key: AutomationPage, label: string, href: string, count: number | string, description: string, needsYou = false): ViewCard =>
@@ -138,5 +139,6 @@ export function automationCards(input: {
       agree && agree.both ? `${Math.round((100 * agree.agree) / agree.both)}%` : "none",
       agree && agree.both ? `${agree.agree} of ${agree.both} calls` : "no call judged by both yet",
     ),
+    card("fit", "Fit ratings", "/fit", input.ratings ?? "none", input.ratings ? "what every call's fit score is built from" : "nothing rated yet"),
   ];
 }

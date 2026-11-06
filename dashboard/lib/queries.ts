@@ -5,6 +5,7 @@ import type { TransactionSql } from "postgres";
 import { sql } from "./db";
 import { CLOSED_PATTERN, PAGE_SIZE, portalOptions, type CallState, type PortalOption, type Sort } from "./filters";
 import type { FitColumns } from "./fit";
+import type { CallTag, EvidenceCall, JudgeRow, RatingRow, TagRow as FitTagRow } from "./fitratings";
 import type { JudgeFilter, Judgment } from "./judges";
 import type { TagOption, TagRow } from "./tags";
 import { isoNow } from "./format";
@@ -157,6 +158,89 @@ function fitColumns(db: Db, present: boolean) {
 /** Whether calls can be scored and sorted by fit: migration 013 is applied. */
 export async function hasFitScore(): Promise<boolean> {
   return hasColumn(sql(), "calls", "fit_score");
+}
+
+/** What the Fit ratings page shows; null before migration 013. Kept for a minute apart from the ratings themselves, which
+ *  a change on the page must show at once. */
+export async function fitRatingInputs(): Promise<{ ratings: RatingRow[]; tags: FitTagRow[]; calls: EvidenceCall[]; callTags: CallTag[]; judges: JudgeRow[] } | null> {
+  const db = sql();
+  if (!(await hasFitScore())) return null;
+  const changedBy = (await hasColumn(db, "fit_ratings", "changed_by")) ? db`changed_by` : db`NULL::text AS changed_by`;
+  const [ratings, evidence] = await Promise.all([
+    db<RatingRow[]>`SELECT key, section, name, rating, note, loaded_at, ${changedBy} FROM fit_ratings`,
+    remember("fit-evidence", keepFor(), readFitEvidence),
+  ]);
+  return { ratings: [...ratings], ...evidence };
+}
+
+async function readFitEvidence() {
+  const db = sql();
+  const [tags, calls, callTags, judges] = await Promise.all([
+    db<FitTagRow[]>`SELECT name, tag_group, covers FROM tag_list ORDER BY position`,
+    db<EvidenceCall[]>`SELECT id, title, url, type, naics_code, matched_keywords, human_status FROM calls`,
+    db<CallTag[]>`SELECT DISTINCT call_id, tag FROM call_tags`,
+    db<JudgeRow[]>`SELECT call_id, judge, verdict, main_work FROM judgments ORDER BY id`,
+  ]);
+  return { tags: [...tags], calls: [...calls], callTags: [...callTags], judges: [...judges] };
+}
+
+/** How many ratings there are, for Automation's card; null before migration 013. */
+export function fitRatingCount(): Promise<number | null> {
+  return remember("fit-count", keepFor(), async () => {
+    const db = sql();
+    if (!(await hasFitScore())) return null;
+    const [row] = await db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM fit_ratings`;
+    return row?.n ?? 0;
+  });
+}
+
+/** Open, undecided calls by fit band, and the newest job that scored them again; null before migration 013. */
+export async function fitOverview(): Promise<{ bands: Record<string, number>; job: { state: string; finished_at: string | null } | null } | null> {
+  const db = sql();
+  if (!(await hasFitScore())) return null;
+  const [bands, jobs] = await Promise.all([
+    db<{ fit_band: string; n: number }[]>`
+      SELECT fit_band, COUNT(*)::int AS n FROM calls
+      WHERE filter_result = 'kept' AND human_status IS NULL AND fit_band IS NOT NULL
+        AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
+        AND (${dueDate(db)} >= CURRENT_DATE OR ${dueDate(db)} IS NULL)
+      GROUP BY fit_band`,
+    db<{ state: string; finished_at: string | null }[]>`
+      SELECT state, finished_at FROM worker_jobs WHERE kind = 'fit_scores' ORDER BY id DESC LIMIT 1`,
+  ]);
+  return { bands: Object.fromEntries(bands.map((b) => [b.fit_band, b.n])), job: jobs[0] ?? null };
+}
+
+/**
+ * Keep a person's rating of one tag, keyword or NAICS code, or clear it (rating null), and ask the worker to score every
+ * call again, unless a job is already waiting: one that has started may have read the old rating, so another is queued.
+ */
+export async function saveFitRating(input: { key: string; section: string; name: string; rating: string | null; note: string; by: string }): Promise<void> {
+  const db = sql();
+  const withBy = await hasColumn(db, "fit_ratings", "changed_by");
+  const now = isoNow();
+  await db.begin(async (tx) => {
+    if (input.rating === null) {
+      await tx`DELETE FROM fit_ratings WHERE key = ${input.key}`;
+    } else if (withBy) {
+      await tx`
+        INSERT INTO fit_ratings (key, section, name, rating, note, loaded_at, changed_by)
+        VALUES (${input.key}, ${input.section}, ${input.name}, ${input.rating}, ${input.note || null}, ${now}, ${input.by})
+        ON CONFLICT (key) DO UPDATE SET rating = EXCLUDED.rating, note = EXCLUDED.note, loaded_at = EXCLUDED.loaded_at, changed_by = EXCLUDED.changed_by`;
+    } else {
+      await tx`
+        INSERT INTO fit_ratings (key, section, name, rating, note, loaded_at)
+        VALUES (${input.key}, ${input.section}, ${input.name}, ${input.rating}, ${input.note || null}, ${now})
+        ON CONFLICT (key) DO UPDATE SET rating = EXCLUDED.rating, note = EXCLUDED.note, loaded_at = EXCLUDED.loaded_at`;
+    }
+    const [waiting] = await tx`SELECT 1 FROM worker_jobs WHERE kind = 'fit_scores' AND state = 'queued'`;
+    if (!waiting) {
+      await tx`
+        INSERT INTO worker_jobs (kind, pursuit_id, payload, state, requested_by, requested_at, updated_at)
+        VALUES ('fit_scores', NULL, NULL, 'queued', ${input.by}, ${now}, ${now})`;
+    }
+  });
+  forget("fit-count");
 }
 
 /** True when a ledger table exists; a migration may not be applied to this database yet. Once found, remembered. */

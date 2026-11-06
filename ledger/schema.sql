@@ -426,3 +426,7 @@ CREATE TABLE IF NOT EXISTS fit_ratings (
   note        TEXT,
   loaded_at   TEXT NOT NULL
 );
+
+-- 014_fit_rating_changes: who last changed a fit rating on the dashboard's Fit ratings page.
+
+ALTER TABLE fit_ratings ADD COLUMN changed_by TEXT;

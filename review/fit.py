@@ -14,10 +14,12 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from ledger.queries import calls_where, fit_ratings, main_work_by_call, set_fit, tags_by_call, verdicts_by_call
 from review.tags import tag_list
 
 VALUES = {"core": 1.0, "good": 0.75, "neutral": 0.5, "poor": 0.25, "never": 0.0}
@@ -95,6 +97,35 @@ def _keywords(call: Mapping[str, Any], ratings: Mapping[str, str]) -> tuple[floa
     if not counted:
         return VALUES[NEUTRAL], []
     return sum(VALUES[rating] for _, rating in counted) / len(counted), [f"Keyword {word}: {rating}" for word, rating in counted]
+
+
+def band_line(bands: Mapping[str, int]) -> str:
+    """How many calls fell in each band, in words."""
+    return ", ".join(f"{bands[band]} {band}" for band in BANDS if bands.get(band))
+
+
+def score_rows(rows: Sequence[Mapping[str, Any]], write: bool = True) -> dict[str, int] | None:
+    """Score these calls from the team's ratings and store what changed; how many fell in each band, or None when nobody
+    has rated anything yet."""
+    ratings = fit_ratings()
+    if not ratings:
+        return None
+    tags, named, verdicts = tags_by_call(), main_work_by_call(), verdicts_by_call()
+    bands: Counter[str] = Counter()
+    for row in rows:
+        fit = score_call(row, tags.get(row["id"], {}), named.get(row["id"], {}), ratings, verdicts.get(row["id"]))
+        if fit is None:
+            continue
+        bands[fit.band] += 1
+        if write and (row.get("fit_score"), row.get("fit_band"), row.get("fit_why")) != (fit.score, fit.band, json.dumps(fit.why)):
+            set_fit(row["id"], fit.score, fit.band, fit.why)
+    return dict(bands)
+
+
+def score_all(write: bool = True) -> tuple[dict[str, int] | None, int]:
+    """Score every kept, reviewed call a judge has named the main work of: (bands, how many calls were looked at)."""
+    rows = calls_where(filter_result="kept", reviewed=True)
+    return score_rows(rows, write), len(rows)
 
 
 def score_call(call: Mapping[str, Any], tags_by_source: Mapping[str, Sequence[str]], main_work: Mapping[str, str | None],

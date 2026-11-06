@@ -409,9 +409,11 @@ Claude and Grok pick the rest on a TAGS line of the review answer they already g
 no extra model calls. A tagging failure only logs a warning.
 
 Fit score (PRO-487, `review/fit.py`). Each judge names a call's main work on the MAIN WORK line of its answer.
-The team rates each tag, keyword and NAICS code on the Call Fit Ratings page; export the page's `ratings` collection
-to a folder (one JSON file a row) and run `python run.py --load-fit-ratings FOLDER`, then `python run.py --fit-scores`
-(`--dry-run` counts the bands and writes nothing). Each scan scores the calls it saw. A Never rules a call out only on
+The team rates each tag, keyword and NAICS code on the dashboard's Fit ratings page (Automation, `/fit`); a change queues
+a `fit_scores` job and the worker scores every call again within about a minute, so the worker must be running.
+`python run.py --fit-scores` does the same by hand (`--dry-run` counts the bands and writes nothing).
+`python run.py --load-fit-ratings FOLDER` loaded the first ratings from an export of the page used before `/fit`; it
+replaces every row, so it would undo changes made on `/fit`. Each scan scores the calls it saw. A Never rules a call out only on
 its main work, its type or its NAICS code; on what the judges name, only when they agree. `python run.py --rejudge-open`
 has both judges rate every open, undecided call again and name its main work, for after a profile change;
 `--dry-run` counts and prices it, and a rerun skips calls already done. Ratings never go in the repo, which is public.

@@ -36,6 +36,7 @@ SECTION_OF = {
     "/runs": "Automation",
     "/runs?view=problems": "Automation",
     "/judges": "Automation",
+    "/fit": "Automation",
 }
 CARD_PAGES = {
     "/review": "Needs review",
@@ -50,6 +51,7 @@ CARD_PAGES = {
     "/runs": "Scans",
     "/runs?view=problems": "Scan problems",
     "/judges": "Judges agree",
+    "/fit": "Fit ratings",
 }
 COUNT_LABEL = re.compile(r"^\d+ (waiting for you|to draft, ready for you or overdue|requests? waiting)$")
 

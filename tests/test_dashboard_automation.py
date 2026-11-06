@@ -1,4 +1,4 @@
-"""Automation's five views and the past weekly briefs (PRO-573): five cards in order, Scans' sortable
+"""Automation's six views and the past weekly briefs (PRO-573): six cards in order, Scans' sortable
 Started column and Portals filter, and the briefs page's way back to Home and its boards' links.
 
 These only read, never write to the ledger. Name a serving dashboard in DASHBOARD_TEST_URL; without it
@@ -30,10 +30,44 @@ def open_page(page: Any, path: str) -> None:
     page.wait_for_timeout(300)
 
 
-def test_automation_has_five_cards_in_order(page: Any) -> None:
+def test_automation_has_six_cards_in_order(page: Any) -> None:
     open_page(page, "/requests")
     labels = [t.strip().lower() for t in page.locator(".view-cards .vt-card__label").all_inner_texts()]
-    assert labels == ["agent update requests", "decided requests", "scans", "scan problems", "judges agree"]
+    assert labels == ["agent update requests", "decided requests", "scans", "scan problems", "judges agree", "fit ratings"]
+
+
+def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed(page: Any) -> None:
+    open_page(page, "/fit")
+    if page.locator(".fit-section").count() == 0:
+        pytest.skip("this database has no fit ratings yet")
+    assert [t.strip() for t in page.locator(".fit-section h2").all_inner_texts()] == ["Work", "Customer", "Type", "Access", "Keywords", "NAICS"]
+    assert page.locator(".fit-scale li").count() == 5
+    row = page.locator(".fit-section#work tbody tr").filter(has_text="Software").first
+    assert [t.split()[0] for t in row.locator(".fit-rate").all_inner_texts()] == ["Core", "Good", "Neutral", "Poor", "Never"]
+    assert row.locator('.fit-rate[aria-pressed="true"]').count() == 1
+    assert row.locator(".fit-mix").count() == 2 and "main work on" in row.inner_text()
+    row.locator(".fit-examples summary").click()
+    assert row.locator(".fit-examples li").count() >= 1
+
+
+def test_a_fit_note_shows_whole_and_saving_it_keeps_the_rating(page: Any) -> None:
+    open_page(page, "/fit")
+    if page.locator(".fit-section").count() == 0:
+        pytest.skip("this database has no fit ratings yet")
+    for form in page.locator(".fit-form").all()[:12]:
+        note = form.locator("textarea")
+        assert note.evaluate("n => n.scrollHeight <= n.clientHeight + 2")   # nothing is cut off
+        pressed = form.locator('.fit-rate[aria-pressed="true"]')
+        save = form.locator("button", has_text="Save note")
+        if pressed.count():
+            assert pressed.get_attribute("value") == "clear"   # pressing the chosen rating clears it
+            assert save.get_attribute("value") in ("core", "good", "neutral", "poor", "never")
+
+
+def test_fit_ratings_does_not_scroll_sideways_at_a_laptop_width(page: Any) -> None:
+    page.set_viewport_size({"width": 1280, "height": 800})
+    open_page(page, "/fit")
+    assert page.evaluate("document.scrollingElement.scrollWidth - window.innerWidth") <= 0
 
 
 def test_scans_sort_by_started_newest_first_and_flip(page: Any) -> None:
