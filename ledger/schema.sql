@@ -409,3 +409,20 @@ CREATE TABLE IF NOT EXISTS linear_issues (
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL
 );
+
+-- 013_fit_score: the fit score (PRO-487): each judge's main work, the team's ratings, and each call's score.
+
+ALTER TABLE judgments ADD COLUMN main_work TEXT;
+
+ALTER TABLE calls ADD COLUMN fit_score INTEGER;
+ALTER TABLE calls ADD COLUMN fit_band TEXT;
+ALTER TABLE calls ADD COLUMN fit_why TEXT;
+
+CREATE TABLE IF NOT EXISTS fit_ratings (
+  key         TEXT PRIMARY KEY,
+  section     TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  rating      TEXT NOT NULL CHECK (rating IN ('core', 'good', 'neutral', 'poor', 'never')),
+  note        TEXT,
+  loaded_at   TEXT NOT NULL
+);

@@ -185,6 +185,16 @@ def rule_tags(row: Mapping[str, Any], tags: TagList) -> list[str]:
     return ordered(found, tags)
 
 
+def parse_main_work(text: str, tags: TagList) -> str | None:
+    """The Work tag on the answer's MAIN WORK line, or None when there is no such line or it names anything else."""
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if line.upper().startswith("MAIN WORK:"):
+            name = tags.canonical(line.split(":", 1)[1])
+            return name if name and tags.group_of(name) == "work" else None
+    return None
+
+
 def rule_tag_names() -> set[str]:
     """Every tag a rule can set, so a test can check each is on the list."""
     return (set(TYPE_BY_KIND.values()) | set(TYPE_BY_PORTAL.values()) | {"Proposal"} | set(CUSTOMER_BY_PORTAL.values())

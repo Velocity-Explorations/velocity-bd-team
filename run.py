@@ -341,6 +341,111 @@ def backfill_tags() -> int:
     return 0
 
 
+def load_fit_ratings(folder: str) -> int:
+    """`--load-fit-ratings FOLDER`: take the team's ratings from the Call Fit Ratings page, exported as one JSON file a
+    row. They live in the ledger and never in the repo, which is public. Run --fit-scores afterwards."""
+    from ledger.queries import save_fit_ratings
+    from review.fit import VALUES
+
+    loaded = []
+    for path in sorted(Path(folder).glob("*.json")):
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        row = doc.get("data", doc)
+        if not row.get("rating"):   # a note with no rating yet
+            continue
+        if row["rating"] not in VALUES:
+            raise ValueError(f"{path.name}: '{row['rating']}' is not a rating.")
+        loaded.append(row)
+    save_fit_ratings(loaded)
+    print(f"Loaded {len(loaded)} fit rating(s).")
+    return 0
+
+
+def fit_scores(dry_run: bool = False) -> int:
+    """`--fit-scores`: score every kept, reviewed call a judge has named the main work of, from the team's ratings.
+    Run it after the ratings change. A dry run counts the bands and writes nothing."""
+    from ledger.queries import calls_where
+
+    _console_logging()
+    rows = calls_where(filter_result="kept", reviewed=True)
+    bands = score_fit(rows, write=not dry_run)
+    if bands is None:
+        print("No fit ratings in the ledger yet: run --load-fit-ratings first.")
+        return 0
+    print(f"{'Would score' if dry_run else 'Scored'} {sum(bands.values())} of {len(rows)} call(s): " + band_counts(bands) + ".")
+    return 0
+
+
+def band_counts(bands: dict[str, int]) -> str:
+    from review.fit import BANDS
+
+    return ", ".join(f"{bands[band]} {band}" for band in BANDS if bands.get(band))
+
+
+def score_fit(rows: list[dict[str, Any]], write: bool = True) -> dict[str, int] | None:
+    """Score these calls and store it; how many fell in each band, or None when nobody has rated anything yet."""
+    from collections import Counter
+
+    from ledger.queries import fit_ratings, main_work_by_call, set_fit, tags_by_call
+    from review.fit import score_call
+
+    ratings = fit_ratings()
+    if not ratings:
+        return None
+    tags, named = tags_by_call(), main_work_by_call()
+    bands: Counter[str] = Counter()
+    for row in rows:
+        fit = score_call(row, tags.get(row["id"], {}), named.get(row["id"], {}), ratings)
+        if fit is None:
+            continue
+        bands[fit.band] += 1
+        if write:
+            set_fit(row["id"], fit.score, fit.band, fit.why)
+    return dict(bands)
+
+
+# Rough answer sizes for the price of a re-judgment: thinking and the answer for Claude, reasoning and the answer for Grok.
+REJUDGE_TOKENS_OUT = {"claude": 700, "grok": 1500}
+
+
+def rejudge_open(dry_run: bool = False) -> int:
+    """`--rejudge-open`: both judges rate every open, undecided call again with today's profile and name its main work,
+    then the calls are scored. A dry run counts the calls and prices the run. Safe to rerun: a call a judge has already
+    named the main work of is not asked again. Takes no lock, like the backfills."""
+    from assistant.tools import open_undecided
+    from drafting.costs import PRICES
+    from ledger.queries import calls_where, main_work_by_call
+    from review.feedback import build_examples_block
+    from review.reviewer import GROK_MODEL_ID, MODEL_ID, build_prompt, review_calls
+
+    _console_logging()
+    rows = [row for row, _ in open_undecided(calls_where(filter_result="kept", reviewed=True), datetime.now(timezone.utc))]
+    named = main_work_by_call()
+    for_claude = [row for row in rows if not named.get(row["id"], {}).get("claude")]
+    for_grok = [row for row in rows if not named.get(row["id"], {}).get("grok")] if grok_enabled() else []
+    examples = build_examples_block()
+    if dry_run:
+        cost = 0.0
+        for judge, model_id, pending in (("claude", MODEL_ID, for_claude), ("grok", GROK_MODEL_ID, for_grok)):
+            price = PRICES[model_id]
+            tokens_in = sum(len(build_prompt(row, "", examples)) // 4 for row in pending)
+            cost += (tokens_in * price.input + len(pending) * REJUDGE_TOKENS_OUT[judge] * price.output) / 1_000_000
+        print(f"{len(for_claude)} open calls for Claude, {len(for_grok)} for Grok; about ${cost:.2f}.")
+        return 0
+    if for_claude:
+        review_calls(for_claude, review_model(), feedback_examples_block=examples)
+    if for_grok:
+        second_judge(for_grok, examples)
+    named = main_work_by_call()
+    done_claude = sum(1 for row in for_claude if named.get(row["id"], {}).get("claude"))
+    done_grok = sum(1 for row in for_grok if named.get(row["id"], {}).get("grok"))
+    print(f"Claude judged {done_claude} of {len(for_claude)} call(s); Grok judged {done_grok} of {len(for_grok)}.")
+    bands = score_fit(rows)
+    if bands:
+        print("Scored: " + band_counts(bands) + ".")
+    return 0
+
+
 def workspace_notices(morning: bool = False) -> int:
     """The proposal workspace's notices in Slack (PW18): every few minutes, cards and steps ready; at 08:00, steps
     behind target and the digest. Nothing posts until WORKSPACE_SLACK is on. They never take the pipeline's lock."""
@@ -861,6 +966,11 @@ def run_portal(portal: Portal, args: argparse.Namespace, log_path: Path) -> dict
         except Exception as exc:   # summaries are a convenience: never let them stop a scan
             log.warning("SUMMARIES: skipped (%s: %s)", type(exc).__name__, str(exc)[:120])
 
+        try:
+            log.info("FIT: %s", score_fit(calls_in_run(run_id)))
+        except Exception as exc:   # the score is a convenience: never let it stop a scan
+            log.warning("FIT: skipped (%s: %s)", type(exc).__name__, str(exc)[:120])
+
         fresh = new_calls(run_id)
         counts["new"] = len(fresh)
         log.info("NEW: %d rows", counts["new"])
@@ -939,6 +1049,13 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="post the morning's workspace notices to Slack: steps behind target, the digest per owner; then exit")
     parser.add_argument("--linear-sync", action="store_true",
                         help="open and move issues in Linear's Pursuits project to match the pursued calls, then exit")
+    parser.add_argument("--load-fit-ratings", metavar="FOLDER",
+                        help="take the team's fit ratings from the page's export, one JSON file a row, then exit")
+    parser.add_argument("--fit-scores", action="store_true",
+                        help="score every call a judge has named the main work of, then exit; with --dry-run, count only")
+    parser.add_argument("--rejudge-open", action="store_true",
+                        help="both judges rate every open, undecided call again and name its main work, then exit; "
+                             "with --dry-run, count and price it")
     parser.add_argument("--backfill-summaries", action="store_true",
                         help="have Claude summarize each open, reviewed call that has no summary, then exit; "
                              "with --dry-run, count the calls and price the run instead")
@@ -961,6 +1078,12 @@ def main(argv: list[str] | None = None) -> int:
         return backfill_tags()
     if args.backfill_summaries:
         return backfill_summaries(dry_run=args.dry_run)
+    if args.load_fit_ratings:
+        return load_fit_ratings(args.load_fit_ratings)
+    if args.fit_scores:
+        return fit_scores(dry_run=args.dry_run)
+    if args.rejudge_open:
+        return rejudge_open(dry_run=args.dry_run)
     if args.workspace_slack or args.workspace_morning:
         return workspace_notices(morning=args.workspace_morning)
     if args.linear_sync:

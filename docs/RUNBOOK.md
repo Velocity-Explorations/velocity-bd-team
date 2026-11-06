@@ -408,6 +408,14 @@ Every call carries tags from `review/tags.yaml`: one type, plus work, customer a
 Claude and Grok pick the rest on a TAGS line of the review answer they already give, so tags cost
 no extra model calls. A tagging failure only logs a warning.
 
+Fit score (PRO-487, `review/fit.py`). Each judge names a call's main work on the MAIN WORK line of its answer.
+The team rates each tag, keyword and NAICS code on the Call Fit Ratings page; export the page's `ratings` collection
+to a folder (one JSON file a row) and run `python run.py --load-fit-ratings FOLDER`, then `python run.py --fit-scores`
+(`--dry-run` counts the bands and writes nothing). Each scan scores the calls it saw. A Never rules a call out only on
+its main work, its type or its NAICS code; on what the judges name, only when they agree. `python run.py --rejudge-open`
+has both judges rate every open, undecided call again and name its main work, for after a profile change;
+`--dry-run` counts and prices it, and a rerun skips calls already done. Ratings never go in the repo, which is public.
+
 After migration 006, `python run.py --backfill-tags` tags every stored call by its rules and has
 Claude and Grok tag the kept, reviewed calls, asking for tags alone. Grok takes about 20 s a call,
 so a full pass over about 120 calls runs some 40 minutes. It is safe to rerun: each pass only asks
