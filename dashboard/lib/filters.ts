@@ -3,15 +3,15 @@
 // `node --test` can load it directly.
 
 export type CallState = "open" | "closed" | "";
-export type SortKey = "seen" | "due" | "title" | "verdict" | "tier" | "decision" | "filter";
+export type SortKey = "seen" | "due" | "title" | "verdict" | "tier" | "decision" | "filter" | "fit";
 export type SortDir = "asc" | "desc";
 export type Sort = { key: SortKey; dir: SortDir };
 export type Params = Record<string, string | readonly string[]>;
 
 /** Each column's first direction: newest first, closing soonest, A to Z, yes before no, tight
- *  before broad, pursue first, kept first. */
+ *  before broad, pursue first, kept first, best fit first. */
 const NATURAL: Record<SortKey, SortDir> = {
-  seen: "desc", due: "asc", title: "asc", verdict: "asc", tier: "asc", decision: "asc", filter: "asc",
+  seen: "desc", due: "asc", title: "asc", verdict: "asc", tier: "asc", decision: "asc", filter: "asc", fit: "desc",
 };
 export const SORT_KEYS = Object.keys(NATURAL) as SortKey[];
 const DEFAULT_SORT: Sort = { key: "seen", dir: "desc" };
@@ -86,6 +86,7 @@ const SORT_WORDS: Record<SortKey, Record<SortDir, string>> = {
   tier: { asc: "tight first", desc: "broad first" },
   decision: { asc: "pursue first", desc: "dismissed first" },
   filter: { asc: "kept first", desc: "rejected first" },
+  fit: { desc: "best fit first", asc: "weakest fit first" },
 };
 
 /** A header menu's sort items (PRO-572): the column's natural direction first, the one in force marked. */

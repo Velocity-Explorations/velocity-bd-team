@@ -3,12 +3,13 @@ import { cache } from "react";
 import { DecideCell } from "@/components/DecideCell";
 import { DraftBadge } from "@/components/DraftBadge";
 import { PortalLogo } from "@/components/PortalLogo";
-import { Badge, TitleLink } from "@/components/bits";
+import { Badge, FitBadge, TitleLink } from "@/components/bits";
 import { asksReason, yourVote } from "@/lib/decide";
 import { descriptionCell } from "@/lib/description";
 import { formatDue } from "@/lib/format";
 import { daysLeftText, topTenOrder } from "@/lib/home";
 import { verdictsFor } from "@/lib/judges";
+import { fitBadge } from "@/lib/fit";
 import { displayPerson } from "@/lib/people";
 import { draftBlock, draftFormat } from "@/lib/proposals";
 import { decisionsOn, draftsFor, latestJudgments, topTenRows } from "@/lib/queries";
@@ -67,6 +68,7 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide }: {
             <th className="rank">#</th>
             <th>Call</th>
             <th>Deadline</th>
+            <th>Fit</th>
             <th>Claude</th>
             <th>Grok</th>
             <th>Decision now</th>
@@ -106,6 +108,9 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide }: {
                 <td className="when">
                   {formatDue(call.due_date, tz) || <span className="muted">no deadline</span>}
                   {call.days_left !== null ? <div className="meta">{daysLeftText(call.days_left)}</div> : null}
+                </td>
+                <td>
+                  {fitBadge(call) ? <FitBadge row={call} /> : <span className="muted">not yet</span>}
                 </td>
                 <td>
                   <Badge value={verdicts.claude?.verdict} empty="not reviewed" />

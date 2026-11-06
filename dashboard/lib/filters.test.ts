@@ -112,6 +112,7 @@ test("a header menu offers the column's two sorts in words, the one in force mar
     ["Sort closing latest first", "/review?view=due-soon&sort=due&dir=desc", false],
   ]);
   assert.deepEqual(sortChoices("/review", {}, { key: "seen", dir: "desc" }, "seen").map((i) => i.label), ["Sort newest first", "Sort oldest first"]);
+  assert.deepEqual(sortChoices("/review", {}, { key: "seen", dir: "desc" }, "fit").map((i) => i.label), ["Sort best fit first", "Sort weakest fit first"]);
 });
 
 test("a page holds 100 calls (David, 4 Nov), half the 200 that made a 4 MB page", () => {
