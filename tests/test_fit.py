@@ -118,6 +118,16 @@ def test_the_best_customer_counts_and_a_tag_nobody_rated_is_neutral() -> None:
     assert both.score > one.score > unrated.score == 73
 
 
+def test_both_judges_saying_no_makes_a_call_weak_at_best() -> None:
+    both_no = fit.score_call(call(), {}, BOTH_SOFTWARE, RATINGS, {"claude": "no", "grok": "no"})
+    assert both_no is not None and both_no.score == 49 and both_no.band == "weak" and "Both judges said no" in both_no.why
+    split = fit.score_call(call(), {}, BOTH_SOFTWARE, RATINGS, {"claude": "yes", "grok": "no"})
+    alone = fit.score_call(call(), {}, BOTH_SOFTWARE, RATINGS, {"claude": "no"})
+    assert split is not None and alone is not None and split.score == alone.score == 73
+    already_weak = fit.score_call(call(), {}, {"claude": "Hardware", "grok": "Hardware"}, RATINGS, {"claude": "no", "grok": "no"})
+    assert already_weak is not None and already_weak.score == 39
+
+
 def seed(call_id: str, **fields: Any) -> None:
     run_id = lq.start_run("Vulcan SOF")
     lq.upsert_call({"id": call_id, "portal": "Vulcan SOF", "title": "C2 software", "description": "software", **fields}, run_id)
@@ -168,6 +178,20 @@ def test_fit_scores_are_stored_with_their_reasons_for_calls_the_judges_have_name
     assert lq.get_call("unnamed")["fit_score"] is None
 
 
+def test_a_score_takes_the_judges_newest_verdicts(ledger_db: str) -> None:
+    lq.save_fit_ratings([{"key": "work.software", "section": "work", "name": "Software", "rating": "core", "note": ""}])
+    seed("named")
+    for judge in ("claude", "grok"):
+        lq.add_judgment("named", judge, "m", "no", "no")
+        lq.set_main_work("named", judge, "Software")
+    assert run.fit_scores() == 0
+    assert lq.get_call("named")["fit_band"] == "weak"
+    lq.add_judgment("named", "grok", "m", "yes", "yes")
+    lq.set_main_work("named", "grok", "Software")
+    assert run.fit_scores() == 0
+    assert lq.get_call("named")["fit_band"] == "strong"
+
+
 def test_a_dry_run_of_the_scores_writes_nothing(ledger_db: str, capsys: pytest.CaptureFixture[str]) -> None:
     lq.save_fit_ratings([{"key": "work.software", "section": "work", "name": "Software", "rating": "core", "note": ""}])
     seed("named")
@@ -191,6 +215,28 @@ def test_a_re_judgment_clears_the_old_main_work_until_the_judge_names_one_again(
     assert lq.main_work_by_call()["named"] == {"claude": "Software"}
     lq.add_judgment("named", "claude", "m", "no", "changed")
     assert lq.main_work_by_call().get("named", {}).get("claude") is None
+
+
+def test_refilter_drops_calls_the_new_rules_no_longer_keep_and_a_dry_run_writes_nothing(
+        ledger_db: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    from portals.registry import Portal
+    from portals.shared.keyword_filter import filter_calls
+
+    settings = tmp_path / "keywords.yaml"
+    settings.write_text("broad_keywords:\n  - ai\ntight_keywords: []\nblocklist_patterns: []\n", encoding="utf-8")
+    run_id = lq.start_run("Test portal")
+    for call_id, title in (("noise", "details are available by email"), ("real", "AI for operators")):
+        lq.upsert_call({"id": call_id, "portal": "Test portal", "title": title, "description": ""}, run_id)
+        lq.set_filter(call_id, "kept", tier="broad", keywords=["ai"])
+    portal = Portal(slug="test", name="Test portal", fetch=lambda *_a, **_k: None,
+                    filter=lambda rows: filter_calls(rows, settings), keywords=settings)
+    monkeypatch.setattr(run.registry, "discover", lambda: [portal])
+    assert run.refilter(dry_run=True) == 0
+    assert "Would drop 1 and would keep 0 more call(s)." in capsys.readouterr().out
+    assert lq.get_call("noise")["filter_result"] == "kept"
+    assert run.refilter() == 0
+    assert "Dropped 1 and kept 0 more call(s)." in capsys.readouterr().out
+    assert lq.get_call("noise")["filter_result"] == "rejected" and lq.get_call("real")["filter_result"] == "kept"
 
 
 def open_seed(call_id: str, due: str | None = "2099-01-15", status: str | None = None, closed: bool = False) -> None:

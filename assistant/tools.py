@@ -34,7 +34,7 @@ VERDICTS = ("yes", "maybe", "no")
 OVERDUE_DAYS = 8          # scans run weekly; more than this without a completed one is worth saying
 CLOSING_WINDOW_DAYS = 14
 TOP_PICKS = 5   # open, undecided calls the weekly summary ranks
-RANKING = "yes before maybe, then the nearest deadline, then the newest"   # how top picks are ordered
+RANKING = "the highest fit score, then the nearest deadline, then the newest"   # how top picks are ordered
 NOTE_LINE = re.compile(r"^\[(\S+) ([^\]]+)\] ?(.*)$")
 STOPWORDS = {
     "with", "from", "into", "that", "this", "their", "they", "have", "will", "your", "call", "calls",
@@ -430,10 +430,17 @@ def open_undecided(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[d
 
 def _waiting(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[str, Any], datetime | None]]:
     """Open, undecided calls the review kept and rated yes or maybe, best first, with their deadlines."""
-    waiting = [pair for pair in open_undecided(rows, moment) if pair[0].get("ai_verdict") in ("yes", "maybe")]
-    # RANKING, in two stable sorts. The fit score will replace this order (PRO-487).
+    waiting = [pair for pair in open_undecided(rows, moment)
+               if pair[0].get("ai_verdict") in ("yes", "maybe") and pair[0].get("fit_band") != "ruled out"]
+    # RANKING, in two stable sorts. A call with no score yet comes after those with one, yes before maybe.
     waiting.sort(key=lambda pair: pair[0].get("first_seen_at") or "", reverse=True)
-    waiting.sort(key=lambda pair: (pair[0]["ai_verdict"] != "yes", pair[1] is None, pair[1] or moment))
+
+    def rank(pair: tuple[dict[str, Any], datetime | None]) -> tuple[bool, int, bool, bool, datetime]:
+        row, due = pair
+        score = row.get("fit_score")
+        return (score is None, -(score or 0), score is None and row["ai_verdict"] != "yes", due is None, due or moment)
+
+    waiting.sort(key=rank)
     return waiting
 
 
