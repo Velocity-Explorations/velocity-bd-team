@@ -415,6 +415,8 @@ to a folder (one JSON file a row) and run `python run.py --load-fit-ratings FOLD
 its main work, its type or its NAICS code; on what the judges name, only when they agree. `python run.py --rejudge-open`
 has both judges rate every open, undecided call again and name its main work, for after a profile change;
 `--dry-run` counts and prices it, and a rerun skips calls already done. Ratings never go in the repo, which is public.
+A call both judges rate no is weak at best. `python run.py --refilter` puts every stored call through the keyword filter
+again after its rules change (`--dry-run` counts). A keyword of three characters or fewer matches only as a whole word.
 
 After migration 006, `python run.py --backfill-tags` tags every stored call by its rules and has
 Claude and Grok tag the kept, reviewed calls, asking for tags alone. Grok takes about 20 s a call,
