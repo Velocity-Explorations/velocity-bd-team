@@ -4,9 +4,10 @@ import { MessageSquareText } from "lucide-react";
 import type { ReactNode } from "react";
 import { PortalLogo } from "@/components/PortalLogo";
 import { panelId } from "@/components/RowPanels";
-import { Badge, Details, TitleLink } from "@/components/bits";
+import { Badge, Details, FitBadge, TitleLink } from "@/components/bits";
 import { callDetails, deadlineNote, noDeadlineLabel, type Detail } from "@/lib/details";
 import { descriptionCell, splitDetails } from "@/lib/description";
+import { fitBadge, type FitColumns } from "@/lib/fit";
 import { formatDue } from "@/lib/format";
 import { daysLeftText } from "@/lib/home";
 import { JUDGES, judgesConflict, judgesDisagree, type Verdicts } from "@/lib/judges";
@@ -77,11 +78,17 @@ function NoteButton({ panel, label }: { panel: string; label: string }) {
  * judges disagree; then, under a dashed rule, each person's latest vote, with a note button when they
  * left a note. `votes` is null where people's votes are not listed.
  */
-export function VotesCell({ callId, verdicts, votes, notesBy }: { callId: string; verdicts: Verdicts; votes: Vote[] | null; notesBy: Set<string> }) {
+export function VotesCell({ callId, verdicts, votes, notesBy, fit }: { callId: string; verdicts: Verdicts; votes: Vote[] | null; notesBy: Set<string>; fit?: Partial<FitColumns> }) {
   const reasons = panelId("reasons", callId);
   return (
     <td className="votes-cell">
       <div className="judges">
+        {fit && fitBadge(fit) ? (
+          <div className="judge fit">
+            <span className="who">Fit</span>
+            <FitBadge row={fit} />
+          </div>
+        ) : null}
         {JUDGES.map(({ key, label }) => (
           <div key={key} className="judge">
             <span className="who">{label}</span>

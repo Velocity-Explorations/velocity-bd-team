@@ -36,6 +36,7 @@ import {
   tagsOn,
   topTenIds,
   type CallFilters,
+  hasFitScore,
 } from "@/lib/queries";
 import { votesByCall } from "@/lib/scoreboard";
 import { defaultsRedirect, drafting, labeler, timeZone } from "@/lib/me";
@@ -70,11 +71,11 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
   const sp = await searchParams;
   const withDefaults = await defaultsRedirect("/calls", sp);
   if (withDefaults) redirect(withDefaults);
-  const [portalList, tagChoices, top] = await Promise.all([portals(), tagOptions(), topTenIds()]);
+  const [portalList, tagChoices, top, scored] = await Promise.all([portals(), tagOptions(), topTenIds(), hasFitScore()]);
   const filters: CallFilters = {
     portals: pickMany(sp.portal, portalList.map((p) => p.name)),
     state: pickState(sp.state, sp.open),
-    sort: pickSort(sp.sort, sp.dir, ["seen", "due", "title", "verdict", "decision", "filter"]),
+    sort: pickSort(sp.sort, sp.dir, scored ? ["fit", "seen", "due", "title", "verdict", "decision", "filter"] : ["seen", "due", "title", "verdict", "decision", "filter"]),
     judges: pickJudgeFilter(sp.judges),
     filterResult: pickAllowed(sp.filter_result, FILTER_RESULTS),
     verdict: pickAllowed(sp.verdict, [...VERDICTS, "none"] as const),
@@ -207,7 +208,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                       label="Votes"
                       sort={sortLink("/calls", params, filters.sort, "verdict")}
                       menu={{
-                        sorts: sortChoices("/calls", params, filters.sort, "verdict"),
+                        sorts: [...(scored ? sortChoices("/calls", params, filters.sort, "fit") : []), ...sortChoices("/calls", params, filters.sort, "verdict")],
                         active: Boolean(filters.verdict || filters.judges),
                         groups: [
                           { title: "Claude's verdict", items: choiceLinks("/calls", params, "verdict", VERDICT_CHOICES, filters.verdict) },
@@ -287,6 +288,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                           verdicts={verdicts}
                           votes={callVotes.map((v) => ({ ...v, person: label(v.person) }))}
                           notesBy={new Set(notes.map((n) => nameOf(n.by)).filter(Boolean))}
+                          fit={r}
                         />
                       ) : null}
                       {show("description") ? <DescriptionCell portal={r.portal} description={r.description} extra={r.extra} summary={r.ai_summary} /> : null}

@@ -3,6 +3,7 @@
 import { ExternalLink } from "lucide-react";
 import { Notice } from "@/components/Notice";
 import type { Detail } from "@/lib/details";
+import { fitBadge, type FitColumns } from "@/lib/fit";
 import { PAGE_SIZE, type Pager } from "@/lib/filters";
 
 const TONES: Record<string, string> = {
@@ -105,6 +106,12 @@ export function TitleLink({ title, url, fallback }: { title: string | null; url:
 function tip(title: string | undefined, className = ""): { title?: string; tabIndex?: number; className?: string } {
   if (!title) return className ? { className } : {};
   return { title, tabIndex: 0, className: `${className} tip`.trim() };
+}
+
+/** A call's fit score and band, with what it rests on as the hover text; nothing for a call with no score yet. */
+export function FitBadge({ row }: { row: Partial<FitColumns> }) {
+  const fit = fitBadge(row);
+  return fit ? <span {...tip(fit.why, `badge tone-${fit.tone}`)}>{fit.text}</span> : null;
 }
 
 /** A call's portal details (lib/details.ts), after the portal name in a row's meta line. */

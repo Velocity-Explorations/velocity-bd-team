@@ -4,6 +4,7 @@
 import type { TransactionSql } from "postgres";
 import { sql } from "./db";
 import { CLOSED_PATTERN, PAGE_SIZE, portalOptions, type CallState, type PortalOption, type Sort } from "./filters";
+import type { FitColumns } from "./fit";
 import type { JudgeFilter, Judgment } from "./judges";
 import type { TagOption, TagRow } from "./tags";
 import { isoNow } from "./format";
@@ -57,7 +58,7 @@ export type QueueRow = {
   extra: string | null;
   human_status: string | null;
   human_notes: string | null;
-};
+} & FitColumns;
 
 /** The filter panel's choices (lib/filters.ts). No portals ticked means every portal; no tag, any tag. */
 export type PanelFilters = { portals: string[]; state: CallState; sort: Sort; judges: JudgeFilter; tag: string };
@@ -112,6 +113,8 @@ function panelOrder(db: Db, f: { sort: Sort; judges: JudgeFilter }) {
       return f.sort.dir === "asc"
         ? db`ORDER BY ${conflictsFirst} (${dueDate(db)} < CURRENT_DATE) IS TRUE, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id`
         : db`ORDER BY ${conflictsFirst} ${dueDate(db)} DESC NULLS LAST, first_seen_at DESC, id`;
+    case "fit":
+      return db`ORDER BY ${conflictsFirst} fit_score ${dir} NULLS LAST, (${dueDate(db)} < CURRENT_DATE) IS TRUE, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id`;
     case "title":
       return db`ORDER BY ${conflictsFirst} lower(title) ${dir} NULLS LAST, first_seen_at DESC, id`;
     case "verdict":
@@ -144,6 +147,16 @@ async function hasColumn(db: Db, table: string, column: string): Promise<boolean
  *  never awaited: awaiting it would run it. */
 function summaryColumn(db: Db, present: boolean) {
   return present ? db`ai_summary` : db`NULL::text AS ai_summary`;
+}
+
+/** Each call's fit score (migration 013), or NULLs before the migration is applied. A fragment, so never awaited. */
+function fitColumns(db: Db, present: boolean) {
+  return present ? db`fit_score, fit_band, fit_why` : db`NULL::int AS fit_score, NULL::text AS fit_band, NULL::text AS fit_why`;
+}
+
+/** Whether calls can be scored and sorted by fit: migration 013 is applied. */
+export async function hasFitScore(): Promise<boolean> {
+  return hasColumn(sql(), "calls", "fit_score");
 }
 
 /** True when a ledger table exists; a migration may not be applied to this database yet. Once found, remembered. */
@@ -223,12 +236,13 @@ export async function reviewQueue(
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
   if (f.view === "top10" && !f.ids?.length) return { rows: [], total: 0, perPerson };
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
+  const fit = fitColumns(db, await hasFitScore());
   const [count, rows] = await Promise.all([
     db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${queueWhere(db, f, perPerson, waitingFor)}`,
     db<QueueRow[]>`
       SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, ${summary}, due_date,
              (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
-             match_tier, first_seen_at, extra, human_status, human_notes
+             match_tier, first_seen_at, extra, human_status, human_notes, ${fit}
       FROM calls ${queueWhere(db, f, perPerson, waitingFor)}
       ${panelOrder(db, f)}
       LIMIT ${page.limit} OFFSET ${page.offset}`,
@@ -333,32 +347,36 @@ export type TopTenRow = {
   human_by: string | null;
   human_at: string | null;
   type: string | null;
-};
+} & FitColumns;
 
 /** Home's Top 10 rows for these calls, as the ledger has them now; the caller keeps the order. */
 export async function topTenRows(ids: string[]): Promise<TopTenRow[]> {
   if (ids.length === 0) return [];
   const db = sql();
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
+  const fit = fitColumns(db, await hasFitScore());
   const rows = await db<TopTenRow[]>`
     SELECT id, portal, title, url, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, description, ${summary},
-           extra, ai_verdict, ai_reasoning, human_status, human_by, human_at, type
+           extra, ai_verdict, ai_reasoning, human_status, human_by, human_at, type, ${fit}
     FROM calls WHERE id IN ${db(ids)}`;
   return [...rows];
 }
 
 /**
- * The live ranking Home shows before the first Monday brief (H2): open calls nobody has decided,
- * rated yes or maybe and kept, yes before maybe, then the nearest deadline, then the newest.
+ * The live ranking Home shows before the first Monday brief (H2): open calls nobody has decided, rated yes or maybe and
+ * kept and not ruled out, the highest fit score first, then the nearest deadline, then the newest. Calls with no score
+ * yet come after those with one, yes before maybe.
  */
 export async function liveTopTen(): Promise<string[]> {
   const db = sql();
+  const scored = await hasFitScore();
   const rows = await db<{ id: string }[]>`
     SELECT id FROM calls
     WHERE ${waitingWhere(db, false, null)}
       AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
       AND (${dueDate(db)} >= CURRENT_DATE OR ${dueDate(db)} IS NULL)
-    ORDER BY CASE ai_verdict WHEN 'yes' THEN 0 ELSE 1 END, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id
+      ${scored ? db`AND fit_band IS DISTINCT FROM 'ruled out'` : db``}
+    ORDER BY ${scored ? db`fit_score DESC NULLS LAST,` : db``} CASE ai_verdict WHEN 'yes' THEN 0 ELSE 1 END, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id
     LIMIT 10`;
   return rows.map((r) => r.id);
 }
@@ -474,19 +492,20 @@ export type CallRow = {
   human_notes: string | null;
   first_seen_at: string;
   extra: string | null;
-};
+} & FitColumns;
 
 /** One page of All calls: `limit` rows from `offset`, and how many calls the filters leave. */
 export async function listCalls(f: CallFilters, limit = PAGE_SIZE, offset = 0): Promise<{ rows: CallRow[]; total: number }> {
   const db = sql();
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
+  const fit = fitColumns(db, await hasFitScore());
   const [count, rows] = await Promise.all([
     db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${callsWhere(db, f)}`,
     db<CallRow[]>`
       SELECT id, portal, title, url, type, department, naics_code, set_aside, ${summary}, due_date,
              (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
              filter_result, filter_reason, match_tier,
-             ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra
+             ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra, ${fit}
       FROM calls ${callsWhere(db, f)}
       ${panelOrder(db, f)}
       LIMIT ${limit} OFFSET ${offset}`,

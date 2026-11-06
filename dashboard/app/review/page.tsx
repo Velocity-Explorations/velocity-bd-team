@@ -36,6 +36,7 @@ import {
   tagOptions,
   tagsOn,
   topTenIds,
+  hasFitScore,
 } from "@/lib/queries";
 import { votesByCall } from "@/lib/scoreboard";
 import { defaultsRedirect, drafting, labeler, timeZone } from "@/lib/me";
@@ -92,7 +93,8 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
   if (withDefaults) redirect(withDefaults);
   const voted = firstParam(sp.voted, 300);   // the call just voted on, for the notice's link
   const view = pickCallView(sp.view);
-  const viewSort = VIEW_SORTS[view];
+  const scored = await hasFitScore();
+  const viewSort: Sort | undefined = view === "needs-review" && scored ? { key: "fit", dir: "desc" } : VIEW_SORTS[view];   // best fit first (David, 6 Nov)
   const focusId = view === "top10" ? firstParam(sp.focus, 300) : "";
   const [portalList, tagChoices, top] = await Promise.all([portals(), tagOptions(), topTenIds()]);
   const asked = pickJudgeFilter(sp.judges);
@@ -101,7 +103,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
     ids: top.ids,
     portals: pickMany(sp.portal, portalList.map((p) => p.name)),
     state: pickState(sp.state, sp.open),
-    sort: pickSort(sp.sort, sp.dir, ["seen", "due", "title", "verdict"], viewSort),
+    sort: pickSort(sp.sort, sp.dir, scored ? ["fit", "seen", "due", "title", "verdict"] : ["seen", "due", "title", "verdict"], viewSort),
     judges: viewJudges(view, asked) as JudgeFilter,
     verdict: pickAllowed(sp.verdict, ["yes", "maybe"] as const),
     tier: pickAllowed(sp.tier, ["tight", "broad"] as const),
@@ -160,7 +162,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
   const show = shows(await hiddenColumns(), "queue");   // the columns chosen in Table settings
   const returnTo = pageHref("/review", params, page);   // a decision comes back to this page
   const filtered = Object.values({ ...barParams, ...columnParams }).some((value) => value.length > 0);
-  const order = sp.sort !== undefined ? "" : view === "due-soon" ? ", closing soonest first" : view === "top10" ? ", in the brief's order" : ", newest first";
+  const order = sp.sort !== undefined ? "" : view === "due-soon" ? ", closing soonest first" : view === "top10" ? ", in the brief's order" : viewSort?.key === "fit" ? ", best fit first" : ", newest first";
   const viewHome = view === "needs-review" ? "/review" : `/review?view=${view}`;
   const now = Date.now();
   const keywords = Boolean(filters.q || filters.desc || filters.why);
@@ -240,7 +242,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
                       label="Votes"
                       sort={sortLink("/review", params, filters.sort, "verdict", viewSort)}
                       menu={{
-                        sorts: sortChoices("/review", params, filters.sort, "verdict", viewSort),
+                        sorts: [...(scored ? sortChoices("/review", params, filters.sort, "fit", viewSort) : []), ...sortChoices("/review", params, filters.sort, "verdict", viewSort)],
                         active: Boolean(filters.verdict || columnParams.judges),
                         groups: [
                           { title: "Claude's verdict", items: choiceLinks("/review", params, "verdict", VERDICT_CHOICES, filters.verdict) },
@@ -313,6 +315,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
                           verdicts={verdicts}
                           votes={listVotes ? callVotes.map((v) => ({ ...v, person: label(v.person) })) : null}
                           notesBy={new Set(notes.map((n) => nameOf(n.by)).filter(Boolean))}
+                          fit={r}
                         />
                       ) : null}
                       {show("description") ? <DescriptionCell portal={r.portal} description={r.description} extra={r.extra} summary={r.ai_summary} /> : null}

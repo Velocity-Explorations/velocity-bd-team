@@ -93,6 +93,16 @@ def first_row(page: Any) -> Any:
     return page.locator("table.calls-table tbody tr[data-call-id]").first
 
 
+def test_needs_review_shows_the_fit_score_with_its_reasons_and_opens_best_fit_first(page: Any) -> None:
+    open_page(page, "/review")
+    badges = page.locator("table.calls-table tbody td.votes-cell .judge.fit .badge")
+    if badges.count() == 0:
+        pytest.skip("no call on this page has a fit score yet")
+    assert badges.first.get_attribute("title")   # what the score rests on
+    scores = [int(text.split()[0]) for text in badges.all_inner_texts() if text.split()[0].isdigit()]
+    assert scores == sorted(scores, reverse=True)
+
+
 def test_the_decide_menu_lists_the_four_decisions_and_the_draft_waits_for_the_worker(page: Any) -> None:
     open_page(page, "/review")
     if page.locator("table.calls-table").count() == 0:
