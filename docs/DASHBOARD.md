@@ -296,8 +296,11 @@ who decided, what, when and the note, so every person's decision is kept. On `ca
 On a call Claude rated yes or maybe, Not relevant opens its reasons (David, 5 Nov 2026): Mostly hardware, Staffing or
 IT support, Wrong customer or eligibility, Too broad with no clear fit, Award or sole-source notice, or another reason
 typed in (`lib/decide.ts` NOT_RELEVANT_REASONS). The reason, with any note typed after it, is the decision's note.
-The judges' examples of recent decisions (`review/feedback.py`) show the team's note in place of Claude's own
-reasoning, so the reason is what tells both judges which part made the whole call wrong for Velocity.
+The judges' examples of recent decisions (`review/feedback.py`) show that note in place of Claude's own reasoning,
+so the reason is what tells both judges which part made the whole call wrong for Velocity. With no note, Claude's
+reasoning appears only if Claude also said no, because its case for a call the team passed on would teach the judges
+the opposite. On a pursued call Claude's reasoning stays where it said yes or maybe, and a note follows it as a team
+note, since a note there is often a side remark (David, 6 Nov 2026).
 
 Choosing the decision a call already has, when someone else made it, adds your row in
 `decisions` and leaves the call's decision, its author and its time alone (a note is still
