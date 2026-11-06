@@ -396,44 +396,22 @@ def load_fit_ratings(folder: str) -> int:
 def fit_scores(dry_run: bool = False) -> int:
     """`--fit-scores`: score every kept, reviewed call a judge has named the main work of, from the team's ratings.
     Run it after the ratings change. A dry run counts the bands and writes nothing."""
-    from ledger.queries import calls_where
+    from review.fit import band_line, score_all
 
     _console_logging()
-    rows = calls_where(filter_result="kept", reviewed=True)
-    bands = score_fit(rows, write=not dry_run)
+    bands, looked_at = score_all(write=not dry_run)
     if bands is None:
         print("No fit ratings in the ledger yet: run --load-fit-ratings first.")
         return 0
-    print(f"{'Would score' if dry_run else 'Scored'} {sum(bands.values())} of {len(rows)} call(s): " + band_counts(bands) + ".")
+    print(f"{'Would score' if dry_run else 'Scored'} {sum(bands.values())} of {looked_at} call(s): " + band_line(bands) + ".")
     return 0
-
-
-def band_counts(bands: dict[str, int]) -> str:
-    from review.fit import BANDS
-
-    return ", ".join(f"{bands[band]} {band}" for band in BANDS if bands.get(band))
 
 
 def score_fit(rows: list[dict[str, Any]], write: bool = True) -> dict[str, int] | None:
     """Score these calls and store it; how many fell in each band, or None when nobody has rated anything yet."""
-    from collections import Counter
+    from review.fit import score_rows
 
-    from ledger.queries import fit_ratings, main_work_by_call, set_fit, tags_by_call, verdicts_by_call
-    from review.fit import score_call
-
-    ratings = fit_ratings()
-    if not ratings:
-        return None
-    tags, named, verdicts = tags_by_call(), main_work_by_call(), verdicts_by_call()
-    bands: Counter[str] = Counter()
-    for row in rows:
-        fit = score_call(row, tags.get(row["id"], {}), named.get(row["id"], {}), ratings, verdicts.get(row["id"]))
-        if fit is None:
-            continue
-        bands[fit.band] += 1
-        if write:
-            set_fit(row["id"], fit.score, fit.band, fit.why)
-    return dict(bands)
+    return score_rows(rows, write)
 
 
 # Rough answer sizes for the price of a re-judgment: thinking and the answer for Claude, reasoning and the answer for Grok.
@@ -474,7 +452,9 @@ def rejudge_open(dry_run: bool = False) -> int:
     print(f"Claude judged {done_claude} of {len(for_claude)} call(s); Grok judged {done_grok} of {len(for_grok)}.")
     bands = score_fit(rows)
     if bands:
-        print("Scored: " + band_counts(bands) + ".")
+        from review.fit import band_line
+
+        print("Scored: " + band_line(bands) + ".")
     return 0
 
 

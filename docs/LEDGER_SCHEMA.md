@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `013_fit_score.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `014_fit_rating_changes.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -271,8 +271,9 @@ it last.
 ## Table: fit_ratings
 
 The team's rating of each tag, keyword and NAICS code, which `review/fit.py` turns into each call's
-score. Set on the Call Fit Ratings page and loaded with `run.py --load-fit-ratings`; loading replaces
-every row. Kept here and never in the repo, which is public. Added by `013_fit_score.sql` (PRO-487).
+score. Changed on the dashboard's Fit ratings page (`/fit`). Kept here and never in the repo, which is
+public. Added by `013_fit_score.sql` (PRO-487). `run.py --load-fit-ratings` replaces every row with an
+export from the first ratings page, so it would undo changes made on `/fit`.
 
 | Column | Type | Values | Written by |
 |---|---|---|---|
@@ -280,8 +281,9 @@ every row. Kept here and never in the repo, which is public. Added by `013_fit_s
 | section | TEXT, not null | `work`, `customer`, `type`, `access`, `keyword`, `naics` | same |
 | name | TEXT, not null | the name shown on the page | same |
 | rating | TEXT, not null | `core`, `good`, `neutral`, `poor`, `never` | same |
-| note | TEXT | the person's note | same |
-| loaded_at | TEXT timestamp, not null | when it was loaded | same |
+| note | TEXT | the person's note | same; the dashboard's `saveFitRating` |
+| loaded_at | TEXT timestamp, not null | when it was loaded or last changed | same |
+| changed_by | TEXT | who last changed it on the dashboard; NULL for a loaded rating (migration 014) | the dashboard's `saveFitRating` |
 
 ## Table: pursuits
 
@@ -560,7 +562,7 @@ Added by `008_pursuits.sql`.
 | Column | Type | Values | Written by |
 |---|---|---|---|
 | id | INTEGER, primary key, auto-increment | | database |
-| kind | TEXT, not null | `drive_refresh` or `slop_scan`; free text the worker checks | the dashboard (Check again queues `slop_scan`, one queued or working per pursuit), `run.py` |
+| kind | TEXT, not null | `drive_refresh`, `slop_scan` or `fit_scores` (score every call again after a rating changes); free text the worker checks | the dashboard (Check again queues `slop_scan`, one queued or working per pursuit), `run.py` |
 | pursuit_id | INTEGER | `pursuits.id`, for a job about one pursuit | same |
 | payload | TEXT JSON | what the job needs beyond its kind | same |
 | state | TEXT, not null, default `queued` | `queued`, `working`, `done`, `failed` | the worker, each change guarded on the state before it |

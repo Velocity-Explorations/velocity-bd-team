@@ -1180,7 +1180,7 @@ def pursued_calls(exclude_id: str | None = None) -> list[dict[str, Any]]:
 
 CHANGE_DECISIONS = ("accepted", "rejected", "edited")
 REVIEWER_CODES = ("evaluator_1", "evaluator_2", "leadership")   # the external evaluator, the second evaluator, Velocity leadership
-JOB_KINDS = ("slop_scan", "drive_refresh")
+JOB_KINDS = ("slop_scan", "drive_refresh", "fit_scores")
 NO_BAND_UNDER_WORDS = 150   # PW21: a scan of a shorter text has no band
 
 

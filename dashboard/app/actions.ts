@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
 import { signIn, signOut } from "@/auth";
 import { readChoice, reasonNote } from "@/lib/decide";
+import { isRating, sectionOfKey } from "@/lib/fitratings";
 import { isoNow, zonedToIso } from "@/lib/format";
 import { safeFrom, SIGNED_IN_COOKIE } from "@/lib/signin";
 import { timeZone } from "@/lib/me";
@@ -44,6 +45,7 @@ import {
   type DecideResult,
   type StartResult,
   type WorkspaceResult,
+  saveFitRating,
 } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
 import { decidedNotice, fromQueue, safeReturnTo } from "@/lib/text";
@@ -106,6 +108,29 @@ export async function decide(formData: FormData): Promise<void> {
     backTo(returnTo, "notice", notice, queue && result.plan !== "note" ? result.title : undefined);
   }
   backTo(returnTo, "error", result.reason);
+}
+
+/**
+ * Change a rating on the Fit ratings page, or its note, or clear it. The form stays where it is on the page, so a person
+ * can work down the list: only a refusal comes back with a message. The worker scores every call again after a change.
+ */
+export async function saveFitRatingAction(formData: FormData): Promise<void> {
+  const key = String(formData.get("key") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim().slice(0, 200);
+  const choice = String(formData.get("rating") ?? "");
+  const note = String(formData.get("note") ?? "").trim().slice(0, 500);
+  const section = sectionOfKey(key);
+  if (!section || !name) backTo("/fit", "error", "That form is out of date. Reload and try again.");
+  if (choice !== "clear" && !isRating(choice)) backTo("/fit", "error", `Choose a rating for ${name} before saving its note.`, undefined, key);
+  const viewer = await currentViewer();
+  if (!viewer) backTo("/fit", "error", "Log in (top right) before changing a rating.");
+  try {
+    await saveFitRating({ key, section: section as string, name, rating: choice === "clear" ? null : choice, note, by: viewer });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
+    backTo("/fit", "error", `Could not save the rating: ${detail}`, undefined, key);
+  }
+  revalidatePath("/fit");
 }
 
 /**
