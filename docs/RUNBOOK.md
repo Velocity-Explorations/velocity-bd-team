@@ -420,6 +420,10 @@ has both judges rate every open, undecided call again and name its main work, fo
 A call both judges rate no is weak at best. `python run.py --refilter` puts every stored call through the keyword filter
 again after its rules change (`--dry-run` counts). A keyword of three characters or fewer matches only as a whole word.
 
+Vulcan SOF writes the same office (USSOCOM) on every call, so no rule tags its calls SOCOM and the judges' prompt does not
+name that office as the buyer: the judges read the call and say who is buying. A title naming INDOPACOM or one of its
+exercises tags the call INDOPACOM by rule.
+
 After migration 006, `python run.py --backfill-tags` tags every stored call by its rules and has
 Claude and Grok tag the kept, reviewed calls, asking for tags alone. Grok takes about 20 s a call,
 so a full pass over about 120 calls runs some 40 minutes. It is safe to rerun: each pass only asks
