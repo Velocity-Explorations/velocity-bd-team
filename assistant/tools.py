@@ -415,16 +415,22 @@ def _bucket(row: dict[str, Any]) -> str:
     return row.get("ai_verdict") or "not reviewed yet"
 
 
-def _waiting(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[str, Any], datetime | None]]:
-    """Open, undecided calls the review kept and rated yes or maybe, best first, with their deadlines."""
-    waiting = []
+def open_undecided(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[str, Any], datetime | None]]:
+    """The calls the filter kept that nobody has decided and that have not closed, with their deadlines."""
+    found = []
     for row in rows:
-        if row.get("human_status") or row.get("filter_result") != "kept" or row.get("ai_verdict") not in ("yes", "maybe"):
+        if row.get("human_status") or row.get("filter_result") != "kept":
             continue
         due = parse_due(row.get("due_date"))
         if _flag(_extra(row), "_closed") or (due is not None and due < moment):
             continue
-        waiting.append((row, due))
+        found.append((row, due))
+    return found
+
+
+def _waiting(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[str, Any], datetime | None]]:
+    """Open, undecided calls the review kept and rated yes or maybe, best first, with their deadlines."""
+    waiting = [pair for pair in open_undecided(rows, moment) if pair[0].get("ai_verdict") in ("yes", "maybe")]
     # RANKING, in two stable sorts. The fit score will replace this order (PRO-487).
     waiting.sort(key=lambda pair: pair[0].get("first_seen_at") or "", reverse=True)
     waiting.sort(key=lambda pair: (pair[0]["ai_verdict"] != "yes", pair[1] is None, pair[1] or moment))

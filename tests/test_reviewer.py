@@ -36,6 +36,45 @@ def test_build_prompt_has_context_fields_and_truncates_description() -> None:
     assert "PAST\nFEEDBACK\n" in with_blocks
 
 
+def test_the_prompt_asks_for_the_main_work_and_to_rate_the_call_on_it() -> None:
+    p = reviewer.build_prompt(ROW)
+    assert "MAIN WORK: [the one Work tag" in p and "Rate the call on its main work." in p
+    assert p.index("TAGS: [") < p.index("MAIN WORK: [") < p.index("SUMMARY: [")
+
+
+def test_the_profile_says_what_the_record_shows() -> None:
+    profile = reviewer.COMPANY_CONTEXT
+    assert "launch, range and space operations" in profile and "AI decision support for command and control" in profile
+    assert "building the vehicles, drones, weapons or control systems themselves" in profile
+    assert "autonomous systems software" not in profile and "creating C2 tools" not in profile
+    assert not any(chr(c) in profile for c in (0x2013, 0x2014))
+
+
+def test_each_judge_names_the_main_work_on_its_newest_judgment(ledger_db: str) -> None:
+    run_id = lq.start_run("Vulcan SOF")
+    lq.upsert_call({"id": "vulcan-1", "portal": "Vulcan SOF", "title": "AI thing", "description": "d"}, run_id)
+    lq.set_filter("vulcan-1", "kept", tier="broad")
+    rows = lq.calls_for_review(run_id)
+    reviewer.review_calls(rows, FakeModel(["VERDICT: yes\nREASON: fits\nTAGS: Software, Cyber\nMAIN WORK: software."]), sleep=lambda _s: None)
+    reviewer.judge_calls(rows, FakeModel(["VERDICT: no\nREASON: no\nMAIN WORK: Services"]), "grok", sleep=lambda _s: None)
+    assert lq.main_work_by_call() == {"vulcan-1": {"claude": "Software", "grok": "Services"}}
+    reviewer.judge_calls(rows, FakeModel(["VERDICT: no\nREASON: no\nMAIN WORK: USSF"]), "grok", sleep=lambda _s: None)
+    assert lq.main_work_by_call() == {"vulcan-1": {"claude": "Software"}}   # a customer is no main work, and the new answer stands
+
+
+def test_a_failure_to_store_the_main_work_never_stops_a_review(ledger_db: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    run_id = lq.start_run("Vulcan SOF")
+    lq.upsert_call({"id": "vulcan-1", "portal": "Vulcan SOF", "title": "AI thing", "description": "d"}, run_id)
+    lq.set_filter("vulcan-1", "kept", tier="broad")
+
+    def broken(*_args: object) -> None:
+        raise RuntimeError("no such column")
+
+    monkeypatch.setattr(reviewer, "set_main_work", broken)
+    passed, _ = reviewer.review_calls(lq.calls_for_review(run_id), FakeModel(["VERDICT: yes\nREASON: fits\nMAIN WORK: Software"]), sleep=lambda _s: None)
+    assert [r.verdict for r in passed] == ["yes"] and lq.get_call("vulcan-1")["ai_verdict"] == "yes"
+
+
 def test_events_are_judged_on_topic_and_other_calls_are_unchanged() -> None:
     event = reviewer.build_prompt({"title": "Space Industry Days 2026", "type": "Industry day", "portal": "SSC Front Door"})
     call = reviewer.build_prompt({"title": "Edge AI", "type": "OTA Prototype", "portal": "Vulcan SOF"})

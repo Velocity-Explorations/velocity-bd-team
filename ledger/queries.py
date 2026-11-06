@@ -488,6 +488,27 @@ def add_judgment(call_id: str, judge: str, model: str, verdict: str, reasoning: 
           (call_id, judge, model, verdict, reasoning, rated_at or now_iso()))
 
 
+def set_main_work(call_id: str, judge: str, tag: str) -> None:
+    """The work tag a judge named as most of what the buyer wants, on its newest judgment of the call (PRO-487)."""
+    with tx() as conn:
+        q(conn, "UPDATE judgments SET main_work = ? WHERE id = "
+                "(SELECT MAX(id) FROM judgments WHERE call_id = ? AND judge = ?)", (tag, call_id, judge))
+
+
+def main_work_by_call() -> dict[str, dict[str, str]]:
+    """What each judge's newest judgment names as each call's main work; a judge that named none is left out."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT call_id, judge, main_work FROM judgments ORDER BY id"))
+    named: dict[str, dict[str, str]] = {}
+    for row in found:
+        judges = named.setdefault(row["call_id"], {})
+        if row["main_work"]:
+            judges[row["judge"]] = row["main_work"]
+        else:
+            judges.pop(row["judge"], None)
+    return {call_id: judges for call_id, judges in named.items() if judges}
+
+
 def latest_judgments(call_id: str) -> dict[str, dict[str, Any]]:
     """The newest judgment from each judge on one call, keyed by judge."""
     with tx() as conn:
@@ -573,12 +594,47 @@ def tag_catalog() -> list[dict[str, Any]]:
         return rows(q(conn, "SELECT name, tag_group, covers, position FROM tag_list ORDER BY position"))
 
 
+def tags_by_call() -> dict[str, dict[str, list[str]]]:
+    """Every call's tags by source."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT call_id, tag, source FROM call_tags ORDER BY id"))
+    by_call: dict[str, dict[str, list[str]]] = {}
+    for row in found:
+        by_call.setdefault(row["call_id"], {}).setdefault(row["source"], []).append(row["tag"])
+    return by_call
+
+
 def calls_without_tags(source: str) -> list[dict[str, Any]]:
     """Kept, reviewed calls with no tags from this judge yet, oldest first."""
     with tx() as conn:
         return rows(q(conn, "SELECT * FROM calls WHERE filter_result = 'kept' AND ai_verdict IS NOT NULL "
                             "AND NOT EXISTS (SELECT 1 FROM call_tags AS t WHERE t.call_id = calls.id AND t.source = ?) "
                             "ORDER BY first_seen_at, id", (source,)))
+
+
+# --------------------------------------------------------------------------------- the fit score
+# The team's rating of each tag, keyword and NAICS code (migration 013), and each call's score from review/fit.py.
+
+def save_fit_ratings(ratings: Sequence[Mapping[str, Any]]) -> None:
+    """Replace the ratings with these: a rating cleared on the page goes from here too."""
+    now = now_iso()
+    with tx() as conn:
+        q(conn, "DELETE FROM fit_ratings")
+        for row in ratings:
+            q(conn, "INSERT INTO fit_ratings (key, section, name, rating, note, loaded_at) VALUES (?, ?, ?, ?, ?, ?)",
+              (row["key"], row["section"], row["name"], row["rating"], row.get("note") or None, now))
+
+
+def fit_ratings() -> dict[str, str]:
+    """Each rated tag, keyword and NAICS code's rating, by its key on the page (work.software, naics.541511)."""
+    with tx() as conn:
+        return {row["key"]: row["rating"] for row in rows(q(conn, "SELECT key, rating FROM fit_ratings"))}
+
+
+def set_fit(call_id: str, score: int, band: str, why: Sequence[str]) -> None:
+    with tx() as conn:
+        q(conn, "UPDATE calls SET fit_score = ?, fit_band = ?, fit_why = ?, updated_at = ? WHERE id = ?",
+          (score, band, json.dumps(list(why)), now_iso(), call_id))
 
 
 # --------------------------------------------------------------------------------- decisions

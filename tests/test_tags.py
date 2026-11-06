@@ -15,6 +15,23 @@ from tests.test_reviewer import FakeModel
 TAGS = tags.load_tags()
 
 
+@pytest.mark.parametrize(("text", "expected"), [
+    ("VERDICT: yes\nMAIN WORK: software\nSUMMARY: x", "Software"),
+    ("MAIN WORK: [AI and ML].", "AI and ML"),
+    ("main work: C2", "C2"),
+    ("MAIN WORK: USSF", None),        # a customer, not work
+    ("MAIN WORK: Made up", None),
+    ("TAGS: Software", None),
+    ("", None),
+])
+def test_the_main_work_is_one_work_tag(text: str, expected: str | None) -> None:
+    assert tags.parse_main_work(text, TAGS) == expected
+
+
+def test_a_call_nobody_else_can_bid_on_has_its_own_type() -> None:
+    assert TAGS.group_of("Sole source") == "type"
+
+
 def call(**fields: Any) -> dict[str, Any]:
     row: dict[str, Any] = {"portal": "", "type": "", "department": "", "set_aside": "", "extra": None}
     row.update(fields)
