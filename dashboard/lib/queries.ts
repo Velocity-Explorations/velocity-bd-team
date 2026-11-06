@@ -448,8 +448,8 @@ export async function topTenRows(ids: string[]): Promise<TopTenRow[]> {
 
 /**
  * The live ranking Home shows before the first Monday brief (H2): open calls nobody has decided, rated yes or maybe and
- * kept and not ruled out, the highest fit score first, then the nearest deadline, then the newest. Calls with no score
- * yet come after those with one, yes before maybe.
+ * kept and not ruled out. A yes from both judges first, then a yes from one, then the highest fit score, the nearest
+ * deadline and the newest; the same order as RANKING in assistant/tools.py.
  */
 export async function liveTopTen(): Promise<string[]> {
   const db = sql();
@@ -460,7 +460,9 @@ export async function liveTopTen(): Promise<string[]> {
       AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
       AND (${dueDate(db)} >= CURRENT_DATE OR ${dueDate(db)} IS NULL)
       ${scored ? db`AND fit_band IS DISTINCT FROM 'ruled out'` : db``}
-    ORDER BY ${scored ? db`fit_score DESC NULLS LAST,` : db``} CASE ai_verdict WHEN 'yes' THEN 0 ELSE 1 END, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id
+    ORDER BY CASE ai_verdict WHEN 'yes' THEN 1 ELSE 0 END
+               + COALESCE((SELECT CASE j.verdict WHEN 'yes' THEN 1 ELSE 0 END FROM judgments j WHERE j.call_id = calls.id AND j.judge = 'grok' ORDER BY j.id DESC LIMIT 1), 0) DESC,
+             ${scored ? db`fit_score DESC NULLS LAST,` : db``} ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id
     LIMIT 10`;
   return rows.map((r) => r.id);
 }
