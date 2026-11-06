@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from assistant.dates import days_until, parse_due
-from ledger.queries import calls_where, get_call, recent_runs
+from ledger.queries import calls_where, get_call, recent_runs, verdicts_by_call
 from portals import registry
 from portals.registry import Portal
 from portals.shared import keyword_filter as kf
@@ -34,7 +34,7 @@ VERDICTS = ("yes", "maybe", "no")
 OVERDUE_DAYS = 8          # scans run weekly; more than this without a completed one is worth saying
 CLOSING_WINDOW_DAYS = 14
 TOP_PICKS = 5   # open, undecided calls the weekly summary ranks
-RANKING = "the highest fit score, then the nearest deadline, then the newest"   # how top picks are ordered
+RANKING = "yes from both judges, then yes from one, then the highest fit score, the nearest deadline and the newest"   # how top picks are ordered
 NOTE_LINE = re.compile(r"^\[(\S+) ([^\]]+)\] ?(.*)$")
 STOPWORDS = {
     "with", "from", "into", "that", "this", "their", "they", "have", "will", "your", "call", "calls",
@@ -432,13 +432,16 @@ def _waiting(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[st
     """Open, undecided calls the review kept and rated yes or maybe, best first, with their deadlines."""
     waiting = [pair for pair in open_undecided(rows, moment)
                if pair[0].get("ai_verdict") in ("yes", "maybe") and pair[0].get("fit_band") != "ruled out"]
-    # RANKING, in two stable sorts. A call with no score yet comes after those with one, yes before maybe.
+    # RANKING, in two stable sorts. A judge reads what the listing asks for and the fit score rates its categories, so a
+    # broad listing can score 95 with no yes from anyone: the yeses count first (David, 6 Nov). No score comes after a score.
     waiting.sort(key=lambda pair: pair[0].get("first_seen_at") or "", reverse=True)
+    verdicts = verdicts_by_call()
 
-    def rank(pair: tuple[dict[str, Any], datetime | None]) -> tuple[bool, int, bool, bool, datetime]:
+    def rank(pair: tuple[dict[str, Any], datetime | None]) -> tuple[int, bool, int, bool, datetime]:
         row, due = pair
         score = row.get("fit_score")
-        return (score is None, -(score or 0), score is None and row["ai_verdict"] != "yes", due is None, due or moment)
+        judges = {**verdicts.get(row["id"], {}), "claude": row["ai_verdict"]}   # the call's own verdict is Claude's newest
+        return (-sum(verdict == "yes" for verdict in judges.values()), score is None, -(score or 0), due is None, due or moment)
 
     waiting.sort(key=rank)
     return waiting

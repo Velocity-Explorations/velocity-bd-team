@@ -35,7 +35,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 function topSource(week: string | null): string {
   return week
     ? `From the Monday brief, ${weekLabel(week)}, with each call's decision as of now.`
-    : "No Monday brief yet, so this is the live ranking: yes before maybe, then the nearest deadline.";
+    : "No Monday brief yet, so this is the live ranking: yes from both judges, then yes from one, then the best fit.";
 }
 
 /**
