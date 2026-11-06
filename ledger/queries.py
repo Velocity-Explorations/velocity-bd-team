@@ -509,6 +509,16 @@ def main_work_by_call() -> dict[str, dict[str, str]]:
     return {call_id: judges for call_id, judges in named.items() if judges}
 
 
+def verdicts_by_call() -> dict[str, dict[str, str]]:
+    """Each judge's newest verdict on each call."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT call_id, judge, verdict FROM judgments ORDER BY id"))
+    verdicts: dict[str, dict[str, str]] = {}
+    for row in found:
+        verdicts.setdefault(row["call_id"], {})[row["judge"]] = row["verdict"]
+    return verdicts
+
+
 def latest_judgments(call_id: str) -> dict[str, dict[str, Any]]:
     """The newest judgment from each judge on one call, keyed by judge."""
     with tx() as conn:

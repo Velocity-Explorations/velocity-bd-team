@@ -5,8 +5,9 @@
 Each row needs id, title and description. Decisions are written to the ledger with
 set_filter(). Order of rules: blocklist regex rejects; no broad keyword rejects; otherwise
 keep, "tight" if a tight keyword also hits, else "broad". Matching is substring on the
-lowercased title + description, on purpose: it is predictable and editable from YAML.
-Known weakness: "ai" matches "maintain"; the tight tier and the LLM phase handle that.
+lowercased title + description, on purpose: it is predictable and editable from YAML. The
+exception is a keyword of three characters or fewer, found only as a whole word: on 6 Nov 2026,
+264 of the 281 calls "ai" matched held it only inside words like "available", "email" and "naics".
 
 Approved keyword changes (docs/ASSISTANT.md) are written with edit_keywords_text(), which
 changes only the lines it adds or removes, so the file's comments and layout survive.
@@ -31,6 +32,7 @@ SECTIONS = {"broad": "broad_keywords", "tight": "tight_keywords", "block": "bloc
 NOUNS = {"broad": "broad keyword", "tight": "tight keyword", "block": "blocklist pattern"}
 LIST_NAMES = {"broad": "broad keywords", "tight": "tight keywords", "block": "blocklist"}
 ITEM_LINE = re.compile(r"^(\s*)-\s+(.*?)\s*$")
+WHOLE_WORD_UP_TO = 3   # a keyword this short is found only as a whole word
 
 
 @dataclass
@@ -195,16 +197,23 @@ def search_text(row: Mapping[str, Any]) -> str:
     return f"{row.get('title') or ''} {row.get('description') or ''}".lower()
 
 
+def found(keyword: str, text: str) -> bool:
+    """Whether a lowercased keyword is in the lowercased text: anywhere, or as a whole word if it is short."""
+    if len(keyword) > WHOLE_WORD_UP_TO:
+        return keyword in text
+    return re.search(rf"(?<![a-z0-9]){re.escape(keyword)}(?![a-z0-9])", text) is not None
+
+
 def decide(row: Mapping[str, Any], kw: Keywords) -> Decision:
     text = search_text(row)
     title = str(row.get("title") or "")
     for pattern in kw.blocklist:
         if pattern.search(text):
             return Decision(row["id"], title, "rejected", reason=f"blocklist: {pattern.pattern}")
-    broad_hits = [k for k in kw.broad if k in text]
+    broad_hits = [k for k in kw.broad if found(k, text)]
     if not broad_hits:
         return Decision(row["id"], title, "rejected", reason=REASON_NO_KEYWORD)
-    tight_hits = [k for k in kw.tight if k in text]
+    tight_hits = [k for k in kw.tight if found(k, text)]
     hits = list(dict.fromkeys(broad_hits + tight_hits))
     return Decision(row["id"], title, "kept", tier="tight" if tight_hits else "broad", keywords=hits)
 

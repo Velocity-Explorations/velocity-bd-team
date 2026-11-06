@@ -7,7 +7,8 @@ this repo, which is public.
 Each part is worth what its rating is worth (VALUES), weighted by WEIGHTS, so main work counts most. Anything nobody
 rated counts as neutral, and a call with nothing but neutral ratings scores 50. A Never rules a call out (score 0) only
 on its main work, its type or its NAICS code, because a Never on one work tag among several would rule out calls the team
-pursues: the judges tag every kind of work a call touches. On what the judges name, it takes all of them to agree.
+pursues: the judges tag every kind of work a call touches. On what the judges name, it takes all of them to agree. A call
+both judges rate no is weak at best: a verdict reads the whole call, which tag ratings cannot.
 """
 from __future__ import annotations
 
@@ -97,7 +98,7 @@ def _keywords(call: Mapping[str, Any], ratings: Mapping[str, str]) -> tuple[floa
 
 
 def score_call(call: Mapping[str, Any], tags_by_source: Mapping[str, Sequence[str]], main_work: Mapping[str, str | None],
-               ratings: Mapping[str, str]) -> Fit | None:
+               ratings: Mapping[str, str], verdicts: Mapping[str, str] | None = None) -> Fit | None:
     """The call's fit, or None while no judge has named its main work."""
     named = list(dict.fromkeys(name for name in main_work.values() if name))
     if not named:
@@ -155,4 +156,7 @@ def score_call(call: Mapping[str, Any], tags_by_source: Mapping[str, Sequence[st
     total = (WEIGHTS["work"] * work + WEIGHTS["customer"] * customer + WEIGHTS["type"] * kind
              + WEIGHTS["naics"] * VALUES[naics] + WEIGHTS["keyword"] * keyword + WEIGHTS["access"] * access)
     score = int(100 * total + 0.5 + 1e-9)
+    if verdicts and len(verdicts) >= 2 and all(verdict == "no" for verdict in verdicts.values()) and score >= POSSIBLE:
+        score = POSSIBLE - 1
+        why.append("Both judges said no")
     return Fit(score, band_of(score), why)

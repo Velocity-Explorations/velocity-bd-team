@@ -37,6 +37,31 @@ def test_rules_in_order(keywords_file: Path) -> None:
     assert broad.result == "kept" and broad.tier == "broad" and broad.keywords == ["software"]
 
 
+@pytest.mark.parametrize(("text", "expected"), [
+    ("AI for operators", True),
+    ("an AI-enabled tool", True),
+    ("uses AI/ML models", True),
+    ("details are available by email; NAICS 541511", False),
+    ("air and maintain", False),
+])
+def test_a_short_keyword_counts_only_as_a_whole_word(text: str, expected: bool) -> None:
+    kw = kf.Keywords(broad=["ai"], tight=[])
+    assert (kf.decide({"id": "c", "title": text, "description": ""}, kw).result == "kept") is expected
+
+
+def test_a_longer_keyword_still_matches_inside_words() -> None:
+    kw = kf.Keywords(broad=["cyber"], tight=["c2"])
+    kept = kf.decide({"id": "c", "title": "cybersecurity", "description": ""}, kw)
+    assert kept.result == "kept" and kept.tier == "broad" and kept.keywords == ["cyber"]
+
+
+def test_every_portal_that_finds_c2_and_isr_also_lists_the_words_that_hold_them() -> None:
+    for path in Path("portals").glob("*/keywords.yaml"):
+        broad = kf.load_keywords(path).broad
+        assert "c2" not in broad or "jadc2" in broad, path
+        assert "isr" not in broad or "c4isr" in broad, path
+
+
 def test_filter_calls_writes_the_ledger_and_follows_the_file(ledger_db: str, keywords_file: Path, tmp_path: Path) -> None:
     run = lq.start_run("Example")
     lq.upsert_call({"id": "ex-a", "portal": "Example", "title": "Machine learning software", "description": ""}, run)

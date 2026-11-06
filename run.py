@@ -341,6 +341,38 @@ def backfill_tags() -> int:
     return 0
 
 
+def refilter(dry_run: bool = False) -> int:
+    """`--refilter`: every portal's stored calls through the keyword filter again, after its rules change, and a review
+    of any call newly kept. A dry run counts what would change and writes nothing."""
+    from ledger.queries import calls_where
+    from portals.shared.keyword_filter import decide, load_keywords
+
+    _console_logging()
+    total_dropped, total_kept = 0, 0
+    for portal in registry.discover():
+        if portal.keywords is None:
+            continue
+        stored = calls_where(portal=portal.name)
+        was = {row["id"]: row["filter_result"] for row in stored}
+        if dry_run:
+            keywords = load_keywords(portal.keywords)
+            now = {row["id"]: decide(row, keywords).result for row in stored}
+        else:
+            if stored:
+                portal.filter(stored)
+            now = {row["id"]: row["filter_result"] for row in calls_where(portal=portal.name)}
+        dropped = [call_id for call_id, result in now.items() if result != "kept" and was.get(call_id) == "kept"]
+        kept = [call_id for call_id, result in now.items() if result == "kept" and was.get(call_id) != "kept"]
+        total_dropped += len(dropped)
+        total_kept += len(kept)
+        if dropped or kept:
+            print(f"{portal.name}: {len(dropped)} newly dropped, {len(kept)} newly kept.")
+        if kept and not dry_run:
+            run_review(portal, None, no_review=False)
+    print(f"{'Would drop' if dry_run else 'Dropped'} {total_dropped} and {'would keep' if dry_run else 'kept'} {total_kept} more call(s).")
+    return 0
+
+
 def load_fit_ratings(folder: str) -> int:
     """`--load-fit-ratings FOLDER`: take the team's ratings from the Call Fit Ratings page, exported as one JSON file a
     row. They live in the ledger and never in the repo, which is public. Run --fit-scores afterwards."""
@@ -386,16 +418,16 @@ def score_fit(rows: list[dict[str, Any]], write: bool = True) -> dict[str, int] 
     """Score these calls and store it; how many fell in each band, or None when nobody has rated anything yet."""
     from collections import Counter
 
-    from ledger.queries import fit_ratings, main_work_by_call, set_fit, tags_by_call
+    from ledger.queries import fit_ratings, main_work_by_call, set_fit, tags_by_call, verdicts_by_call
     from review.fit import score_call
 
     ratings = fit_ratings()
     if not ratings:
         return None
-    tags, named = tags_by_call(), main_work_by_call()
+    tags, named, verdicts = tags_by_call(), main_work_by_call(), verdicts_by_call()
     bands: Counter[str] = Counter()
     for row in rows:
-        fit = score_call(row, tags.get(row["id"], {}), named.get(row["id"], {}), ratings)
+        fit = score_call(row, tags.get(row["id"], {}), named.get(row["id"], {}), ratings, verdicts.get(row["id"]))
         if fit is None:
             continue
         bands[fit.band] += 1
@@ -1049,6 +1081,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="post the morning's workspace notices to Slack: steps behind target, the digest per owner; then exit")
     parser.add_argument("--linear-sync", action="store_true",
                         help="open and move issues in Linear's Pursuits project to match the pursued calls, then exit")
+    parser.add_argument("--refilter", action="store_true",
+                        help="filter every stored call again with today's keywords, then exit; with --dry-run, count only")
     parser.add_argument("--load-fit-ratings", metavar="FOLDER",
                         help="take the team's fit ratings from the page's export, one JSON file a row, then exit")
     parser.add_argument("--fit-scores", action="store_true",
@@ -1078,6 +1112,8 @@ def main(argv: list[str] | None = None) -> int:
         return backfill_tags()
     if args.backfill_summaries:
         return backfill_summaries(dry_run=args.dry_run)
+    if args.refilter:
+        return refilter(dry_run=args.dry_run)
     if args.load_fit_ratings:
         return load_fit_ratings(args.load_fit_ratings)
     if args.fit_scores:
