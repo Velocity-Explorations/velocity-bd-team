@@ -9,6 +9,42 @@ portal content.
 
 ## Current Session
 
+**Date**: 2026-11-06 (covers 4 to 6 Nov)
+**Focus**: Scans post a summary, pursued calls in Linear, a faster dashboard, and a fit score from the team's ratings with both judges re-run on the open queue
+
+### What Was Done
+- Scans: `--hold-slack` (#110); a scan posts its summary and no card per call (#115); a cut answer is retried (#118). The SAM.gov role works: a first full scan made 305 requests.
+- Linear: each pursued call gets an issue in Pursuits, moved as the call moves (#116, #117, #120).
+- Dashboard: Needs review and All calls at 100 rows, pages answer at once (#111, #112, #121, #123, #124); decide from Home (#122); Not relevant asks why (#125, #126). Slop check counts long placeholders (#113, #114).
+- Fit score (PRO-487): each judge names a call's main work and calls score 0 to 100 from the team's ratings (#127); short keywords match whole words and both judges' no caps a call at weak (#128); shown on the dashboard (#129); ratings changed on `/fit` in Automation (#131); an INDOPACOM tag and a fix to Vulcan's SOCOM tag (#132). Migrations 013 and 014 applied live; rule tags refreshed on 61 calls.
+- Both judges re-ran all 258 open calls ([evidence](../../research/analysis/2026-11-06_fit-score-against-judges.md)).
+- Top 10: a judge's yes ranks first, and inside each group calls due within 60 days come first (#133, #135). The judges' examples drop Claude's reasoning where the team decided otherwise (#134), and David's four per-call reasons are stored on those calls.
+
+### Key Decisions
+- Ratings live in the ledger and never in the repo. Do not run `--load-fit-ratings` again: it replaces changes made on `/fit`.
+- The score rates a call's categories, not what the listing asks for, so verdicts lead the Top 10; Needs review stays best fit first (David, 6 Nov).
+- A Never rules a call out only on its main work, type or NAICS code.
+
+### Key Files Modified
+| File | Change |
+|------|--------|
+| `review/fit.py`, `review/reviewer.py`, `review/tags.py` | The score, main work, the judges' profile, tag rules |
+| `review/feedback.py` | Examples show reasoning only where it agrees with the decision |
+| `assistant/tools.py`, `dashboard/lib/queries.ts` | RANKING and Home's live ranking |
+| `dashboard/app/fit/page.tsx`, `dashboard/lib/fitratings.ts`, `dashboard/lib/fit.ts` | The Fit ratings page and the score on call rows |
+| `linear/`, `slack/sink.py`, `run.py` | Pursuits sync, summary-only scans, new run flags |
+
+### In Progress
+- A prompt for Grok on three Company Reference items is ready for David to paste; the edits still need checking live afterwards. Two more stale items in Drive (a spelling, a former employee's bio) are not in it.
+- David to rate the new INDOPACOM tag and the `jadc2` and `c4isr` keywords on `/fit` (unrated counts as Neutral).
+- The AFWERX cycle listings close 25 Nov and left the Top 10. DSIP forbids automated access, so a person has to read the topics.
+- Linear catch-up notes for #109 to #135 are kept locally in data/linear/catchup.md until Linear writes resume.
+
+### Blockers
+- None.
+
+## Session: 2026-11-04
+
 **Date**: 2026-11-04 (covers 30 Oct to 4 Nov)
 **Focus**: The Writer on Claude with Velocity's facts read live from Drive, the page budget, the 02 Submissions rename, and a drafting trial against a past winner
 

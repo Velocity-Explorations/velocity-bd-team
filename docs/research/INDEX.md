@@ -20,6 +20,7 @@ instead of restating it.
 
 | Date | Document | Summary | Tags |
 |---|---|---|---|
+| 2026-11-06 | [The fit score against the judges' verdicts](analysis/2026-11-06_fit-score-against-judges.md) | The score rates categories: 35 of 44 strong calls had no yes, so the Top 10 ranks verdicts first | fit-score, ranking, judges, top-10 |
 
 ## Benchmarks
 
