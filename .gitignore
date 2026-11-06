@@ -12,6 +12,7 @@ __pycache__/
 .pytest_cache/
 
 # Playwright and local state
+.vscode/
 playwright-state/
 *.log
 
