@@ -144,6 +144,22 @@ export default async function BriefPage({ searchParams }: { searchParams: Search
         )}
       </section>
 
+      {top?.watch ? (
+        <section className="top-ten" aria-labelledby="watch-title">
+          <div className="section-head">
+            <h2 id="watch-title">Top 10 to watch</h2>
+            <p className="muted">Umbrellas and announcements: standing CSOs, BAAs and cycles, and notices with nothing to submit yet.</p>
+          </div>
+          {top.watch.length ? (
+            <TopTenTable ids={top.watch.map((c) => c.id)} description={false} tz={tz} nameOf={nameOf} watch />
+          ) : (
+            <div className="empty">
+              <p className="title">Nothing to watch that week.</p>
+            </div>
+          )}
+        </section>
+      ) : null}
+
       <div className="board-grid">
         {boards.map((b) => {
           const pursued = b.closingSoon.filter((c) => c.status === "pursue");

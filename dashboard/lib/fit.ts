@@ -1,7 +1,7 @@
 // The fit score on a call (PRO-487): review/fit.py scores it 0 to 100 from the team's ratings and says why. No imports, so
 // `node --test` can load it directly.
 
-export type FitColumns = { fit_score: number | null; fit_band: string | null; fit_why: string | null };
+export type FitColumns = { fit_score: number | null; fit_band: string | null; fit_why: string | null; listing?: string | null };
 
 const TONES: Record<string, string> = { strong: "good", possible: "warn", weak: "grey", "ruled out": "bad" };
 

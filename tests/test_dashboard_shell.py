@@ -116,8 +116,45 @@ def test_home_shows_five_link_cards_then_the_top_10(page: Any) -> None:
     assert page.locator("main form").count() == page.locator("section.top-ten form.decide-form").count()
     top = page.locator("section.top-ten")
     assert top.count() == 1
-    assert top.locator("table").count() == 1 or top.locator(".empty").count() == 1
+    panels = top.locator("[role=tabpanel]")
+    assert panels.count() == 2   # the calls, and the umbrellas and announcements to watch (David, 7 Nov)
+    for i in range(2):
+        assert panels.nth(i).locator("table").count() + panels.nth(i).locator(".empty").count() == 1
     assert page.locator("main a[href='/brief']").count() >= 1
+
+
+def open_tab(page: Any, key: str) -> None:
+    """Click a Top 10 tab, again if the page had not finished starting when the first click landed."""
+    for _ in range(3):
+        page.locator(f"#top-tab-{key}").click()
+        try:
+            page.wait_for_function(f"!document.querySelector('#top-panel-{key}').hidden", timeout=5_000)
+            return
+        except Exception:
+            continue
+    raise AssertionError(f"the {key} tab did not open")
+
+
+def test_home_keeps_its_two_top_10s_in_tabs_and_a_link_opens_either(page: Any) -> None:
+    """David, 7 Nov: the calls to respond to now on one tab, the umbrellas and announcements to watch on the next."""
+    open_page(page, "/")
+    tabs = page.locator("section.top-ten [role=tab]")
+    assert [re.sub(r"\s*\d+$", "", t).strip() for t in tabs.all_inner_texts()] == ["Top 10 calls", "Top 10 to watch"]
+    assert tabs.first.get_attribute("aria-selected") == "true"
+    assert page.locator("#top-panel-calls").is_visible() and page.locator("#top-panel-watch").is_hidden()
+    open_tab(page, "watch")
+    assert page.locator("#top-panel-calls").is_hidden()
+    assert page.url.endswith("/?top=watch")
+    page.keyboard.press("ArrowLeft")   # the arrow keys move between the tabs
+    page.wait_for_function("!document.querySelector('#top-panel-calls').hidden", timeout=5_000)
+    assert "top=" not in page.url
+    open_page(page, "/?top=watch")
+    assert page.locator("#top-tab-watch").get_attribute("aria-selected") == "true"
+    assert page.locator("#top-panel-watch").is_visible()
+    rows = page.locator("#top-panel-watch tbody tr")
+    if rows.count():
+        assert rows.first.locator(".badge", has_text=re.compile(r"^(umbrella|announcement)$")).count() == 1
+        assert rows.first.get_attribute("data-href") is None   # Calls' Top 10 does not hold them
 
 
 def test_home_top_10_heads_its_summaries_summary_description(page: Any) -> None:
@@ -143,11 +180,11 @@ def test_a_page_streams_its_loading_screen_before_its_content(path: str) -> None
 def test_each_top_10_call_on_home_can_be_decided_there(page: Any) -> None:
     """David, 5 Nov: a Top 10 call is decided from Home, without going to Calls first."""
     open_page(page, "/")
-    rows = page.locator("section.top-ten tbody tr")
+    rows = page.locator("#top-panel-calls tbody tr")
     if rows.count() == 0:
         pytest.skip("there is no Top 10 yet")
-    assert "decide" in [t.strip().lower() for t in page.locator("section.top-ten thead th").all_inner_texts()]
-    assert page.locator("section.top-ten tbody td.decide").count() == rows.count()
+    assert "decide" in [t.strip().lower() for t in page.locator("#top-panel-calls thead th").all_inner_texts()]
+    assert page.locator("#top-panel-calls tbody td.decide").count() == rows.count()
     first = rows.first
     first.locator("details.decide-menu > summary").click()
     items = [t.strip() for t in first.locator("details.decide-menu > .menu-body > button, details.decide-menu > .menu-body > details > summary").all_inner_texts()]
