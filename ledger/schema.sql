@@ -435,3 +435,25 @@ ALTER TABLE fit_ratings ADD COLUMN changed_by TEXT;
 -- group check also takes listing (the tag_list table above shows the wider check).
 
 ALTER TABLE calls ADD COLUMN listing TEXT;
+
+-- 016_chat: Ask Grok, each question asked from the dashboard's panel with its answer (run.py --assistant).
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id           INTEGER PRIMARY KEY @@AUTOINCREMENT@@,
+  thread_id    TEXT NOT NULL,
+  asked_by     TEXT NOT NULL,
+  page         TEXT,
+  question     TEXT NOT NULL,
+  state        TEXT NOT NULL DEFAULT 'queued' CHECK (state IN ('queued', 'working', 'done', 'failed')),
+  answer       TEXT,
+  sources      TEXT,
+  tools        TEXT,
+  model        TEXT,
+  cost_usd     REAL,
+  asked_at     TEXT NOT NULL,
+  started_at   TEXT,
+  answered_at  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_state ON chat_messages (state, id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages (asked_by, thread_id, id);

@@ -26,6 +26,7 @@ param(
     [string[]]$RequestsAt = @("12:07", "17:07"),
     [int]$WaitLockMinutes = 30,
     [string]$WorkerTaskName = "velocity-bd-team worker",
+    [string]$AssistantTaskName = "velocity-bd-team assistant",
     [int]$WorkerCheckMinutes = 5,
     [int]$WorkspaceSlackMinutes = 5,
     [string[]]$LinearSyncAt = @("08:07", "13:07"),
@@ -125,6 +126,22 @@ Write-Host "Registered '$WorkerTaskName'"
 Write-Host "  runs:     $python -m drafting.worker  (in $repo)"
 Write-Host "  trigger:  at logon, and started again within $WorkerCheckMinutes minutes if it stops"
 Write-Host "Start it now with:  Start-ScheduledTask -TaskName '$WorkerTaskName'"
+
+# Ask Grok's assistant (docs/ASSISTANT.md, "Ask Grok"): it answers the questions asked from the dashboard's panel,
+# always on while David is logged on, started again within a few minutes if it stops, like the worker. IgnoreNew
+# leaves a running one alone, and data\assistant.lock keeps it to one. It never takes the pipeline's lock.
+$assistantAction = New-ScheduledTaskAction -Execute $conhost -Argument (Headless "run.py --assistant") -WorkingDirectory $repo
+$assistantTriggers = @(
+    (New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"),
+    (New-ScheduledTaskTrigger -Once -At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Minutes $WorkerCheckMinutes))
+)
+Register-ScheduledTask -TaskName $AssistantTaskName -Action $assistantAction -Trigger $assistantTriggers -Settings $workerSettings `
+    -Description "velocity-bd-team: Ask Grok's assistant, which answers questions from the dashboard. Logs in data\assistant\logs." `
+    -Force | Out-Null
+Write-Host "Registered '$AssistantTaskName'"
+Write-Host "  runs:     $python run.py --assistant  (in $repo)"
+Write-Host "  trigger:  at logon, and started again within $WorkerCheckMinutes minutes if it stops"
+Write-Host "Start it now with:  Start-ScheduledTask -TaskName '$AssistantTaskName'"
 
 # Workspace notices in Slack (docs/RUNBOOK.md, "Workspace notices in Slack"): every few minutes, a card for a
 # pursued call without one and each step newly ready for its owner, in the call's thread; at 08:00, steps behind
