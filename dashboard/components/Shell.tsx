@@ -15,7 +15,7 @@ import { callsHref } from "@/lib/profile";
 import { aliasesFor } from "@/lib/people";
 import { pastWorkGroups, pastWorkLabel } from "@/lib/pastwork";
 import { overdueCount, sortIntoViews } from "@/lib/proposals";
-import { countStepsReadyFor, countWaitingRequests, hasChat, pastWork, proposalCalls, queueCounts } from "@/lib/queries";
+import { countStepsReadyFor, countWaitingRequests, hasChat, hasSuggestions, pastWork, proposalCalls, queueCounts } from "@/lib/queries";
 import { hiddenColumns, queueMode } from "@/lib/settings";
 import { allowlist, iapAudience, sessionMode, team, viewerHeader } from "@/lib/viewer";
 
@@ -62,7 +62,7 @@ function viewerMode(): { mode: ViewerMode; why: string } {
 const shellData = cache(async (section: Section | null) => {
   const { viewer } = await me();
   const startsDrafts = section === "calls" || section === "proposals";
-  const [counts, hidden, label, filters, draft, tz, past, members, chat] = await Promise.all([
+  const [counts, hidden, label, filters, draft, tz, past, members, chat, suggests] = await Promise.all([
     sectionCounts(viewer),
     section === "calls" ? hiddenColumns() : null,
     labeler(),
@@ -72,9 +72,10 @@ const shellData = cache(async (section: Section | null) => {
     startsDrafts ? pastWork() : null,
     team(),
     hasChat().catch(() => false),
+    startsDrafts ? hasSuggestions().catch(() => false) : false,
   ]);
   const people = await Promise.all(members.map(async (p) => ({ name: p.name, label: label(p.name), initials: await initialsOf(p.name) })));
-  return { viewer, counts, hidden, label, filters, draft, tz, past, people, chat };
+  return { viewer, counts, hidden, label, filters, draft, tz, past, people, chat, suggests };
 });
 
 /** Start loading the frame's data at the top of a page; the Shell picks it up when it renders. */
@@ -83,7 +84,7 @@ export function preloadShell(section: Section | null): void {
 }
 
 export async function Shell({ section, children }: { section: Section | null; children: ReactNode }) {
-  const { viewer, counts, hidden, label, filters, draft, tz, past, people, chat } = await shellData(section);
+  const { viewer, counts, hidden, label, filters, draft, tz, past, people, chat, suggests } = await shellData(section);
   const tableSettings = section === "calls";
   const { mode, why } = viewerMode();
   return (
@@ -135,6 +136,7 @@ export async function Shell({ section, children }: { section: Section | null; ch
             title: g.title, items: g.items.map((i) => ({ id: i.id, label: pastWorkLabel(i) })),
           }))}
           indexed={past?.indexedAt ? formatTime(past.indexedAt, tz) : null}
+          suggests={suggests}
         />
       ) : null}
       {chat ? <AskPanel viewer={viewer} /> : null}

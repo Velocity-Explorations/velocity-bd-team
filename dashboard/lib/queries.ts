@@ -15,6 +15,7 @@ import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
 import type { AskMessage } from "./ask";
+import type { SuggestionRow } from "./suggest";
 import { WATCH } from "./listing";
 import type { ProfileFields } from "./profile";
 import { pushDate, RESULTS, resultWord, startRefusal, workerReadiness, type ProposalCall } from "./proposals";
@@ -1159,6 +1160,42 @@ export async function questionWaiting(names: string[]): Promise<boolean> {
   const [row] = await db<{ n: number }[]>`
     SELECT COUNT(*)::int AS n FROM chat_messages WHERE asked_by IN ${db(names)} AND state IN ('queued', 'working')`;
   return (row?.n ?? 0) > 0;
+}
+
+/** Whether Start the draft can suggest: migration 017 is applied. */
+export async function hasSuggestions(): Promise<boolean> {
+  return hasTable(sql(), "draft_suggestions");
+}
+
+/** A call's newest suggestion request, whatever its state, and when the assistant was last seen. */
+export async function latestSuggestion(callId: string): Promise<{ row: SuggestionRow | null; seenAt: string | null }> {
+  const db = sql();
+  if (!(await hasSuggestions())) return { row: null, seenAt: null };
+  const [[row], seen] = await Promise.all([
+    db<SuggestionRow[]>`
+      SELECT id, state, suggestion, note, answered_at FROM draft_suggestions WHERE call_id = ${callId} ORDER BY id DESC LIMIT 1`,
+    db<{ seen_at: string }[]>`SELECT seen_at FROM workers WHERE name = 'assistant'`,
+  ]);
+  return { row: row ?? null, seenAt: seen[0]?.seen_at ?? null };
+}
+
+/** Whether a call is in the ledger. */
+export async function callExists(callId: string): Promise<boolean> {
+  const [row] = await sql()<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls WHERE id = ${callId}`;
+  return (row?.n ?? 0) > 0;
+}
+
+/** A request for a call's suggestion; the one already waiting for that call, if any. */
+export async function askSuggestion(callId: string, by: string): Promise<number> {
+  const db = sql();
+  return db.begin(async (tx) => {
+    const [waiting] = await tx<{ id: number }[]>`
+      SELECT id FROM draft_suggestions WHERE call_id = ${callId} AND state IN ('queued', 'working') ORDER BY id LIMIT 1`;
+    if (waiting) return Number(waiting.id);
+    const [row] = await tx<{ id: number }[]>`
+      INSERT INTO draft_suggestions (call_id, asked_by, state, asked_at) VALUES (${callId}, ${by}, 'queued', ${isoNow()}) RETURNING id`;
+    return Number(row.id);
+  });
 }
 
 /** A question for run.py --assistant to answer; its id. */

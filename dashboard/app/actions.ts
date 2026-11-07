@@ -50,6 +50,9 @@ import {
   saveFitRating,
   hasChat,
   questionWaiting,
+  askSuggestion,
+  callExists,
+  hasSuggestions,
 } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
 import { decidedNotice, fromQueue, safeReturnTo } from "@/lib/text";
@@ -79,6 +82,24 @@ export async function askGrokAction(input: { question?: unknown; thread?: unknow
     return { ok: true, id: await askQuestion(thread, viewer, question, page), thread };
   } catch (err) {
     return { ok: false, reason: `The question did not reach the ledger: ${err instanceof Error ? err.message.slice(0, 160) : "unknown error"}` };
+  }
+}
+
+export type SuggestResult = { ok: true; id: number } | { ok: false; reason: string };
+
+/** Ask for Start the draft's suggestion for a call (David, 7 Nov 2026): it waits for run.py --assistant, where Claude
+ *  makes it. Called from the dialog's script, so it returns what happened instead of redirecting. */
+export async function suggestDraftAction(input: { callId?: unknown }): Promise<SuggestResult> {
+  const viewer = await currentViewer();
+  if (!viewer) return { ok: false, reason: "Log in (top right) to ask for a suggestion." };
+  const callId = typeof input?.callId === "string" ? input.callId.trim().slice(0, 300) : "";
+  if (!callId) return { ok: false, reason: "Choose a call first." };
+  try {
+    if (!(await hasSuggestions())) return { ok: false, reason: "Suggestions are not set up yet." };
+    if (!(await callExists(callId))) return { ok: false, reason: "That call is not in the ledger." };
+    return { ok: true, id: await askSuggestion(callId, viewer) };
+  } catch (err) {
+    return { ok: false, reason: `The request did not reach the ledger: ${err instanceof Error ? err.message.slice(0, 160) : "unknown error"}` };
   }
 }
 
