@@ -214,7 +214,8 @@ def test_a_long_tool_result_is_cut_and_grok_must_answer_after_the_last_round(led
 
 
 def test_the_rules_ask_for_ids_and_needs_fact_and_forbid_sensitive_items_and_dashes() -> None:
-    for words in ("NEEDS FACT", "SENSITIVE", "F-06", "only from what your tools return", "cannot change"):
+    for words in ("NEEDS FACT", "SENSITIVE", "F-06", "only from what your tools return", "cannot change",
+                  "not approved to name"):   # David, 7 Nov: an answer named a contact the record said not to
         assert words in chat.SYSTEM, words
     assert "–" not in chat.SYSTEM and "—" not in chat.SYSTEM
 
