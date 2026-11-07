@@ -1161,9 +1161,65 @@ def chat_spend_today(now: datetime | None = None) -> float:
 
 
 def requeue_working_questions() -> int:
-    """Questions a stopped assistant left half done wait again; how many."""
+    """Questions and draft suggestions a stopped assistant left half done wait again; how many."""
     with tx() as conn:
-        return q(conn, "UPDATE chat_messages SET state = 'queued', started_at = NULL WHERE state = 'working'").rowcount
+        found = q(conn, "UPDATE chat_messages SET state = 'queued', started_at = NULL WHERE state = 'working'").rowcount
+        return found + q(conn, "UPDATE draft_suggestions SET state = 'queued', started_at = NULL WHERE state = 'working'").rowcount
+
+
+# ----------------------------------------------------------------- Start the draft's suggestions
+
+def ask_suggestion(call_id: str, asked_by: str) -> int:
+    """A request for Start the draft's suggestion (migration 017); the one already waiting for this call, if any."""
+    with tx() as conn:
+        waiting = one(q(conn, "SELECT id FROM draft_suggestions WHERE call_id = ? AND state IN ('queued', 'working') "
+                              "ORDER BY id LIMIT 1", (call_id,)))
+        if waiting:
+            return int(waiting["id"])
+        cur = q(conn, "INSERT INTO draft_suggestions (call_id, asked_by, state, asked_at) VALUES (?, ?, 'queued', ?) RETURNING id",
+                (call_id, asked_by, now_iso()))
+        return int(cur.fetchone()[0])
+
+
+def get_suggestion(suggestion_id: int) -> dict[str, Any] | None:
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM draft_suggestions WHERE id = ?", (suggestion_id,)))
+
+
+def latest_suggestion(call_id: str) -> dict[str, Any] | None:
+    """A call's newest suggestion request, whatever its state."""
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM draft_suggestions WHERE call_id = ? ORDER BY id DESC LIMIT 1", (call_id,)))
+
+
+def claim_next_suggestion() -> dict[str, Any] | None:
+    """The assistant takes the oldest waiting request: queued -> working, guarded."""
+    with tx() as conn:
+        for row in rows(q(conn, "SELECT id FROM draft_suggestions WHERE state = 'queued' ORDER BY id LIMIT 3")):
+            cur = q(conn, "UPDATE draft_suggestions SET state = 'working', started_at = ? WHERE id = ? AND state = 'queued'",
+                    (now_iso(), row["id"]))
+            if cur.rowcount == 1:
+                return one(q(conn, "SELECT * FROM draft_suggestions WHERE id = ?", (row["id"],)))
+    return None
+
+
+def finish_suggestion(suggestion_id: int, state: str, suggestion: Any = None, note: str | None = None,
+                      model: str | None = None, cost_usd: float | None = None) -> None:
+    if state not in ("done", "failed"):
+        raise ValueError(f"a suggestion finishes done or failed, not {state}")
+    with tx() as conn:
+        q(conn, "UPDATE draft_suggestions SET state = ?, suggestion = ?, note = ?, model = ?, cost_usd = ?, answered_at = ? "
+                "WHERE id = ?", (state, _jsonify(suggestion) if suggestion is not None else None, note, model, cost_usd,
+                                 now_iso(), suggestion_id))
+
+
+def assistant_spend_today(now: datetime | None = None) -> float:
+    """What Ask Grok's answers and Start the draft's suggestions have cost since midnight UTC: one daily budget."""
+    moment = now or datetime.now(timezone.utc)
+    midnight = moment.astimezone(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+    with tx() as conn:
+        row = one(q(conn, "SELECT COALESCE(SUM(cost_usd), 0) AS spent FROM draft_suggestions WHERE answered_at >= ?", (midnight,)))
+    return chat_spend_today(moment) + (float(row["spent"]) if row else 0.0)
 
 
 def steps_in_state(state: str) -> list[dict[str, Any]]:

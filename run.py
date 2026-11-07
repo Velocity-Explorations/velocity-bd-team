@@ -1113,10 +1113,10 @@ def answer_question(row: dict[str, Any], model: Any, tools: list[Any]) -> str:
     """Answer one waiting question and store the answer, or why there is none; the state it ended in."""
     from assistant import chat
     from assistant.grok import MODEL_ID
-    from ledger.queries import chat_spend_today, finish_question, thread_history
+    from ledger.queries import assistant_spend_today, finish_question, thread_history
 
     budget = daily_budget()
-    if chat_spend_today() >= budget:
+    if assistant_spend_today() >= budget:
         finish_question(row["id"], "failed", f"Ask Grok has used today's budget of ${budget:.2f}. It starts again at midnight UTC.")
         return "failed"
     history = [(h["question"], h["answer"]) for h in thread_history(row["thread_id"], row["asked_by"], row["id"])]
@@ -1134,11 +1134,41 @@ def answer_question(row: dict[str, Any], model: Any, tools: list[Any]) -> str:
     return "done"
 
 
+def draft_suggestion(call_id: str) -> tuple[dict[str, Any], float]:
+    """Start the draft's suggestion for one call, from the Writer's model (drafting/suggest.py), and its cost."""
+    from drafting.suggest import suggest
+
+    return suggest(call_id)
+
+
+def answer_suggestion(row: dict[str, Any]) -> str:
+    """Make one waiting draft suggestion and store it, or why there is none; the state it ended in."""
+    from drafting.llm import writer_model
+    from ledger.queries import assistant_spend_today, finish_suggestion
+
+    budget = daily_budget()
+    if assistant_spend_today() >= budget:
+        finish_suggestion(row["id"], "failed", note=f"Today's budget of ${budget:.2f} for Ask Grok and suggestions is used. "
+                                                    "It starts again at midnight UTC.")
+        return "failed"
+    model = writer_model()
+    try:
+        suggestion, cost = draft_suggestion(row["call_id"])
+    except Exception as exc:   # Claude down, the facts unreadable, an answer that could not be read
+        log.warning("Suggestion %s for %s failed: %s: %s", row["id"], row["call_id"], type(exc).__name__, str(exc)[:200])
+        finish_suggestion(row["id"], "failed", note="Claude could not make a suggestion just now. Try again in a minute.",
+                          model=model)
+        return "failed"
+    finish_suggestion(row["id"], "done", suggestion, model=model, cost_usd=cost)
+    log.info("Suggestion %s for %s made: $%.4f", row["id"], row["call_id"], cost)
+    return "done"
+
+
 def run_assistant(model: Any = None, max_questions: int | None = None, poll_s: float = ASSISTANT_POLL_S) -> int:
-    """`--assistant`: answer Ask Grok's questions as they arrive, until stopped. With max_questions (tests), stop after
-    that many, or as soon as none is waiting."""
+    """`--assistant`: answer Ask Grok's questions and make Start the draft's suggestions as they arrive, until stopped.
+    With max_questions (tests), stop after that many, or as soon as none is waiting."""
     from assistant.grok import GrokChat
-    from ledger.queries import claim_next_question, requeue_working_questions, worker_beat, worker_started
+    from ledger.queries import claim_next_question, claim_next_suggestion, requeue_working_questions, worker_beat, worker_started
 
     model = model or GrokChat()
     tools = assistant_tools()
@@ -1151,6 +1181,14 @@ def run_assistant(model: Any = None, max_questions: int | None = None, poll_s: f
         while max_questions is None or handled < max_questions:
             row = claim_next_question()
             if row is None:
+                wanted = claim_next_suggestion()
+                if wanted is not None:
+                    worker_beat(ASSISTANT, "working", f"suggesting for {wanted['call_id']}")
+                    answer_suggestion(wanted)
+                    handled += 1
+                    worker_beat(ASSISTANT, "idle")
+                    beat = time.monotonic()
+                    continue
                 if max_questions is not None:
                     break
                 if time.monotonic() - beat >= ASSISTANT_BEAT_S:

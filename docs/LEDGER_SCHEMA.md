@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `016_chat.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `017_draft_suggestions.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -734,3 +734,24 @@ Grok) and writes the answer back. A person reads only their own threads. Added b
 | asked_at | TEXT timestamp | | the dashboard |
 | started_at | TEXT timestamp | when the assistant took it | `run.py --assistant` |
 | answered_at | TEXT timestamp | when the answer was written | same |
+
+## Table: draft_suggestions
+
+What Start the draft suggests (David, 7 Nov 2026): one row per request from the dialog's Suggest button. `run.py
+--assistant` has Claude, the Writer's model, recommend how to set the draft up (`drafting/suggest.py`), and the newest
+done row for a call fills the dialog in for the person to change. One request waits per call. Added by
+`017_draft_suggestions.sql`.
+
+| Column | Type | Meaning | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key | | the dashboard |
+| call_id | TEXT, not null | the call the draft would be for | the dashboard |
+| asked_by | TEXT, not null | who pressed Suggest | the dashboard |
+| state | TEXT, not null | `queued`, `working`, `done` or `failed` | the dashboard, then `run.py --assistant` |
+| suggestion | TEXT JSON | `{"format", "format_why", "approval_mode", "approval_why", "direction", "builds_on": [{"id", "why"}]}`; `builds_on` ids are `drive_items` ids, and anything not on the dialog's lists is left out | `run.py --assistant` |
+| note | TEXT | why there is no suggestion (the day's budget, Claude unreachable) | same |
+| model | TEXT | the model that answered, the Writer's (WRITER_MODEL) | same |
+| cost_usd | REAL | what it cost, counted in Ask Grok's daily budget (ASSISTANT_DAILY_USD) | same |
+| asked_at | TEXT timestamp | | the dashboard |
+| started_at | TEXT timestamp | when the assistant took it | `run.py --assistant` |
+| answered_at | TEXT timestamp | when the suggestion was written | same |

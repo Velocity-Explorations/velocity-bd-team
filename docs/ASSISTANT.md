@@ -137,7 +137,8 @@ gets the read tools above and nothing that records or changes anything.
 - **What goes to xAI:** the question, the thread's last 8 exchanges and the tools' results, Velocity's facts among
   them, with `store: false`. Grok is asked not to keep them. Conversations stay in the ledger, never in this repo.
 - **Limits:** six rounds of tool calls a question, each result cut to 6,000 characters, and a daily budget for the
-  team, `ASSISTANT_DAILY_USD` (default $5, about 120 questions at grok-4.7's price); over it a question says so.
+  team, `ASSISTANT_DAILY_USD` (default $5, about 120 questions at grok-4.7's price), which Start the draft's
+  suggestions share (docs/RUNBOOK.md); over it a question says so.
 
 ## Connecting a model later
 
