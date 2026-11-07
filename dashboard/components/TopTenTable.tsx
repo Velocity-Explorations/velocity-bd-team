@@ -10,6 +10,7 @@ import { formatDue } from "@/lib/format";
 import { daysLeftText, topTenOrder } from "@/lib/home";
 import { verdictsFor } from "@/lib/judges";
 import { fitBadge } from "@/lib/fit";
+import { listingBadge } from "@/lib/listing";
 import { displayPerson } from "@/lib/people";
 import { draftBlock, draftFormat } from "@/lib/proposals";
 import { decisionsOn, draftsFor, latestJudgments, topTenRows } from "@/lib/queries";
@@ -41,22 +42,28 @@ export function preloadTopTen(ids: string[]): void {
  * and portal, the deadline and days left, both verdicts, the decision now, the description (Home only:
  * Claude's executive summary where there is one, the portal's words on hover) and Claude's reason, each
  * as the ledger has them now; a call with a draft shows its badge
- * (DB1). A row opens Calls, Top 10 with that call focused. With `decide` (Home), each row also has the Decide menu,
+ * (DB1). A row opens Calls, Top 10 with that call focused, except on the list to watch (`watch`), which Calls' Top 10
+ * does not hold. An umbrella or announcement wears its badge. With `decide` (Home), each row also has the Decide menu,
  * and a decision comes back to Home.
  */
-export async function TopTenTable({ ids, description, tz, nameOf, decide }: {
+export async function TopTenTable({ ids, description, tz, nameOf, decide, watch = false }: {
   ids: string[];
   description: boolean;
   tz: string;
   nameOf: (by: string | null) => string;
   decide?: TopTenDecide;
+  watch?: boolean;
 }) {
   const { byId, order, judged, drafts, votes } = await topTenData(JSON.stringify(ids));
   if (order.length === 0) {
     return (
       <div className="empty">
-        <p className="title">Nothing to rank yet.</p>
-        <p className="muted">The Top 10 lists open yes and maybe calls nobody has decided. New ones arrive with each scan.</p>
+        <p className="title">{watch ? "Nothing to watch yet." : "Nothing to rank yet."}</p>
+        <p className="muted">
+          {watch
+            ? "This list holds open yes and maybe umbrellas and announcements nobody has decided: standing CSOs, BAAs and cycles, and notices with nothing to submit yet."
+            : "The Top 10 lists open yes and maybe calls nobody has decided. New ones arrive with each scan."}
+        </p>
       </div>
     );
   }
@@ -86,13 +93,14 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide }: {
             const verdicts = verdictsFor(judged.get(id), call.ai_verdict, call.ai_reasoning);
             const cell = descriptionCell(call.portal, call.description, call.extra, call.ai_summary);
             const draft = drafts.get(id);
+            const kind = listingBadge(call.listing);
             return (
               <tr
                 key={id}
-                className="row-link"
-                data-href={`/review?view=top10&focus=${encodeURIComponent(id)}`}
-                tabIndex={0}
-                aria-label={`${call.title || call.id}: open it in Calls, Top 10`}
+                className={watch ? undefined : "row-link"}
+                data-href={watch ? undefined : `/review?view=top10&focus=${encodeURIComponent(id)}`}
+                tabIndex={watch ? undefined : 0}
+                aria-label={watch ? undefined : `${call.title || call.id}: open it in Calls, Top 10`}
               >
                 <td className="rank num">{i + 1}</td>
                 <td className="call">
@@ -101,6 +109,7 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide }: {
                     <div>
                       <TitleLink title={call.title} url={call.url} fallback={call.id} />
                       <div className="meta">{call.portal}</div>
+                      {kind ? <div className="meta badges"><span className="badge tone-info" title={kind.title}>{kind.text}</span></div> : null}
                       {draft ? <DraftBadge draft={draft} nameOf={nameOf} /> : null}
                     </div>
                   </div>
@@ -165,7 +174,7 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide }: {
                   />
                 ) : null}
                 <td className="row-arrow" aria-hidden="true">
-                  <ArrowRight />
+                  {watch ? null : <ArrowRight />}
                 </td>
               </tr>
             );

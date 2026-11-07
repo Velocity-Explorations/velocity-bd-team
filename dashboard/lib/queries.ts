@@ -14,6 +14,7 @@ import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
+import { WATCH } from "./listing";
 import type { ProfileFields } from "./profile";
 import { pushDate, RESULTS, resultWord, startRefusal, workerReadiness, type ProposalCall } from "./proposals";
 import { DESCRIPTION_READ } from "./description";
@@ -151,8 +152,15 @@ function summaryColumn(db: Db, present: boolean) {
 }
 
 /** Each call's fit score (migration 013), or NULLs before the migration is applied. A fragment, so never awaited. */
-function fitColumns(db: Db, present: boolean) {
-  return present ? db`fit_score, fit_band, fit_why` : db`NULL::int AS fit_score, NULL::text AS fit_band, NULL::text AS fit_why`;
+/** The score's columns and the call's kind of listing (migration 015), or NULLs where the migration is not applied. */
+function fitColumns(db: Db, present: boolean, listing: boolean) {
+  const score = present ? db`fit_score, fit_band, fit_why` : db`NULL::int AS fit_score, NULL::text AS fit_band, NULL::text AS fit_why`;
+  return listing ? db`${score}, listing` : db`${score}, NULL::text AS listing`;
+}
+
+/** Whether calls carry their kind of listing: migration 015 is applied. */
+export async function hasListing(): Promise<boolean> {
+  return hasColumn(sql(), "calls", "listing");
 }
 
 /** Whether calls can be scored and sorted by fit: migration 013 is applied. */
@@ -320,7 +328,7 @@ export async function reviewQueue(
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
   if (f.view === "top10" && !f.ids?.length) return { rows: [], total: 0, perPerson };
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
-  const fit = fitColumns(db, await hasFitScore());
+  const fit = fitColumns(db, await hasFitScore(), await hasListing());
   const [count, rows] = await Promise.all([
     db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${queueWhere(db, f, perPerson, waitingFor)}`,
     db<QueueRow[]>`
@@ -438,7 +446,7 @@ export async function topTenRows(ids: string[]): Promise<TopTenRow[]> {
   if (ids.length === 0) return [];
   const db = sql();
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
-  const fit = fitColumns(db, await hasFitScore());
+  const fit = fitColumns(db, await hasFitScore(), await hasListing());
   const rows = await db<TopTenRow[]>`
     SELECT id, portal, title, url, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, description, ${summary},
            extra, ai_verdict, ai_reasoning, human_status, human_by, human_at, type, ${fit}
@@ -450,16 +458,19 @@ export async function topTenRows(ids: string[]): Promise<TopTenRow[]> {
  * The live ranking Home shows before the first Monday brief (H2): open calls nobody has decided, rated yes or maybe and
  * kept and not ruled out. A yes from both judges first, then a yes from one; inside each, what closes within 60 days,
  * then the highest fit score, the nearest deadline and the newest. The same order as RANKING in assistant/tools.py.
+ * With `watch`, the umbrellas and announcements (none before migration 015); otherwise the calls to respond to now.
  */
-export async function liveTopTen(): Promise<string[]> {
+export async function liveTopTen(watch = false): Promise<string[]> {
   const db = sql();
-  const scored = await hasFitScore();
+  const [scored, kinds] = await Promise.all([hasFitScore(), hasListing()]);
+  if (watch && !kinds) return [];
   const rows = await db<{ id: string }[]>`
     SELECT id FROM calls
     WHERE ${waitingWhere(db, false, null)}
       AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
       AND (${dueDate(db)} >= CURRENT_DATE OR ${dueDate(db)} IS NULL)
       ${scored ? db`AND fit_band IS DISTINCT FROM 'ruled out'` : db``}
+      ${kinds ? (watch ? db`AND listing IN ${db(WATCH)}` : db`AND (listing IS NULL OR listing NOT IN ${db(WATCH)})`) : db``}
     ORDER BY CASE ai_verdict WHEN 'yes' THEN 1 ELSE 0 END
                + COALESCE((SELECT CASE j.verdict WHEN 'yes' THEN 1 ELSE 0 END FROM judgments j WHERE j.call_id = calls.id AND j.judge = 'grok' ORDER BY j.id DESC LIMIT 1), 0) DESC,
              CASE WHEN ${dueDate(db)} <= CURRENT_DATE + 60 THEN 0 ELSE 1 END,
@@ -468,13 +479,13 @@ export async function liveTopTen(): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-/** This week's Top 10: the newest Monday brief's, in its order, or the live ranking before the first brief (H2). One
- *  query for the newest week's ranking, where there were two in turn. */
-export function topTenIds(): Promise<{ ids: string[]; week: string | null }> {
+/** This week's Top 10 and top 10 to watch: the newest Monday brief's, in its order, or the live ranking before the first
+ *  brief (H2), and for a brief written before the watch list began. One query for the newest week's ranking. */
+export function topTenIds(): Promise<{ ids: string[]; watch: string[]; week: string | null }> {
   return remember("top10", keepFor(), readTopTenIds);
 }
 
-async function readTopTenIds(): Promise<{ ids: string[]; week: string | null }> {
+async function readTopTenIds(): Promise<{ ids: string[]; watch: string[]; week: string | null }> {
   let newest: { week_of: string; body: string | null } | undefined;
   try {
     [newest] = await sql()<{ week_of: string; body: string | null }[]>`
@@ -484,8 +495,12 @@ async function readTopTenIds(): Promise<{ ids: string[]; week: string | null }> 
     newest = undefined;   // briefs table missing (migration 005)
   }
   const top = newest ? parseTop(newest.body) : null;
-  if (newest && top) return { ids: top.top.map((c) => c.id), week: newest.week_of };
-  return { ids: await liveTopTen(), week: null };
+  if (newest && top) {
+    const watch = top.watch ? top.watch.map((c) => c.id) : await liveTopTen(true);
+    return { ids: top.top.map((c) => c.id), watch, week: newest.week_of };
+  }
+  const [ids, watch] = await Promise.all([liveTopTen(), liveTopTen(true)]);
+  return { ids, watch, week: null };
 }
 
 /** "New calls this week" from LEDGER_SCHEMA.md, as a count. */
@@ -585,7 +600,7 @@ export type CallRow = {
 export async function listCalls(f: CallFilters, limit = PAGE_SIZE, offset = 0): Promise<{ rows: CallRow[]; total: number }> {
   const db = sql();
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
-  const fit = fitColumns(db, await hasFitScore());
+  const fit = fitColumns(db, await hasFitScore(), await hasListing());
   const [count, rows] = await Promise.all([
     db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${callsWhere(db, f)}`,
     db<CallRow[]>`

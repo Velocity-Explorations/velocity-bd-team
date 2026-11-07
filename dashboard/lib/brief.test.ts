@@ -54,6 +54,17 @@ test("parseTop reads the Top 10 with its ranking and the judges' records", () =>
   assert.equal(top.judges[0].matches, 2);
 });
 
+test("parseTop reads the top 10 to watch, and says when the brief predates it", () => {
+  const top = parseTop(JSON.stringify({
+    top: [],
+    watch: [{ id: "cso-1", title: "CSO PEO-SDA", portal: "SAM.gov", url: null, verdict: "yes", deadline: "2026-12-01",
+              days_left: 24, reason: "A standing CSO.", listing: "Umbrella" }],
+  }));
+  assert.deepEqual(top?.watch?.map((c) => [c.id, c.listing]), [["cso-1", "Umbrella"]]);
+  assert.equal(parseTop(JSON.stringify({ top: [] }))?.watch, null);   // written before 7 Nov 2026
+  assert.deepEqual(parseTop(JSON.stringify({ top: [], watch: "nope" }))?.watch, []);
+});
+
 test("weekLabel names the Monday, with the year only when it is not this year", () => {
   const now = new Date("2026-10-21T12:00:00Z");
   assert.equal(weekLabel("2026-10-19", now), "week of 19 Oct");
