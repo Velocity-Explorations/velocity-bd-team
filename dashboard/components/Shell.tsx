@@ -1,7 +1,8 @@
-import { FileText, House, Inbox, Workflow, type LucideIcon } from "lucide-react";
+import { Bot, FileText, House, Inbox, Workflow, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { cache, type ReactNode } from "react";
 import { AccountMenu, type ViewerMode } from "@/components/AccountMenu";
+import { AskPanel } from "@/components/AskPanel";
 import { MenuController } from "@/components/MenuController";
 import { StartDraftDialog } from "@/components/StartDraftDialog";
 import { TableController } from "@/components/TableController";
@@ -14,7 +15,7 @@ import { callsHref } from "@/lib/profile";
 import { aliasesFor } from "@/lib/people";
 import { pastWorkGroups, pastWorkLabel } from "@/lib/pastwork";
 import { overdueCount, sortIntoViews } from "@/lib/proposals";
-import { countStepsReadyFor, countWaitingRequests, pastWork, proposalCalls, queueCounts } from "@/lib/queries";
+import { countStepsReadyFor, countWaitingRequests, hasChat, pastWork, proposalCalls, queueCounts } from "@/lib/queries";
 import { hiddenColumns, queueMode } from "@/lib/settings";
 import { allowlist, iapAudience, sessionMode, team, viewerHeader } from "@/lib/viewer";
 
@@ -61,7 +62,7 @@ function viewerMode(): { mode: ViewerMode; why: string } {
 const shellData = cache(async (section: Section | null) => {
   const { viewer } = await me();
   const startsDrafts = section === "calls" || section === "proposals";
-  const [counts, hidden, label, filters, draft, tz, past, members] = await Promise.all([
+  const [counts, hidden, label, filters, draft, tz, past, members, chat] = await Promise.all([
     sectionCounts(viewer),
     section === "calls" ? hiddenColumns() : null,
     labeler(),
@@ -70,9 +71,10 @@ const shellData = cache(async (section: Section | null) => {
     timeZone(),
     startsDrafts ? pastWork() : null,
     team(),
+    hasChat().catch(() => false),
   ]);
   const people = await Promise.all(members.map(async (p) => ({ name: p.name, label: label(p.name), initials: await initialsOf(p.name) })));
-  return { viewer, counts, hidden, label, filters, draft, tz, past, people };
+  return { viewer, counts, hidden, label, filters, draft, tz, past, people, chat };
 });
 
 /** Start loading the frame's data at the top of a page; the Shell picks it up when it renders. */
@@ -81,7 +83,7 @@ export function preloadShell(section: Section | null): void {
 }
 
 export async function Shell({ section, children }: { section: Section | null; children: ReactNode }) {
-  const { viewer, counts, hidden, label, filters, draft, tz, past, people } = await shellData(section);
+  const { viewer, counts, hidden, label, filters, draft, tz, past, people, chat } = await shellData(section);
   const tableSettings = section === "calls";
   const { mode, why } = viewerMode();
   return (
@@ -113,6 +115,12 @@ export async function Shell({ section, children }: { section: Section | null; ch
             );
           })}
         </nav>
+        {chat ? (
+          <button type="button" className="ask-button" data-opens="ask-grok" aria-controls="ask-grok">
+            <Bot aria-hidden="true" />
+            Ask Grok
+          </button>
+        ) : null}
         <AccountMenu viewer={viewer} people={people} mode={mode} why={why} tableSettings={tableSettings} />
       </header>
       <main>{children}</main>
@@ -129,6 +137,7 @@ export async function Shell({ section, children }: { section: Section | null; ch
           indexed={past?.indexedAt ? formatTime(past.indexedAt, tz) : null}
         />
       ) : null}
+      {chat ? <AskPanel viewer={viewer} /> : null}
       <MenuController />
       <TooltipController />
       <TableController />

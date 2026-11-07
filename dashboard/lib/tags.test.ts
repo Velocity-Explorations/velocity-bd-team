@@ -26,6 +26,15 @@ test("a call shows one type first, then its other tags in the list's order, each
   assert.equal(shown.get("c"), undefined);
 });
 
+test("a call's kind of listing is not shown among its tags: the row's own badge says it", () => {
+  const shown = tagsByCall([
+    { call_id: "u", tag: "White paper", source: "rule", tag_group: "type", position: 0 },
+    { call_id: "u", tag: "Umbrella", source: "claude", tag_group: "listing", position: 60 },
+    { call_id: "u", tag: "Call", source: "grok", tag_group: "listing", position: 59 },
+  ]);
+  assert.deepEqual(shown.get("u")?.map((b) => b.text), ["White paper"]);
+});
+
 test("without the call's data, Claude's type shows and Grok's other pick is named", () => {
   const shown = tagsByCall([
     { call_id: "c", tag: "Proposal", source: "grok", tag_group: "type", position: 1 },

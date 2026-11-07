@@ -1,4 +1,4 @@
-import { FileText, House, Inbox, Workflow, type LucideIcon } from "lucide-react";
+import { Bot, FileText, House, Inbox, Workflow, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { SECTIONS, type Section } from "@/lib/nav";
 
@@ -29,6 +29,10 @@ export default function Loading() {
             );
           })}
         </nav>
+        <span className="ask-button" aria-hidden="true">
+          <Bot aria-hidden="true" />
+          Ask Grok
+        </span>
       </div>
       <div className="loading-page" role="status" aria-live="polite">
         <p className="loading-word">Loading</p>

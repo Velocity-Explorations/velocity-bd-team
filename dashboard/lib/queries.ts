@@ -14,6 +14,7 @@ import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
+import type { AskMessage } from "./ask";
 import { WATCH } from "./listing";
 import type { ProfileFields } from "./profile";
 import { pushDate, RESULTS, resultWord, startRefusal, workerReadiness, type ProposalCall } from "./proposals";
@@ -1116,9 +1117,56 @@ export function workerStatus(): Promise<{ name: string; seen_at: string; state: 
 async function readWorkerStatus(): Promise<{ name: string; seen_at: string; state: string } | null> {
   const db = sql();
   if (!(await hasTable(db, "workers"))) return null;
+  // The Writer's worker only: Ask Grok's assistant beats in the same table, under its own name.
   const [row] = await db<{ name: string; seen_at: string; state: string }[]>`
-    SELECT name, seen_at, state FROM workers ORDER BY seen_at DESC LIMIT 1`;
+    SELECT name, seen_at, state FROM workers WHERE name = 'worker' ORDER BY seen_at DESC LIMIT 1`;
   return row ?? null;
+}
+
+// ------------------------------------------------------------------ Ask Grok (David, 7 Nov 2026)
+
+/** Whether Ask Grok is set up: migration 016 is applied. */
+export async function hasChat(): Promise<boolean> {
+  return hasTable(sql(), "chat_messages");
+}
+
+/** One person's Ask Grok thread, the newest unless one is named: its questions in order (the last 50) and when the
+ *  assistant was last seen. A person reads only what they asked, under any of their names. */
+export async function chatThread(names: string[], thread: string | null): Promise<{ thread: string | null; messages: AskMessage[]; seenAt: string | null }> {
+  const db = sql();
+  if (!names.length || !(await hasChat())) return { thread: null, messages: [], seenAt: null };
+  let id = thread;
+  if (!id) {
+    const [newest] = await db<{ thread_id: string }[]>`
+      SELECT thread_id FROM chat_messages WHERE asked_by IN ${db(names)} ORDER BY id DESC LIMIT 1`;
+    id = newest?.thread_id ?? null;
+  }
+  const [messages, seen] = await Promise.all([
+    id
+      ? db<AskMessage[]>`
+          SELECT id, question, state, answer, sources, tools, model, cost_usd, asked_at, answered_at FROM chat_messages
+          WHERE thread_id = ${id} AND asked_by IN ${db(names)} ORDER BY id DESC LIMIT 50`
+      : Promise.resolve([] as AskMessage[]),
+    db<{ seen_at: string }[]>`SELECT seen_at FROM workers WHERE name = 'assistant'`,
+  ]);
+  return { thread: id, messages: [...messages].reverse().map((m) => ({ ...m, cost_usd: m.cost_usd === null ? null : Number(m.cost_usd) })), seenAt: seen[0]?.seen_at ?? null };
+}
+
+/** Whether this person already has a question waiting: one at a time each. */
+export async function questionWaiting(names: string[]): Promise<boolean> {
+  if (!names.length) return false;
+  const db = sql();
+  const [row] = await db<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n FROM chat_messages WHERE asked_by IN ${db(names)} AND state IN ('queued', 'working')`;
+  return (row?.n ?? 0) > 0;
+}
+
+/** A question for run.py --assistant to answer; its id. */
+export async function askQuestion(thread: string, by: string, question: string, page: string | null): Promise<number> {
+  const [row] = await sql()<{ id: number }[]>`
+    INSERT INTO chat_messages (thread_id, asked_by, page, question, state, asked_at)
+    VALUES (${thread}, ${by}, ${page}, ${question}, 'queued', ${isoNow()}) RETURNING id`;
+  return Number(row.id);
 }
 
 /** A call's draft as its badge and the Decide cell show it (DB1 to DB3, Q17). */

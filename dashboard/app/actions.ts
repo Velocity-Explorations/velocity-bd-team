@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
 import { signIn, signOut } from "@/auth";
+import { MAX_QUESTION, threadIdOk } from "@/lib/ask";
 import { readChoice, reasonNote } from "@/lib/decide";
 import { isRating, sectionOfKey } from "@/lib/fitratings";
 import { isoNow, zonedToIso } from "@/lib/format";
@@ -19,6 +20,7 @@ import {
   approveStep,
   askChanges,
   changeBuildsOn,
+  askQuestion,
   checkAgain,
   decideChange,
   decideCall,
@@ -46,6 +48,8 @@ import {
   type StartResult,
   type WorkspaceResult,
   saveFitRating,
+  hasChat,
+  questionWaiting,
 } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
 import { decidedNotice, fromQueue, safeReturnTo } from "@/lib/text";
@@ -55,6 +59,28 @@ import { parseJson, permissions } from "@/lib/workspace";
 
 const MAX_NOTE_CHARS = 2000;
 const MAX_CHANGE_CHARS = 8000;
+
+export type AskResult = { ok: true; id: number; thread: string } | { ok: false; reason: string };
+
+/** A question for Ask Grok (David, 7 Nov 2026), from the panel: it waits in the ledger for run.py --assistant. Called
+ *  from the panel's script, so it returns what happened instead of redirecting. */
+export async function askGrokAction(input: { question?: unknown; thread?: unknown; page?: unknown }): Promise<AskResult> {
+  const viewer = await currentViewer();
+  if (!viewer) return { ok: false, reason: "Log in (top right) to ask Grok." };
+  const question = String(input?.question ?? "").trim().slice(0, MAX_QUESTION);
+  if (!question) return { ok: false, reason: "Type a question first." };
+  const thread = typeof input?.thread === "string" ? input.thread : "";
+  if (!threadIdOk(thread)) return { ok: false, reason: "Start a new conversation and ask again." };
+  const page = safeReturnTo(input?.page, "").slice(0, 300) || null;
+  try {
+    if (!(await hasChat())) return { ok: false, reason: "Ask Grok is not set up yet." };
+    const names = aliasesFor(viewer, allowlist());
+    if (await questionWaiting(names)) return { ok: false, reason: "Grok is still answering your last question." };
+    return { ok: true, id: await askQuestion(thread, viewer, question, page), thread };
+  } catch (err) {
+    return { ok: false, reason: `The question did not reach the ledger: ${err instanceof Error ? err.message.slice(0, 160) : "unknown error"}` };
+  }
+}
 
 function backTo(returnTo: string, key: "notice" | "error", message: string, voted?: string, anchor?: string): never {
   const url = new URL(returnTo, "http://dashboard.local");
