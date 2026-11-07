@@ -12,7 +12,7 @@ from __future__ import annotations
 import csv
 import json
 from collections.abc import Mapping, Sequence
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -488,6 +488,37 @@ def add_judgment(call_id: str, judge: str, model: str, verdict: str, reasoning: 
           (call_id, judge, model, verdict, reasoning, rated_at or now_iso()))
 
 
+def set_main_work(call_id: str, judge: str, tag: str) -> None:
+    """The work tag a judge named as most of what the buyer wants, on its newest judgment of the call (PRO-487)."""
+    with tx() as conn:
+        q(conn, "UPDATE judgments SET main_work = ? WHERE id = "
+                "(SELECT MAX(id) FROM judgments WHERE call_id = ? AND judge = ?)", (tag, call_id, judge))
+
+
+def main_work_by_call() -> dict[str, dict[str, str]]:
+    """What each judge's newest judgment names as each call's main work; a judge that named none is left out."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT call_id, judge, main_work FROM judgments ORDER BY id"))
+    named: dict[str, dict[str, str]] = {}
+    for row in found:
+        judges = named.setdefault(row["call_id"], {})
+        if row["main_work"]:
+            judges[row["judge"]] = row["main_work"]
+        else:
+            judges.pop(row["judge"], None)
+    return {call_id: judges for call_id, judges in named.items() if judges}
+
+
+def verdicts_by_call() -> dict[str, dict[str, str]]:
+    """Each judge's newest verdict on each call."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT call_id, judge, verdict FROM judgments ORDER BY id"))
+    verdicts: dict[str, dict[str, str]] = {}
+    for row in found:
+        verdicts.setdefault(row["call_id"], {})[row["judge"]] = row["verdict"]
+    return verdicts
+
+
 def latest_judgments(call_id: str) -> dict[str, dict[str, Any]]:
     """The newest judgment from each judge on one call, keyed by judge."""
     with tx() as conn:
@@ -573,12 +604,53 @@ def tag_catalog() -> list[dict[str, Any]]:
         return rows(q(conn, "SELECT name, tag_group, covers, position FROM tag_list ORDER BY position"))
 
 
+def tags_by_call() -> dict[str, dict[str, list[str]]]:
+    """Every call's tags by source."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT call_id, tag, source FROM call_tags ORDER BY id"))
+    by_call: dict[str, dict[str, list[str]]] = {}
+    for row in found:
+        by_call.setdefault(row["call_id"], {}).setdefault(row["source"], []).append(row["tag"])
+    return by_call
+
+
 def calls_without_tags(source: str) -> list[dict[str, Any]]:
     """Kept, reviewed calls with no tags from this judge yet, oldest first."""
     with tx() as conn:
         return rows(q(conn, "SELECT * FROM calls WHERE filter_result = 'kept' AND ai_verdict IS NOT NULL "
                             "AND NOT EXISTS (SELECT 1 FROM call_tags AS t WHERE t.call_id = calls.id AND t.source = ?) "
                             "ORDER BY first_seen_at, id", (source,)))
+
+
+# --------------------------------------------------------------------------------- the fit score
+# The team's rating of each tag, keyword and NAICS code (migration 013), and each call's score from review/fit.py.
+
+def save_fit_ratings(ratings: Sequence[Mapping[str, Any]]) -> None:
+    """Replace the ratings with these: a rating cleared on the page goes from here too."""
+    now = now_iso()
+    with tx() as conn:
+        q(conn, "DELETE FROM fit_ratings")
+        for row in ratings:
+            q(conn, "INSERT INTO fit_ratings (key, section, name, rating, note, loaded_at) VALUES (?, ?, ?, ?, ?, ?)",
+              (row["key"], row["section"], row["name"], row["rating"], row.get("note") or None, now))
+
+
+def fit_ratings() -> dict[str, str]:
+    """Each rated tag, keyword and NAICS code's rating, by its key on the page (work.software, naics.541511)."""
+    with tx() as conn:
+        return {row["key"]: row["rating"] for row in rows(q(conn, "SELECT key, rating FROM fit_ratings"))}
+
+
+def set_fit(call_id: str, score: int, band: str, why: Sequence[str]) -> None:
+    with tx() as conn:
+        q(conn, "UPDATE calls SET fit_score = ?, fit_band = ?, fit_why = ?, updated_at = ? WHERE id = ?",
+          (score, band, json.dumps(list(why)), now_iso(), call_id))
+
+
+def set_listing(call_id: str, listing: str | None) -> None:
+    """What kind of listing the call is: Call, Umbrella or Announcement (migration 015); None counts as a call."""
+    with tx() as conn:
+        q(conn, "UPDATE calls SET listing = ?, updated_at = ? WHERE id = ?", (listing, now_iso(), call_id))
 
 
 # --------------------------------------------------------------------------------- decisions
@@ -1029,6 +1101,71 @@ def get_worker(name: str) -> dict[str, Any] | None:
         return one(q(conn, "SELECT * FROM workers WHERE name = ?", (name,)))
 
 
+# ------------------------------------------------------------------------------ Ask Grok
+
+CHAT_STATES = ("queued", "working", "done", "failed")
+
+
+def ask_question(thread_id: str, asked_by: str, question: str, page: str | None) -> int:
+    """A question for Ask Grok, waiting for run.py --assistant (migration 016). The dashboard writes these; this is
+    for tests and the command line."""
+    with tx() as conn:
+        cur = q(conn, "INSERT INTO chat_messages (thread_id, asked_by, page, question, state, asked_at) "
+                      "VALUES (?, ?, ?, ?, 'queued', ?) RETURNING id", (thread_id, asked_by, page, question, now_iso()))
+        return int(cur.fetchone()[0])
+
+
+def get_question(question_id: int) -> dict[str, Any] | None:
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM chat_messages WHERE id = ?", (question_id,)))
+
+
+def claim_next_question() -> dict[str, Any] | None:
+    """The assistant takes the oldest waiting question: queued -> working, guarded so only one process takes it."""
+    with tx() as conn:
+        for row in rows(q(conn, "SELECT id FROM chat_messages WHERE state = 'queued' ORDER BY id LIMIT 3")):
+            cur = q(conn, "UPDATE chat_messages SET state = 'working', started_at = ? WHERE id = ? AND state = 'queued'",
+                    (now_iso(), row["id"]))
+            if cur.rowcount == 1:
+                return one(q(conn, "SELECT * FROM chat_messages WHERE id = ?", (row["id"],)))
+    return None
+
+
+def finish_question(question_id: int, state: str, answer: str, sources: Any = None, tools: Any = None,
+                    model: str | None = None, cost_usd: float | None = None) -> None:
+    """The answer, or why there is none: working -> done or failed."""
+    if state not in ("done", "failed"):
+        raise ValueError(f"a question finishes done or failed, not {state}")
+    with tx() as conn:
+        q(conn, "UPDATE chat_messages SET state = ?, answer = ?, sources = ?, tools = ?, model = ?, cost_usd = ?, "
+                "answered_at = ? WHERE id = ?",
+          (state, answer, _jsonify(sources) if sources is not None else None, _jsonify(tools) if tools is not None else None,
+           model, cost_usd, now_iso(), question_id))
+
+
+def thread_history(thread_id: str, asked_by: str, before_id: int, limit: int = 8) -> list[dict[str, Any]]:
+    """The thread's answered exchanges before this question, oldest first: what Grok is reminded of."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT question, answer FROM chat_messages WHERE thread_id = ? AND asked_by = ? AND id < ? "
+                             "AND state = 'done' ORDER BY id DESC LIMIT ?", (thread_id, asked_by, before_id, limit)))
+    return list(reversed(found))
+
+
+def chat_spend_today(now: datetime | None = None) -> float:
+    """What Ask Grok's answers have cost since midnight UTC, for the day's budget."""
+    moment = now or datetime.now(timezone.utc)
+    midnight = moment.astimezone(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+    with tx() as conn:
+        row = one(q(conn, "SELECT COALESCE(SUM(cost_usd), 0) AS spent FROM chat_messages WHERE answered_at >= ?", (midnight,)))
+    return float(row["spent"]) if row else 0.0
+
+
+def requeue_working_questions() -> int:
+    """Questions a stopped assistant left half done wait again; how many."""
+    with tx() as conn:
+        return q(conn, "UPDATE chat_messages SET state = 'queued', started_at = NULL WHERE state = 'working'").rowcount
+
+
 def steps_in_state(state: str) -> list[dict[str, Any]]:
     """Every attempt in one state, oldest first. At start the worker fails any left working (PW15)."""
     with tx() as conn:
@@ -1114,7 +1251,7 @@ def pursued_calls(exclude_id: str | None = None) -> list[dict[str, Any]]:
 
 CHANGE_DECISIONS = ("accepted", "rejected", "edited")
 REVIEWER_CODES = ("evaluator_1", "evaluator_2", "leadership")   # the external evaluator, the second evaluator, Velocity leadership
-JOB_KINDS = ("slop_scan", "drive_refresh")
+JOB_KINDS = ("slop_scan", "drive_refresh", "fit_scores")
 NO_BAND_UNDER_WORDS = 150   # PW21: a scan of a shorter text has no band
 
 

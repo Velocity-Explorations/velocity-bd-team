@@ -90,12 +90,18 @@ def priority_for(due: datetime | None, now: datetime) -> int:
     return 1 if days <= 7 else 2 if days <= 14 else 3
 
 
+NO_ZONE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$")   # SAM.gov sometimes gives a time without its zone
+
+
 def _deadline(text: str | None) -> str:
     due = parse_due(text)
     if due is None:
         return str(text or "not given")
-    if len(str(text).strip()) == 10:   # a bare date
+    written = str(text).strip()
+    if len(written) == 10:   # a bare date
         return day_text(due.date())
+    if NO_ZONE.match(written):
+        return f"{day_text(due.date())} {written[11:16]} (no time zone given)"
     local = due.astimezone(DASHBOARD_ZONE)
     return f"{day_text(local.date())} {local:%H:%M} {local.tzname()}"
 
@@ -132,7 +138,7 @@ def body_for(row: Mapping[str, Any]) -> str:
     lines = [f"Marked Pursue on the dashboard by {row.get('human_by') or 'someone'}{_on(row.get('human_at'))}.", "",
              "**What the call asks**", str(row.get("ai_summary") or "No summary yet."), "",
              "**Why it fits**", *why, "",
-             "**Details**", *[f"- {label}: {value}" for label, value in details if value], "",
+             "**Details**", *[f"- {label}: {' '.join(str(value).split())}" for label, value in details if value], "",
              "**Links**", *links]
     return undash("\n".join(lines).strip())
 

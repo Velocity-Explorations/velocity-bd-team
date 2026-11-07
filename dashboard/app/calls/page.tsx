@@ -6,12 +6,12 @@ import { DraftBadge } from "@/components/DraftBadge";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
 import { NotesPanel, ReasonsPanel } from "@/components/RowPanels";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
 import { Badge, Flash, PageLinks } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
 import { shows } from "@/lib/columns";
-import { yourVote } from "@/lib/decide";
+import { asksReason, yourVote } from "@/lib/decide";
 import { callDetails, deadlineNote } from "@/lib/details";
 import { detailSources } from "@/lib/description";
 import {
@@ -23,6 +23,7 @@ import { dayMonth } from "@/lib/home";
 import { pickJudgeFilter, verdictsFor } from "@/lib/judges";
 import { aliasesFor, displayPerson } from "@/lib/people";
 import {
+  callsPage,
   countAmong,
   decisionsOn,
   draftsFor,
@@ -35,6 +36,7 @@ import {
   tagsOn,
   topTenIds,
   type CallFilters,
+  hasFitScore,
 } from "@/lib/queries";
 import { votesByCall } from "@/lib/scoreboard";
 import { defaultsRedirect, drafting, labeler, timeZone } from "@/lib/me";
@@ -65,14 +67,15 @@ const STATUS_CHOICES = [
  * Decide. A decision here changes the call's (the newest wins), and every person's is kept.
  */
 export default async function CallsPage({ searchParams }: { searchParams: SearchParams }) {
+  preloadShell("calls");   // the frame's queries run beside this page's
   const sp = await searchParams;
   const withDefaults = await defaultsRedirect("/calls", sp);
   if (withDefaults) redirect(withDefaults);
-  const [portalList, tagChoices, top] = await Promise.all([portals(), tagOptions(), topTenIds()]);
+  const [portalList, tagChoices, top, scored] = await Promise.all([portals(), tagOptions(), topTenIds(), hasFitScore()]);
   const filters: CallFilters = {
     portals: pickMany(sp.portal, portalList.map((p) => p.name)),
     state: pickState(sp.state, sp.open),
-    sort: pickSort(sp.sort, sp.dir, ["seen", "due", "title", "verdict", "decision", "filter"]),
+    sort: pickSort(sp.sort, sp.dir, scored ? ["fit", "seen", "due", "title", "verdict", "decision", "filter"] : ["seen", "due", "title", "verdict", "decision", "filter"]),
     judges: pickJudgeFilter(sp.judges),
     filterResult: pickAllowed(sp.filter_result, FILTER_RESULTS),
     verdict: pickAllowed(sp.verdict, [...VERDICTS, "none"] as const),
@@ -99,19 +102,24 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
     ...sortParams(filters.sort),
   };
   const page = pickPage(sp.page);
-  const [{ rows, total }, counts, topCount, agreement] = await Promise.all([
-    listCalls(filters, PAGE_SIZE, (page - 1) * PAGE_SIZE),
+  const offset = (page - 1) * PAGE_SIZE;
+  const onPage = callsPage(filters, PAGE_SIZE, offset);   // the per-row reads run beside the rows, not after them
+  const [{ rows, total }, counts, topCount, agreement, judged, decisions, tagRows, drafts, { readiness }] = await Promise.all([
+    listCalls(filters, PAGE_SIZE, offset),
     queueCounts(filters, waitingFor),
     countAmong(top.ids, filters),
     judgeAgreement(),
+    latestJudgments(onPage),
+    decisionsOn(onPage),
+    tagsOn(onPage),
+    draftsFor(onPage),
+    drafting(),
   ]);
   const pages = pager("/calls", params, page, total);
   // A page past the last (the list shrank since the link was made) opens the last, keeping the notice.
   if (page > pages.pages) {
     redirect(pageHref("/calls", { ...params, notice: firstParam(sp.notice, 300), error: firstParam(sp.error, 300) }, pages.pages));
   }
-  const ids = rows.map((r) => r.id);
-  const [judged, decisions, tagRows, drafts, { readiness }] = await Promise.all([latestJudgments(ids), decisionsOn(ids), tagsOn(ids), draftsFor(ids), drafting()]);
   const tagsFor = tagsByCall(tagRows);
   const tz = await timeZone();
   const show = shows(await hiddenColumns(), "calls");   // the columns chosen in Table settings
@@ -200,7 +208,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                       label="Votes"
                       sort={sortLink("/calls", params, filters.sort, "verdict")}
                       menu={{
-                        sorts: sortChoices("/calls", params, filters.sort, "verdict"),
+                        sorts: [...(scored ? sortChoices("/calls", params, filters.sort, "fit") : []), ...sortChoices("/calls", params, filters.sort, "verdict")],
                         active: Boolean(filters.verdict || filters.judges),
                         groups: [
                           { title: "Claude's verdict", items: choiceLinks("/calls", params, "verdict", VERDICT_CHOICES, filters.verdict) },
@@ -280,6 +288,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                           verdicts={verdicts}
                           votes={callVotes.map((v) => ({ ...v, person: label(v.person) }))}
                           notesBy={new Set(notes.map((n) => nameOf(n.by)).filter(Boolean))}
+                          fit={r}
                         />
                       ) : null}
                       {show("description") ? <DescriptionCell portal={r.portal} description={r.description} extra={r.extra} summary={r.ai_summary} /> : null}
@@ -300,6 +309,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                         draft={draft}
                         drafting={readiness !== "not set up"}
                         start={{ portal: r.portal, due: formatDue(r.due_date, tz), format: draftFormat(r.type), block: draftBlock(r) }}
+                        askReason={asksReason(r.ai_verdict)}
                       />
                     </tr>,
                     <ReasonsPanel

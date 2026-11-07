@@ -15,6 +15,23 @@ from tests.test_reviewer import FakeModel
 TAGS = tags.load_tags()
 
 
+@pytest.mark.parametrize(("text", "expected"), [
+    ("VERDICT: yes\nMAIN WORK: software\nSUMMARY: x", "Software"),
+    ("MAIN WORK: [AI and ML].", "AI and ML"),
+    ("main work: C2", "C2"),
+    ("MAIN WORK: USSF", None),        # a customer, not work
+    ("MAIN WORK: Made up", None),
+    ("TAGS: Software", None),
+    ("", None),
+])
+def test_the_main_work_is_one_work_tag(text: str, expected: str | None) -> None:
+    assert tags.parse_main_work(text, TAGS) == expected
+
+
+def test_a_call_nobody_else_can_bid_on_has_its_own_type() -> None:
+    assert TAGS.group_of("Sole source") == "type"
+
+
 def call(**fields: Any) -> dict[str, Any]:
     row: dict[str, Any] = {"portal": "", "type": "", "department": "", "set_aside": "", "extra": None}
     row.update(fields)
@@ -31,17 +48,19 @@ def seed(call_id: str = "c-1", kept: bool = True, **fields: Any) -> dict[str, An
     return lq.get_call(call_id)   # type: ignore[return-value]
 
 
-def test_the_list_has_four_groups_and_the_prompt_asks_for_exactly_one_type() -> None:
-    assert list(TAGS.groups) == ["type", "work", "customer", "access"]
+def test_the_list_has_five_groups_and_the_prompt_asks_for_exactly_one_type_and_one_listing() -> None:
+    assert list(TAGS.groups) == ["type", "work", "customer", "access", "listing"]
     assert "White paper" in TAGS.groups["type"] and "Members only" in TAGS.groups["access"]
+    assert list(TAGS.groups["listing"]) == ["Call", "Umbrella", "Announcement"]
     block = tags.prompt_block(TAGS)
-    assert "exactly one" in block
+    assert "Type, exactly one" in block and "Listing, exactly one" in block
     assert all(name in block for names in TAGS.groups.values() for name in names)
 
 
 @pytest.mark.parametrize(("text", "expected"), [
     ("VERDICT: yes\nREASON: fits\nTAGS: OTA, software, AI and ML, SOCOM", ["OTA", "Software", "AI and ML", "SOCOM"]),
     ("TAGS: RFI, Proposal, Space, Made up.", ["RFI", "Space"]),   # one type only; a tag not on the list is dropped
+    ("TAGS: Umbrella, Call, Software, OTA", ["OTA", "Software", "Umbrella"]),   # one listing only, the first named
     ("VERDICT: no\nREASON: hardware", []),
     ("TAGS:", []),
 ])
@@ -50,25 +69,35 @@ def test_tags_are_read_from_the_answer_s_tags_line(text: str, expected: list[str
 
 
 @pytest.mark.parametrize(("row", "expected"), [
-    (call(portal="Vulcan SOF", type="OTA Prototype", department="USSOCOM / SOF Enterprise"), ["OTA", "SOCOM"]),
-    (call(portal="Vulcan SOF", type="Tech Experimentation"), ["Demo or exercise", "SOCOM"]),
+    (call(portal="Vulcan SOF", type="OTA Prototype", department="USSOCOM / SOF Enterprise"), ["OTA"]),   # the office is on every call
+    (call(portal="Vulcan SOF", type="Tech Experimentation"), ["Demo or exercise"]),
+    (call(portal="Vulcan SOF", type="Tech Experimentation", title="Balikatan 2027"), ["Demo or exercise", "INDOPACOM"]),
+    (call(portal="Vulcan SOF", title="U.S. PACOM FY27 Experiment Calling Message"), ["INDOPACOM"]),
+    (call(portal="SAM.gov", type="RFI", department="DEPT OF DEFENSE / USSOCOM / SOF AT&L"), ["RFI", "SOCOM"]),
+    (call(portal="SAM.gov", type="RFI", department="DEPT OF DEFENSE / USINDOPACOM"), ["RFI", "INDOPACOM"]),
+    (call(portal="SAM.gov", type="RFI", title="Pacomp sensor resin"), ["RFI"]),
     (call(portal="NASA Forecast", type="Forecast", department="NASA KSC", set_aside="Small Business Set Aside - Total"),
-     ["Forecast", "NASA", "Small business set-aside"]),
-    (call(portal="NASA Forecast", type="Forecast", set_aside="No set aside used"), ["Forecast", "NASA"]),
+     ["Forecast", "NASA", "Small business set-aside", "Announcement"]),
+    (call(portal="NASA Forecast", type="Forecast", set_aside="No set aside used"), ["Forecast", "NASA", "Announcement"]),
     (call(portal="NSTXL", type="OTA opportunity", department="SpEC", extra={"nstxl_members_only": True}),
      ["OTA", "USSF", "Members only"]),
     (call(portal="NSTXL", type="Solicitation", department="S2MARTS"), ["Navy"]),   # the judges pick its type
     (call(portal="AFWERX", type="SBIR cycle", extra={"afwerx_branches": ["Air Force", "Space Force"]}),
-     ["SBIR or STTR", "USSF", "USAF"]),
-    (call(portal="SpaceWERX", type="TACFI", department="U.S. Space Force"), ["SBIR or STTR", "USSF", "Phase II holders only"]),
-    (call(portal="SSC Front Door", type="Webinar"), ["Event", "USSF"]),
+     ["SBIR or STTR", "USSF", "USAF", "Umbrella"]),
+    (call(portal="SpaceWERX", type="TACFI", department="U.S. Space Force"),
+     ["SBIR or STTR", "USSF", "Phase II holders only", "Umbrella"]),
+    (call(portal="SSC Front Door", type="Webinar"), ["Event", "USSF", "Announcement"]),
+    (call(portal="SSC Front Door", type="Conference"), ["Event", "USSF", "Announcement"]),
+    (call(portal="SAM.gov", type="Presolicitation", department="DEPT OF DEFENSE / DEPT OF THE NAVY"), ["Navy", "Announcement"]),
+    (call(portal="SAM.gov", type="Special notice"), []),   # CSOs, BAAs, industry days and more: the judges say which
+    (call(portal="NSTXL", type="Coming soon", department="S2MARTS"), ["Navy", "Announcement"]),
     (call(portal="DIU", type="CSO", department="Defense Innovation Unit"), ["White paper", "DIU"]),
     (call(portal="SAM.gov", type="Sources sought", department="DEPT OF DEFENSE / DEPT OF THE ARMY / AMC",
           set_aside="Total Small Business Set-Aside (FAR 19.5)"), ["RFI", "Army", "Small business set-aside"]),
     (call(portal="SAM.gov", type="Special notice",
           department="OFFICE OF THE DIRECTOR OF NATIONAL INTELLIGENCE / INTELLIGENCE ADVANCED RESEARCH PROJECTS ACTIVITY"),
      ["Intelligence community"]),
-    (call(portal="DOE SBIR", type="Upcoming"), ["SBIR or STTR", "DOE"]),
+    (call(portal="DOE SBIR", type="Upcoming"), ["SBIR or STTR", "DOE", "Announcement"]),
     (call(portal="Space Florida", type="Solicitation"), ["Proposal", "Other buyer"]),
     (call(portal="APFIT", type="APFIT cycle"), ["Sponsor needed"]),
 ])
@@ -113,7 +142,7 @@ def test_a_failed_or_tagless_answer_leaves_the_tags_alone(ledger_db: str) -> Non
 def test_the_pipeline_tags_every_call_a_run_saw_by_its_rules(ledger_db: str) -> None:
     row = seed()
     assert run.tag_by_rules(row["last_run_id"]) == 1
-    assert lq.tags_on("c-1") == {"rule": ["OTA", "SOCOM"]}
+    assert lq.tags_on("c-1") == {"rule": ["OTA"]}
 
 
 def test_the_backfill_tags_every_call_by_rules_and_reviewed_calls_by_both_judges(
@@ -125,8 +154,8 @@ def test_the_backfill_tags_every_call_by_rules_and_reviewed_calls_by_both_judges
     monkeypatch.setattr(run, "grok_model", lambda: FakeModel(["TAGS: OTA, AI and ML"]))
     monkeypatch.setattr(run, "grok_enabled", lambda: True)
     assert run.backfill_tags() == 0
-    assert lq.tags_on("k-1") == {"rule": ["OTA", "SOCOM"], "claude": ["OTA", "Software"], "grok": ["OTA", "AI and ML"]}
-    assert lq.tags_on("r-1") == {"rule": ["OTA", "SOCOM"]}
+    assert lq.tags_on("k-1") == {"rule": ["OTA"], "claude": ["OTA", "Software"], "grok": ["OTA", "AI and ML"]}
+    assert lq.tags_on("r-1") == {"rule": ["OTA"]}
     assert run.backfill_tags() == 0   # a second pass finds nothing left to ask the judges
 
 

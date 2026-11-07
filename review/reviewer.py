@@ -9,7 +9,8 @@ library component, later) and feedback_examples_block (Phase 8). A third, extra_
 carries the team's note when a person approves a re-review (docs/ASSISTANT.md).
 
 The answer also carries a TAGS line: each judge tags the call from review/tags.yaml in the same
-call (PRO-556). Tagging is best-effort and never changes a verdict.
+call (PRO-556), and a MAIN WORK line naming the one Work tag that is most of what the buyer wants
+(PRO-487, for the fit score in review/fit.py). Both are best-effort and never change a verdict.
 """
 from __future__ import annotations
 
@@ -22,8 +23,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from ledger.queries import add_judgment, set_review, set_summary, set_tags
-from review.tags import parse_tags, prompt_block, tag_list
+from ledger.queries import add_judgment, set_main_work, set_review, set_summary, set_tags
+from review.tags import OFFICE_SAYS_NOTHING, parse_main_work, parse_tags, prompt_block, tag_list
 
 log = logging.getLogger("review")
 
@@ -44,18 +45,20 @@ DESCRIPTION_CHARS = 1500   # the spec said 500; the ledger now stores 1,500 and 
 # Company profile, used verbatim in every review prompt.
 COMPANY_CONTEXT = """Velocity Explorations is a small defense technology company focused on:
 - Software development and AI/ML development for DoD and government
-- Legacy system modernization (COBOL, AS/400, mainframe -> modern web/cloud)
-- Command and control (C2) systems, Echo C2 AI is their flagship product
+- Software and AI for U.S. Space Force launch, range and space operations
+- AI decision support for command and control (C2) operators; Echo C2 AI, the flagship product, transcribes, translates and summarizes live voice and text communications
+- Software that ties communications from different systems into one application
 - Natural language processing, transcription, translation for operational environments
-- Computer vision, autonomous systems software
+- Legacy system modernization (COBOL, AS/400, mainframe -> modern web/cloud)
+- Computer vision, AI that automates workflows and processes, and the decision and communications layer for autonomous systems
 - DevSecOps, cloud migration, data analytics platforms
-- SBIR/STTR contracts and OTA agreements
+- SBIR/STTR contracts, OTA agreements, prize challenges, and military exercises and demonstrations
 
 Velocity IS a registered member of the S2MARTS and SpEC OTA consortia (managed by NSTXL) and can submit to their opportunities.
 
-Velocity does NOT do: hardware development or manufacturing; physical construction or facilities work; IT management or administrative support services; medical devices or healthcare equipment; training/education services; events or conference participation; logistics, supply chain, or parts procurement; financial software unrelated to defense.
+Velocity does NOT do: hardware development or manufacturing; building the vehicles, drones, weapons or control systems themselves; physical construction or facilities work; IT management, staffing or administrative support services; medical devices or healthcare equipment; training/education services; events or conference participation; logistics, supply chain, or parts procurement; financial software unrelated to defense.
 
-A good opportunity for Velocity involves: building software, developing AI/ML models, modernizing legacy systems, creating C2 tools, or conducting R&D in AI/autonomy/NLP.
+A good opportunity for Velocity involves: building software, developing AI/ML models, modernizing legacy systems, AI tools for C2 operators and launch operations, AI that makes sense of communications and data, or conducting R&D in AI/NLP.
 """
 
 # Listing types that are events, not contracts (SSC Front Door writes these). The company context
@@ -84,9 +87,11 @@ Respond with exactly this format (no other text):
 VERDICT: yes|no|maybe
 REASON: [one sentence explaining why]
 TAGS: [tags from the list below, separated by commas]
+MAIN WORK: [the one Work tag from the list below that is most of what the buyer wants done]
 SUMMARY: [{summary_ask}]
 
 Use "yes" if clearly relevant, "no" if clearly not, "maybe" if uncertain.
+Rate the call on its main work. If most of what the buyer wants done is something Velocity does not do, answer "no" even when part of the call sounds relevant.
 If past experience shows similar work has been pursued or won, weight that positively.
 
 {tags_block}"""
@@ -189,6 +194,14 @@ class Reviewed:
     match_tier: str | None = None
 
 
+def agency_line(row: Mapping[str, Any]) -> str:
+    """The prompt's Agency line. Where a portal writes the same office on every call, it would tell the judges the wrong
+    buyer: they tagged nearly every Vulcan SOF call SOCOM, whoever it was for."""
+    if row.get("portal") in OFFICE_SAYS_NOTHING:
+        return f"Not stated; {row['portal']} lists calls for SOCOM and for other commands, so read the description"
+    return row.get("department") or ""
+
+
 def build_prompt(
     row: Mapping[str, Any],
     past_experience_block: str = "",
@@ -208,7 +221,7 @@ def build_prompt(
         portal=row.get("portal") or "",
         type=row.get("type") or "",
         naics_code=row.get("naics_code") or "",
-        department=row.get("department") or "",
+        department=agency_line(row),
         description=(row.get("description") or "")[:DESCRIPTION_CHARS],
         tags_block=prompt_block(tag_list()),
         summary_ask=SUMMARY_ASK,
@@ -221,7 +234,7 @@ def build_tag_prompt(row: Mapping[str, Any]) -> str:
         portal=row.get("portal") or "",
         type=row.get("type") or "",
         naics_code=row.get("naics_code") or "",
-        department=row.get("department") or "",
+        department=agency_line(row),
         description=(row.get("description") or "")[:DESCRIPTION_CHARS],
         tags_block=prompt_block(tag_list()),
     )
@@ -336,6 +349,19 @@ def store_tags(call_id: str, source: str, text: str) -> list[str]:
     return picked
 
 
+def store_main_work(call_id: str, judge: str, text: str) -> str | None:
+    """Keep the main work an answer named on that judge's newest judgment. An answer without one changes nothing, and
+    a failure to store it only logs: it never stops a review."""
+    named = parse_main_work(text, tag_list())
+    if named:
+        try:
+            set_main_work(call_id, judge, named)
+        except Exception as exc:
+            log.warning("Could not store %s's main work on %s: %s", judge, call_id, type(exc).__name__)
+            return None
+    return named
+
+
 def review_calls(
     rows: list[Mapping[str, Any]],
     model_client: ModelClient,
@@ -356,6 +382,7 @@ def review_calls(
         set_review(row["id"], verdict, reason)
         if is_judgment(reason):
             add_judgment(row["id"], "claude", getattr(model_client, "model", MODEL_ID), verdict, reason)
+            store_main_work(row["id"], "claude", text)
             store_tags(row["id"], "claude", text)
             store_summary(row["id"], text)
         reviewed = Reviewed(row["id"], str(row.get("title") or ""), verdict, reason, row.get("match_tier"))
@@ -391,6 +418,7 @@ def judge_calls(
         title = str(row.get("title") or "")
         if is_judgment(reason):
             add_judgment(row["id"], judge, name, verdict, reason)
+            store_main_work(row["id"], judge, text)
             store_tags(row["id"], judge, text)
             judged.append(Reviewed(row["id"], title, verdict, reason, row.get("match_tier")))
             log.info("%s judged [%s]: %s", judge, verdict, title[:80])

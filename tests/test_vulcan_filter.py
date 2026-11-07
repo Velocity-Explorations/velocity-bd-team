@@ -44,9 +44,9 @@ def test_blocklist_wins_over_keywords_and_hits_are_listed() -> None:
     assert len(d.keywords) == len(set(d.keywords))
 
 
-def test_known_weakness_ai_in_maintain() -> None:
+def test_ai_inside_a_word_no_longer_keeps_a_call() -> None:
     d = kf.decide({"id": "x", "title": "Maintain the grounds", "description": ""}, KW)
-    assert d.result == "kept" and d.tier == "broad" and d.keywords == ["ai"]
+    assert d.result == "rejected" and d.reason == kf.REASON_NO_KEYWORD
 
 
 def test_portal_filter_uses_vulcan_keywords(ledger_db: str) -> None:

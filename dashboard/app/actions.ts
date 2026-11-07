@@ -5,6 +5,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
 import { signIn, signOut } from "@/auth";
+import { MAX_QUESTION, threadIdOk } from "@/lib/ask";
+import { readChoice, reasonNote } from "@/lib/decide";
+import { isRating, sectionOfKey } from "@/lib/fitratings";
 import { isoNow, zonedToIso } from "@/lib/format";
 import { safeFrom, SIGNED_IN_COOKIE } from "@/lib/signin";
 import { timeZone } from "@/lib/me";
@@ -17,6 +20,7 @@ import {
   approveStep,
   askChanges,
   changeBuildsOn,
+  askQuestion,
   checkAgain,
   decideChange,
   decideCall,
@@ -43,6 +47,9 @@ import {
   type DecideResult,
   type StartResult,
   type WorkspaceResult,
+  saveFitRating,
+  hasChat,
+  questionWaiting,
 } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
 import { decidedNotice, fromQueue, safeReturnTo } from "@/lib/text";
@@ -52,6 +59,28 @@ import { parseJson, permissions } from "@/lib/workspace";
 
 const MAX_NOTE_CHARS = 2000;
 const MAX_CHANGE_CHARS = 8000;
+
+export type AskResult = { ok: true; id: number; thread: string } | { ok: false; reason: string };
+
+/** A question for Ask Grok (David, 7 Nov 2026), from the panel: it waits in the ledger for run.py --assistant. Called
+ *  from the panel's script, so it returns what happened instead of redirecting. */
+export async function askGrokAction(input: { question?: unknown; thread?: unknown; page?: unknown }): Promise<AskResult> {
+  const viewer = await currentViewer();
+  if (!viewer) return { ok: false, reason: "Log in (top right) to ask Grok." };
+  const question = String(input?.question ?? "").trim().slice(0, MAX_QUESTION);
+  if (!question) return { ok: false, reason: "Type a question first." };
+  const thread = typeof input?.thread === "string" ? input.thread : "";
+  if (!threadIdOk(thread)) return { ok: false, reason: "Start a new conversation and ask again." };
+  const page = safeReturnTo(input?.page, "").slice(0, 300) || null;
+  try {
+    if (!(await hasChat())) return { ok: false, reason: "Ask Grok is not set up yet." };
+    const names = aliasesFor(viewer, allowlist());
+    if (await questionWaiting(names)) return { ok: false, reason: "Grok is still answering your last question." };
+    return { ok: true, id: await askQuestion(thread, viewer, question, page), thread };
+  } catch (err) {
+    return { ok: false, reason: `The question did not reach the ledger: ${err instanceof Error ? err.message.slice(0, 160) : "unknown error"}` };
+  }
+}
 
 function backTo(returnTo: string, key: "notice" | "error", message: string, voted?: string, anchor?: string): never {
   const url = new URL(returnTo, "http://dashboard.local");
@@ -74,11 +103,13 @@ function backTo(returnTo: string, key: "notice" | "error", message: string, vote
 export async function decide(formData: FormData): Promise<void> {
   const returnTo = safeReturnTo(formData.get("return_to"));
   const id = String(formData.get("id") ?? "").trim();
-  const asked = formData.get("status");
-  const thenDraft = asked === "pursue_draft";   // the Decide menu's Pursue and start the draft (Q9)
-  const status = thenDraft ? "pursue" : asked;
+  const choice = readChoice(formData.get("status"));   // Not relevant may carry its reason ("not_relevant:hardware")
+  const thenDraft = choice.status === "pursue_draft";   // the Decide menu's Pursue and start the draft (Q9)
+  const status = thenDraft ? "pursue" : choice.status;
   const expectedField = String(formData.get("expected") ?? "");
-  const note = String(formData.get("note") ?? "").slice(0, MAX_NOTE_CHARS);
+  const typed = String(formData.get("note") ?? "");
+  const words = choice.reason === "other" ? String(formData.get("reason_text") ?? "").trim() || typed : typed;
+  const note = reasonNote(choice.reason, words).slice(0, MAX_NOTE_CHARS);   // the reason is the note the judges learn from
   if (!id || !isDecision(status)) backTo(returnTo, "error", "Choose a decision first.");
   if (expectedField && !isDecision(expectedField)) backTo(returnTo, "error", "That form is out of date. Reload and try again.");
   const expected = isDecision(expectedField) ? expectedField : null;
@@ -103,6 +134,29 @@ export async function decide(formData: FormData): Promise<void> {
     backTo(returnTo, "notice", notice, queue && result.plan !== "note" ? result.title : undefined);
   }
   backTo(returnTo, "error", result.reason);
+}
+
+/**
+ * Change a rating on the Fit ratings page, or its note, or clear it. The form stays where it is on the page, so a person
+ * can work down the list: only a refusal comes back with a message. The worker scores every call again after a change.
+ */
+export async function saveFitRatingAction(formData: FormData): Promise<void> {
+  const key = String(formData.get("key") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim().slice(0, 200);
+  const choice = String(formData.get("rating") ?? "");
+  const note = String(formData.get("note") ?? "").trim().slice(0, 500);
+  const section = sectionOfKey(key);
+  if (!section || !name) backTo("/fit", "error", "That form is out of date. Reload and try again.");
+  if (choice !== "clear" && !isRating(choice)) backTo("/fit", "error", `Choose a rating for ${name} before saving its note.`, undefined, key);
+  const viewer = await currentViewer();
+  if (!viewer) backTo("/fit", "error", "Log in (top right) before changing a rating.");
+  try {
+    await saveFitRating({ key, section: section as string, name, rating: choice === "clear" ? null : choice, note, by: viewer });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
+    backTo("/fit", "error", `Could not save the rating: ${detail}`, undefined, key);
+  }
+  revalidatePath("/fit");
 }
 
 /**

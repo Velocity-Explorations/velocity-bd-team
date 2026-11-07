@@ -1,7 +1,7 @@
 # Tags on each call, from this list only (PRO-556). Rules in review/tags.py set the ones a call's
 # own data makes certain; Claude and Grok pick the rest on the TAGS line of their review answers.
-# Each call gets exactly one type, and any work, customer and access tags that apply. Each tag is
-# followed by what it covers, which the judges read. Names must differ across groups.
+# Each call gets exactly one type and one listing, and any work, customer and access tags that apply. Each
+# tag is followed by what it covers, which the judges read. Names must differ across groups.
 type:
   White paper: BAA, CSO and AOI calls that start with a white paper or solution brief
   Proposal: RFPs and FAR acquisitions asking for a full proposal
@@ -12,6 +12,7 @@ type:
   Demo or exercise: tech experimentation, capability demonstrations and assessment events
   Event: conferences, industry days and webinars
   Forecast: a planned buy with no solicitation yet
+  Sole source: intents to sole source, award notices, option years exercised and contract changes nobody else can bid on
   Other: CRADAs and anything else
 work:
   Software: building or modernizing software applications and platforms
@@ -34,6 +35,7 @@ customer:
   Navy: U.S. Navy
   USMC: U.S. Marine Corps
   SOCOM: U.S. Special Operations Command
+  INDOPACOM: U.S. Indo-Pacific Command and its exercises, such as Cobra Gold, Balikatan, Northern Edge and Talisman Sabre
   DIU: Defense Innovation Unit
   OSD: DoD-wide offices such as OUSD R&E, TRMC and DARPA
   Intelligence community: IARPA and the intelligence agencies
@@ -45,3 +47,7 @@ access:
   Small business set-aside: only small businesses may bid
   Phase II holders only: only for companies with a current or recent SBIR or STTR Phase II award
   Sponsor needed: a company takes part through a government sponsor
+listing:
+  Call: something to respond to now, such as a solicitation, an RFI or sources sought, a challenge, or one topic or Area of Interest under a CSO or BAA
+  Umbrella: a standing CSO, BAA, open period or SBIR or STTR cycle whose topics, calls or Areas of Interest are issued under it, or that takes white papers at any time
+  Announcement: nothing to submit yet, such as a forecast, a presolicitation or coming-soon notice, an industry day, proposers day or other event, or a notice of intent to sole source

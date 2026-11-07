@@ -4,6 +4,8 @@
 import type { TransactionSql } from "postgres";
 import { sql } from "./db";
 import { CLOSED_PATTERN, PAGE_SIZE, portalOptions, type CallState, type PortalOption, type Sort } from "./filters";
+import type { FitColumns } from "./fit";
+import type { CallTag, EvidenceCall, JudgeRow, RatingRow, TagRow as FitTagRow } from "./fitratings";
 import type { JudgeFilter, Judgment } from "./judges";
 import type { TagOption, TagRow } from "./tags";
 import { isoNow } from "./format";
@@ -12,6 +14,8 @@ import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
+import type { AskMessage } from "./ask";
+import { WATCH } from "./listing";
 import type { ProfileFields } from "./profile";
 import { pushDate, RESULTS, resultWord, startRefusal, workerReadiness, type ProposalCall } from "./proposals";
 import { DESCRIPTION_READ } from "./description";
@@ -20,6 +24,7 @@ import { DUE_SOON_DAYS, NEW_DAYS, type CallView } from "./views";
 import { finalGate, type ScanJob, type ScanRow } from "./slop";
 import type { PastWorkItem } from "./pastwork";
 import { present } from "./schema";
+import { cacheMs, forget, remember } from "./remember";
 import {
   changeCounts,
   decidedLine,
@@ -56,7 +61,7 @@ export type QueueRow = {
   extra: string | null;
   human_status: string | null;
   human_notes: string | null;
-};
+} & FitColumns;
 
 /** The filter panel's choices (lib/filters.ts). No portals ticked means every portal; no tag, any tag. */
 export type PanelFilters = { portals: string[]; state: CallState; sort: Sort; judges: JudgeFilter; tag: string };
@@ -64,6 +69,11 @@ export type PanelFilters = { portals: string[]; state: CallState; sort: Sort; ju
 type Db = ReturnType<typeof sql>;
 /** A transaction from db.begin, for the helpers that write inside one. */
 type Tx = TransactionSql<Record<string, never>>;
+
+/** How long the slow-changing reads below are kept (remember.ts). */
+function keepFor(): number {
+  return cacheMs(process.env);
+}
 
 /** The panel's portal and open-or-closed conditions, appended after a WHERE. */
 function panelWhere(db: Db, f: PanelFilters) {
@@ -106,6 +116,8 @@ function panelOrder(db: Db, f: { sort: Sort; judges: JudgeFilter }) {
       return f.sort.dir === "asc"
         ? db`ORDER BY ${conflictsFirst} (${dueDate(db)} < CURRENT_DATE) IS TRUE, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id`
         : db`ORDER BY ${conflictsFirst} ${dueDate(db)} DESC NULLS LAST, first_seen_at DESC, id`;
+    case "fit":
+      return db`ORDER BY ${conflictsFirst} fit_score ${dir} NULLS LAST, (${dueDate(db)} < CURRENT_DATE) IS TRUE, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id`;
     case "title":
       return db`ORDER BY ${conflictsFirst} lower(title) ${dir} NULLS LAST, first_seen_at DESC, id`;
     case "verdict":
@@ -138,6 +150,106 @@ async function hasColumn(db: Db, table: string, column: string): Promise<boolean
  *  never awaited: awaiting it would run it. */
 function summaryColumn(db: Db, present: boolean) {
   return present ? db`ai_summary` : db`NULL::text AS ai_summary`;
+}
+
+/** Each call's fit score (migration 013), or NULLs before the migration is applied. A fragment, so never awaited. */
+/** The score's columns and the call's kind of listing (migration 015), or NULLs where the migration is not applied. */
+function fitColumns(db: Db, present: boolean, listing: boolean) {
+  const score = present ? db`fit_score, fit_band, fit_why` : db`NULL::int AS fit_score, NULL::text AS fit_band, NULL::text AS fit_why`;
+  return listing ? db`${score}, listing` : db`${score}, NULL::text AS listing`;
+}
+
+/** Whether calls carry their kind of listing: migration 015 is applied. */
+export async function hasListing(): Promise<boolean> {
+  return hasColumn(sql(), "calls", "listing");
+}
+
+/** Whether calls can be scored and sorted by fit: migration 013 is applied. */
+export async function hasFitScore(): Promise<boolean> {
+  return hasColumn(sql(), "calls", "fit_score");
+}
+
+/** What the Fit ratings page shows; null before migration 013. Kept for a minute apart from the ratings themselves, which
+ *  a change on the page must show at once. */
+export async function fitRatingInputs(): Promise<{ ratings: RatingRow[]; tags: FitTagRow[]; calls: EvidenceCall[]; callTags: CallTag[]; judges: JudgeRow[] } | null> {
+  const db = sql();
+  if (!(await hasFitScore())) return null;
+  const changedBy = (await hasColumn(db, "fit_ratings", "changed_by")) ? db`changed_by` : db`NULL::text AS changed_by`;
+  const [ratings, evidence] = await Promise.all([
+    db<RatingRow[]>`SELECT key, section, name, rating, note, loaded_at, ${changedBy} FROM fit_ratings`,
+    remember("fit-evidence", keepFor(), readFitEvidence),
+  ]);
+  return { ratings: [...ratings], ...evidence };
+}
+
+async function readFitEvidence() {
+  const db = sql();
+  const [tags, calls, callTags, judges] = await Promise.all([
+    db<FitTagRow[]>`SELECT name, tag_group, covers FROM tag_list ORDER BY position`,
+    db<EvidenceCall[]>`SELECT id, title, url, type, naics_code, matched_keywords, human_status FROM calls`,
+    db<CallTag[]>`SELECT DISTINCT call_id, tag FROM call_tags`,
+    db<JudgeRow[]>`SELECT call_id, judge, verdict, main_work FROM judgments ORDER BY id`,
+  ]);
+  return { tags: [...tags], calls: [...calls], callTags: [...callTags], judges: [...judges] };
+}
+
+/** How many ratings there are, for Automation's card; null before migration 013. */
+export function fitRatingCount(): Promise<number | null> {
+  return remember("fit-count", keepFor(), async () => {
+    const db = sql();
+    if (!(await hasFitScore())) return null;
+    const [row] = await db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM fit_ratings`;
+    return row?.n ?? 0;
+  });
+}
+
+/** Open, undecided calls by fit band, and the newest job that scored them again; null before migration 013. */
+export async function fitOverview(): Promise<{ bands: Record<string, number>; job: { state: string; finished_at: string | null } | null } | null> {
+  const db = sql();
+  if (!(await hasFitScore())) return null;
+  const [bands, jobs] = await Promise.all([
+    db<{ fit_band: string; n: number }[]>`
+      SELECT fit_band, COUNT(*)::int AS n FROM calls
+      WHERE filter_result = 'kept' AND human_status IS NULL AND fit_band IS NOT NULL
+        AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
+        AND (${dueDate(db)} >= CURRENT_DATE OR ${dueDate(db)} IS NULL)
+      GROUP BY fit_band`,
+    db<{ state: string; finished_at: string | null }[]>`
+      SELECT state, finished_at FROM worker_jobs WHERE kind = 'fit_scores' ORDER BY id DESC LIMIT 1`,
+  ]);
+  return { bands: Object.fromEntries(bands.map((b) => [b.fit_band, b.n])), job: jobs[0] ?? null };
+}
+
+/**
+ * Keep a person's rating of one tag, keyword or NAICS code, or clear it (rating null), and ask the worker to score every
+ * call again, unless a job is already waiting: one that has started may have read the old rating, so another is queued.
+ */
+export async function saveFitRating(input: { key: string; section: string; name: string; rating: string | null; note: string; by: string }): Promise<void> {
+  const db = sql();
+  const withBy = await hasColumn(db, "fit_ratings", "changed_by");
+  const now = isoNow();
+  await db.begin(async (tx) => {
+    if (input.rating === null) {
+      await tx`DELETE FROM fit_ratings WHERE key = ${input.key}`;
+    } else if (withBy) {
+      await tx`
+        INSERT INTO fit_ratings (key, section, name, rating, note, loaded_at, changed_by)
+        VALUES (${input.key}, ${input.section}, ${input.name}, ${input.rating}, ${input.note || null}, ${now}, ${input.by})
+        ON CONFLICT (key) DO UPDATE SET rating = EXCLUDED.rating, note = EXCLUDED.note, loaded_at = EXCLUDED.loaded_at, changed_by = EXCLUDED.changed_by`;
+    } else {
+      await tx`
+        INSERT INTO fit_ratings (key, section, name, rating, note, loaded_at)
+        VALUES (${input.key}, ${input.section}, ${input.name}, ${input.rating}, ${input.note || null}, ${now})
+        ON CONFLICT (key) DO UPDATE SET rating = EXCLUDED.rating, note = EXCLUDED.note, loaded_at = EXCLUDED.loaded_at`;
+    }
+    const [waiting] = await tx`SELECT 1 FROM worker_jobs WHERE kind = 'fit_scores' AND state = 'queued'`;
+    if (!waiting) {
+      await tx`
+        INSERT INTO worker_jobs (kind, pursuit_id, payload, state, requested_by, requested_at, updated_at)
+        VALUES ('fit_scores', NULL, NULL, 'queued', ${input.by}, ${now}, ${now})`;
+    }
+  });
+  forget("fit-count");
 }
 
 /** True when a ledger table exists; a migration may not be applied to this database yet. Once found, remembered. */
@@ -183,6 +295,21 @@ function keywordWhere(db: Db, f: Keywords) {
     ${f.why ? db`AND ai_reasoning ILIKE ${`%${escapeLike(f.why)}%`}` : db``}`;
 }
 
+/** A piece of SQL from the tagged template, spliced into another query. */
+type Fragment = ReturnType<typeof keywordWhere>;
+
+/**
+ * The calls a per-row read covers: their ids, or one page of a list as a subquery (callsPage, queuePage), so the read
+ * runs beside the page's own query instead of waiting for its rows, a round trip of about 60 ms saved.
+ */
+export type CallIds = string[] | { page: (db: Db) => Fragment };
+
+/** What follows `call_id IN`: the ids, or the page's subquery; null when there is nothing to read. */
+function idsIn(db: Db, ids: CallIds) {
+  if (Array.isArray(ids)) return ids.length ? db(ids) : null;
+  return ids.page(db);
+}
+
 /**
  * The triage backlog, newest first unless sorted otherwise. With `waitingFor` (the names one
  * person's decisions are recorded under, while everyone decides every call): the calls that
@@ -194,7 +321,7 @@ function keywordWhere(db: Db, f: Keywords) {
  * `offset`, with the view's total.
  */
 export async function reviewQueue(
-  f: PanelFilters & Keywords & { verdict: string; tier: string; view?: CallView; ids?: string[] },
+  f: QueueFilters,
   waitingFor: string[] | null,
   page: { limit: number; offset: number } = { limit: PAGE_SIZE, offset: 0 },
 ): Promise<{ rows: QueueRow[]; total: number; perPerson: boolean }> {
@@ -202,7 +329,25 @@ export async function reviewQueue(
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
   if (f.view === "top10" && !f.ids?.length) return { rows: [], total: 0, perPerson };
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
-  const where = () => db`
+  const fit = fitColumns(db, await hasFitScore(), await hasListing());
+  const [count, rows] = await Promise.all([
+    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${queueWhere(db, f, perPerson, waitingFor)}`,
+    db<QueueRow[]>`
+      SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, ${summary}, due_date,
+             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
+             match_tier, first_seen_at, extra, human_status, human_notes, ${fit}
+      FROM calls ${queueWhere(db, f, perPerson, waitingFor)}
+      ${panelOrder(db, f)}
+      LIMIT ${page.limit} OFFSET ${page.offset}`,
+  ]);
+  return { rows: [...rows], total: count[0]?.n ?? 0, perPerson };
+}
+
+export type QueueFilters = PanelFilters & Keywords & { verdict: string; tier: string; view?: CallView; ids?: string[] };
+
+/** The queue's WHERE: the view's calls under the bar's and the headers' filters. */
+function queueWhere(db: Db, f: QueueFilters, perPerson: boolean, waitingFor: string[] | null) {
+  return db`
     WHERE ${f.view === "top10" ? db`id IN ${db(f.ids ?? [])}` : waitingWhere(db, perPerson, waitingFor)}
       ${f.view === "due-soon" ? db`AND ${dueSoon(db)}` : db``}
       ${f.view === "new" ? db`AND first_seen_at >= ${newSince()}` : db``}
@@ -210,17 +355,16 @@ export async function reviewQueue(
       ${f.tier ? db`AND match_tier = ${f.tier}` : db``}
       ${keywordWhere(db, f)}
       ${panelWhere(db, f)}`;
-  const [count, rows] = await Promise.all([
-    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${where()}`,
-    db<QueueRow[]>`
-      SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, ${summary}, due_date,
-             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
-             match_tier, first_seen_at, extra, human_status, human_notes
-      FROM calls ${where()}
-      ${panelOrder(db, f)}
-      LIMIT ${page.limit} OFFSET ${page.offset}`,
-  ]);
-  return { rows: [...rows], total: count[0]?.n ?? 0, perPerson };
+}
+
+/** The ids on one page of the queue, as reviewQueue orders and cuts it, for the per-row reads beside it (CallIds). */
+export async function queuePage(f: QueueFilters, waitingFor: string[] | null, page: { limit: number; offset: number }): Promise<CallIds> {
+  if (f.view === "top10") return f.ids ?? [];
+  const perPerson = Boolean(waitingFor?.length) && (await hasTable(sql(), "decisions"));
+  return {
+    page: (db) => db`(SELECT id FROM calls ${queueWhere(db, f, perPerson, waitingFor)} ${panelOrder(db, f)}
+                      LIMIT ${page.limit} OFFSET ${page.offset})`,
+  };
 }
 
 /** The first-seen time from which a call is New this week. */
@@ -294,45 +438,70 @@ export type TopTenRow = {
   ai_reasoning: string | null;
   human_status: string | null;
   human_by: string | null;
-};
+  human_at: string | null;
+  type: string | null;
+} & FitColumns;
 
 /** Home's Top 10 rows for these calls, as the ledger has them now; the caller keeps the order. */
 export async function topTenRows(ids: string[]): Promise<TopTenRow[]> {
   if (ids.length === 0) return [];
   const db = sql();
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
+  const fit = fitColumns(db, await hasFitScore(), await hasListing());
   const rows = await db<TopTenRow[]>`
     SELECT id, portal, title, url, due_date, (${dueDate(db)} - CURRENT_DATE)::int AS days_left, description, ${summary},
-           extra, ai_verdict, ai_reasoning, human_status, human_by
+           extra, ai_verdict, ai_reasoning, human_status, human_by, human_at, type, ${fit}
     FROM calls WHERE id IN ${db(ids)}`;
   return [...rows];
 }
 
 /**
- * The live ranking Home shows before the first Monday brief (H2): open calls nobody has decided,
- * rated yes or maybe and kept, yes before maybe, then the nearest deadline, then the newest.
+ * The live ranking Home shows before the first Monday brief (H2): open calls nobody has decided, rated yes or maybe and
+ * kept and not ruled out. A yes from both judges first, then a yes from one; inside each, what closes within 60 days,
+ * then the highest fit score, the nearest deadline and the newest. The same order as RANKING in assistant/tools.py.
+ * With `watch`, the umbrellas and announcements (none before migration 015); otherwise the calls to respond to now.
  */
-export async function liveTopTen(): Promise<string[]> {
+export async function liveTopTen(watch = false): Promise<string[]> {
   const db = sql();
+  const [scored, kinds] = await Promise.all([hasFitScore(), hasListing()]);
+  if (watch && !kinds) return [];
   const rows = await db<{ id: string }[]>`
     SELECT id FROM calls
     WHERE ${waitingWhere(db, false, null)}
       AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
       AND (${dueDate(db)} >= CURRENT_DATE OR ${dueDate(db)} IS NULL)
-    ORDER BY CASE ai_verdict WHEN 'yes' THEN 0 ELSE 1 END, ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id
+      ${scored ? db`AND fit_band IS DISTINCT FROM 'ruled out'` : db``}
+      ${kinds ? (watch ? db`AND listing IN ${db(WATCH)}` : db`AND (listing IS NULL OR listing NOT IN ${db(WATCH)})`) : db``}
+    ORDER BY CASE ai_verdict WHEN 'yes' THEN 1 ELSE 0 END
+               + COALESCE((SELECT CASE j.verdict WHEN 'yes' THEN 1 ELSE 0 END FROM judgments j WHERE j.call_id = calls.id AND j.judge = 'grok' ORDER BY j.id DESC LIMIT 1), 0) DESC,
+             CASE WHEN ${dueDate(db)} <= CURRENT_DATE + 60 THEN 0 ELSE 1 END,
+             ${scored ? db`fit_score DESC NULLS LAST,` : db``} ${dueDate(db)} ASC NULLS LAST, first_seen_at DESC, id
     LIMIT 10`;
   return rows.map((r) => r.id);
 }
 
-/** This week's Top 10: the newest Monday brief's, in its order, or the live ranking before the first brief (H2). */
-export async function topTenIds(): Promise<{ ids: string[]; week: string | null }> {
-  const weeks = await briefWeeks();
-  if (weeks && weeks.length) {
-    const rows = await briefRows(weeks[0]);
-    const top = parseTop(rows.find((r) => r.portal === null)?.body);
-    if (top) return { ids: top.top.map((c) => c.id), week: weeks[0] };
+/** This week's Top 10 and top 10 to watch: the newest Monday brief's, in its order, or the live ranking before the first
+ *  brief (H2), and for a brief written before the watch list began. One query for the newest week's ranking. */
+export function topTenIds(): Promise<{ ids: string[]; watch: string[]; week: string | null }> {
+  return remember("top10", keepFor(), readTopTenIds);
+}
+
+async function readTopTenIds(): Promise<{ ids: string[]; watch: string[]; week: string | null }> {
+  let newest: { week_of: string; body: string | null } | undefined;
+  try {
+    [newest] = await sql()<{ week_of: string; body: string | null }[]>`
+      SELECT week_of, body FROM briefs WHERE portal IS NULL AND week_of = (SELECT MAX(week_of) FROM briefs)
+      ORDER BY id DESC LIMIT 1`;
+  } catch {
+    newest = undefined;   // briefs table missing (migration 005)
   }
-  return { ids: await liveTopTen(), week: null };
+  const top = newest ? parseTop(newest.body) : null;
+  if (newest && top) {
+    const watch = top.watch ? top.watch.map((c) => c.id) : await liveTopTen(true);
+    return { ids: top.top.map((c) => c.id), watch, week: newest.week_of };
+  }
+  const [ids, watch] = await Promise.all([liveTopTen(), liveTopTen(true)]);
+  return { ids, watch, week: null };
 }
 
 /** "New calls this week" from LEDGER_SCHEMA.md, as a count. */
@@ -343,7 +512,11 @@ export async function newThisWeek(): Promise<number> {
 }
 
 /** Every portal that has completed a real scan or has calls, with its number of stored calls (PRO-563). */
-export async function portals(): Promise<PortalOption[]> {
+export function portals(): Promise<PortalOption[]> {
+  return remember("portals", keepFor(), readPortals);
+}
+
+async function readPortals(): Promise<PortalOption[]> {
   const [scanned, counts] = await Promise.all([
     sql()<{ portal: string }[]>`SELECT DISTINCT portal FROM runs WHERE portal IS NOT NULL AND dry_run = 0`,
     sql()<{ portal: string; calls: number }[]>`SELECT portal, COUNT(*)::int AS calls FROM calls WHERE portal IS NOT NULL GROUP BY portal`,
@@ -355,15 +528,16 @@ export async function portals(): Promise<PortalOption[]> {
  * Each judge's newest judgment on these calls, by call id. Empty when the judgments table is not
  * there yet (migration 003): the pages then show the review's verdict alone.
  */
-export async function latestJudgments(callIds: string[]): Promise<Map<string, Judgment[]>> {
+export async function latestJudgments(callIds: CallIds): Promise<Map<string, Judgment[]>> {
   const byCall = new Map<string, Judgment[]>();
-  if (callIds.length === 0) return byCall;
   try {
     const db = sql();
+    const ids = idsIn(db, callIds);
+    if (!ids) return byCall;
     const found = await db<(Judgment & { call_id: string })[]>`
       SELECT DISTINCT ON (call_id, judge) call_id, judge, model, verdict, reasoning, rated_at
       FROM judgments
-      WHERE call_id IN ${db(callIds)}
+      WHERE call_id IN ${ids}
       ORDER BY call_id, judge, id DESC`;
     for (const { call_id, ...judgment } of found) {
       byCall.set(call_id, [...(byCall.get(call_id) ?? []), judgment]);
@@ -375,7 +549,11 @@ export async function latestJudgments(callIds: string[]): Promise<Map<string, Ju
 }
 
 /** "Judge agreement" from LEDGER_SCHEMA.md: calls both judges rated, and how many verdicts match. */
-export async function judgeAgreement(): Promise<{ both: number; agree: number } | null> {
+export function judgeAgreement(): Promise<{ both: number; agree: number } | null> {
+  return remember("agreement", keepFor(), readJudgeAgreement);
+}
+
+async function readJudgeAgreement(): Promise<{ both: number; agree: number } | null> {
   try {
     const [row] = await sql()<{ both_judged: number; agree: number }[]>`
       SELECT COUNT(*)::int AS both_judged,
@@ -417,31 +595,41 @@ export type CallRow = {
   human_notes: string | null;
   first_seen_at: string;
   extra: string | null;
-};
+} & FitColumns;
 
 /** One page of All calls: `limit` rows from `offset`, and how many calls the filters leave. */
 export async function listCalls(f: CallFilters, limit = PAGE_SIZE, offset = 0): Promise<{ rows: CallRow[]; total: number }> {
   const db = sql();
-  const where = () => db`
+  const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
+  const fit = fitColumns(db, await hasFitScore(), await hasListing());
+  const [count, rows] = await Promise.all([
+    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${callsWhere(db, f)}`,
+    db<CallRow[]>`
+      SELECT id, portal, title, url, type, department, naics_code, set_aside, ${summary}, due_date,
+             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
+             filter_result, filter_reason, match_tier,
+             ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra, ${fit}
+      FROM calls ${callsWhere(db, f)}
+      ${panelOrder(db, f)}
+      LIMIT ${limit} OFFSET ${offset}`,
+  ]);
+  return { rows: [...rows], total: count[0]?.n ?? 0 };
+}
+
+/** All calls' WHERE: the bar's and the headers' filters. */
+function callsWhere(db: Db, f: CallFilters) {
+  return db`
     WHERE TRUE
       ${f.filterResult ? db`AND filter_result = ${f.filterResult}` : db``}
       ${f.verdict === "none" ? db`AND ai_verdict IS NULL` : f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
       ${f.status === "none" ? db`AND human_status IS NULL` : f.status ? db`AND human_status = ${f.status}` : db``}
       ${keywordWhere(db, f)}
       ${panelWhere(db, f)}`;
-  const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
-  const [count, rows] = await Promise.all([
-    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${where()}`,
-    db<CallRow[]>`
-      SELECT id, portal, title, url, type, department, naics_code, set_aside, ${summary}, due_date,
-             (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
-             filter_result, filter_reason, match_tier,
-             ai_verdict, ai_reasoning, human_status, human_by, human_at, human_notes, first_seen_at, extra
-      FROM calls ${where()}
-      ${panelOrder(db, f)}
-      LIMIT ${limit} OFFSET ${offset}`,
-  ]);
-  return { rows: [...rows], total: count[0]?.n ?? 0 };
+}
+
+/** The ids on one page of All calls, as listCalls orders and cuts it, for the per-row reads beside it (CallIds). */
+export function callsPage(f: CallFilters, limit = PAGE_SIZE, offset = 0): CallIds {
+  return { page: (db) => db`(SELECT id FROM calls ${callsWhere(db, f)} ${panelOrder(db, f)} LIMIT ${limit} OFFSET ${offset})` };
 }
 
 export type DecideResult =
@@ -482,7 +670,7 @@ export async function decideCall(input: {
   const mine = history ? await latestDecisionBy(db, input.id, input.aliases) : null;
   const now = isoNow();
   const line = noteLine(now, input.by, input.note) || null;
-  return db.begin(async (tx): Promise<DecideResult> => {
+  const result = await db.begin(async (tx): Promise<DecideResult> => {
     const [call] = await tx<{ title: string | null; human_status: string | null; human_by: string | null }[]>`
       SELECT title, human_status, human_by FROM calls WHERE id = ${input.id} FOR UPDATE`;
     if (!call) return { ok: false, reason: "That call is no longer in the ledger." };
@@ -519,20 +707,23 @@ export async function decideCall(input: {
     }
     return { ok: true, title: call.title ?? input.id, plan, callStatus: plan === "decide" ? input.status : current };
   });
+  if (result.ok) forget("top10");   // before the first brief, the live Top 10 leaves out decided calls
+  return result;
 }
 
 // ------------------------------------------------------------------ tags
 
 /** Every tag on these calls, with who set it and its group and place in the list (call_tags and
  *  tag_list, migrations 006 and 007); empty before those tables exist. */
-export async function tagsOn(callIds: string[]): Promise<TagRow[]> {
-  if (callIds.length === 0) return [];
+export async function tagsOn(callIds: CallIds): Promise<TagRow[]> {
   try {
     const db = sql();
+    const ids = idsIn(db, callIds);
+    if (!ids) return [];
     const rows = await db<TagRow[]>`
       SELECT t.call_id, t.tag, t.source, l.tag_group, l.position
       FROM call_tags AS t LEFT JOIN tag_list AS l ON l.name = t.tag
-      WHERE t.call_id IN ${db(callIds)}
+      WHERE t.call_id IN ${ids}
       ORDER BY t.id`;
     return [...rows];
   } catch {
@@ -541,7 +732,11 @@ export async function tagsOn(callIds: string[]): Promise<TagRow[]> {
 }
 
 /** The tag list, in order, for the Tag filter; empty before migration 007. */
-export async function tagOptions(): Promise<TagOption[]> {
+export function tagOptions(): Promise<TagOption[]> {
+  return remember("tags", keepFor(), readTagOptions);
+}
+
+async function readTagOptions(): Promise<TagOption[]> {
   try {
     const rows = await sql()<TagOption[]>`SELECT name, tag_group, covers FROM tag_list ORDER BY position`;
     return [...rows];
@@ -553,12 +748,13 @@ export async function tagOptions(): Promise<TagOption[]> {
 // ------------------------------------------------------------------ decisions, judges
 
 /** Every decision on these calls, oldest first (migration 004); empty before that table exists. */
-export async function decisionsOn(callIds: string[]): Promise<DecisionRow[]> {
-  if (callIds.length === 0) return [];
+export async function decisionsOn(callIds: CallIds): Promise<DecisionRow[]> {
   try {
     const db = sql();
+    const ids = idsIn(db, callIds);
+    if (!ids) return [];
     const rows = await db<DecisionRow[]>`
-      SELECT call_id, decided_by, status, decided_at FROM decisions WHERE call_id IN ${db(callIds)} ORDER BY id`;
+      SELECT call_id, decided_by, status, decided_at FROM decisions WHERE call_id IN ${ids} ORDER BY id`;
     return [...rows];
   } catch {
     return [];   // decisions table missing (migration 004)
@@ -711,7 +907,11 @@ export async function countDecidedRequests(): Promise<number> {
 }
 
 /** How many requests wait for a decision; null when the table is not there yet (migration 002 not applied). */
-export async function countWaitingRequests(): Promise<number | null> {
+export function countWaitingRequests(): Promise<number | null> {
+  return remember("requests", keepFor(), readCountWaitingRequests);
+}
+
+async function readCountWaitingRequests(): Promise<number | null> {
   try {
     const [row] = await sql()<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM change_requests WHERE status = 'proposed'`;
     return row?.n ?? 0;
@@ -742,7 +942,10 @@ export async function decideRequest(input: {
         decision_note = ${input.note.trim() || null}, updated_at = ${now}
     WHERE id = ${input.id} AND status = 'proposed'
     RETURNING summary`;
-  if (updated.length === 1) return { ok: true, summary: updated[0].summary };
+  if (updated.length === 1) {
+    forget("requests");   // the Automation chip counts the requests waiting
+    return { ok: true, summary: updated[0].summary };
+  }
   const [existing] = await db<{ status: string; decided_by: string | null }[]>`
     SELECT status, decided_by FROM change_requests WHERE id = ${input.id}`;
   if (!existing) return { ok: false, reason: `There is no request #${input.id}.` };
@@ -907,12 +1110,63 @@ export async function proposalCalls(f: BarFilters): Promise<ProposalCall[]> {
 }
 
 /** The worker's newest heartbeat (PRO-576), or null when it has never run or migration 008 is missing. */
-export async function workerStatus(): Promise<{ name: string; seen_at: string; state: string } | null> {
+export function workerStatus(): Promise<{ name: string; seen_at: string; state: string } | null> {
+  return remember("worker", keepFor(), readWorkerStatus);
+}
+
+async function readWorkerStatus(): Promise<{ name: string; seen_at: string; state: string } | null> {
   const db = sql();
   if (!(await hasTable(db, "workers"))) return null;
+  // The Writer's worker only: Ask Grok's assistant beats in the same table, under its own name.
   const [row] = await db<{ name: string; seen_at: string; state: string }[]>`
-    SELECT name, seen_at, state FROM workers ORDER BY seen_at DESC LIMIT 1`;
+    SELECT name, seen_at, state FROM workers WHERE name = 'worker' ORDER BY seen_at DESC LIMIT 1`;
   return row ?? null;
+}
+
+// ------------------------------------------------------------------ Ask Grok (David, 7 Nov 2026)
+
+/** Whether Ask Grok is set up: migration 016 is applied. */
+export async function hasChat(): Promise<boolean> {
+  return hasTable(sql(), "chat_messages");
+}
+
+/** One person's Ask Grok thread, the newest unless one is named: its questions in order (the last 50) and when the
+ *  assistant was last seen. A person reads only what they asked, under any of their names. */
+export async function chatThread(names: string[], thread: string | null): Promise<{ thread: string | null; messages: AskMessage[]; seenAt: string | null }> {
+  const db = sql();
+  if (!names.length || !(await hasChat())) return { thread: null, messages: [], seenAt: null };
+  let id = thread;
+  if (!id) {
+    const [newest] = await db<{ thread_id: string }[]>`
+      SELECT thread_id FROM chat_messages WHERE asked_by IN ${db(names)} ORDER BY id DESC LIMIT 1`;
+    id = newest?.thread_id ?? null;
+  }
+  const [messages, seen] = await Promise.all([
+    id
+      ? db<AskMessage[]>`
+          SELECT id, question, state, answer, sources, tools, model, cost_usd, asked_at, answered_at FROM chat_messages
+          WHERE thread_id = ${id} AND asked_by IN ${db(names)} ORDER BY id DESC LIMIT 50`
+      : Promise.resolve([] as AskMessage[]),
+    db<{ seen_at: string }[]>`SELECT seen_at FROM workers WHERE name = 'assistant'`,
+  ]);
+  return { thread: id, messages: [...messages].reverse().map((m) => ({ ...m, cost_usd: m.cost_usd === null ? null : Number(m.cost_usd) })), seenAt: seen[0]?.seen_at ?? null };
+}
+
+/** Whether this person already has a question waiting: one at a time each. */
+export async function questionWaiting(names: string[]): Promise<boolean> {
+  if (!names.length) return false;
+  const db = sql();
+  const [row] = await db<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n FROM chat_messages WHERE asked_by IN ${db(names)} AND state IN ('queued', 'working')`;
+  return (row?.n ?? 0) > 0;
+}
+
+/** A question for run.py --assistant to answer; its id. */
+export async function askQuestion(thread: string, by: string, question: string, page: string | null): Promise<number> {
+  const [row] = await sql()<{ id: number }[]>`
+    INSERT INTO chat_messages (thread_id, asked_by, page, question, state, asked_at)
+    VALUES (${thread}, ${by}, ${page}, ${question}, 'queued', ${isoNow()}) RETURNING id`;
+  return Number(row.id);
 }
 
 /** A call's draft as its badge and the Decide cell show it (DB1 to DB3, Q17). */
@@ -929,18 +1183,18 @@ export type DraftInfo = {
 };
 
 /** The drafts of these calls, by call id; empty before migration 008. */
-export async function draftsFor(callIds: string[]): Promise<Map<string, DraftInfo>> {
+export async function draftsFor(callIds: CallIds): Promise<Map<string, DraftInfo>> {
   const found = new Map<string, DraftInfo>();
-  if (callIds.length === 0) return found;
   const db = sql();
-  if (!(await hasTable(db, "pursuits"))) return found;
+  const ids = idsIn(db, callIds);
+  if (!ids || !(await hasTable(db, "pursuits"))) return found;
   const rows = await db<DraftInfo[]>`
     SELECT p.call_id, p.owner, p.state AS pursuit_state, p.current_step, s.state AS step_state, p.drive_folder_id,
            p.submitted_at, p.submitted_by, p.result_expected_by
     FROM pursuits AS p
     LEFT JOIN pursuit_steps AS s
       ON s.id = (SELECT MAX(x.id) FROM pursuit_steps AS x WHERE x.pursuit_id = p.id AND x.step = p.current_step)
-    WHERE p.call_id IN ${db(callIds)}`;
+    WHERE p.call_id IN ${ids}`;
   for (const row of rows) found.set(row.call_id, row);
   return found;
 }
@@ -1008,7 +1262,11 @@ export type ProfileRow = {
 };
 
 /** Every saved profile, by name (PRO-574); empty before migration 008. */
-export async function allProfiles(): Promise<Map<string, ProfileRow>> {
+export function allProfiles(): Promise<Map<string, ProfileRow>> {
+  return remember("profiles", keepFor(), readAllProfiles);
+}
+
+async function readAllProfiles(): Promise<Map<string, ProfileRow>> {
   const db = sql();
   if (!(await hasTable(db, "profiles"))) return new Map();
   const rows = await db<ProfileRow[]>`
@@ -1026,11 +1284,13 @@ export async function saveProfile(name: string, f: ProfileFields): Promise<void>
     ON CONFLICT (name) DO UPDATE SET
       display_name = EXCLUDED.display_name, initials = EXCLUDED.initials, opens = EXCLUDED.opens,
       default_filters = EXCLUDED.default_filters, time_zone = EXCLUDED.time_zone, updated_at = EXCLUDED.updated_at`;
+  forget("profiles");
 }
 
 /** Profile settings' Reset to defaults: the person's row goes, so every default applies. */
 export async function deleteProfile(name: string): Promise<void> {
   await sql()`DELETE FROM profiles WHERE name = ${name}`;
+  forget("profiles");
 }
 
 // ----------------------------------------------------------------- the proposal workspace
@@ -1643,7 +1903,11 @@ export async function recordResult(input: { callId: string; by: string; result: 
 // ----------------------------------------------------------------- the Proposal Library's index (phase 6b)
 
 /** Past work the worker indexed from the Proposal Library (drive_items), and when it last did. */
-export async function pastWork(): Promise<{ items: PastWorkItem[]; indexedAt: string | null }> {
+export function pastWork(): Promise<{ items: PastWorkItem[]; indexedAt: string | null }> {
+  return remember("pastwork", keepFor(), readPastWork);
+}
+
+async function readPastWork(): Promise<{ items: PastWorkItem[]; indexedAt: string | null }> {
   const db = sql();
   if (!(await hasTable(db, "drive_items"))) return { items: [], indexedAt: null };
   const items = await db<PastWorkItem[]>`SELECT id, name, path, mime, web_link, modified_at FROM drive_items ORDER BY path, id`;

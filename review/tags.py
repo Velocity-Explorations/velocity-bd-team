@@ -1,14 +1,16 @@
 """Tags from a set list on each call (PRO-556).
 
-The list is review/tags.yaml, in four groups: type (exactly one per call), then work, customer and
-access (any that apply). Rules tag what a call's own data makes certain; Claude and Grok pick the
-rest on the TAGS line of their review answers. Each source's tags are kept apart (call_tags).
+The list is review/tags.yaml, in five groups: type (exactly one per call), work, customer and access
+(any that apply), and listing (exactly one: a call to respond to now, an umbrella whose calls come
+under it, or an announcement with nothing to submit yet; David, 7 Nov 2026). Rules tag what a call's
+own data makes certain; Claude and Grok pick the rest on the TAGS line of their review answers. Each
+source's tags are kept apart (call_tags).
 """
 from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -17,10 +19,12 @@ from typing import Any
 import yaml
 
 TAGS_FILE = Path(__file__).with_name("tags.yaml")
-GROUPS = ("type", "work", "customer", "access")
-SINGLE = "type"   # the group a call gets exactly one tag from
-LABELS = {"type": "Type, exactly one", "work": "Work, any that apply",
-          "customer": "Customer, any that apply", "access": "Access, any that apply"}
+GROUPS = ("type", "work", "customer", "access", "listing")
+SINGLE = ("type", "listing")   # the groups a call gets exactly one tag from
+LISTING = "listing"
+WATCH = ("Umbrella", "Announcement")   # listings with nothing to respond to yet: they have a top 10 of their own
+LABELS = {"type": "Type, exactly one", "work": "Work, any that apply", "customer": "Customer, any that apply",
+          "access": "Access, any that apply", "listing": "Listing, exactly one"}
 
 
 @dataclass(frozen=True)
@@ -79,24 +83,35 @@ def ordered(names: set[str], tags: TagList) -> list[str]:
 
 
 def parse_tags(text: str, tags: TagList) -> list[str]:
-    """The listed tags on the answer's TAGS line, at most one type (the first named), in list order."""
+    """The listed tags on the answer's TAGS line, at most one type and one listing (the first named), in list order."""
     for raw in (text or "").splitlines():
         line = raw.strip()
         if not line.upper().startswith("TAGS:"):
             continue
         picked: set[str] = set()
-        has_type = False
+        single: set[str] = set()   # the one-only groups already named
         for part in line.split(":", 1)[1].split(","):
             name = tags.canonical(part)
             if name is None:
                 continue
-            if tags.group_of(name) == SINGLE:
-                if has_type:
+            group = tags.group_of(name)
+            if group in SINGLE:
+                if group in single:
                     continue
-                has_type = True
+                single.add(group)
             picked.add(name)
         return ordered(picked, tags)
     return []
+
+
+def listing_of(tags_by_source: Mapping[str, Sequence[str]], tags: TagList) -> str | None:
+    """The call's kind of listing: the rule's where the portal's own type settles it, else Claude's, else Grok's (as for
+    verdicts, Claude's stands when the judges differ). None until someone has said, which counts as a call."""
+    for source in ("rule", "claude", "grok"):
+        found = next((name for name in tags_by_source.get(source) or [] if tags.group_of(name) == LISTING), None)
+        if found:
+            return found
+    return None
 
 
 # ------------------------------------------------------------------------------- rules
@@ -113,19 +128,32 @@ TYPE_BY_KIND = {
     "stratfi": "SBIR or STTR", "tacfi": "SBIR or STTR", "stratfi/tacfi": "SBIR or STTR",
 }
 TYPE_BY_PORTAL = {"NASA Forecast": "Forecast", "DOE SBIR": "SBIR or STTR"}   # every call on these
+# A portal's own type -> the listing, where it is certain. SAM.gov's special notices and solicitations mix calls, CSOs,
+# BAAs and industry days, so the judges say which.
+LISTING_BY_KIND = {
+    "forecast": "Announcement", "coming soon": "Announcement", "presolicitation": "Announcement", "upcoming": "Announcement",
+    "industry day": "Announcement", "webinar": "Announcement", "conference": "Announcement", "event": "Announcement",
+    "sbir cycle": "Umbrella", "sttr cycle": "Umbrella", "sbir/sttr cycle": "Umbrella",
+    "stratfi": "Umbrella", "tacfi": "Umbrella", "stratfi/tacfi": "Umbrella",
+}
 SOLICITATION_IS_PROPOSAL = {"SAM.gov", "Space Florida"}   # elsewhere "Solicitation" may be an OT call
-CUSTOMER_BY_PORTAL = {"Vulcan SOF": "SOCOM", "NASA Forecast": "NASA", "DOE SBIR": "DOE", "DIU": "DIU",
+CUSTOMER_BY_PORTAL = {"NASA Forecast": "NASA", "DOE SBIR": "DOE", "DIU": "DIU",
                       "SpaceWERX": "USSF", "SSC Front Door": "USSF", "AFWERX": "USAF", "Space Florida": "Other buyer"}
 CUSTOMER_BY_CONSORTIUM = {"SpEC": "USSF", "S2MARTS": "Navy", "Microelectronics Commons": "OSD"}   # NSTXL's
 CUSTOMER_BY_OFFICE = (   # words in an agency path (SAM.gov writes them) -> the customer
     ("DEPT OF THE ARMY", "Army"), ("DEPT OF THE NAVY", "Navy"), ("DEPT OF THE AIR FORCE", "USAF"),
     ("SPACE FORCE", "USSF"), ("SPACE SYSTEMS COMMAND", "USSF"),
     ("SPECIAL OPERATIONS COMMAND", "SOCOM"), ("USSOCOM", "SOCOM"), ("DEFENSE INNOVATION UNIT", "DIU"),
+    ("USINDOPACOM", "INDOPACOM"), ("INDO-PACIFIC COMMAND", "INDOPACOM"),
     ("DEFENSE ADVANCED RESEARCH PROJECTS AGENCY", "OSD"), ("TEST RESOURCE MANAGEMENT CENTER", "OSD"),
     ("INTELLIGENCE ADVANCED RESEARCH PROJECTS ACTIVITY", "Intelligence community"),
     ("DIRECTOR OF NATIONAL INTELLIGENCE", "Intelligence community"),
     ("NATIONAL AERONAUTICS AND SPACE ADMINISTRATION", "NASA"), ("ENERGY, DEPARTMENT OF", "DOE"),
 )
+# The portal writes the same office on every call, so it says nothing about the buyer: Vulcan SOF is run for SOCOM but lists
+# calls for the Navy, the Army and INDOPACOM too. The judges read the call and say who is buying.
+OFFICE_SAYS_NOTHING = {"Vulcan SOF"}
+INDOPACOM_TITLE = re.compile(r"\b(?:us)?(?:indo)?pacom\b|indo-pacific command|cobra gold|balikatan|northern edge|talisman sabre", re.IGNORECASE)
 BRANCHES = {"Air Force": "USAF", "Space Force": "USSF"}   # AFWERX's and SpaceWERX's service badges
 SMALL_BUSINESS = re.compile(r"small business|\b8\(?a\)?|sdvosb|service-disabled|wosb|women-owned|hubzone", re.IGNORECASE)
 PHASE_II_ONLY = {"stratfi", "tacfi", "stratfi/tacfi"}
@@ -144,11 +172,13 @@ def _extra(row: Mapping[str, Any]) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def _customers(portal: str, office: str, extra: Mapping[str, Any]) -> set[str]:
+def _customers(portal: str, office: str, extra: Mapping[str, Any], title: str = "") -> set[str]:
     found = {CUSTOMER_BY_PORTAL[portal]} if portal in CUSTOMER_BY_PORTAL else set()
     if office in CUSTOMER_BY_CONSORTIUM:
         found.add(CUSTOMER_BY_CONSORTIUM[office])
-    by_office = {customer for words, customer in CUSTOMER_BY_OFFICE if words in office.upper()}
+    if INDOPACOM_TITLE.search(title):
+        found.add("INDOPACOM")
+    by_office = set() if portal in OFFICE_SAYS_NOTHING else {customer for words, customer in CUSTOMER_BY_OFFICE if words in office.upper()}
     if "USSF" in by_office:
         by_office.discard("USAF")   # the Space Force's offices sit under the Department of the Air Force
     branches = extra.get(f"{portal.lower()}_branches")
@@ -172,7 +202,7 @@ def rule_tags(row: Mapping[str, Any], tags: TagList) -> list[str]:
             found.add("Proposal")
     elif kind in TYPE_BY_KIND:
         found.add(TYPE_BY_KIND[kind])
-    found |= _customers(portal, office, extra)
+    found |= _customers(portal, office, extra, str(row.get("title") or ""))
     if extra.get("nstxl_members_only") is True:
         found.add("Members only")
     aside = str(row.get("set_aside") or "")
@@ -182,11 +212,23 @@ def rule_tags(row: Mapping[str, Any], tags: TagList) -> list[str]:
         found.add("Phase II holders only")
     if portal in SPONSOR_PORTALS:
         found.add("Sponsor needed")
+    if kind in LISTING_BY_KIND:
+        found.add(LISTING_BY_KIND[kind])
     return ordered(found, tags)
+
+
+def parse_main_work(text: str, tags: TagList) -> str | None:
+    """The Work tag on the answer's MAIN WORK line, or None when there is no such line or it names anything else."""
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if line.upper().startswith("MAIN WORK:"):
+            name = tags.canonical(line.split(":", 1)[1])
+            return name if name and tags.group_of(name) == "work" else None
+    return None
 
 
 def rule_tag_names() -> set[str]:
     """Every tag a rule can set, so a test can check each is on the list."""
     return (set(TYPE_BY_KIND.values()) | set(TYPE_BY_PORTAL.values()) | {"Proposal"} | set(CUSTOMER_BY_PORTAL.values())
             | set(CUSTOMER_BY_CONSORTIUM.values()) | {customer for _, customer in CUSTOMER_BY_OFFICE}
-            | set(BRANCHES.values()) | ACCESS_TAGS)
+            | set(BRANCHES.values()) | ACCESS_TAGS | set(LISTING_BY_KIND.values()))

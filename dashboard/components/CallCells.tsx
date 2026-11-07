@@ -4,9 +4,11 @@ import { MessageSquareText } from "lucide-react";
 import type { ReactNode } from "react";
 import { PortalLogo } from "@/components/PortalLogo";
 import { panelId } from "@/components/RowPanels";
-import { Badge, Details, TitleLink } from "@/components/bits";
+import { Badge, Details, FitBadge, TitleLink } from "@/components/bits";
 import { callDetails, deadlineNote, noDeadlineLabel, type Detail } from "@/lib/details";
 import { descriptionCell, splitDetails } from "@/lib/description";
+import { fitBadge, type FitColumns } from "@/lib/fit";
+import { listingBadge } from "@/lib/listing";
 import { formatDue } from "@/lib/format";
 import { daysLeftText } from "@/lib/home";
 import { JUDGES, judgesConflict, judgesDisagree, type Verdicts } from "@/lib/judges";
@@ -15,7 +17,9 @@ import { withoutTags, type TagBadge } from "@/lib/tags";
 import { isClosed } from "@/lib/text";
 import { isDecision, STATUS_LABELS } from "@/lib/values";
 
-type CallFields = Parameters<typeof callDetails>[0] & { id: string; portal: string; title: string | null; url: string | null; extra: string | null };
+type CallFields = Parameters<typeof callDetails>[0] & {
+  id: string; portal: string; title: string | null; url: string | null; extra: string | null; listing?: string | null;
+};
 
 /**
  * The Call cell: the portal's logo tile, the title linked to the portal's page, the details line (the
@@ -33,6 +37,7 @@ export function CallCell({ row, tags, details, reason, topRank, draft }: {
 }) {
   const { facts, badges } = splitDetails<Detail>(withoutTags(callDetails(row), tags));
   const closed = isClosed(row.extra);
+  const kind = listingBadge(row.listing);   // an umbrella or announcement says so (David, 7 Nov)
   return (
     <td className="call">
       <div className="call-with-logo">
@@ -44,9 +49,10 @@ export function CallCell({ row, tags, details, reason, topRank, draft }: {
             {details ? <Details items={facts} /> : null}
           </div>
           {draft ?? null}
-          {closed || badges.length || topRank ? (
+          {closed || badges.length || topRank || kind ? (
             <div className="meta badges">
               {topRank ? <span className="badge tone-grey">Top 10, #{topRank}</span> : null}
+              {kind ? <span className="badge tone-info" title={kind.title}>{kind.text}</span> : null}
               {closed ? <span className="badge tone-grey">closed</span> : null}
               <Details items={badges} />
             </div>
@@ -77,11 +83,17 @@ function NoteButton({ panel, label }: { panel: string; label: string }) {
  * judges disagree; then, under a dashed rule, each person's latest vote, with a note button when they
  * left a note. `votes` is null where people's votes are not listed.
  */
-export function VotesCell({ callId, verdicts, votes, notesBy }: { callId: string; verdicts: Verdicts; votes: Vote[] | null; notesBy: Set<string> }) {
+export function VotesCell({ callId, verdicts, votes, notesBy, fit }: { callId: string; verdicts: Verdicts; votes: Vote[] | null; notesBy: Set<string>; fit?: Partial<FitColumns> }) {
   const reasons = panelId("reasons", callId);
   return (
     <td className="votes-cell">
       <div className="judges">
+        {fit && fitBadge(fit) ? (
+          <div className="judge fit">
+            <span className="who">Fit</span>
+            <FitBadge row={fit} />
+          </div>
+        ) : null}
         {JUDGES.map(({ key, label }) => (
           <div key={key} className="judge">
             <span className="who">{label}</span>

@@ -184,7 +184,7 @@ CREATE INDEX IF NOT EXISTS idx_call_tags_tag ON call_tags (tag);
 
 CREATE TABLE IF NOT EXISTS tag_list (
   name        TEXT PRIMARY KEY,
-  tag_group   TEXT NOT NULL CHECK (tag_group IN ('type', 'work', 'customer', 'access')),
+  tag_group   TEXT NOT NULL CHECK (tag_group IN ('type', 'work', 'customer', 'access', 'listing')),
   covers      TEXT,
   position    INTEGER NOT NULL
 );
@@ -409,3 +409,51 @@ CREATE TABLE IF NOT EXISTS linear_issues (
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL
 );
+
+-- 013_fit_score: the fit score (PRO-487): each judge's main work, the team's ratings, and each call's score.
+
+ALTER TABLE judgments ADD COLUMN main_work TEXT;
+
+ALTER TABLE calls ADD COLUMN fit_score INTEGER;
+ALTER TABLE calls ADD COLUMN fit_band TEXT;
+ALTER TABLE calls ADD COLUMN fit_why TEXT;
+
+CREATE TABLE IF NOT EXISTS fit_ratings (
+  key         TEXT PRIMARY KEY,
+  section     TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  rating      TEXT NOT NULL CHECK (rating IN ('core', 'good', 'neutral', 'poor', 'never')),
+  note        TEXT,
+  loaded_at   TEXT NOT NULL
+);
+
+-- 014_fit_rating_changes: who last changed a fit rating on the dashboard's Fit ratings page.
+
+ALTER TABLE fit_ratings ADD COLUMN changed_by TEXT;
+
+-- 015_listing: what kind of listing each call is: Call, Umbrella or Announcement; NULL counts as a call. The tag list's
+-- group check also takes listing (the tag_list table above shows the wider check).
+
+ALTER TABLE calls ADD COLUMN listing TEXT;
+
+-- 016_chat: Ask Grok, each question asked from the dashboard's panel with its answer (run.py --assistant).
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id           INTEGER PRIMARY KEY @@AUTOINCREMENT@@,
+  thread_id    TEXT NOT NULL,
+  asked_by     TEXT NOT NULL,
+  page         TEXT,
+  question     TEXT NOT NULL,
+  state        TEXT NOT NULL DEFAULT 'queued' CHECK (state IN ('queued', 'working', 'done', 'failed')),
+  answer       TEXT,
+  sources      TEXT,
+  tools        TEXT,
+  model        TEXT,
+  cost_usd     REAL,
+  asked_at     TEXT NOT NULL,
+  started_at   TEXT,
+  answered_at  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_state ON chat_messages (state, id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages (asked_by, thread_id, id);

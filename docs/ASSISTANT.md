@@ -52,7 +52,7 @@ Add `--json` to any of them for the full result.
 | Job | When | What it does |
 |---|---|---|
 | `python run.py --remind` | Daily 08:00 | Posts the calls marked Pursue and due within 14 days, nearest first. Posts nothing when none are due. |
-| `python run.py --post-summary` | Mondays 09:00 | Posts the Monday summary to Slack: for each portal, new calls, open calls waiting for a decision, the top picks (yes before maybe, then nearest deadline) with links and reasons, pursued calls closing within 14 days, the week's decisions by name, and scraper health. |
+| `python run.py --post-summary` | Mondays 09:00 | Posts the Monday summary to Slack: for each portal, new calls, open calls waiting for a decision, the top picks, calls to respond to now only (yes from both judges, then yes from one; inside each, calls closing within 60 days, then highest fit score and nearest deadline; umbrellas and announcements go to the brief's top 10 to watch) with links and reasons, pursued calls closing within 14 days, the week's decisions by name, and scraper health. |
 | `python run.py --apply-requests` | Daily at 12:07 and 17:07 | Carries out the change requests approved on the dashboard (see "Approvals"). |
 | Scraper watch, inside `run.py` | After every scan | Alerts when at least 3 pages, and at least a tenth of the scan, were read badly. |
 
@@ -118,6 +118,26 @@ python -m assistant requests --status proposed
   `_instructions` (text), and the flags `_closed` and `_description_fallback`.
 - Deadlines as the portal writes them, such as "30 OCT 2026 : 21:59 MDT", read by
   `assistant/dates.py`.
+
+## Ask Grok
+
+Since 7 Nov 2026 (David), Grok answers the team's questions from a panel on every dashboard page. Answer only: Grok
+gets the read tools above and nothing that records or changes anything.
+
+- **How a question travels:** the dashboard writes it to `chat_messages` with the page it was asked from (migration
+  016). `python run.py --assistant`, always running as the scheduled task "velocity-bd-team assistant", takes it within
+  2 seconds and has Grok answer it (`assistant/chat.py`, `assistant/grok.py`). The answer, the calls and Company
+  Reference ids it names, the tools it called and its cost go back to the same row, and the panel shows it.
+- **Tools:** every read tool here, plus `search_calls` (calls by words, with both verdicts, fit, kind and deadline),
+  `top_ten` (this week's Top 10 calls, or the top 10 to watch), `past_bids` (the Proposal Register, without its money
+  values) and `company_facts`. run.py supplies `company_facts`: it reads 01 Company Reference live through
+  `drafting/facts.py`, leaves out every SENSITIVE item and former employees, and marks open conflicts.
+- **Rules** (`chat.SYSTEM`, rules only, never facts): answer only from the tools; cite F, PP, PR and PE ids; write
+  NEEDS FACT where the record is silent; never state SENSITIVE items; no en or em dashes.
+- **What goes to xAI:** the question, the thread's last 8 exchanges and the tools' results, Velocity's facts among
+  them, with `store: false`. Grok is asked not to keep them. Conversations stay in the ledger, never in this repo.
+- **Limits:** six rounds of tool calls a question, each result cut to 6,000 characters, and a daily budget for the
+  team, `ASSISTANT_DAILY_USD` (default $5, about 120 questions at grok-4.7's price); over it a question says so.
 
 ## Connecting a model later
 

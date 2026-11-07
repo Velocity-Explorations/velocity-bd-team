@@ -5,7 +5,7 @@ param(
     [string[]]$TaskNames = @("velocity-bd-team pipeline", "velocity-bd-team feedback", "velocity-bd-team reminders",
                              "velocity-bd-team weekly summary", "velocity-bd-team requests", "velocity-bd-team worker",
                              "velocity-bd-team workspace slack", "velocity-bd-team workspace morning",
-                             "velocity-bd-team linear")
+                             "velocity-bd-team linear", "velocity-bd-team assistant")
 )
 
 $ErrorActionPreference = "Stop"

@@ -38,6 +38,7 @@ deployed. `.env.local` is git-ignored; never commit it or print its values.
 | DASHBOARD_IAP_AUDIENCE | behind Google's IAP | `/projects/<project number>/global/backendServices/<id>`. Every request except `/healthz` must carry IAP's signed header, and the viewer is the email in it. |
 | DASHBOARD_USER_HEADER | no | Behind another access proxy: the header it sets with the person's name or email, used instead of the "Deciding as" picker. |
 | DASHBOARD_QUEUE | no | `each` (default): everyone decides every call. `shared`: the first decision takes a call off every queue. |
+| DASHBOARD_CACHE_SECONDS | no | How long reads that change only with a scan, a sign-in or a saved setting are kept in the server (`lib/remember.ts`): 60 by default, 0 to keep none. |
 | DASHBOARD_TIMEZONE | no | Zone for displayed times. Default `America/Denver`. The ledger stores UTC. |
 | LEDGER_LOG_DIR | no | Where the pipeline writes run logs, for the log links on /runs. Default `../data/logs`. |
 

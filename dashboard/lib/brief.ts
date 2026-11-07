@@ -14,6 +14,7 @@ export type BriefCall = {
   reason: string;
   status: string | null;
   by: string | null;
+  listing: string | null;
 };
 export type PortalBrief = {
   portal: string;
@@ -26,7 +27,9 @@ export type PortalBrief = {
   health: string;
 };
 export type JudgeLine = { judge: string; decided: number; matches: number; misses: number; false_alarms: number };
-export type TopBrief = { top: BriefCall[]; rankedBy: string; judges: JudgeLine[] };
+/** The Top 10 (calls to respond to now) and, from 7 Nov 2026, the top 10 umbrellas and announcements to watch; watch is
+ *  null for a brief written before then. */
+export type TopBrief = { top: BriefCall[]; watch: BriefCall[] | null; rankedBy: string; judges: JudgeLine[] };
 
 /** The weekly summary's order for its verdict counts. */
 const VERDICT_ORDER = ["yes", "maybe", "no", "not reviewed yet", "rejected by filter"];
@@ -67,6 +70,7 @@ function calls(v: unknown): BriefCall[] {
       reason: text(c.reason) ?? "",
       status: text(c.status),
       by: text(c.by),
+      listing: text(c.listing),
     });
   }
   return found;
@@ -109,7 +113,7 @@ export function parseTop(body: unknown): TopBrief | null {
           : [];
       })
     : [];
-  return { top: calls(b.top), rankedBy: text(b.ranked_by) ?? "", judges };
+  return { top: calls(b.top), watch: "watch" in b ? calls(b.watch) : null, rankedBy: text(b.ranked_by) ?? "", judges };
 }
 
 /** "week of 19 Oct", with the year when it is not `now`'s year; the raw text when it is not a date. */

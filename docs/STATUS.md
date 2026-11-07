@@ -27,6 +27,9 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
   Operations team's Pursuits project for each call marked Pursue and moves it as the call moves. Live on
   5 Nov: BD_LINEAR_API_KEY in .env, migration 012 applied, the task installed; the first sync found no
   open pursued call.
+- Fit score (PRO-487, 6 Nov 2026): the judges name each call's main work, and `review/fit.py` scores calls 0 to 100
+  from the team's ratings (the Call Fit Ratings page, loaded into the ledger). The judges' profile was rewritten from
+  the Company Reference and the Register at David's request. Waits on migration 013 on the live ledger.
 - Phase 9 (dashboard): Next.js 16.4 app in dashboard/, run locally with `npm run dev`. The only
   place decisions are made: review queue buttons, plus a change control on all calls. Several
   people can decide (DASHBOARD_USERS lists David and Shaun since 2026-10-20); each person's

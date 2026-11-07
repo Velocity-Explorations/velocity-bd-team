@@ -20,7 +20,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from assistant.dates import days_until, parse_due
-from ledger.queries import calls_where, get_call, recent_runs
+from ledger.queries import calls_where, get_call, list_proposals, recent_runs, verdicts_by_call
+from review.tags import WATCH
 from portals import registry
 from portals.registry import Portal
 from portals.shared import keyword_filter as kf
@@ -33,8 +34,9 @@ NEGATIVE = {"not_relevant", "dismissed"}
 VERDICTS = ("yes", "maybe", "no")
 OVERDUE_DAYS = 8          # scans run weekly; more than this without a completed one is worth saying
 CLOSING_WINDOW_DAYS = 14
+SOON_DAYS = 60            # top picks: inside each yes group, what closes this soon comes before what stays open for years
 TOP_PICKS = 5   # open, undecided calls the weekly summary ranks
-RANKING = "yes before maybe, then the nearest deadline, then the newest"   # how top picks are ordered
+RANKING = "yes from both judges, then yes from one; inside each, what closes within 60 days, then the highest fit score, the nearest deadline and the newest"   # how top picks are ordered
 NOTE_LINE = re.compile(r"^\[(\S+) ([^\]]+)\] ?(.*)$")
 STOPWORDS = {
     "with", "from", "into", "that", "this", "their", "they", "have", "will", "your", "call", "calls",
@@ -415,32 +417,60 @@ def _bucket(row: dict[str, Any]) -> str:
     return row.get("ai_verdict") or "not reviewed yet"
 
 
-def _waiting(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[str, Any], datetime | None]]:
-    """Open, undecided calls the review kept and rated yes or maybe, best first, with their deadlines."""
-    waiting = []
+def open_undecided(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[str, Any], datetime | None]]:
+    """The calls the filter kept that nobody has decided and that have not closed, with their deadlines."""
+    found = []
     for row in rows:
-        if row.get("human_status") or row.get("filter_result") != "kept" or row.get("ai_verdict") not in ("yes", "maybe"):
+        if row.get("human_status") or row.get("filter_result") != "kept":
             continue
         due = parse_due(row.get("due_date"))
         if _flag(_extra(row), "_closed") or (due is not None and due < moment):
             continue
-        waiting.append((row, due))
-    # RANKING, in two stable sorts. The fit score will replace this order (PRO-487).
+        found.append((row, due))
+    return found
+
+
+def _waiting(rows: list[dict[str, Any]], moment: datetime,
+             watch: bool | None = False) -> list[tuple[dict[str, Any], datetime | None]]:
+    """Open, undecided calls the review kept and rated yes or maybe, best first, with their deadlines. watch=False keeps
+    the calls to respond to now, True the umbrellas and announcements (WATCH), None both."""
+    waiting = [pair for pair in open_undecided(rows, moment)
+               if pair[0].get("ai_verdict") in ("yes", "maybe") and pair[0].get("fit_band") != "ruled out"
+               and (watch is None or (pair[0].get("listing") in WATCH) == watch)]
+    # RANKING, in two stable sorts. A judge reads what the listing asks for and the fit score rates its categories, so a
+    # broad listing can score 95 with no yes from anyone: the yeses count first (David, 6 Nov). No score comes after a score.
     waiting.sort(key=lambda pair: pair[0].get("first_seen_at") or "", reverse=True)
-    waiting.sort(key=lambda pair: (pair[0]["ai_verdict"] != "yes", pair[1] is None, pair[1] or moment))
+    verdicts = verdicts_by_call()
+    soon = (moment + timedelta(days=SOON_DAYS)).date()
+
+    def rank(pair: tuple[dict[str, Any], datetime | None]) -> tuple[int, bool, bool, int, bool, datetime]:
+        row, due = pair
+        score = row.get("fit_score")
+        judges = {**verdicts.get(row["id"], {}), "claude": row["ai_verdict"]}   # the call's own verdict is Claude's newest
+        yeses = sum(verdict == "yes" for verdict in judges.values())
+        return (-yeses, due is None or due.date() > soon, score is None, -(score or 0), due is None, due or moment)
+
+    waiting.sort(key=rank)
     return waiting
 
 
 def _pick(row: dict[str, Any], due: datetime | None, moment: datetime) -> dict[str, Any]:
-    return _call_ref(row, verdict=row["ai_verdict"], deadline=row.get("due_date"),
+    return _call_ref(row, verdict=row["ai_verdict"], deadline=row.get("due_date"), listing=row.get("listing") or "Call",
                      days_left=days_until(due, moment) if due else None, reason=_first_sentence(row.get("ai_reasoning")))
 
 
 def top_calls(limit: int = 10, now: datetime | None = None) -> list[dict[str, Any]]:
-    """The best open, undecided calls across every portal, in the weekly summary's order (RANKING)."""
+    """The best open, undecided calls to respond to now across every portal, in the weekly summary's order (RANKING)."""
     moment = _now(now)
     _, rows = _portal_rows(None)
     return [_pick(r, d, moment) for r, d in _waiting(rows, moment)[:limit]]
+
+
+def top_watch(limit: int = 10, now: datetime | None = None) -> list[dict[str, Any]]:
+    """The best open umbrellas and announcements across every portal, ranked like the Top 10 (David, 7 Nov 2026)."""
+    moment = _now(now)
+    _, rows = _portal_rows(None)
+    return [_pick(r, d, moment) for r, d in _waiting(rows, moment, watch=True)[:limit]]
 
 
 def weekly_summary(portal: str | None = None, days: int = 7, now: datetime | None = None) -> dict[str, Any]:
@@ -462,8 +492,8 @@ def weekly_summary(portal: str | None = None, days: int = 7, now: datetime | Non
             closing.append((due, _call_ref(row, deadline=row.get("due_date"), days_left=days_until(due, moment),
                                            status=row.get("human_status"))))
     closing_soon = [item for _, item in sorted(closing, key=lambda pair: pair[0])]
-    waiting = _waiting(rows, moment)
-    top_picks = [_pick(r, d, moment) for r, d in waiting[:TOP_PICKS]]
+    waiting = _waiting(rows, moment, watch=None)
+    top_picks = [_pick(r, d, moment) for r, d in _waiting(rows, moment)[:TOP_PICKS]]   # calls to respond to now
     decided = sorted((r for r in rows if r.get("human_status") and (r.get("human_at") or "") >= cutoff),
                      key=lambda r: r.get("human_at") or "", reverse=True)
     decided_refs = [_call_ref(r, status=r["human_status"], by=r.get("human_by"), at=r.get("human_at")) for r in decided]
@@ -610,6 +640,88 @@ def tuning_report(portal: str, min_examples: int = 3) -> dict[str, Any]:
             "ai_disagreements": disagreements, "text": "\n".join(lines)}
 
 
+# --------------------------------------------------------------------------- Ask Grok's lookups (David, 7 Nov 2026)
+
+SEARCH_LIMIT = 25
+BID_FIELDS = ("submission_id", "title", "portal", "agency", "solicitation_id", "type", "role", "partners", "submitted_date",
+              "due_date", "outcome", "outcome_date", "strength_rating", "why_won_or_lost", "themes")   # never the money
+
+
+def _words(text: str | None) -> list[str]:
+    return [w for w in re.findall(r"[a-z0-9]+", (text or "").lower()) if len(w) > 1]
+
+
+def _open(row: dict[str, Any], moment: datetime) -> bool:
+    due = parse_due(row.get("due_date"))
+    return not _flag(_extra(row), "_closed") and (due is None or due >= moment)
+
+
+def search_calls(query: str = "", portal: str | None = None, open_only: bool = True, listing: str | None = None,
+                 limit: int = 10, now: datetime | None = None) -> dict[str, Any]:
+    """Calls the keyword filter kept whose title, description or agency holds every word asked for, best fit first."""
+    moment = _now(now)
+    _, rows = _portal_rows(portal)
+    words = _words(query)
+    verdicts = verdicts_by_call()
+    found = []
+    for row in rows:
+        if row.get("filter_result") != "kept" or (open_only and not _open(row, moment)):
+            continue
+        if listing and (row.get("listing") or "Call").lower() != listing.lower():
+            continue
+        haystack = f"{row.get('title') or ''} {row.get('description') or ''} {row.get('department') or ''}".lower()
+        if all(w in haystack for w in words):
+            found.append(row)
+    found.sort(key=lambda r: (-(r.get("fit_score") if r.get("fit_score") is not None else -1), r.get("due_date") or "~"))
+    picked = found[:max(1, min(limit, SEARCH_LIMIT))]
+    calls = []
+    for row in picked:
+        due = parse_due(row.get("due_date"))
+        calls.append(_call_ref(row, claude=row.get("ai_verdict"), grok=verdicts.get(row["id"], {}).get("grok"),
+                               fit=row.get("fit_score"), band=row.get("fit_band"), listing=row.get("listing") or "Call",
+                               deadline=row.get("due_date"), days_left=days_until(due, moment) if due else None,
+                               decision=row.get("human_status"), type=row.get("type")))
+    lines = [f"{len(found)} call(s) match" + (f" '{query}'" if query else "") + (", open only" if open_only else "")
+             + (f"; the first {len(picked)}:" if len(found) > len(picked) else ":")]
+    for c in calls:
+        lines.append(f"- {c['title']} ({c['portal']}; id {c['id']}): {c['listing']}, due {c['deadline'] or 'no deadline'}; "
+                     f"Claude {c['claude'] or 'not yet'}, Grok {c['grok'] or 'not yet'}; fit "
+                     f"{c['fit'] if c['fit'] is not None else 'not scored'} {c['band'] or ''}".rstrip()
+                     + f"; {STATUS_LABELS.get(c['decision'] or '', 'undecided')}")
+    return {"query": query, "total": len(found), "calls": calls, "text": "\n".join(lines)}
+
+
+def top_ten(which: str = "calls", now: datetime | None = None) -> dict[str, Any]:
+    """This week's Top 10 calls to respond to now, or the top 10 umbrellas and announcements to watch."""
+    watch = which == "watch"
+    picks = top_watch(10, now=now) if watch else top_calls(10, now=now)
+    lines = ["Top 10 to watch (umbrellas and announcements):" if watch else "Top 10 calls to respond to now:"]
+    for n, c in enumerate(picks, 1):
+        lines.append(f"{n}. {c['title']} ({c['portal']}; id {c['id']}): {c['listing']}, due {c['deadline'] or 'no deadline'}; "
+                     f"Claude {c['verdict']}; {c['reason']}")
+    return {"which": "watch" if watch else "calls", "calls": picks, "text": "\n".join(lines) if picks else lines[0] + " none."}
+
+
+def past_bids(query: str = "", outcome: str | None = None, limit: int = 10) -> dict[str, Any]:
+    """Velocity's past bids in the Proposal Register whose title, agency, portal or themes hold every word asked for,
+    newest first. Requested and award values are left out: contract values are SENSITIVE."""
+    words = _words(query)
+    found = []
+    for row in list_proposals(outcome=outcome):
+        haystack = " ".join(str(row.get(k) or "") for k in ("title", "agency", "portal", "themes", "type", "solicitation_id",
+                                                          "brief", "submission_id")).lower()
+        if all(w in haystack for w in words):
+            found.append({k: row.get(k) for k in BID_FIELDS})
+    picked = found[:max(1, min(limit, SEARCH_LIMIT))]
+    lines = [f"{len(found)} past bid(s) match" + (f" '{query}'" if query else "") + ":"]
+    for b in picked:
+        lines.append(f"- {b['title']} ({b['agency'] or b['portal'] or 'no agency'}; {b['submission_id']}), submitted "
+                     f"{b['submitted_date'] or 'date unknown'}: {b['outcome'] or 'no outcome yet'}"
+                     + (f"; {b['why_won_or_lost']}" if b.get("why_won_or_lost") else "")
+                     + (f"; themes {b['themes']}" if b.get("themes") else ""))
+    return {"query": query, "total": len(found), "bids": picked, "text": "\n".join(lines)}
+
+
 # --------------------------------------------------------------------------- the registry
 
 @dataclass(frozen=True)
@@ -658,6 +770,24 @@ READ_TOOLS = [
          "reviewer's company profile.", "read",
          _schema({"portal": PORTAL_ARG, "min_examples": {"type": "integer", "minimum": 2, "default": 3}}, ["portal"]),
          tuning_report),
+    Tool("search_calls", "Find calls the dashboard lists by words in their title, description or agency, best fit first, "
+         "with both judges' verdicts, the fit score, the kind of listing (Call, Umbrella or Announcement), the deadline and "
+         "the team's decision. Open calls only unless open_only is false.", "read",
+         _schema({"query": {"type": "string", "description": "Words that must all appear, for example 'space domain awareness'."},
+                  "portal": PORTAL_ARG, "open_only": {"type": "boolean", "default": True},
+                  "listing": {"type": "string", "enum": ["Call", "Umbrella", "Announcement"]},
+                  "limit": {"type": "integer", "minimum": 1, "maximum": SEARCH_LIMIT, "default": 10}}),
+         search_calls),
+    Tool("top_ten", "This week's Top 10 calls to respond to now (which: calls), or the top 10 umbrellas and announcements "
+         "to watch (which: watch), with why each ranks.", "read",
+         _schema({"which": {"type": "string", "enum": ["calls", "watch"], "default": "calls"}}), top_ten),
+    Tool("past_bids", "Velocity's past bids from the Proposal Register: title, agency, when, the outcome and why it was won "
+         "or lost, newest first. Money values are not shared.", "read",
+         _schema({"query": {"type": "string", "description": "Words that must all appear, for example 'DARPA autonomy'."},
+                  "outcome": {"type": "string", "enum": ["won", "lost", "no_award", "pending", "withdrawn", "shortlisted",
+                                                         "not_submitted"]},
+                  "limit": {"type": "integer", "minimum": 1, "maximum": SEARCH_LIMIT, "default": 10}}),
+         past_bids),
 ]
 
 def all_tools() -> list[Tool]:

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Shell } from "@/components/Shell";
+import { preloadShell, Shell } from "@/components/Shell";
 import { TopTenTable } from "@/components/TopTenTable";
 import { Badge, TitleLink } from "@/components/bits";
 import { boardHref, closesText, judgesSentence, parseBrief, parseTop, weekLabel, type BriefCall, type PortalBrief } from "@/lib/brief";
@@ -67,6 +67,7 @@ function Empty({ title, children }: { title: string; children: ReactNode }) {
  * calls. Earlier weeks are linked at the top. Monday's Slack post links here.
  */
 export default async function BriefPage({ searchParams }: { searchParams: SearchParams }) {
+  preloadShell("home");   // the frame's queries run beside this page's
   const sp = await searchParams;
   const weeks = await briefWeeks();
   if (weeks === null) {
@@ -142,6 +143,22 @@ export default async function BriefPage({ searchParams }: { searchParams: Search
           </div>
         )}
       </section>
+
+      {top?.watch ? (
+        <section className="top-ten" aria-labelledby="watch-title">
+          <div className="section-head">
+            <h2 id="watch-title">Top 10 to watch</h2>
+            <p className="muted">Umbrellas and announcements: standing CSOs, BAAs and cycles, and notices with nothing to submit yet.</p>
+          </div>
+          {top.watch.length ? (
+            <TopTenTable ids={top.watch.map((c) => c.id)} description={false} tz={tz} nameOf={nameOf} watch />
+          ) : (
+            <div className="empty">
+              <p className="title">Nothing to watch that week.</p>
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <div className="board-grid">
         {boards.map((b) => {

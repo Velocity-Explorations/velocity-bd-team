@@ -255,6 +255,18 @@ Change requests:
 - To carry out approved requests now instead of waiting for the next pass:
   `python run.py --apply-requests`.
 
+### Ask Grok's assistant
+
+`python run.py --assistant` answers the questions asked from the dashboard's Ask Grok panel (docs/ASSISTANT.md, Ask
+Grok). The scheduled task "velocity-bd-team assistant" keeps it running, like the worker, and `data\assistant.lock`
+keeps it to one. Its logs are in `data\assistant\logs`, and its heartbeat is the `assistant` row in `workers`; the
+panel says Grok is offline when that row is more than two minutes old.
+
+- **Restart it** after a change to `assistant/` or run.py: check no question is being answered (`workers.state` for
+  `assistant` is idle), stop the python process whose command line holds `run.py --assistant`, then
+  `Start-ScheduledTask -TaskName "velocity-bd-team assistant"`. A question it was answering waits again.
+- **Budget:** `ASSISTANT_DAILY_USD` in .env, the team's dollars a day (default 5).
+
 ## GitHub token
 
 Approved fault reports become GitHub issues through `gh issue create`. With `BD_GITHUB_TOKEN`
@@ -407,6 +419,22 @@ Every call carries tags from `review/tags.yaml`: one type, plus work, customer a
 (PRO-556). Rules set the tags a call's own data makes certain, on every call each run sees;
 Claude and Grok pick the rest on a TAGS line of the review answer they already give, so tags cost
 no extra model calls. A tagging failure only logs a warning.
+
+Fit score (PRO-487, `review/fit.py`). Each judge names a call's main work on the MAIN WORK line of its answer.
+The team rates each tag, keyword and NAICS code on the dashboard's Fit ratings page (Automation, `/fit`); a change queues
+a `fit_scores` job and the worker scores every call again within about a minute, so the worker must be running.
+`python run.py --fit-scores` does the same by hand (`--dry-run` counts the bands and writes nothing).
+`python run.py --load-fit-ratings FOLDER` loaded the first ratings from an export of the page used before `/fit`; it
+replaces every row, so it would undo changes made on `/fit`. Each scan scores the calls it saw. A Never rules a call out only on
+its main work, its type or its NAICS code; on what the judges name, only when they agree. `python run.py --rejudge-open`
+has both judges rate every open, undecided call again and name its main work, for after a profile change;
+`--dry-run` counts and prices it, and a rerun skips calls already done. Ratings never go in the repo, which is public.
+A call both judges rate no is weak at best. `python run.py --refilter` puts every stored call through the keyword filter
+again after its rules change (`--dry-run` counts). A keyword of three characters or fewer matches only as a whole word.
+
+Vulcan SOF writes the same office (USSOCOM) on every call, so no rule tags its calls SOCOM and the judges' prompt does not
+name that office as the buyer: the judges read the call and say who is buying. A title naming INDOPACOM or one of its
+exercises tags the call INDOPACOM by rule.
 
 After migration 006, `python run.py --backfill-tags` tags every stored call by its rules and has
 Claude and Grok tag the kept, reviewed calls, asking for tags alone. Grok takes about 20 s a call,

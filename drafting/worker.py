@@ -416,7 +416,7 @@ def _run(step: dict[str, Any], pursuit: dict[str, Any], label: str, doing: str, 
 
 def run_job(job: dict[str, Any]) -> None:
     """A job other than a step: Check again (PW22) scans the pursuit's newest draft; a Drive refresh indexes the
-    Proposal Library for Builds on."""
+    Proposal Library for Builds on; fit scores scores every call again after a rating changes on the dashboard."""
     lq.worker_beat(lq.WORKER, "working", f"{job['kind']} (job {job['id']})")
     log.info("Job %s claimed: %s, pursuit %s", job["id"], job["kind"], job["pursuit_id"])
     try:
@@ -426,6 +426,12 @@ def run_job(job: dict[str, Any]) -> None:
                 lq.finish_job(job["id"], "failed", "Drive is not set up yet.")
             else:
                 lq.finish_job(job["id"], "done", f"Indexed {count} {'item' if count == 1 else 'items'} from the Proposal Library.")
+            return
+        if job["kind"] == "fit_scores":
+            from review.fit import band_line, score_all
+
+            bands, _ = score_all()
+            lq.finish_job(job["id"], "done", f"Scored: {band_line(bands)}." if bands else "No call has a score yet.")
             return
         if job["kind"] != "slop_scan":
             lq.finish_job(job["id"], "failed", f"The worker has no job called {job['kind']}.")

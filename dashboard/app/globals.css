@@ -161,6 +161,35 @@ main {
   padding: 16px 24px 32px;
 }
 
+/* While a page's data loads (app/loading.tsx): placeholder rows that pulse, still where motion is reduced. */
+.loading-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 24px 32px;   /* where main's content starts */
+}
+
+.loading-word {
+  margin: 0 0 4px;
+  font: 400 12px/1.3 var(--font-label);
+  color: var(--ink-3);
+}
+
+.loading-bar {
+  height: 44px;
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  animation: loading-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-bar { animation: none; }
+}
+
 /* Read by screen readers, not shown: each page's title, since the pressed view card names it. */
 .sr-only {
   position: absolute;
@@ -184,6 +213,150 @@ main {
   flex: none;
   width: 15px;
   height: 15px;
+}
+
+/* ------------------------------------------------------------------ Ask Grok (David, 7 Nov 2026) */
+
+/* The header's button sits at the right, just before the account menu. */
+.ask-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  margin-left: auto;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  color: var(--ink);
+  font: 600 13px/1 var(--font-body);
+}
+
+.ask-button + details.account {
+  margin-left: 8px;
+}
+
+.ask-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* The panel: the right edge under the top bar; the page stays usable beside it. */
+dialog.ask-panel {
+  position: fixed;
+  inset: var(--top-bar-height) 0 0 auto;
+  z-index: 40;
+  width: min(460px, 100vw);
+  height: calc(100vh - var(--top-bar-height));
+  max-width: 100vw;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  color: var(--ink);
+  border: 0;
+  border-left: 1px solid var(--line);
+  box-shadow: var(--card-shadow);
+}
+
+dialog.ask-panel[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.ask-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ask-head h2 {
+  margin: 0 auto 0 0;
+  font: var(--type-label);
+}
+
+.ask-close {
+  width: 34px;
+  padding: 0;
+}
+
+.ask-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.ask-thread {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ask-question {
+  justify-self: end;
+  max-width: 85%;
+  margin: 0 0 8px auto;
+  padding: 8px 12px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-card);
+  white-space: pre-wrap;
+}
+
+.ask-answer p,
+.ask-answer ul {
+  margin: 0 0 8px;
+}
+
+.ask-answer ul {
+  padding-left: 18px;
+}
+
+.ask-wait {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+.ask-failed {
+  color: var(--conflict);
+}
+
+.ask-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.ask-sources a.badge {
+  text-decoration: none;
+}
+
+.ask-empty ul {
+  padding-left: 18px;
+  color: var(--ink-3);
+}
+
+.ask-form {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.ask-form textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.ask-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 /* ------------------------------------------------------------------ account menu */
@@ -293,6 +466,51 @@ details.account .menu-body {
   margin-top: 0;
   padding-top: 6px;
   border-top: 1px solid var(--line-subtle);
+}
+
+/* Not relevant on a call Claude liked opens its reasons (lib/decide.ts NOT_RELEVANT_REASONS) inside the Decide menu. */
+.menu-body .reason-menu > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--menu-item-height);
+  padding: 0 8px;
+  border-radius: var(--radius-chip);
+  list-style: none;
+  cursor: pointer;
+}
+
+.menu-body .reason-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.menu-body .reason-menu > summary:hover {
+  background: var(--surface-raised);
+}
+
+.menu-body .reason-menu > summary svg {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+}
+
+.reason-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 6px 16px;
+}
+
+.reason-body .hint {
+  margin: 2px 8px 4px;
+}
+
+.menu-body .reason-body input[type="text"] {   /* over td.decide's full-width inputs */
+  box-sizing: border-box;
+  width: calc(100% - 8px);
+  height: var(--control-height-small);
+  margin: 4px 0 2px 8px;
+  font-size: 12.5px;
 }
 
 /* A menu item that acts (Table settings, a name, Log out): 28px, full width, like a link item. */
@@ -1863,6 +2081,57 @@ tr.row-link:focus-visible .row-arrow {
 
 .top-ten table {
   table-layout: fixed;
+}
+
+/* Home's two top 10s as tabs, between the cards and the table (David, 7 Nov 2026). */
+.top-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 24px 0 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.top-tab,
+.top-tab:hover {
+  height: auto;
+  padding: 8px 14px;
+  margin-bottom: -1px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  color: var(--ink-3);
+  font: var(--type-label);
+}
+
+.top-tab:hover {
+  color: var(--ink);
+}
+
+.top-tab[aria-selected="true"] {
+  background: var(--surface);
+  border-color: var(--line);
+  border-bottom-color: var(--surface);
+  color: var(--ink);
+}
+
+.top-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.top-tab-count {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: var(--radius-chip);
+  background: var(--surface-raised);
+  color: var(--ink-3);
+  font: var(--type-small);
+}
+
+.top-note {
+  margin: 10px 0 8px;
+  font: var(--type-small);
 }
 
 .top-ten th.rank {
@@ -3824,4 +4093,207 @@ button[disabled] {
   height: 18px;
   margin: 0 -32px;
   background: linear-gradient(90deg, #f2c94c, #8fd3a8, #22c7ef, #0b7fd9, #1747b5);
+}
+
+/* Fit ratings (/fit, PRO-487): the scale, a jump to each section, and one table a section. */
+.fit-scale {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font: var(--type-detail);
+  color: var(--ink-2);
+}
+
+.fit-scale li {
+  padding-top: 6px;
+  border-top: 3px solid var(--tone-line);
+}
+
+.fit-scale b {
+  display: block;
+  font: var(--type-row-title);
+  color: var(--tone);
+}
+
+.fit-scale b span,
+.fit-rate span {
+  margin-left: 4px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.fit-status {
+  margin: 0 0 12px;
+  font: var(--type-small);
+}
+
+.fit-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin: 0 0 20px;
+  font: var(--type-small);
+}
+
+.fit-nav a {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.fit-section {
+  margin-bottom: 28px;
+  scroll-margin-top: 72px;
+}
+
+.fit-table tr {
+  scroll-margin-top: 72px;
+}
+
+.fit-table td {
+  vertical-align: top;
+}
+
+.fit-table .num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.fit-table .fit-rating-col {
+  width: 390px;
+}
+
+.fit-item {
+  min-width: 240px;
+}
+
+.fit-name {
+  margin-right: 6px;
+  font: var(--type-row-title);
+}
+
+.fit-codes,
+.fit-examples ul {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font: var(--type-detail);
+}
+
+.fit-examples {
+  margin-top: 4px;
+  font: var(--type-detail);
+}
+
+.fit-examples summary {
+  cursor: pointer;
+}
+
+.fit-examples li + li {
+  margin-top: 4px;
+}
+
+.fit-judges {
+  min-width: 190px;
+}
+
+.fit-mix {
+  display: grid;
+  grid-template-columns: 46px 74px minmax(40px, 1fr);
+  gap: 6px;
+  align-items: center;
+  font: var(--type-detail);
+  font-variant-numeric: tabular-nums;
+}
+
+.fit-mix .bar {
+  display: flex;
+  gap: 1px;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.fit-mix .bar.empty {
+  background: var(--line-subtle);
+}
+
+.fit-mix .seg {
+  min-width: 2px;
+}
+
+.fit-mix .seg-0 {
+  background: var(--good-line);
+}
+
+.fit-mix .seg-1 {
+  background: var(--caution-line);
+}
+
+.fit-mix .seg-2 {
+  background: var(--conflict-line);
+}
+
+.fit-team {
+  white-space: nowrap;
+  font: var(--type-detail);
+}
+
+.fit-form {
+  display: grid;
+  gap: 6px;
+}
+
+.fit-rates {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.fit-rate {
+  padding: 4px 2px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: var(--type-detail);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fit-rate:hover {
+  border-color: var(--tone-line);
+}
+
+.fit-rate[aria-pressed="true"] {
+  border-color: var(--tone-line);
+  background: var(--tone-wash);
+  color: var(--tone);
+  font-weight: 600;
+}
+
+.fit-note {
+  display: flex;
+  gap: 6px;
+}
+
+.fit-note {
+  align-items: flex-start;
+}
+
+.fit-note textarea {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+}
+
+@media (max-width: 900px) {
+  .fit-scale {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
