@@ -77,8 +77,10 @@ def test_start_the_draft_opens_for_its_call_and_cancel_hands_focus_back(page: An
     dialog.locator("h2", has_text="Start the draft").wait_for(timeout=10_000)
     assert dialog.evaluate("d => d.open")
     assert title in dialog.locator(".lead").inner_text()
-    assert dialog.locator("select[name=format]").input_value() == format_
-    assert dialog.locator("input[name=approval_mode][value=every_step]").is_checked()
+    page.wait_for_timeout(1500)   # a stored suggestion, if any, fills the dialog in
+    if "Filled in from Claude's suggestion" not in dialog.inner_text():
+        assert dialog.locator("select[name=format]").input_value() == format_
+        assert dialog.locator("input[name=approval_mode][value=every_step]").is_checked()
     assert dialog.locator("input[name=call_id]").input_value() == call_id
     assert f"02 Submissions/{date.today().isoformat()}_" in dialog.locator(".draft-folder").inner_text()
     start = dialog.get_by_role("button", name="Start the draft")
@@ -103,3 +105,44 @@ def test_the_start_address_opens_the_dialog_on_arrival(page: Any) -> None:
     assert dialog.evaluate("d => d.open")
     assert dialog.locator("input[name=call_id]").input_value() == call_id
     assert "start=" not in dialog.locator("input[name=return_to]").input_value()
+
+
+# ------------------------------------------------------------- the suggestion (David, 7 Nov 2026)
+
+def open_dialog(page: Any, button: Any) -> Any:
+    button.click()
+    dialog = page.locator("dialog#start-draft")
+    dialog.locator("h2", has_text="Start the draft").wait_for(timeout=10_000)
+    return dialog
+
+
+def test_start_the_draft_offers_to_suggest_what_to_include(page: Any) -> None:
+    dialog = open_dialog(page, first_start_button(page) or stand_in_button(page))
+    bar = dialog.locator(".suggest-bar")
+    if bar.count() == 0:
+        pytest.skip("suggestions are not set up here (migration 017)")
+    assert bar.locator("button").inner_text().strip() in ("Suggest what to include", "Suggest again")
+    dialog.get_by_role("button", name="Cancel").click()
+
+
+@pytest.mark.skipif(os.environ.get("ASK_TESTS") != "1", reason="asks Claude for a real suggestion on the live ledger: ASK_TESTS=1")
+def test_a_suggestion_fills_the_dialog_in_for_the_person_to_change(page: Any) -> None:
+    open_page(page, "/review")
+    menu = page.locator(".topbar details.account")
+    menu.locator("summary").click()
+    names = menu.locator("form.choose-viewer button[name=viewer]")
+    if names.count() == 0:
+        pytest.skip("nobody to log in as")
+    names.first.click()
+    page.wait_for_timeout(2000)
+    button = first_start_button(page)
+    if button is None:
+        pytest.skip("no pursued call to suggest for")
+    dialog = open_dialog(page, button)
+    if dialog.locator(".suggest-bar").count() == 0:
+        pytest.skip("suggestions are not set up here (migration 017)")
+    dialog.locator(".suggest-bar button").click()
+    page.wait_for_function("document.querySelector('#start-draft .suggest-bar .hint').textContent.includes('Filled in')", timeout=180_000)
+    assert dialog.locator("textarea[name=direction]").input_value().strip()
+    assert dialog.locator("select[name=format]").input_value()
+    dialog.get_by_role("button", name="Cancel").click()   # never Start: that would spend on a real draft

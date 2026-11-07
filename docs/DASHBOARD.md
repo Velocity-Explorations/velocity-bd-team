@@ -296,6 +296,13 @@ who decided, what, when and the note, so every person's decision is kept. On `ca
 On a call Claude rated yes or maybe, Not relevant opens its reasons (David, 5 Nov 2026): Mostly hardware, Staffing or
 IT support, Wrong customer or eligibility, Too broad with no clear fit, Award or sole-source notice, or another reason
 typed in (`lib/decide.ts` NOT_RELEVANT_REASONS). The reason, with any note typed after it, is the decision's note.
+Start the draft suggests what to include (David, 7 Nov 2026), once migration 017 is applied: Suggest what to include asks
+`run.py --assistant` for Claude's recommendation (`drafting/suggest.py`), and the dialog reads it from
+`GET /api/suggestion?call=<id>` every two seconds until it arrives, about half a minute. It fills in the format, the
+approval mode, the Direction and the past work to build on (first, under Suggested by Claude, each with its reason), all
+for the person to change before Start the draft. The newest suggestion for a call fills the dialog in when it opens
+again; Suggest again asks for a new one.
+
 Ask Grok (David, 7 Nov 2026): an Ask Grok button in the top bar, on every page once migration 016 is applied, opens a
 panel at the right edge; the page stays usable beside it. A question goes to `chat_messages` (`askGrokAction`, one waiting
 question a person), `run.py --assistant` answers it with read-only tools (docs/ASSISTANT.md, Ask Grok), and the panel reads

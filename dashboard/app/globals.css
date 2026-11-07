@@ -215,6 +215,28 @@ main {
   height: 15px;
 }
 
+/* ------------------------------------------------------------------ Start the draft's suggestion (David, 7 Nov 2026) */
+
+.suggest-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0 0 16px;
+}
+
+.suggest-bar .error-text {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.suggest-why {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-3);
+  font: var(--type-small);
+}
+
 /* ------------------------------------------------------------------ Ask Grok (David, 7 Nov 2026) */
 
 /* The header's button sits at the right, just before the account menu. */
