@@ -266,6 +266,9 @@ panel says Grok is offline when that row is more than two minutes old.
   `assistant` is idle), stop the python process whose command line holds `run.py --assistant`, then
   `Start-ScheduledTask -TaskName "velocity-bd-team assistant"`. A question it was answering waits again.
 - **Budget:** `ASSISTANT_DAILY_USD` in .env, the team's dollars a day (default 5).
+- **Start the draft's suggestions** run here too (David, 7 Nov 2026): the dialog's Suggest button writes a
+  `draft_suggestions` row, and the assistant has the Writer's model recommend the format, how to approve, a
+  direction and the past work to build on (`drafting/suggest.py`), about 10 cents each, from the same budget.
 
 ## GitHub token
 

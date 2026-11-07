@@ -457,3 +457,22 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 
 CREATE INDEX IF NOT EXISTS idx_chat_messages_state ON chat_messages (state, id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages (asked_by, thread_id, id);
+
+-- 017_draft_suggestions: what Start the draft suggests for a call, from Claude (run.py --assistant).
+
+CREATE TABLE IF NOT EXISTS draft_suggestions (
+  id           INTEGER PRIMARY KEY @@AUTOINCREMENT@@,
+  call_id      TEXT NOT NULL,
+  asked_by     TEXT NOT NULL,
+  state        TEXT NOT NULL DEFAULT 'queued' CHECK (state IN ('queued', 'working', 'done', 'failed')),
+  suggestion   TEXT,
+  note         TEXT,
+  model        TEXT,
+  cost_usd     REAL,
+  asked_at     TEXT NOT NULL,
+  started_at   TEXT,
+  answered_at  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_draft_suggestions_state ON draft_suggestions (state, id);
+CREATE INDEX IF NOT EXISTS idx_draft_suggestions_call ON draft_suggestions (call_id, id);
