@@ -23,6 +23,7 @@ from assistant.tools import Tool, ToolError
 log = logging.getLogger("assistant.chat")
 
 MAX_ROUNDS = 6           # rounds of tool calls before Grok must answer
+MAX_REQUESTS = 2         # change requests Grok may file for one question (David, 7 Nov 2026)
 RESULT_CHARS = 6000      # the most of one tool's result Grok reads
 HISTORY = 8              # earlier exchanges of the thread it is reminded of
 FACT_ID = re.compile(r"\b(?:F|PP|PR|PE)-\d+[a-z]?\b")
@@ -36,7 +37,8 @@ Rules:
 - Never state anything SENSITIVE (clearances, contract values, commercial pricing). The tools leave such items out; if asked, say it is not shared here.
 - Never name a person the record says is not approved to name, or not to cite: say only that a contact exists, and leave the name out.
 - Name each call by its title and give its deadline as the tool gives it. The person's current page may name the call they are looking at.
-- You can read but cannot change anything. If someone asks you to decide a call, start a draft, change keywords or run a scan, say where on the dashboard they can do it.
+- You can ask for three kinds of change, each recorded as a request that a person approves on the Requests page: a change to a portal's keywords (propose_keyword_change, after preview_keyword_change shows what it would keep and drop), a re-review of one call with the team's context (propose_rereview), and a scan of one portal now (propose_scan). Call one only when the person asks for that change in this conversation, never on your own, and at most two a question. Then give the request's number and say it waits for approval.
+- To start a draft, point the person to Start the draft on the call, which can suggest what to include; to decide a call, to its Decide menu. You cannot do either yourself.
 - Answer briefly in plain words: short paragraphs, or bullets that start with "- ". No headings and no tables. Never use an en dash or an em dash.
 - If someone pastes a password, a key or CUI, do not repeat it back."""
 
@@ -120,14 +122,15 @@ def _call_refs(value: Any) -> list[dict[str, Any]]:
 
 
 def _sources(text: str, results: list[dict[str, Any]]) -> dict[str, Any]:
-    """The calls the answer names, by title or id, and the Company Reference ids it cites."""
+    """The calls the answer names, by title or id, the Company Reference ids it cites, and the requests Grok filed."""
     lowered = text.lower()
     calls: list[dict[str, Any]] = []
     for ref in (r for result in results for r in _call_refs(result)):
         named = str(ref["id"]).lower() in lowered or (str(ref["title"] or "").strip() and str(ref["title"]).lower() in lowered)
         if named and ref["id"] not in [c["id"] for c in calls]:
             calls.append(ref)
-    return {"calls": calls[:8], "facts": list(dict.fromkeys(FACT_ID.findall(text)))}
+    requests = [{"id": r["request_id"], "kind": r.get("kind"), "summary": r.get("summary")} for r in results if r.get("request_id")]
+    return {"calls": calls[:8], "facts": list(dict.fromkeys(FACT_ID.findall(text))), "requests": requests}
 
 
 def answer(question: str, history: Sequence[tuple[str, str]], page: str | None, model: Model, tools: Sequence[Tool],
@@ -141,6 +144,7 @@ def answer(question: str, history: Sequence[tuple[str, str]], page: str | None, 
     items.append({"role": "user", "content": _opening(question, page, asked_by)})
     reply = Reply(text="")
     results: list[dict[str, Any]] = []
+    filed = 0
     while True:
         last = reply.rounds >= MAX_ROUNDS
         turn = model.respond(items, [] if last else defs)
@@ -155,7 +159,16 @@ def answer(question: str, history: Sequence[tuple[str, str]], page: str | None, 
         items += turn.items
         for call in turn.calls:
             name, arguments = str(call.get("name") or ""), call.get("arguments") or {}
-            output, result = _run(by_name.get(name), name, arguments)
+            tool = by_name.get(name)
+            if tool is not None and tool.permission == "propose":
+                # A request is in the asker's name, set here and never by Grok, and only so many a question.
+                arguments = {**{k: v for k, v in arguments.items() if k != "requested_by"}, "requested_by": asked_by or "Ask Grok"}
+                filed += 1
+                if filed > MAX_REQUESTS:
+                    tool = None
+                    output, result = "Not filed: Ask Grok files at most two requests a question. Ask again for more.", None
+            if tool is not None or by_name.get(name) is None:
+                output, result = _run(tool, name, arguments)
             if result is not None:
                 results.append(result)
             reply.trace.append({"name": name, "arguments": arguments, "chars": len(output)})

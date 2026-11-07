@@ -6,10 +6,11 @@ export const MAX_QUESTION = 2000;
 export const POLL_MS = 2000;
 const OFFLINE_MS = 2 * 60 * 1000;   // the assistant beats every 30 seconds while idle
 
-export type Part = { text: string; href?: string };
+export type Part = { text: string; href?: string; strong?: boolean };
 export type Block = { kind: "p"; lines: Part[][] } | { kind: "ul"; items: Part[][] };
 export type SourceCall = { id: string; title: string; portal: string };
-export type Sources = { calls: SourceCall[]; facts: string[] };
+export type SourceRequest = { id: number; kind: string; summary: string };
+export type Sources = { calls: SourceCall[]; facts: string[]; requests: SourceRequest[] };
 export type AskMessage = {
   id: number;
   question: string;
@@ -31,18 +32,33 @@ function safeHref(href: string): string | null {
   return null;
 }
 
-/** One line of text, with its markdown links made parts that link where that is safe. */
+const BOLD = /\*\*([^*\n]+)\*\*/g;
+
+/** Plain text with its **bold** runs made bold parts. */
+function plain(text: string): Part[] {
+  const found: Part[] = [];
+  let at = 0;
+  for (const match of text.matchAll(BOLD)) {
+    if (match.index > at) found.push({ text: text.slice(at, match.index) });
+    found.push({ text: match[1], strong: true });
+    at = match.index + match[0].length;
+  }
+  if (at < text.length) found.push({ text: text.slice(at) });
+  return found;
+}
+
+/** One line of text, with its markdown links made parts that link where that is safe, and bold runs bold. */
 function parts(line: string): Part[] {
   const found: Part[] = [];
   let at = 0;
   for (const match of line.matchAll(LINK)) {
     const href = safeHref(match[2]);
     if (!href) continue;
-    if (match.index > at) found.push({ text: line.slice(at, match.index) });
+    if (match.index > at) found.push(...plain(line.slice(at, match.index)));
     found.push({ text: match[1], href });
     at = match.index + match[0].length;
   }
-  if (at < line.length) found.push({ text: line.slice(at) });
+  if (at < line.length) found.push(...plain(line.slice(at)));
   return found;
 }
 
@@ -70,12 +86,13 @@ export function parseAnswer(text: string | null | undefined): Block[] {
   return blocks;
 }
 
-/** The calls and Company Reference ids an answer names, from the sources column; nothing for anything odd. */
+/** The calls and Company Reference ids an answer names, and the change requests Grok filed (version 2, David, 7 Nov
+ *  2026), from the sources column; nothing for anything odd. */
 export function parseSources(json: string | null | undefined): Sources {
   try {
     const value: unknown = JSON.parse(json ?? "");
-    if (!value || typeof value !== "object") return { calls: [], facts: [] };
-    const v = value as { calls?: unknown; facts?: unknown };
+    if (!value || typeof value !== "object") return { calls: [], facts: [], requests: [] };
+    const v = value as { calls?: unknown; facts?: unknown; requests?: unknown };
     const calls = Array.isArray(v.calls)
       ? v.calls.flatMap((c) => {
           if (!c || typeof c !== "object") return [];
@@ -86,9 +103,16 @@ export function parseSources(json: string | null | undefined): Sources {
         })
       : [];
     const facts = Array.isArray(v.facts) ? v.facts.filter((f): f is string => typeof f === "string") : [];
-    return { calls, facts };
+    const requests = Array.isArray(v.requests)
+      ? v.requests.flatMap((r) => {
+          if (!r || typeof r !== "object") return [];
+          const { id, kind, summary } = r as Record<string, unknown>;
+          return typeof id === "number" ? [{ id, kind: typeof kind === "string" ? kind : "", summary: typeof summary === "string" ? summary : "" }] : [];
+        })
+      : [];
+    return { calls, facts, requests };
   } catch {
-    return { calls: [], facts: [] };
+    return { calls: [], facts: [], requests: [] };
   }
 }
 

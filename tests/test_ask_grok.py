@@ -178,7 +178,8 @@ def test_grok_calls_the_tools_it_needs_and_answers_with_sources(ledger_db: str) 
     reply = chat.answer("Tell me about Unison", [("Hi", "Hello.")], "/review?view=top10&focus=samgov-1", model, [search],
                         asked_by="David Wood")
     assert reply.text == "Unison is open until 4 Dec, per F-07 and PP-20."
-    assert reply.sources == {"calls": [{"id": "samgov-1", "title": "Unison", "portal": "SAM.gov"}], "facts": ["F-07", "PP-20"]}
+    assert reply.sources == {"calls": [{"id": "samgov-1", "title": "Unison", "portal": "SAM.gov"}], "facts": ["F-07", "PP-20"],
+                             "requests": []}
     sent = "- Unison (SAM.gov; id samgov-1), searched for unison"
     assert reply.trace == [{"name": "search_calls", "arguments": {"query": "unison"}, "chars": len(sent)}]
     assert (reply.input_tokens, reply.cached_tokens, reply.output_tokens, reply.rounds) == (300, 50, 50, 2)
@@ -214,8 +215,8 @@ def test_a_long_tool_result_is_cut_and_grok_must_answer_after_the_last_round(led
 
 
 def test_the_rules_ask_for_ids_and_needs_fact_and_forbid_sensitive_items_and_dashes() -> None:
-    for words in ("NEEDS FACT", "SENSITIVE", "F-06", "only from what your tools return", "cannot change",
-                  "not approved to name"):   # David, 7 Nov: an answer named a contact the record said not to
+    for words in ("NEEDS FACT", "SENSITIVE", "F-06", "only from what your tools return", "Requests page",
+                  "only when the person asks", "Start the draft", "not approved to name"):
         assert words in chat.SYSTEM, words
     assert "–" not in chat.SYSTEM and "—" not in chat.SYSTEM
 
@@ -311,3 +312,50 @@ def test_when_grok_fails_the_question_says_so_and_the_assistant_carries_on(ledge
     for asked in (first, second):
         row = lq.get_question(asked)
         assert row["state"] == "failed" and "Try again" in row["answer"]
+
+
+# --------------------------------------------------------------------------- version 2: it may ask for changes (David, 7 Nov 2026)
+
+def proposing_tool(name: str, seen: list[dict[str, Any]]) -> tools.Tool:
+    def run_it(**kwargs: Any) -> dict[str, Any]:
+        seen.append(kwargs)
+        return {"request_id": 41 + len(seen), "status": "proposed", "duplicate": False, "kind": "rereview",
+                "summary": f"Re-review 'Unison' ({len(seen)})", "text": f"Request #{41 + len(seen)} is waiting for approval."}
+
+    return tools.Tool(name, "asks for a change", "propose", {"type": "object", "properties": {}}, run_it)
+
+
+def test_a_request_grok_files_is_in_the_asker_s_name_whatever_grok_says(ledger_db: str) -> None:
+    seen: list[dict[str, Any]] = []
+    model = ScriptedGrok(asks(("propose_rereview", {"call_id": "c-1", "context": "We built this", "requested_by": "Grok"})),
+                         says("Filed request #42 for a re-review; it waits for approval on the Requests page."))
+    reply = chat.answer("Please have Unison re-reviewed: we built this", [], None, model,
+                        [proposing_tool("propose_rereview", seen)], asked_by="David Wood")
+    assert seen == [{"call_id": "c-1", "context": "We built this", "requested_by": "David Wood"}]
+    assert reply.sources["requests"] == [{"id": 42, "kind": "rereview", "summary": "Re-review 'Unison' (1)"}]
+
+
+def test_grok_files_at_most_two_requests_a_question(ledger_db: str) -> None:
+    seen: list[dict[str, Any]] = []
+    model = ScriptedGrok(asks(*[("propose_scan", {"portal": "nstxl"})] * 3), says("Done."))
+    chat.answer("Scan everything", [], None, model, [proposing_tool("propose_scan", seen)], asked_by="David Wood")
+    outputs = [item["output"] for item in model.sent[1][0] if item.get("type") == "function_call_output"]
+    assert len(seen) == chat.MAX_REQUESTS == 2
+    assert "two requests" in outputs[-1]
+
+
+def test_grok_may_ask_for_keyword_changes_re_reviews_and_scans_but_not_drafts_or_fault_reports() -> None:
+    names = {t.name for t in run.assistant_tools()}
+    assert {"propose_keyword_change", "propose_rereview", "propose_scan", "preview_keyword_change"} <= names
+    assert "propose_draft" not in names and "propose_fault_report" not in names
+
+
+def test_a_re_review_grok_asks_for_waits_on_the_requests_page_in_the_asker_s_name(ledger_db: str) -> None:
+    seed("samgov-1", "SAM.gov", "no", 20.5)
+    asked = lq.ask_question("t-1", "David Wood", "Have samgov-1 re-reviewed: it is software, not hardware", "/calls")
+    model = ScriptedGrok(asks(("propose_rereview", {"call_id": "samgov-1", "context": "It is software, not hardware."})),
+                         says("Request filed; it waits for approval on the Requests page."))
+    assert run.run_assistant(model=model, max_questions=1, poll_s=0) == 0
+    request = lq.list_requests("proposed", limit=5)[0]
+    assert (request["kind"], request["call_id"], request["requested_by"]) == ("rereview", "samgov-1", "David Wood")
+    assert json.loads(lq.get_question(asked)["sources"])["requests"][0]["kind"] == "rereview"

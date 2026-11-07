@@ -1087,11 +1087,17 @@ def company_facts_tool() -> Any:
                 company_facts)
 
 
+ASSISTANT_PROPOSES = ("propose_keyword_change", "propose_rereview", "propose_scan")
+
+
 def assistant_tools() -> list[Any]:
-    """Every read tool Ask Grok may call: the assistant's toolbox, then company_facts. No propose tool: answer only."""
+    """The tools Ask Grok may call: every read tool, then company_facts, and three propose tools (David, 7 Nov 2026), each
+    only recording a request a person approves on the Requests page. Not propose_draft: drafts start from Start the draft,
+    and nothing carries out an approved draft request. Not propose_fault_report: an approved one becomes a GitHub issue on
+    the public repo, which a person should write."""
     from assistant.tools import all_tools
 
-    return [t for t in all_tools() if t.permission == "read"] + [company_facts_tool()]
+    return [t for t in all_tools() if t.permission == "read" or t.name in ASSISTANT_PROPOSES] + [company_facts_tool()]
 
 
 def daily_budget() -> float:
