@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `015_listing.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `016_chat.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -711,3 +711,26 @@ WHERE c.human_status IS NOT NULL
 GROUP BY j.judge
 ORDER BY j.judge;
 ```
+
+## Table: chat_messages
+
+Ask Grok (David, 7 Nov 2026): one row per question asked from the dashboard's panel, with its answer. The dashboard
+writes the question; `run.py --assistant` takes it, has Grok answer it with read-only tools (docs/ASSISTANT.md, Ask
+Grok) and writes the answer back. A person reads only their own threads. Added by `016_chat.sql`.
+
+| Column | Type | Meaning | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key | | the dashboard |
+| thread_id | TEXT, not null | the conversation it belongs to, chosen by the panel | the dashboard |
+| asked_by | TEXT, not null | the person who asked, by the name their decisions are recorded under | the dashboard |
+| page | TEXT | the page they asked from, such as `/review?view=top10&focus=<call id>`, so Grok knows which call is open | the dashboard |
+| question | TEXT, not null | what they asked, at most 2,000 characters | the dashboard |
+| state | TEXT, not null | `queued`, `working`, `done` or `failed` | the dashboard, then `run.py --assistant` |
+| answer | TEXT | Grok's answer, or why there is none (the day's budget, Grok unreachable) | `run.py --assistant` |
+| sources | TEXT JSON | `{"calls": [{"id", "title", "portal"}], "facts": ["F-06", "PP-20"]}`: the calls and Company Reference ids the answer names | same |
+| tools | TEXT JSON | array of the tools Grok called: `{"name", "arguments", "chars"}` | same |
+| model | TEXT | the model that answered, such as `grok-4.7` | same |
+| cost_usd | REAL | what the answer cost, from `drafting/costs.py` PRICES; the day's total is held under ASSISTANT_DAILY_USD | same |
+| asked_at | TEXT timestamp | | the dashboard |
+| started_at | TEXT timestamp | when the assistant took it | `run.py --assistant` |
+| answered_at | TEXT timestamp | when the answer was written | same |

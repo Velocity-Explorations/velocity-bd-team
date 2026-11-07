@@ -255,6 +255,18 @@ Change requests:
 - To carry out approved requests now instead of waiting for the next pass:
   `python run.py --apply-requests`.
 
+### Ask Grok's assistant
+
+`python run.py --assistant` answers the questions asked from the dashboard's Ask Grok panel (docs/ASSISTANT.md, Ask
+Grok). The scheduled task "velocity-bd-team assistant" keeps it running, like the worker, and `data\assistant.lock`
+keeps it to one. Its logs are in `data\assistant\logs`, and its heartbeat is the `assistant` row in `workers`; the
+panel says Grok is offline when that row is more than two minutes old.
+
+- **Restart it** after a change to `assistant/` or run.py: check no question is being answered (`workers.state` for
+  `assistant` is idle), stop the python process whose command line holds `run.py --assistant`, then
+  `Start-ScheduledTask -TaskName "velocity-bd-team assistant"`. A question it was answering waits again.
+- **Budget:** `ASSISTANT_DAILY_USD` in .env, the team's dollars a day (default 5).
+
 ## GitHub token
 
 Approved fault reports become GitHub issues through `gh issue create`. With `BD_GITHUB_TOKEN`

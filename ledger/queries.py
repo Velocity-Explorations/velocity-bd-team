@@ -12,7 +12,7 @@ from __future__ import annotations
 import csv
 import json
 from collections.abc import Mapping, Sequence
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -1099,6 +1099,71 @@ def worker_beat(name: str, state: str, doing: str | None = None) -> None:
 def get_worker(name: str) -> dict[str, Any] | None:
     with tx() as conn:
         return one(q(conn, "SELECT * FROM workers WHERE name = ?", (name,)))
+
+
+# ------------------------------------------------------------------------------ Ask Grok
+
+CHAT_STATES = ("queued", "working", "done", "failed")
+
+
+def ask_question(thread_id: str, asked_by: str, question: str, page: str | None) -> int:
+    """A question for Ask Grok, waiting for run.py --assistant (migration 016). The dashboard writes these; this is
+    for tests and the command line."""
+    with tx() as conn:
+        cur = q(conn, "INSERT INTO chat_messages (thread_id, asked_by, page, question, state, asked_at) "
+                      "VALUES (?, ?, ?, ?, 'queued', ?) RETURNING id", (thread_id, asked_by, page, question, now_iso()))
+        return int(cur.fetchone()[0])
+
+
+def get_question(question_id: int) -> dict[str, Any] | None:
+    with tx() as conn:
+        return one(q(conn, "SELECT * FROM chat_messages WHERE id = ?", (question_id,)))
+
+
+def claim_next_question() -> dict[str, Any] | None:
+    """The assistant takes the oldest waiting question: queued -> working, guarded so only one process takes it."""
+    with tx() as conn:
+        for row in rows(q(conn, "SELECT id FROM chat_messages WHERE state = 'queued' ORDER BY id LIMIT 3")):
+            cur = q(conn, "UPDATE chat_messages SET state = 'working', started_at = ? WHERE id = ? AND state = 'queued'",
+                    (now_iso(), row["id"]))
+            if cur.rowcount == 1:
+                return one(q(conn, "SELECT * FROM chat_messages WHERE id = ?", (row["id"],)))
+    return None
+
+
+def finish_question(question_id: int, state: str, answer: str, sources: Any = None, tools: Any = None,
+                    model: str | None = None, cost_usd: float | None = None) -> None:
+    """The answer, or why there is none: working -> done or failed."""
+    if state not in ("done", "failed"):
+        raise ValueError(f"a question finishes done or failed, not {state}")
+    with tx() as conn:
+        q(conn, "UPDATE chat_messages SET state = ?, answer = ?, sources = ?, tools = ?, model = ?, cost_usd = ?, "
+                "answered_at = ? WHERE id = ?",
+          (state, answer, _jsonify(sources) if sources is not None else None, _jsonify(tools) if tools is not None else None,
+           model, cost_usd, now_iso(), question_id))
+
+
+def thread_history(thread_id: str, asked_by: str, before_id: int, limit: int = 8) -> list[dict[str, Any]]:
+    """The thread's answered exchanges before this question, oldest first: what Grok is reminded of."""
+    with tx() as conn:
+        found = rows(q(conn, "SELECT question, answer FROM chat_messages WHERE thread_id = ? AND asked_by = ? AND id < ? "
+                             "AND state = 'done' ORDER BY id DESC LIMIT ?", (thread_id, asked_by, before_id, limit)))
+    return list(reversed(found))
+
+
+def chat_spend_today(now: datetime | None = None) -> float:
+    """What Ask Grok's answers have cost since midnight UTC, for the day's budget."""
+    moment = now or datetime.now(timezone.utc)
+    midnight = moment.astimezone(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+    with tx() as conn:
+        row = one(q(conn, "SELECT COALESCE(SUM(cost_usd), 0) AS spent FROM chat_messages WHERE answered_at >= ?", (midnight,)))
+    return float(row["spent"]) if row else 0.0
+
+
+def requeue_working_questions() -> int:
+    """Questions a stopped assistant left half done wait again; how many."""
+    with tx() as conn:
+        return q(conn, "UPDATE chat_messages SET state = 'queued', started_at = NULL WHERE state = 'working'").rowcount
 
 
 def steps_in_state(state: str) -> list[dict[str, Any]]:

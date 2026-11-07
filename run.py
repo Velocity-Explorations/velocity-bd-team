@@ -1031,6 +1031,159 @@ def linear_sync() -> int:
     return 0
 
 
+# ------------------------------------------------------------------------- Ask Grok (David, 7 Nov 2026)
+
+ASSISTANT = "assistant"                       # its row in workers, beside the Writer's worker
+ASSISTANT_LOCK = DATA_DIR / "assistant.lock"
+ASSISTANT_LOG_DIR = DATA_DIR / "assistant" / "logs"
+ASSISTANT_POLL_S = 2.0                        # how often it looks for a question
+ASSISTANT_BEAT_S = 30.0                       # how often it says it is alive while idle
+ASSISTANT_DAILY_USD = 5.0                     # the team's daily budget, unless ASSISTANT_DAILY_USD says otherwise
+FACTS_SHOWN = 40                              # the most Company Reference items one facts lookup hands over
+FACT_SOURCES = {"facts": "00 Company Facts", "past_performance": "01 Past Performance Register",
+                "products": "02 Products & Capabilities", "people": "03 People"}
+
+
+def company_facts_tool() -> Any:
+    """The company_facts tool for Ask Grok: Velocity's facts read live from 01 Company Reference (drafting/facts.py, which
+    leaves out former employees), never an item marked SENSITIVE, with each open conflict marked. run.py supplies it so
+    the assistant never imports the Writer's code."""
+    from assistant.tools import Tool, _schema
+
+    def company_facts(query: str = "", source: str = "") -> dict[str, Any]:
+        import re
+
+        from drafting.facts import load
+        from drafting.steps import fix_dashes
+
+        facts = load()
+        words = [w for w in re.findall(r"[a-z0-9]+", query.lower()) if len(w) > 1]
+        title = FACT_SOURCES.get(source)
+        hoverslam = "hoverslam" in words
+        scored = []
+        for item in facts.items.values():
+            if item.sensitive or (title and item.source != title):
+                continue
+            if "hoverslam" in item.entity.lower() and not hoverslam:
+                continue
+            text = f"{item.id} {item.text}".lower()
+            hits = sum(1 for w in words if w in text)
+            if words and not hits:
+                continue
+            scored.append((-hits, item))
+        scored.sort(key=lambda pair: pair[0])
+        shown = [item for _, item in scored[:FACTS_SHOWN]]
+        lines = [f"{len(scored)} Velocity fact(s) match" + (f" '{query}'" if query else "")
+                 + f", read from 01 Company Reference at {facts.read_at:%Y-%m-%d %H:%M} UTC" + (f" ({facts.note})" if facts.note else "")
+                 + (f"; the {len(shown)} best:" if len(scored) > len(shown) else ":")]
+        lines += [f"{item.id}{''.join(f' [{m}]' for m in facts.marks(item))} ({item.source}) | {item.text}" for item in shown]
+        return {"ids": [item.id for item in shown], "total": len(scored), "text": fix_dashes("\n".join(lines))}
+
+    return Tool("company_facts", "Velocity's own facts from 01 Company Reference, read live: registration, size and status, "
+                "products and capabilities, people and their roles, past performance and its customers. Each has an id to "
+                "cite. SENSITIVE items are never included.", "read",
+                _schema({"query": {"type": "string", "description": "Words to look for, for example 'INDOPACOM' or 'WOSB'."},
+                         "source": {"type": "string", "enum": list(FACT_SOURCES)}}),
+                company_facts)
+
+
+def assistant_tools() -> list[Any]:
+    """Every read tool Ask Grok may call: the assistant's toolbox, then company_facts. No propose tool: answer only."""
+    from assistant.tools import all_tools
+
+    return [t for t in all_tools() if t.permission == "read"] + [company_facts_tool()]
+
+
+def daily_budget() -> float:
+    try:
+        return float(config.get("ASSISTANT_DAILY_USD") or ASSISTANT_DAILY_USD)
+    except ValueError:
+        return ASSISTANT_DAILY_USD
+
+
+def answer_cost(reply: Any, model: str) -> float:
+    from drafting.costs import cost_of
+    from drafting.llm import Usage
+
+    return cost_of(Usage(phase_label="ask grok", model=model, input_tokens=reply.input_tokens, output_tokens=reply.output_tokens,
+                         cache_read_tokens=reply.cached_tokens, cache_write_tokens=0, seconds=0.0, truncated=False, request_id=""))
+
+
+def answer_question(row: dict[str, Any], model: Any, tools: list[Any]) -> str:
+    """Answer one waiting question and store the answer, or why there is none; the state it ended in."""
+    from assistant import chat
+    from assistant.grok import MODEL_ID
+    from ledger.queries import chat_spend_today, finish_question, thread_history
+
+    budget = daily_budget()
+    if chat_spend_today() >= budget:
+        finish_question(row["id"], "failed", f"Ask Grok has used today's budget of ${budget:.2f}. It starts again at midnight UTC.")
+        return "failed"
+    history = [(h["question"], h["answer"]) for h in thread_history(row["thread_id"], row["asked_by"], row["id"])]
+    name = getattr(model, "model", MODEL_ID)
+    try:
+        reply = chat.answer(row["question"], history, row.get("page"), model, tools, asked_by=row["asked_by"])
+    except Exception as exc:   # Grok down or refusing: say so and keep serving
+        log.warning("Question %s: Grok could not answer: %s: %s", row["id"], type(exc).__name__, str(exc)[:200])
+        finish_question(row["id"], "failed", "Grok could not answer just now. Try again in a minute.", model=name)
+        return "failed"
+    cost = answer_cost(reply, name)
+    finish_question(row["id"], "done", reply.text, sources=reply.sources, tools=reply.trace, model=name, cost_usd=cost)
+    log.info("Question %s answered for %s: %d round(s), %d tool call(s), $%.4f", row["id"], row["asked_by"], reply.rounds,
+             len(reply.trace), cost)
+    return "done"
+
+
+def run_assistant(model: Any = None, max_questions: int | None = None, poll_s: float = ASSISTANT_POLL_S) -> int:
+    """`--assistant`: answer Ask Grok's questions as they arrive, until stopped. With max_questions (tests), stop after
+    that many, or as soon as none is waiting."""
+    from assistant.grok import GrokChat
+    from ledger.queries import claim_next_question, requeue_working_questions, worker_beat, worker_started
+
+    model = model or GrokChat()
+    tools = assistant_tools()
+    worker_started(ASSISTANT)
+    again = requeue_working_questions()
+    if again:
+        log.info("%d question(s) left half answered wait again", again)
+    handled, beat = 0, time.monotonic()
+    try:
+        while max_questions is None or handled < max_questions:
+            row = claim_next_question()
+            if row is None:
+                if max_questions is not None:
+                    break
+                if time.monotonic() - beat >= ASSISTANT_BEAT_S:
+                    worker_beat(ASSISTANT, "idle")
+                    beat = time.monotonic()
+                time.sleep(poll_s)
+                continue
+            worker_beat(ASSISTANT, "working", f"answering question {row['id']}")
+            answer_question(row, model, tools)
+            handled += 1
+            worker_beat(ASSISTANT, "idle")
+            beat = time.monotonic()
+    finally:
+        worker_beat(ASSISTANT, "stopped")
+    return 0
+
+
+def serve_assistant() -> int:
+    """The scheduled task's entry: one assistant at a time, logging to data/assistant/logs."""
+    try:
+        acquire_lock(ASSISTANT_LOCK)
+    except LockHeld as exc:
+        print(exc)
+        return 0
+    try:
+        log_path = setup_logging(ASSISTANT_LOG_DIR)
+        log.info("Ask Grok's assistant start; log %s; BD_XAI_API_KEY present: %s", log_path,
+                 "yes" if config.get("BD_XAI_API_KEY") else "no")
+        return run_assistant()
+    finally:
+        release_lock(ASSISTANT_LOCK)
+
+
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="velocity-bd-team pipeline")
     parser.add_argument("--portal", help="run a single portal by slug")
@@ -1074,11 +1227,15 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--backfill-summaries", action="store_true",
                         help="have Claude summarize each open, reviewed call that has no summary, then exit; "
                              "with --dry-run, count the calls and price the run instead")
+    parser.add_argument("--assistant", action="store_true",
+                        help="answer Ask Grok's questions from the dashboard as they arrive, until stopped")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.assistant:
+        return serve_assistant()
     if args.remind:
         return remind()
     if args.post_summary:
