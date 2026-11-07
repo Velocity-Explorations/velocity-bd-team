@@ -121,8 +121,12 @@ python -m assistant requests --status proposed
 
 ## Ask Grok
 
-Since 7 Nov 2026 (David), Grok answers the team's questions from a panel on every dashboard page. Answer only: Grok
-gets the read tools above and nothing that records or changes anything.
+Since 7 Nov 2026 (David), Grok answers the team's questions from a panel on every dashboard page. Grok gets the read
+tools above and three propose tools: `propose_keyword_change`, `propose_rereview` and `propose_scan`, each only recording
+a request a person approves on the Requests page, filed only when the person asks, in their name (set by the runner,
+never by Grok) and at most two a question. Not `propose_draft`, since drafts start from Start the draft and nothing
+carries out an approved draft request; not `propose_fault_report`, since an approved one becomes an issue on the public
+repo. The panel links each request Grok filed to the Requests page.
 
 - **How a question travels:** the dashboard writes it to `chat_messages` with the page it was asked from (migration
   016). `python run.py --assistant`, always running as the scheduled task "velocity-bd-team assistant", takes it within

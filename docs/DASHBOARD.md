@@ -306,8 +306,9 @@ again; Suggest again asks for a new one.
 Ask Grok (David, 7 Nov 2026): an Ask Grok button in the top bar, on every page once migration 016 is applied, opens a
 panel at the right edge; the page stays usable beside it. A question goes to `chat_messages` (`askGrokAction`, one waiting
 question a person), `run.py --assistant` answers it with read-only tools (docs/ASSISTANT.md, Ask Grok), and the panel reads
-its thread from `GET /api/ask` every two seconds while an answer is on its way. Each answer shows the calls it names (to
-All calls) and the Company Reference ids it cites, then the model, the tools it called and about what it cost. A person
+its thread from `GET /api/ask` every two seconds while an answer is on its way. Each answer shows the change requests Grok filed
+for the person (to Requests, where someone approves them), the calls it names (to All calls) and the Company Reference
+ids it cites, then the model, the tools it called and about what it cost. A person
 sees only their own conversations; New conversation starts another. The panel says Grok is offline when the assistant's
 heartbeat is over two minutes old. Escape or the close button closes it.
 

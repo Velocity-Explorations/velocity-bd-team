@@ -22,7 +22,7 @@ function newThread(): string {
 }
 
 function PartView({ part }: { part: Part }) {
-  if (!part.href) return <>{part.text}</>;
+  if (!part.href) return part.strong ? <strong>{part.text}</strong> : <>{part.text}</>;
   return part.href.startsWith("/") ? (
     <a href={part.href}>{part.text}</a>
   ) : (
@@ -69,8 +69,13 @@ function Message({ m, seenAt, now }: { m: AskMessage; seenAt: string | null; now
       <p className="ask-question">{m.question}</p>
       <div className="ask-answer">
         {body}
-        {sources.calls.length || sources.facts.length ? (
+        {sources.calls.length || sources.facts.length || sources.requests.length ? (
           <div className="ask-sources">
+            {sources.requests.map((r) => (
+              <a key={`r${r.id}`} className="badge tone-warn" href="/requests" title={`${r.summary}: waits for approval on the Requests page`}>
+                Request #{r.id}
+              </a>
+            ))}
             {sources.calls.map((c) => (
               <a key={c.id} className="badge tone-info" href={callHref(c)} title={`${c.title}, ${c.portal}`}>
                 {c.title.length > 48 ? `${c.title.slice(0, 46)}...` : c.title}

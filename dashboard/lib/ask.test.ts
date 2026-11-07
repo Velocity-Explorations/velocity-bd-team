@@ -18,16 +18,26 @@ test("an answer becomes paragraphs and bullet lists, with only same-site and htt
   assert.match(blocks[2].lines[0].map((p) => p.text).join(""), /\[x\]\(javascript:alert\(1\)\)/);
 });
 
+test("bold words show bold, without their asterisks", () => {
+  const [block] = parseAnswer("Request **#1** waits for **approval** on the Requests page.");
+  assert.equal(block.kind, "p");
+  if (block.kind !== "p") return;
+  assert.deepEqual(block.lines[0], [{ text: "Request " }, { text: "#1", strong: true }, { text: " waits for " },
+    { text: "approval", strong: true }, { text: " on the Requests page." }]);
+});
+
 test("an empty or missing answer gives no blocks", () => {
   assert.deepEqual(parseAnswer(""), []);
   assert.deepEqual(parseAnswer(null), []);
 });
 
 test("sources are read defensively, and each call links to its title on All calls", () => {
-  assert.deepEqual(parseSources('{"calls":[{"id":"c-1","title":"Unison","portal":"SAM.gov"},{"id":5}],"facts":["F-06",3]}'),
-    { calls: [{ id: "c-1", title: "Unison", portal: "SAM.gov" }], facts: ["F-06"] });
-  assert.deepEqual(parseSources("not json"), { calls: [], facts: [] });
-  assert.deepEqual(parseSources(null), { calls: [], facts: [] });
+  assert.deepEqual(parseSources('{"calls":[{"id":"c-1","title":"Unison","portal":"SAM.gov"},{"id":5}],"facts":["F-06",3],' +
+    '"requests":[{"id":42,"kind":"rereview","summary":"Re-review Unison"},{"id":"x"}]}'),
+    { calls: [{ id: "c-1", title: "Unison", portal: "SAM.gov" }], facts: ["F-06"],
+      requests: [{ id: 42, kind: "rereview", summary: "Re-review Unison" }] });
+  assert.deepEqual(parseSources("not json"), { calls: [], facts: [], requests: [] });
+  assert.deepEqual(parseSources(null), { calls: [], facts: [], requests: [] });
   assert.equal(callHref({ id: "c-1", title: "Unison & co", portal: "SAM.gov" }), "/calls?q=Unison%20%26%20co");
 });
 
