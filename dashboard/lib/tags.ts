@@ -45,7 +45,7 @@ export function tagsByCall(rows: TagRow[]): Map<string, TagBadge[]> {
       badges.push({ text: type, tone: "info", title: `Type, set by ${setBy(who.get(type) ?? new Set())}.${others}` });
     }
     const rest = [...who.keys()]
-      .filter((tag) => place.get(tag)?.group !== "type")
+      .filter((tag) => place.get(tag)?.group !== "type" && place.get(tag)?.group !== "listing")   // the kind has its own badge
       .sort((a, b) => (place.get(a)?.position ?? 0) - (place.get(b)?.position ?? 0) || a.localeCompare(b));
     for (const tag of rest) badges.push({ text: tag, tone: "grey", title: `Set by ${setBy(who.get(tag) ?? new Set())}` });
     shown.set(callId, badges);

@@ -215,6 +215,150 @@ main {
   height: 15px;
 }
 
+/* ------------------------------------------------------------------ Ask Grok (David, 7 Nov 2026) */
+
+/* The header's button sits at the right, just before the account menu. */
+.ask-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  margin-left: auto;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  color: var(--ink);
+  font: 600 13px/1 var(--font-body);
+}
+
+.ask-button + details.account {
+  margin-left: 8px;
+}
+
+.ask-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* The panel: the right edge under the top bar; the page stays usable beside it. */
+dialog.ask-panel {
+  position: fixed;
+  inset: var(--top-bar-height) 0 0 auto;
+  z-index: 40;
+  width: min(460px, 100vw);
+  height: calc(100vh - var(--top-bar-height));
+  max-width: 100vw;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  color: var(--ink);
+  border: 0;
+  border-left: 1px solid var(--line);
+  box-shadow: var(--card-shadow);
+}
+
+dialog.ask-panel[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.ask-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ask-head h2 {
+  margin: 0 auto 0 0;
+  font: var(--type-label);
+}
+
+.ask-close {
+  width: 34px;
+  padding: 0;
+}
+
+.ask-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.ask-thread {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ask-question {
+  justify-self: end;
+  max-width: 85%;
+  margin: 0 0 8px auto;
+  padding: 8px 12px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-card);
+  white-space: pre-wrap;
+}
+
+.ask-answer p,
+.ask-answer ul {
+  margin: 0 0 8px;
+}
+
+.ask-answer ul {
+  padding-left: 18px;
+}
+
+.ask-wait {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+.ask-failed {
+  color: var(--conflict);
+}
+
+.ask-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.ask-sources a.badge {
+  text-decoration: none;
+}
+
+.ask-empty ul {
+  padding-left: 18px;
+  color: var(--ink-3);
+}
+
+.ask-form {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.ask-form textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.ask-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 /* ------------------------------------------------------------------ account menu */
 
 /* The account button: initials, the name and Deciding; the accent line while its menu is open. */

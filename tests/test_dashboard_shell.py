@@ -205,3 +205,69 @@ def test_a_not_relevant_decision_wears_the_red_of_a_judges_no(page: Any) -> None
     if no.count():
         assert chips.first.get_attribute("class") == no.first.get_attribute("class")
 
+
+# ---------------------------------------------------------------------- Ask Grok (David, 7 Nov 2026)
+
+def open_ask(page: Any) -> Any:
+    """Open Ask Grok from the top bar, again if the page had not finished starting; skip before migration 016."""
+    button = page.locator("header.topbar button.ask-button")
+    if button.count() == 0:
+        pytest.skip("Ask Grok is not set up here (migration 016)")
+    for _ in range(3):
+        button.click()
+        try:
+            page.wait_for_function("document.querySelector('#ask-grok').open", timeout=5_000)
+            return page.locator("dialog#ask-grok")
+        except Exception:
+            continue
+    raise AssertionError("Ask Grok did not open")
+
+
+def test_ask_grok_opens_beside_the_page_and_closes_back_to_its_button(page: Any) -> None:
+    open_page(page, "/calls")
+    panel = open_ask(page)
+    assert panel.locator("h2").inner_text().strip() == "Ask Grok"
+    assert page.locator("main").is_visible() and page.locator("header.topbar nav a").first.is_enabled()
+    box = panel.locator("textarea")
+    if box.is_disabled():   # nobody is logged in on this test server
+        assert "Log in" in (box.get_attribute("placeholder") or "")
+        assert panel.locator("button[type=submit]").is_disabled()
+    page.keyboard.press("Escape")
+    page.wait_for_function("!document.querySelector('#ask-grok').open", timeout=5_000)
+    assert page.evaluate("document.activeElement && document.activeElement.classList.contains('ask-button')")
+
+
+def test_nobody_can_read_a_thread_without_logging_in(page: Any) -> None:
+    import urllib.error
+    import urllib.request
+
+    open_page(page, "/")
+    if page.locator("header.topbar button.ask-button").count() == 0:
+        pytest.skip("Ask Grok is not set up here (migration 016)")
+    try:
+        with urllib.request.urlopen(URL + "/api/ask", timeout=60) as response:
+            status = response.status
+    except urllib.error.HTTPError as exc:
+        status = exc.code
+    assert status == 401
+
+
+@pytest.mark.skipif(os.environ.get("ASK_TESTS") != "1", reason="sends a real question to Grok and the live ledger: ASK_TESTS=1")
+def test_a_question_asked_in_the_panel_gets_grok_s_answer(page: Any) -> None:
+    open_page(page, "/review")
+    menu = page.locator(".topbar details.account")
+    menu.locator("summary").click()
+    names = menu.locator("form.choose-viewer button[name=viewer]")
+    if names.count() == 0:
+        pytest.skip("nobody to log in as")
+    names.first.click()
+    page.wait_for_timeout(2000)
+    panel = open_ask(page)
+    panel.locator("button.ask-new").click()
+    panel.locator("textarea").fill("In one line: how many open calls are umbrellas this week?")
+    panel.locator("textarea").press("Enter")
+    page.wait_for_selector("#ask-grok .ask-exchange[data-state=done], #ask-grok .ask-exchange[data-state=failed]", timeout=150_000)
+    last = panel.locator(".ask-exchange").last
+    assert last.get_attribute("data-state") == "done", last.inner_text()
+    assert last.locator(".ask-answer").inner_text().strip()
+    assert "grok-4.7" in last.locator(".meta").last.inner_text()
