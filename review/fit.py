@@ -19,8 +19,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from ledger.queries import calls_where, fit_ratings, main_work_by_call, set_fit, tags_by_call, verdicts_by_call
-from review.tags import tag_list
+from ledger.queries import calls_where, fit_ratings, main_work_by_call, set_fit, set_listing, tags_by_call, verdicts_by_call
+from review.tags import listing_of, tag_list
 
 VALUES = {"core": 1.0, "good": 0.75, "neutral": 0.5, "poor": 0.25, "never": 0.0}
 WEIGHTS = {"work": 0.45, "customer": 0.15, "type": 0.15, "naics": 0.10, "keyword": 0.10, "access": 0.05}
@@ -106,11 +106,17 @@ def band_line(bands: Mapping[str, int]) -> str:
 
 def score_rows(rows: Sequence[Mapping[str, Any]], write: bool = True) -> dict[str, int] | None:
     """Score these calls from the team's ratings and store what changed; how many fell in each band, or None when nobody
-    has rated anything yet."""
+    has rated anything yet. Each call's kind of listing is stored too, rated or not: it rests on tags alone."""
+    tags = tags_by_call()
+    if write:
+        for row in rows:
+            listing = listing_of(tags.get(row["id"], {}), tag_list())
+            if row.get("listing") != listing:
+                set_listing(row["id"], listing)
     ratings = fit_ratings()
     if not ratings:
         return None
-    tags, named, verdicts = tags_by_call(), main_work_by_call(), verdicts_by_call()
+    named, verdicts = main_work_by_call(), verdicts_by_call()
     bands: Counter[str] = Counter()
     for row in rows:
         fit = score_call(row, tags.get(row["id"], {}), named.get(row["id"], {}), ratings, verdicts.get(row["id"]))

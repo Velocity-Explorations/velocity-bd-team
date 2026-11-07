@@ -184,7 +184,7 @@ CREATE INDEX IF NOT EXISTS idx_call_tags_tag ON call_tags (tag);
 
 CREATE TABLE IF NOT EXISTS tag_list (
   name        TEXT PRIMARY KEY,
-  tag_group   TEXT NOT NULL CHECK (tag_group IN ('type', 'work', 'customer', 'access')),
+  tag_group   TEXT NOT NULL CHECK (tag_group IN ('type', 'work', 'customer', 'access', 'listing')),
   covers      TEXT,
   position    INTEGER NOT NULL
 );
@@ -430,3 +430,8 @@ CREATE TABLE IF NOT EXISTS fit_ratings (
 -- 014_fit_rating_changes: who last changed a fit rating on the dashboard's Fit ratings page.
 
 ALTER TABLE fit_ratings ADD COLUMN changed_by TEXT;
+
+-- 015_listing: what kind of listing each call is: Call, Umbrella or Announcement; NULL counts as a call. The tag list's
+-- group check also takes listing (the tag_list table above shows the wider check).
+
+ALTER TABLE calls ADD COLUMN listing TEXT;

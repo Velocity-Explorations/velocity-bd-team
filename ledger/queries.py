@@ -647,6 +647,12 @@ def set_fit(call_id: str, score: int, band: str, why: Sequence[str]) -> None:
           (score, band, json.dumps(list(why)), now_iso(), call_id))
 
 
+def set_listing(call_id: str, listing: str | None) -> None:
+    """What kind of listing the call is: Call, Umbrella or Announcement (migration 015); None counts as a call."""
+    with tx() as conn:
+        q(conn, "UPDATE calls SET listing = ?, updated_at = ? WHERE id = ?", (listing, now_iso(), call_id))
+
+
 # --------------------------------------------------------------------------------- decisions
 # Every decision on every call, kept per person (migration 004). calls.human_status is the
 # latest of them, the team's current decision.

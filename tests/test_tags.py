@@ -48,17 +48,19 @@ def seed(call_id: str = "c-1", kept: bool = True, **fields: Any) -> dict[str, An
     return lq.get_call(call_id)   # type: ignore[return-value]
 
 
-def test_the_list_has_four_groups_and_the_prompt_asks_for_exactly_one_type() -> None:
-    assert list(TAGS.groups) == ["type", "work", "customer", "access"]
+def test_the_list_has_five_groups_and_the_prompt_asks_for_exactly_one_type_and_one_listing() -> None:
+    assert list(TAGS.groups) == ["type", "work", "customer", "access", "listing"]
     assert "White paper" in TAGS.groups["type"] and "Members only" in TAGS.groups["access"]
+    assert list(TAGS.groups["listing"]) == ["Call", "Umbrella", "Announcement"]
     block = tags.prompt_block(TAGS)
-    assert "exactly one" in block
+    assert "Type, exactly one" in block and "Listing, exactly one" in block
     assert all(name in block for names in TAGS.groups.values() for name in names)
 
 
 @pytest.mark.parametrize(("text", "expected"), [
     ("VERDICT: yes\nREASON: fits\nTAGS: OTA, software, AI and ML, SOCOM", ["OTA", "Software", "AI and ML", "SOCOM"]),
     ("TAGS: RFI, Proposal, Space, Made up.", ["RFI", "Space"]),   # one type only; a tag not on the list is dropped
+    ("TAGS: Umbrella, Call, Software, OTA", ["OTA", "Software", "Umbrella"]),   # one listing only, the first named
     ("VERDICT: no\nREASON: hardware", []),
     ("TAGS:", []),
 ])
@@ -75,22 +77,27 @@ def test_tags_are_read_from_the_answer_s_tags_line(text: str, expected: list[str
     (call(portal="SAM.gov", type="RFI", department="DEPT OF DEFENSE / USINDOPACOM"), ["RFI", "INDOPACOM"]),
     (call(portal="SAM.gov", type="RFI", title="Pacomp sensor resin"), ["RFI"]),
     (call(portal="NASA Forecast", type="Forecast", department="NASA KSC", set_aside="Small Business Set Aside - Total"),
-     ["Forecast", "NASA", "Small business set-aside"]),
-    (call(portal="NASA Forecast", type="Forecast", set_aside="No set aside used"), ["Forecast", "NASA"]),
+     ["Forecast", "NASA", "Small business set-aside", "Announcement"]),
+    (call(portal="NASA Forecast", type="Forecast", set_aside="No set aside used"), ["Forecast", "NASA", "Announcement"]),
     (call(portal="NSTXL", type="OTA opportunity", department="SpEC", extra={"nstxl_members_only": True}),
      ["OTA", "USSF", "Members only"]),
     (call(portal="NSTXL", type="Solicitation", department="S2MARTS"), ["Navy"]),   # the judges pick its type
     (call(portal="AFWERX", type="SBIR cycle", extra={"afwerx_branches": ["Air Force", "Space Force"]}),
-     ["SBIR or STTR", "USSF", "USAF"]),
-    (call(portal="SpaceWERX", type="TACFI", department="U.S. Space Force"), ["SBIR or STTR", "USSF", "Phase II holders only"]),
-    (call(portal="SSC Front Door", type="Webinar"), ["Event", "USSF"]),
+     ["SBIR or STTR", "USSF", "USAF", "Umbrella"]),
+    (call(portal="SpaceWERX", type="TACFI", department="U.S. Space Force"),
+     ["SBIR or STTR", "USSF", "Phase II holders only", "Umbrella"]),
+    (call(portal="SSC Front Door", type="Webinar"), ["Event", "USSF", "Announcement"]),
+    (call(portal="SSC Front Door", type="Conference"), ["Event", "USSF", "Announcement"]),
+    (call(portal="SAM.gov", type="Presolicitation", department="DEPT OF DEFENSE / DEPT OF THE NAVY"), ["Navy", "Announcement"]),
+    (call(portal="SAM.gov", type="Special notice"), []),   # CSOs, BAAs, industry days and more: the judges say which
+    (call(portal="NSTXL", type="Coming soon", department="S2MARTS"), ["Navy", "Announcement"]),
     (call(portal="DIU", type="CSO", department="Defense Innovation Unit"), ["White paper", "DIU"]),
     (call(portal="SAM.gov", type="Sources sought", department="DEPT OF DEFENSE / DEPT OF THE ARMY / AMC",
           set_aside="Total Small Business Set-Aside (FAR 19.5)"), ["RFI", "Army", "Small business set-aside"]),
     (call(portal="SAM.gov", type="Special notice",
           department="OFFICE OF THE DIRECTOR OF NATIONAL INTELLIGENCE / INTELLIGENCE ADVANCED RESEARCH PROJECTS ACTIVITY"),
      ["Intelligence community"]),
-    (call(portal="DOE SBIR", type="Upcoming"), ["SBIR or STTR", "DOE"]),
+    (call(portal="DOE SBIR", type="Upcoming"), ["SBIR or STTR", "DOE", "Announcement"]),
     (call(portal="Space Florida", type="Solicitation"), ["Proposal", "Other buyer"]),
     (call(portal="APFIT", type="APFIT cycle"), ["Sponsor needed"]),
 ])

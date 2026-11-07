@@ -19,7 +19,8 @@ def test_migrate_creates_tables_and_is_idempotent(tmp_path: Path) -> None:
     first = migrate.apply(url)
     assert first == ["001_initial.sql", "002_change_requests.sql", "003_judgments.sql", "004_decisions.sql", "005_briefs.sql",
                      "006_call_tags.sql", "007_tag_list.sql", "008_pursuits.sql", "009_call_summaries.sql", "010_people.sql",
-                     "011_not_submitted.sql", "012_linear_issues.sql", "013_fit_score.sql", "014_fit_rating_changes.sql"]
+                     "011_not_submitted.sql", "012_linear_issues.sql", "013_fit_score.sql", "014_fit_rating_changes.sql",
+                     "015_listing.sql"]
     assert migrate.apply(url) == []
     assert migrate.list_tables(url) == ["briefs", "call_tags", "calls", "change_requests", "checklist_items", "decisions",
                                          "drive_items", "fit_ratings", "judgments", "linear_issues", "people", "profiles", "proposals", "pursuit_events", "pursuit_steps",

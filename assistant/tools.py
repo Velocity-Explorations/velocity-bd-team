@@ -21,6 +21,7 @@ from typing import Any
 
 from assistant.dates import days_until, parse_due
 from ledger.queries import calls_where, get_call, recent_runs, verdicts_by_call
+from review.tags import WATCH
 from portals import registry
 from portals.registry import Portal
 from portals.shared import keyword_filter as kf
@@ -429,10 +430,13 @@ def open_undecided(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[d
     return found
 
 
-def _waiting(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[str, Any], datetime | None]]:
-    """Open, undecided calls the review kept and rated yes or maybe, best first, with their deadlines."""
+def _waiting(rows: list[dict[str, Any]], moment: datetime,
+             watch: bool | None = False) -> list[tuple[dict[str, Any], datetime | None]]:
+    """Open, undecided calls the review kept and rated yes or maybe, best first, with their deadlines. watch=False keeps
+    the calls to respond to now, True the umbrellas and announcements (WATCH), None both."""
     waiting = [pair for pair in open_undecided(rows, moment)
-               if pair[0].get("ai_verdict") in ("yes", "maybe") and pair[0].get("fit_band") != "ruled out"]
+               if pair[0].get("ai_verdict") in ("yes", "maybe") and pair[0].get("fit_band") != "ruled out"
+               and (watch is None or (pair[0].get("listing") in WATCH) == watch)]
     # RANKING, in two stable sorts. A judge reads what the listing asks for and the fit score rates its categories, so a
     # broad listing can score 95 with no yes from anyone: the yeses count first (David, 6 Nov). No score comes after a score.
     waiting.sort(key=lambda pair: pair[0].get("first_seen_at") or "", reverse=True)
@@ -451,15 +455,22 @@ def _waiting(rows: list[dict[str, Any]], moment: datetime) -> list[tuple[dict[st
 
 
 def _pick(row: dict[str, Any], due: datetime | None, moment: datetime) -> dict[str, Any]:
-    return _call_ref(row, verdict=row["ai_verdict"], deadline=row.get("due_date"),
+    return _call_ref(row, verdict=row["ai_verdict"], deadline=row.get("due_date"), listing=row.get("listing") or "Call",
                      days_left=days_until(due, moment) if due else None, reason=_first_sentence(row.get("ai_reasoning")))
 
 
 def top_calls(limit: int = 10, now: datetime | None = None) -> list[dict[str, Any]]:
-    """The best open, undecided calls across every portal, in the weekly summary's order (RANKING)."""
+    """The best open, undecided calls to respond to now across every portal, in the weekly summary's order (RANKING)."""
     moment = _now(now)
     _, rows = _portal_rows(None)
     return [_pick(r, d, moment) for r, d in _waiting(rows, moment)[:limit]]
+
+
+def top_watch(limit: int = 10, now: datetime | None = None) -> list[dict[str, Any]]:
+    """The best open umbrellas and announcements across every portal, ranked like the Top 10 (David, 7 Nov 2026)."""
+    moment = _now(now)
+    _, rows = _portal_rows(None)
+    return [_pick(r, d, moment) for r, d in _waiting(rows, moment, watch=True)[:limit]]
 
 
 def weekly_summary(portal: str | None = None, days: int = 7, now: datetime | None = None) -> dict[str, Any]:
@@ -481,8 +492,8 @@ def weekly_summary(portal: str | None = None, days: int = 7, now: datetime | Non
             closing.append((due, _call_ref(row, deadline=row.get("due_date"), days_left=days_until(due, moment),
                                            status=row.get("human_status"))))
     closing_soon = [item for _, item in sorted(closing, key=lambda pair: pair[0])]
-    waiting = _waiting(rows, moment)
-    top_picks = [_pick(r, d, moment) for r, d in waiting[:TOP_PICKS]]
+    waiting = _waiting(rows, moment, watch=None)
+    top_picks = [_pick(r, d, moment) for r, d in _waiting(rows, moment)[:TOP_PICKS]]   # calls to respond to now
     decided = sorted((r for r in rows if r.get("human_status") and (r.get("human_at") or "") >= cutoff),
                      key=lambda r: r.get("human_at") or "", reverse=True)
     decided_refs = [_call_ref(r, status=r["human_status"], by=r.get("human_by"), at=r.get("human_at")) for r in decided]

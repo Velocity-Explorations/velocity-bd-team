@@ -636,8 +636,9 @@ def remind() -> int:
 
 def write_brief(portals: list[Portal], now: datetime | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Store this week's Monday brief for the dashboard: each portal's week with its scraper line, and
-    the Top 10 across portals. Returns (summaries, health, judges), so the Slack post shows the same."""
-    from assistant.tools import RANKING, scraper_health, top_calls, weekly_summary
+    the Top 10 across portals with the top 10 umbrellas and announcements to watch. Returns (summaries, health, judges),
+    so the Slack post shows the same."""
+    from assistant.tools import RANKING, scraper_health, top_calls, top_watch, weekly_summary
 
     moment = now or datetime.now(timezone.utc)
     week_of = (moment.date() - timedelta(days=moment.weekday())).isoformat()
@@ -647,8 +648,8 @@ def write_brief(portals: list[Portal], now: datetime | None = None) -> tuple[lis
     scraper = {entry.get("name"): entry.get("text", "") for entry in health}
     for summary in summaries:
         save_brief(week_of, summary["portal"], {**summary, "health": scraper.get(summary["portal"], "")}, BRIEF_AUTHOR)
-    save_brief(week_of, None, {"top": top_calls(BRIEF_TOP, now=moment), "ranked_by": RANKING, "judges": judges},
-               BRIEF_AUTHOR)
+    save_brief(week_of, None, {"top": top_calls(BRIEF_TOP, now=moment), "watch": top_watch(BRIEF_TOP, now=moment),
+                               "ranked_by": RANKING, "judges": judges}, BRIEF_AUTHOR)
     return summaries, health, judges
 
 
