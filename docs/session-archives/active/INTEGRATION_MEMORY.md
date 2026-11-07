@@ -35,7 +35,7 @@ portal content.
 | `linear/`, `slack/sink.py`, `run.py` | Pursuits sync, summary-only scans, new run flags |
 
 ### In Progress
-- Grok updated three Company Reference items and they were checked live on 6 Nov. Two more stale items in Drive remain (a spelling, a former employee's bio).
+- Grok updated the stale Company Reference items in two passes (6 and 7 Nov); each was checked live and landed as written.
 - David to rate the new INDOPACOM tag and the `jadc2` and `c4isr` keywords on `/fit` (unrated counts as Neutral).
 - The AFWERX cycle listings close 25 Nov and left the Top 10. DSIP forbids automated access, so a person has to read the topics.
 - Linear catch-up notes for #109 to #135 are kept locally in data/linear/catchup.md until Linear writes resume.
