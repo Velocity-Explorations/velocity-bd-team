@@ -4,6 +4,7 @@ import { AutomationCards } from "@/components/AutomationCards";
 import { FitNote } from "@/components/FitNote";
 import { FitSlider } from "@/components/FitSlider";
 import { preloadShell, Shell } from "@/components/Shell";
+import { TopTabs } from "@/components/TopTabs";
 import { Badge, Flash } from "@/components/bits";
 import { buildFitRows, SECTIONS, SLIDER, type FitRow, type Mix } from "@/lib/fitratings";
 import { formatTime } from "@/lib/format";
@@ -27,6 +28,15 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
   const unrated = rows.filter((r) => !r.rating).length;
   const bands = overview ? BANDS.filter((b) => overview.bands[b]).map((b) => `${overview.bands[b]} ${b}`).join(", ") : "";
   const job = overview?.job;
+  const status = [   // the scores' status, at the end of the lead (David, 9 Nov 2026)
+    bands ? `Open calls now: ${bands}.` : "",
+    job && (job.state === "queued" || job.state === "working")
+      ? "Scoring again with the latest ratings, done within about a minute."
+      : job?.finished_at
+        ? `Scores last updated ${formatTime(job.finished_at, tz)}; a change here updates them within about a minute.`
+        : "A change here updates the scores within about a minute.",
+    inputs && rows.length && !unrated ? "Everything is rated." : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <Shell section="automation">
@@ -36,8 +46,9 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
       <div className="lead-line">
         <p className="muted">
           How well each tag, keyword and NAICS code fits Velocity. Every call&apos;s fit score is built from these, with its
-          primary focus (the work that is most of what the buyer wants) counting most, and anything not rated counts as Neutral. Slide a rating from Never to Core; it saves when you let
-          go, and Clear sets it back to not rated. A note saves as you type.
+          primary focus (the work that is most of what the buyer wants) counting most, and anything not rated counts as
+          Neutral. Slide a rating from Never to Core: it saves when you let go, Clear sets it back to not rated, and a note
+          saves as you type. {status}
         </p>
       </div>
 
@@ -58,54 +69,51 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
               </li>
             ))}
           </ul>
-          <p className="fit-status">
-            {bands ? <>Open calls now: {bands}. </> : null}
-            {job && (job.state === "queued" || job.state === "working")
-              ? "Scoring again with the latest ratings; this takes about a minute."
-              : job?.finished_at
-                ? `Scores last updated ${formatTime(job.finished_at, tz)}. A change here updates them within about a minute.`
-                : "A change here updates the scores within about a minute."}
-          </p>
-          <nav className="fit-nav" aria-label="Sections">
-            {SECTIONS.map((s) => {
+          <TopTabs
+            param="section"
+            label="Fit rating sections"
+            className="fit-tabs"
+            initial={firstParam(sp.section, 20)}
+            tabs={SECTIONS.map((s) => {   // one section at a time (David, 9 Nov 2026)
               const own = rows.filter((r) => r.section === s.key);
               const open = own.filter((r) => !r.rating).length;
-              return (
-                <a key={s.key} href={`#${s.key}`}>
-                  {s.label} <span className="muted">{own.length}</span>
-                  {open ? <span className="badge tone-warn">{open} not rated</span> : null}
-                </a>
-              );
+              return {
+                key: s.key,
+                label: s.label,
+                count: own.length,
+                badge: open ? <span className="badge tone-warn">{open} not rated</span> : undefined,
+                note: `Each rating counts ${s.question.charAt(0).toLowerCase()}${s.question.slice(1)}. ${s.hint ?? ""}`.trim(),
+                panel: <FitSectionTable section={s} rows={own} tz={tz} />,
+              };
             })}
-            {unrated ? null : <span className="muted">Everything is rated.</span>}
-          </nav>
-          {SECTIONS.map((s) => (
-            <section key={s.key} id={s.key} className="fit-section" aria-labelledby={`fit-${s.key}`}>
-              <div className="section-head">
-                <h2 id={`fit-${s.key}`}>{s.label}</h2>
-                <p>{s.question}. {s.hint ?? ""}</p>
-              </div>
-              <div className="table-wrap">
-                <table className="fit-table">
-                  <thead>
-                    <tr>
-                      <th><HeadHelp label={s.label} tip={`What is being rated, what it covers, and example calls. ${s.question}.`} /></th>
-                      <th className="fit-rating-col"><HeadHelp label="Rating and note" tip={RATING_TIP} /></th>
-                      <th className="num"><HeadHelp label="Calls" tip={s.key === "work" ? CALLS_WORK_TIP : CALLS_TIP} /></th>
-                      <th><HeadHelp label="Judges (yes, maybe, no)" tip={JUDGES_TIP} /></th>
-                      <th><HeadHelp label="Team" tip={TEAM_TIP} /></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.filter((r) => r.section === s.key).map((row) => <FitRatingRow key={row.key} row={row} tz={tz} focus={s.key === "work"} />)}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          ))}
+          />
         </>
       )}
     </Shell>
+  );
+}
+
+/** One section's table, the panel of its tab. */
+function FitSectionTable({ section: s, rows, tz }: { section: (typeof SECTIONS)[number]; rows: FitRow[]; tz: string }) {
+  return (
+    <section id={s.key} className="fit-section" aria-label={s.label}>
+      <div className="table-wrap">
+        <table className="fit-table">
+          <thead>
+            <tr>
+              <th><HeadHelp label={s.label} tip={`What is being rated, what it covers, and example calls. ${s.question}.`} /></th>
+              <th className="fit-rating-col"><HeadHelp label="Rating and note" tip={RATING_TIP} /></th>
+              <th className="num"><HeadHelp label="Calls" tip={s.key === "work" ? CALLS_WORK_TIP : CALLS_TIP} /></th>
+              <th><HeadHelp label="Judges (yes, maybe, no)" tip={JUDGES_TIP} /></th>
+              <th><HeadHelp label="Team" tip={TEAM_TIP} /></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => <FitRatingRow key={row.key} row={row} tz={tz} focus={s.key === "work"} />)}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

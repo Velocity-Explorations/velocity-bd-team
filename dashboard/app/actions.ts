@@ -168,14 +168,15 @@ export async function saveFitRatingAction(formData: FormData): Promise<void> {
   const note = String(formData.get("note") ?? "").trim().slice(0, 500);
   const section = sectionOfKey(key);
   if (!section || !name) backTo("/fit", "error", "That form is out of date. Reload and try again.");
-  if (choice !== "clear" && !isRating(choice)) backTo("/fit", "error", `Choose a rating for ${name} before saving its note.`, undefined, key);
+  const back = section ? `/fit?section=${section}` : "/fit";   // the tab the row is on (David, 9 Nov 2026)
+  if (choice !== "clear" && !isRating(choice)) backTo(back, "error", `Choose a rating for ${name} before saving its note.`, undefined, key);
   const viewer = await currentViewer();
   if (!viewer) backTo("/fit", "error", "Log in (top right) before changing a rating.");
   try {
     await saveFitRating({ key, section: section as string, name, rating: choice === "clear" ? null : choice, note, by: viewer });
   } catch (err) {
     const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
-    backTo("/fit", "error", `Could not save the rating: ${detail}`, undefined, key);
+    backTo(back, "error", `Could not save the rating: ${detail}`, undefined, key);
   }
   revalidatePath("/fit");
 }

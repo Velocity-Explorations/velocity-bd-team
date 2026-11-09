@@ -4146,24 +4146,13 @@ button[disabled] {
   opacity: 0.8;
 }
 
-.fit-status {
-  margin: 0 0 12px;
-  font: var(--type-small);
+/* Fit ratings shows one section at a time, as tabs that keep their not-rated counts (David, 9 Nov 2026). */
+.fit-tabs {
+  margin-top: 4px;
 }
 
-.fit-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  align-items: center;
-  margin: 0 0 20px;
-  font: var(--type-small);
-}
-
-.fit-nav a {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
+.fit-tabs .badge {
+  margin-left: 6px;
 }
 
 .fit-section {
