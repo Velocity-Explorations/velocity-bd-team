@@ -13,6 +13,22 @@ export const SCALE: { key: Rating; label: string; points: string; tone: string; 
   { key: "never", label: "Never", points: "", tone: "bad", means: "We don't pursue it, whatever else the call has." },
 ];
 
+/** The rating slider's five stops, low to high, as a tuning control reads (David, 9 Nov 2026). */
+export const SLIDER = [...SCALE].reverse();
+const NEUTRAL_STOP = 2;
+
+/** Where a rating sits on the slider; a row nobody rated sits at Neutral. */
+export function stopOf(rating: string | null | undefined): number {
+  const at = SLIDER.findIndex((s) => s.key === rating);
+  return at < 0 ? NEUTRAL_STOP : at;
+}
+
+/** The rating at a slider position, held to the five stops. */
+export function ratingAt(stop: number): Rating {
+  if (Number.isNaN(stop)) return SLIDER[NEUTRAL_STOP].key;
+  return SLIDER[Math.min(SLIDER.length - 1, Math.max(0, Math.round(stop)))].key;
+}
+
 export type FitSection = "work" | "customer" | "type" | "access" | "keyword" | "naics";
 
 /** The page's sections in order, with the question each one's rating answers. */
