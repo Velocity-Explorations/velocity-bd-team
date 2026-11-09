@@ -8,7 +8,7 @@ export type TagBadge = { text: string; tone: "info" | "grey"; title: string };
 
 const SOURCES = ["rule", "claude", "grok"];   // the order a call's type is chosen in, and who is named first
 const SOURCE_NAMES: Record<string, string> = { rule: "the call's data", claude: "Claude", grok: "Grok" };
-const GROUPS: [string, string][] = [["type", "Type"], ["work", "Work"], ["customer", "Customer"], ["access", "Access"]];
+const GROUPS: [string, string][] = [["type", "Type"], ["work", "Capability area"], ["customer", "Customer"], ["access", "Access"]];
 
 function listed(names: string[]): string {
   return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;

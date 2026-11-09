@@ -51,7 +51,7 @@ test("the Tag filter groups the list by type, work, customer and access", () => 
   ]);
   assert.deepEqual(groups, [
     { label: "Type", names: ["OTA"] },
-    { label: "Work", names: ["Software"] },
+    { label: "Capability area", names: ["Software"] },
     { label: "Access", names: ["Members only"] },
   ]);
 });

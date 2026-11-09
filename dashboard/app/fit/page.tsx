@@ -110,7 +110,7 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
 }
 
 const CALLS_TIP = "How many calls the keyword filter kept that carry this.";
-const CALLS_WORK_TIP = "How many calls the keyword filter kept that carry this work, and below, how many of them a judge named it " +
+const CALLS_WORK_TIP = "How many calls the keyword filter kept that carry this capability area, and below, how many of them a judge named it " +
   "the primary focus of: the work that is most of what the buyer wants. A Never rules a call out only when this is its primary focus.";
 const JUDGES_TIP = "Claude's and Grok's newest verdicts on those calls: how many yes, maybe and no.";
 const TEAM_TIP = "What the team decided on those calls: Pursue, Not relevant, Submitted or Dismissed.";

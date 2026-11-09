@@ -35,7 +35,7 @@ export type FitSection = "work" | "customer" | "type" | "access" | "keyword" | "
 export const SECTIONS: { key: FitSection; label: string; question: string; hint?: string }[] = [
   {
     key: "work",
-    label: "Work",
+    label: "Capability area",   // David, 9 Nov 2026: not "Work", and not to be confused with Keywords
     question: "When this is the primary focus of a call, the work that is most of what the buyer wants",
     hint: "A Never here rules a call out only when the judges agree this is its primary focus.",
   },
