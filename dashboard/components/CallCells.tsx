@@ -2,6 +2,7 @@
 
 import { MessageSquareText } from "lucide-react";
 import type { ReactNode } from "react";
+import { PersonName } from "@/components/PersonName";
 import { PortalLogo } from "@/components/PortalLogo";
 import { panelId } from "@/components/RowPanels";
 import { Badge, Details, FitBadge, TitleLink } from "@/components/bits";
@@ -113,7 +114,7 @@ export function VotesCell({ callId, verdicts, votes, notesBy, fit }: { callId: s
             <ul className="notes votes">
               {votes.map((v) => (
                 <li key={v.person}>
-                  {v.person}: {isDecision(v.status) ? STATUS_LABELS[v.status] : v.status}
+                  <PersonName by={v.person}>{v.person}:</PersonName> {isDecision(v.status) ? STATUS_LABELS[v.status] : v.status}
                   {notesBy.has(v.person) ? <NoteButton panel={panelId("notes", callId)} label={`${v.person}'s notes`} /> : null}
                 </li>
               ))}

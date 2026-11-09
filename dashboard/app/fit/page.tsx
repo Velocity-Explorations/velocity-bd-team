@@ -3,6 +3,7 @@ import { saveFitRatingAction } from "@/app/actions";
 import { AutomationCards } from "@/components/AutomationCards";
 import { FitNote } from "@/components/FitNote";
 import { FitSlider } from "@/components/FitSlider";
+import { PersonName } from "@/components/PersonName";
 import { preloadShell, Shell } from "@/components/Shell";
 import { TopTabs } from "@/components/TopTabs";
 import { Badge, Flash } from "@/components/bits";
@@ -168,7 +169,11 @@ function FitRatingRow({ row, tz, focus }: { row: FitRow; tz: string; focus: bool
           <input type="hidden" name="name" value={row.name} />
           <FitSlider name={row.name} rating={row.rating} />
           <FitNote id={`note-${row.key}`} name={row.name} note={row.note} rated={Boolean(row.rating)} />
-          {row.changedBy ? <div className="meta">Changed by {row.changedBy}{row.changedAt ? `, ${formatTime(row.changedAt, tz)}` : ""}</div> : null}
+          {row.changedBy ? (
+            <div className="meta">
+              Changed by <PersonName by={row.changedBy}>{row.changedBy}</PersonName>{row.changedAt ? `, ${formatTime(row.changedAt, tz)}` : ""}
+            </div>
+          ) : null}
         </form>
       </td>
       <td className="num">

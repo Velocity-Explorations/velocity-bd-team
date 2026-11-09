@@ -3,12 +3,13 @@
 import { headers } from "next/headers";
 import { cache } from "react";
 import { initials } from "./nav";
+import { displayPerson } from "./people";
 import { pictureUrl } from "./picture";
 import { callsHref, isFreshArrival, isValidTimeZone, parseDefaultFilters, withDefaultFilters, type DefaultFilters } from "./profile";
 import { workerReadiness } from "./proposals";
 import { allProfiles, pictureStamps, workerStatus, type ProfileRow } from "./queries";
 import { displayTimeZone } from "./settings";
-import { currentViewer } from "./viewer";
+import { allowlist, currentViewer } from "./viewer";
 
 /** Every saved profile, by name. */
 export const profiles = cache(allProfiles);
@@ -51,6 +52,25 @@ export async function pictureOf(name: string): Promise<string | null> {
   const at = (await pictures()).get(name);
   return at ? pictureUrl(name, at) : null;
 }
+
+/** A person as they show beside their name: their picture, else their initials. */
+export type Face = { initials: string; picture: string | null };
+
+/**
+ * Each person's face, looked up by the name the ledger records (a Slack id becomes the allowlisted name), once per
+ * request (David, 9 Nov 2026). Null for no name.
+ */
+export const faceLookup = cache(async (): Promise<(by: string | null | undefined) => Face | null> => {
+  const [all, stamps] = await Promise.all([profiles(), pictures()]);
+  const users = allowlist();
+  return (by) => {
+    const name = displayPerson(by, users);
+    if (!name) return null;
+    const profile = all.get(name);
+    const at = stamps.get(name);
+    return { initials: profile?.initials || initials(profile?.display_name || name), picture: at ? pictureUrl(name, at) : null };
+  };
+});
 
 /** Whether this request opens the dashboard, not a move between its own pages (U3, U4). */
 async function freshArrival(): Promise<boolean> {

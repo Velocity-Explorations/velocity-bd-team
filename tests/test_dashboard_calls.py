@@ -93,6 +93,25 @@ def first_row(page: Any) -> Any:
     return page.locator("table.calls-table tbody tr[data-call-id]").first
 
 
+def test_each_vote_and_each_note_shows_the_person_beside_their_name(page: Any) -> None:
+    """David, 9 Nov 2026: a small picture, or the person's initials while they have none, beside every name on a vote
+    and on a note."""
+    votes = page.locator("table.calls-table td.votes-cell ul.votes > li")
+    notes = page.locator("table.calls-table .panel-notes li .meta")
+    for path in ("/calls?status=pursue", "/calls?state=closed", "/calls"):   # decided calls carry the votes
+        open_page(page, path)
+        if votes.count() or notes.count():
+            break
+    else:
+        pytest.skip("nobody has voted or left a note yet")
+    for item in votes.all()[:20] + [n for n in notes.all()[:20] if n.locator(".person").count()]:
+        face = item.locator(".person .avatar")
+        assert face.count() == 1, item.inner_text()
+        # a picture, or initials drawn by CSS so they stay out of the line's text
+        assert face.evaluate("e => e.tagName === 'IMG' ? e.getAttribute('alt') === '' : (e.dataset.initials || '').length > 0")
+        assert face.inner_text() == ""
+
+
 def test_needs_review_shows_the_fit_score_with_its_reasons_and_opens_best_fit_first(page: Any) -> None:
     open_page(page, "/review")
     badges = page.locator("table.calls-table tbody td.votes-cell .judge.fit .badge")

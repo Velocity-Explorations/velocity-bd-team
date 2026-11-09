@@ -24,6 +24,7 @@ import {
   retryStepAction,
   setCollaboratorsAction,
 } from "@/app/actions";
+import { PersonName } from "@/components/PersonName";
 import { PortalLogo } from "@/components/PortalLogo";
 import {
   AlignmentView,
@@ -104,8 +105,8 @@ export function WorkspaceHeader({ call, pursuit, checklist, label, tz }: {
             Due <strong>{due || "not given"}</strong>
             {call.days_left !== null && call.days_left >= 0 ? `, ${call.days_left} ${call.days_left === 1 ? "day" : "days"} left` : ""}
           </span>
-          <span>Owner: {label(pursuit.owner)}</span>
-          {collaborators.length ? <span>Working with: {collaborators.map(label).join(", ")}</span> : null}
+          <span>Owner: <PersonName by={pursuit.owner}>{label(pursuit.owner)}</PersonName></span>
+          {collaborators.length ? <span>Working with: <PersonList names={collaborators} label={label} /></span> : null}
           <span>User approval required: {pursuit.approval_mode === "key_gates" ? "key gates only" : "every step"}</span>
           <span>
             Spent {money(pursuit.cost_usd)} of {money(pursuit.budget_usd)}
@@ -164,8 +165,8 @@ export function WorkspacePanels({ call, pursuit, checklist, events, step, can, p
           <button type="button" className="btn-text" data-close-panel="ws-people">Close</button>
         </div>
         <p>
-          <strong>{label(pursuit.owner)}</strong>, the owner
-          {collaborators.length ? <>; working with {collaborators.map(label).join(", ")}</> : "; nobody else is working on it yet"}.
+          <strong><PersonName by={pursuit.owner}>{label(pursuit.owner)}</PersonName></strong>, the owner
+          {collaborators.length ? <>; working with <PersonList names={collaborators} label={label} /></> : "; nobody else is working on it yet"}.
         </p>
         <p className="hint">
           Only the owner approves steps and decides the gates. The people working with them add material and past work, and
@@ -181,7 +182,7 @@ export function WorkspacePanels({ call, pursuit, checklist, events, step, can, p
                 {others.map((person) => (
                   <label key={person.name} className="chip-check">
                     <input type="checkbox" name="with" value={person.name} defaultChecked={collaborators.includes(person.name)} />
-                    {person.label}
+                    <PersonName by={person.name}>{person.label}</PersonName>
                   </label>
                 ))}
               </div>
@@ -219,6 +220,20 @@ export function WorkspacePanels({ call, pursuit, checklist, events, step, can, p
 }
 
 /** The stage strip (PW1): six stages, each done, now or next. */
+/** Names, each with their face, joined with commas (David, 9 Nov 2026). */
+function PersonList({ names, label }: { names: string[]; label: Label }) {
+  return (
+    <>
+      {names.map((who, i) => (
+        <span key={who}>
+          {i ? ", " : null}
+          <PersonName by={who}>{label(who)}</PersonName>
+        </span>
+      ))}
+    </>
+  );
+}
+
 export function StageStrip({ current, pursuitState }: { current: string; pursuitState: string }) {
   const states = stageStates(current, pursuitState);
   return (
