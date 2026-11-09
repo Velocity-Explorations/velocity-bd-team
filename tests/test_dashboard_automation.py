@@ -7,6 +7,7 @@ they are skipped.
 from __future__ import annotations
 
 import os
+import re
 from typing import Any
 
 import pytest
@@ -27,6 +28,7 @@ def page() -> Any:
 
 def open_page(page: Any, path: str) -> None:
     page.goto(URL + path, wait_until="load", timeout=120_000)
+    page.wait_for_function("!document.querySelector('.loading-page')", timeout=60_000)   # the page has streamed in
     page.wait_for_timeout(300)
 
 
@@ -54,7 +56,12 @@ def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed
     assert [t.strip() for t in row.locator(".fit-stops li").all_inner_texts()] == ["Never", "Poor", "Neutral", "Good", "Core"]
     assert slider.get_attribute("aria-valuetext") in ("Never", "Poor", "Neutral", "Good", "Core")
     assert row.locator("input[type=hidden][name=rating]").input_value() in ("never", "poor", "neutral", "good", "core")
-    assert row.locator(".fit-mix").count() == 2 and "main work on" in row.inner_text()
+    assert row.locator(".fit-mix").count() == 2
+    # David, 9 Nov: how many of its calls are mostly this work has a column of its own, on Work only
+    heads = [t.strip() for t in page.locator(".fit-section#work thead th").all_inner_texts()]
+    assert "Primary focus of call" in heads and "main work on" not in row.inner_text()
+    assert re.fullmatch(r"\d+ of \d+", row.locator("td.fit-focus").inner_text().strip())
+    assert "Primary focus of call" not in page.locator(".fit-section#customer thead").inner_text()
     row.locator(".fit-examples summary").click()
     assert row.locator(".fit-examples li").count() >= 1
 

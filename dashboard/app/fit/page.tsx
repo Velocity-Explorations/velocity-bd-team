@@ -34,8 +34,8 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
       <Flash notice={firstParam(sp.notice, 300)} error={firstParam(sp.error, 300)} />
       <div className="lead-line">
         <p className="muted">
-          How well each tag, keyword and NAICS code fits Velocity. Every call&apos;s fit score is built from these, with its main
-          work counting most, and anything not rated counts as Neutral. Slide a rating from Never to Core; it saves when you let
+          How well each tag, keyword and NAICS code fits Velocity. Every call&apos;s fit score is built from these, with its
+          primary focus (the work that is most of what the buyer wants) counting most, and anything not rated counts as Neutral. Slide a rating from Never to Core; it saves when you let
           go, and Clear sets it back to not rated.
         </p>
       </div>
@@ -90,13 +90,18 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
                     <tr>
                       <th>{s.label}</th>
                       <th className="num">Calls</th>
+                      {s.key === "work" ? (
+                        <th className="num" title="How many of its calls a judge named this as most of what the buyer wants. A Never rules a call out only when it is the call's primary focus.">
+                          Primary focus of call
+                        </th>
+                      ) : null}
                       <th>Judges (yes, maybe, no)</th>
                       <th>Team</th>
                       <th className="fit-rating-col">Rating and note</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.filter((r) => r.section === s.key).map((row) => <FitRatingRow key={row.key} row={row} tz={tz} />)}
+                    {rows.filter((r) => r.section === s.key).map((row) => <FitRatingRow key={row.key} row={row} tz={tz} focus={s.key === "work"} />)}
                   </tbody>
                 </table>
               </div>
@@ -108,7 +113,7 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
   );
 }
 
-function FitRatingRow({ row, tz }: { row: FitRow; tz: string }) {
+function FitRatingRow({ row, tz, focus }: { row: FitRow; tz: string; focus: boolean }) {
   return (
     <tr id={row.key}>
       <td className="fit-item">
@@ -136,10 +141,8 @@ function FitRatingRow({ row, tz }: { row: FitRow; tz: string }) {
           </details>
         ) : null}
       </td>
-      <td className="num">
-        {row.calls}
-        {row.mainWork !== null ? <div className="meta">main work on {row.mainWork}</div> : null}
-      </td>
+      <td className="num">{row.calls}</td>
+      {focus ? <td className="num fit-focus">{row.mainWork ?? 0} of {row.calls}</td> : null}
       <td className="fit-judges">
         <MixLine who="Claude" mix={row.claude} />
         <MixLine who="Grok" mix={row.grok} />
