@@ -61,9 +61,23 @@ def test_profile_settings_shows_each_setting_and_the_menu_links_it(page: Any) ->
     assert page.locator("select[name=time_zone] option").first.inner_text().endswith("(dashboard default)")
 
 
+def test_profile_settings_save_themselves_with_no_save_button(page: Any) -> None:
+    """David, 9 Nov: every change saves as it is made, so there is no Save (or Cancel) at the foot of the page. Reset to
+    defaults stays, in a form of its own, so pressing Enter in a field can never reset the profile."""
+    if not log_in(page):
+        pytest.skip("this dashboard has nobody to choose")
+    page.goto(URL + "/profile", wait_until="load", timeout=120_000)
+    settings = page.locator("form.profile-form")
+    assert settings.get_attribute("data-autosave") == "true"
+    assert settings.locator("button", has_text="Save").count() == 0 and page.locator("main a.btn", has_text="Cancel").count() == 0
+    reset = page.locator("main button", has_text="Reset to defaults")
+    assert reset.count() == 1 and reset.evaluate("b => b.form !== document.querySelector('form.profile-form')")
+    assert "save as you make them" in page.locator("main .lead-text").inner_text()
+
+
 def test_profile_settings_offers_a_picture_upload(page: Any) -> None:
     """David, 9 Nov: a person uploads their own picture, shown in place of their initials. The file box has no name, so
-    the profile's Save never sends it; choosing a file saves the picture on its own."""
+    the profile's own saving never sends it; choosing a file saves the picture on its own."""
     if not log_in(page):
         pytest.skip("this dashboard has nobody to choose")
     page.goto(URL + "/profile", wait_until="load", timeout=120_000)

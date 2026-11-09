@@ -258,16 +258,25 @@ export async function resetColumns(): Promise<void> {
   revalidatePath("/", "layout");
 }
 
-/** Profile settings' Save (PRO-574): the viewer's own row, checked against the portals and tags that exist. */
-export async function saveProfileAction(formData: FormData): Promise<void> {
+export type ProfileSaveResult = { ok: boolean; message: string };
+
+/**
+ * Profile settings, saved as each change is made (PRO-574; David, 9 Nov 2026: no Save button). The viewer's own row,
+ * checked against the portals and tags that exist. It answers rather than redirecting, so the page stays where it is.
+ */
+export async function autoSaveProfileAction(formData: FormData): Promise<ProfileSaveResult> {
   const viewer = await currentViewer();
-  if (!viewer) backTo("/profile", "error", "Log in (top right) before saving your profile.");
-  const [portalList, tagList] = await Promise.all([portals(), tagOptions()]);
-  const form = new Map<string, string[]>();
-  for (const key of new Set(formData.keys())) form.set(key, formData.getAll(key).map(String));
-  await saveProfile(viewer, profileFromForm(form, viewer, { portals: portalList.map((p) => p.name), tags: tagList.map((t) => t.name) }));
+  if (!viewer) return { ok: false, message: "Log in (top right) before changing your profile." };
+  try {
+    const [portalList, tagList] = await Promise.all([portals(), tagOptions()]);
+    const form = new Map<string, string[]>();
+    for (const key of new Set(formData.keys())) form.set(key, formData.getAll(key).map(String));
+    await saveProfile(viewer, profileFromForm(form, viewer, { portals: portalList.map((p) => p.name), tags: tagList.map((t) => t.name) }));
+  } catch (err) {
+    return { ok: false, message: `Could not save: ${err instanceof Error ? err.message.slice(0, 160) : "database error"}` };
+  }
   revalidatePath("/", "layout");
-  backTo("/profile", "notice", "Saved your profile.");
+  return { ok: true, message: "Saved" };
 }
 
 /** Profile settings' Reset to defaults: the viewer's row goes, so every default applies again. */
@@ -276,7 +285,8 @@ export async function resetProfileAction(): Promise<void> {
   if (!viewer) backTo("/profile", "error", "Log in (top right) before changing your profile.");
   await deleteProfile(viewer);
   revalidatePath("/", "layout");
-  backTo("/profile", "notice", "Your profile is back to the defaults.");
+  // A fresh mark in the address makes the page draw its fields anew, showing the defaults in place of what was typed.
+  backTo(`/profile?reset=${Date.now()}`, "notice", "Your profile is back to the defaults.");
 }
 
 export type PictureResult = { ok: boolean; message: string };

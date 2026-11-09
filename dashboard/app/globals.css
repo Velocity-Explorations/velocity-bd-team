@@ -486,6 +486,33 @@ details.account[open] > .account-button {
   color: var(--conflict);
 }
 
+/* Profile settings save themselves (David, 9 Nov 2026); what happened shows in a note at the corner of the window. */
+.autosave-state {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  color: var(--ink-2);
+  font: var(--type-small);
+}
+
+.autosave-state:empty {
+  display: none;
+}
+
+.autosave-state.saved {
+  color: var(--good);
+}
+
+.autosave-state.error {
+  color: var(--conflict);
+}
+
 .account-who {
   display: grid;
   line-height: 1.2;
