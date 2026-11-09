@@ -48,7 +48,8 @@ def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed
     open_page(page, "/fit")
     if page.locator(".fit-section").count() == 0:
         pytest.skip("this database has no fit ratings yet")
-    assert [t.strip() for t in page.locator(".fit-section h2").all_inner_texts()] == ["Capability area", "Customer", "Type", "Access", "Keywords", "NAICS"]   # David, 9 Nov: not "Work"
+    tabs = page.locator(".fit-tabs [role=tab]")   # David, 9 Nov: one section at a time, as tabs
+    assert [t.get_attribute("data-label") for t in tabs.all()] == ["Capability area", "Customer", "Type", "Access", "Keywords", "NAICS"]   # not "Work"
     assert page.locator(".fit-scale li").count() == 5
     row = page.locator(".fit-section#work tbody tr").filter(has_text="Software").first
     slider = row.locator("input[type=range].fit-slider")   # David, 9 Nov: a slider in place of five buttons
@@ -70,6 +71,33 @@ def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed
             assert help_.get_attribute("tabindex") == "0"
     row.locator(".fit-examples summary").click()
     assert row.locator(".fit-examples li").count() >= 1
+
+
+def test_fit_ratings_shows_one_section_at_a_time_as_tabs(page: Any) -> None:
+    """David, 9 Nov: the section links became tabs, keeping their not-rated counts; the heading above each table went,
+    its rule is one line under the tabs, and the scores' status joined the lead paragraph."""
+    open_page(page, "/fit")
+    if page.locator(".fit-section").count() == 0:
+        pytest.skip("this database has no fit ratings yet")
+    assert page.locator(".fit-nav").count() == 0 and page.locator(".fit-section .section-head").count() == 0
+    assert page.locator("p.fit-status").count() == 0
+    assert "within about a minute" in page.locator(".lead-line").inner_text()
+    tabs = page.locator(".fit-tabs [role=tab]")
+    assert tabs.count() == 6 and tabs.nth(0).get_attribute("aria-selected") == "true"
+    assert page.locator(".fit-section#work").is_visible() and not page.locator(".fit-section#keyword").is_visible()
+    for tab in tabs.all():   # each tab counts its rows, and says how many are not rated when any are
+        assert re.search(r"\d+", tab.locator(".top-tab-count").inner_text())
+        badge = tab.locator(".badge")
+        assert badge.count() == 0 or re.fullmatch(r"\d+ not rated", badge.inner_text().strip())
+    keywords = page.locator(".fit-tabs [role=tab][data-label=Keywords]")
+    keywords.click()
+    assert keywords.get_attribute("aria-selected") == "true"
+    assert page.locator(".fit-section#keyword").is_visible() and not page.locator(".fit-section#work").is_visible()
+    assert "section=keyword" in page.url
+    assert "does not rule a call out" in page.locator("#section-panel-keyword .top-note").inner_text()   # the section's rule
+    open_page(page, "/fit?section=naics")   # a link or a reload opens the same tab
+    assert page.locator(".fit-tabs [role=tab][data-label=NAICS]").get_attribute("aria-selected") == "true"
+    assert page.locator(".fit-section#naics").is_visible()
 
 
 def test_a_fit_note_shows_whole_and_saving_it_keeps_the_rating(page: Any) -> None:
