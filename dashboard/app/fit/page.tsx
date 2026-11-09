@@ -88,16 +88,11 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
                 <table className="fit-table">
                   <thead>
                     <tr>
-                      <th>{s.label}</th>
-                      <th className="num">Calls</th>
-                      {s.key === "work" ? (
-                        <th className="num" title="How many of its calls a judge named this as most of what the buyer wants. A Never rules a call out only when it is the call's primary focus.">
-                          Primary focus of call
-                        </th>
-                      ) : null}
-                      <th>Judges (yes, maybe, no)</th>
-                      <th>Team</th>
-                      <th className="fit-rating-col">Rating and note</th>
+                      <th><HeadHelp label={s.label} tip={`What is being rated, what it covers, and example calls. ${s.question}.`} /></th>
+                      <th className="num"><HeadHelp label="Calls" tip={s.key === "work" ? CALLS_WORK_TIP : CALLS_TIP} /></th>
+                      <th><HeadHelp label="Judges (yes, maybe, no)" tip={JUDGES_TIP} /></th>
+                      <th><HeadHelp label="Team" tip={TEAM_TIP} /></th>
+                      <th className="fit-rating-col"><HeadHelp label="Rating and note" tip={RATING_TIP} /></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -110,6 +105,23 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
         </>
       )}
     </Shell>
+  );
+}
+
+const CALLS_TIP = "How many calls the keyword filter kept that carry this.";
+const CALLS_WORK_TIP = "How many calls the keyword filter kept that carry this work, and below, how many of them a judge named it " +
+  "the primary focus of: the work that is most of what the buyer wants. A Never rules a call out only when this is its primary focus.";
+const JUDGES_TIP = "Claude's and Grok's newest verdicts on those calls: how many yes, maybe and no.";
+const TEAM_TIP = "What the team decided on those calls: Pursue, Not relevant, Submitted or Dismissed.";
+const RATING_TIP = "How well this fits Velocity, from Never to Core; every call's fit score is built from these. It saves when you " +
+  "let go of the slider, and the note says why.";
+
+/** A column header that explains itself on hover, or on keyboard focus through the TooltipController (David, 9 Nov 2026). */
+function HeadHelp({ label, tip }: { label: string; tip: string }) {
+  return (
+    <span className="th-help" title={tip} tabIndex={0}>
+      {label}
+    </span>
   );
 }
 
@@ -141,8 +153,17 @@ function FitRatingRow({ row, tz, focus }: { row: FitRow; tz: string; focus: bool
           </details>
         ) : null}
       </td>
-      <td className="num">{row.calls}</td>
-      {focus ? <td className="num fit-focus">{row.mainWork ?? 0} of {row.calls}</td> : null}
+      <td className="num">
+        {row.calls}
+        {focus ? (
+          <div className="fit-focus" title={`${row.mainWork ?? 0} of these ${row.calls} calls have this as their primary focus`}>
+            <span className="fit-focus-bar" aria-hidden="true">
+              <span style={{ width: `${row.calls ? Math.round((100 * (row.mainWork ?? 0)) / row.calls) : 0}%` }} />
+            </span>
+            <span className="meta">{row.mainWork ?? 0} as primary focus</span>
+          </div>
+        ) : null}
+      </td>
       <td className="fit-judges">
         <MixLine who="Claude" mix={row.claude} />
         <MixLine who="Grok" mix={row.grok} />

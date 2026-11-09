@@ -57,11 +57,17 @@ def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed
     assert slider.get_attribute("aria-valuetext") in ("Never", "Poor", "Neutral", "Good", "Core")
     assert row.locator("input[type=hidden][name=rating]").input_value() in ("never", "poor", "neutral", "good", "core")
     assert row.locator(".fit-mix").count() == 2
-    # David, 9 Nov: how many of its calls are mostly this work has a column of its own, on Work only
+    # David, 9 Nov: one Calls column, with how many are mostly this work under the count on Work rows
     heads = [t.strip() for t in page.locator(".fit-section#work thead th").all_inner_texts()]
-    assert "Primary focus of call" in heads and "main work on" not in row.inner_text()
-    assert re.fullmatch(r"\d+ of \d+", row.locator("td.fit-focus").inner_text().strip())
-    assert "Primary focus of call" not in page.locator(".fit-section#customer thead").inner_text()
+    assert heads[:2] == ["Work", "Calls"] and "Primary focus of call" not in heads
+    assert re.fullmatch(r"\d+ as primary focus", row.locator("td .fit-focus .meta").inner_text().strip())
+    assert page.locator(".fit-section#customer .fit-focus").count() == 0
+    # and every column header explains itself on hover or keyboard focus
+    for section in ("work", "keyword"):
+        for th in page.locator(f".fit-section#{section} thead th").all():
+            help_ = th.locator(".th-help")
+            assert help_.count() == 1 and (help_.get_attribute("title") or "").strip(), th.inner_text()
+            assert help_.get_attribute("tabindex") == "0"
     row.locator(".fit-examples summary").click()
     assert row.locator(".fit-examples li").count() >= 1
 
