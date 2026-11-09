@@ -49,7 +49,8 @@ def test_main_work_counts_most_and_every_rated_part_adds_to_the_score() -> None:
         call(naics_code="541511", matched_keywords=["ai"], description="uses AI"),
         {"rule": ["USSF", "OTA", "Small business set-aside"], "claude": ["Software"]}, BOTH_SOFTWARE, RATINGS)
     assert full is not None and full.score == 98   # all core but the NAICS code at good
-    assert "Main work Software: core" in full.why and "NAICS 541511: good" in full.why and "Customer USSF: core" in full.why
+    # David, 9 Nov: the reasons say primary focus, not main work, and name ratings as the slider does
+    assert "Primary focus Software: Core" in full.why and "NAICS 541511: Good" in full.why and "Customer USSF: Core" in full.why
 
 
 def test_a_call_no_judge_has_named_the_main_work_of_has_no_score_yet() -> None:
@@ -60,12 +61,12 @@ def test_a_call_no_judge_has_named_the_main_work_of_has_no_score_yet() -> None:
 def test_never_on_main_work_rules_a_call_out_only_when_the_judges_agree() -> None:
     both = fit.score_call(call(), {}, {"claude": "Services", "grok": "Services"}, RATINGS)
     assert both is not None and both.score == 0 and both.band == fit.RULED_OUT
-    assert both.why == ["Ruled out: main work Services is rated never"]
+    assert both.why == ["Ruled out: primary focus Services is rated Never"]
     alone = fit.score_call(call(), {}, {"claude": "Services"}, RATINGS)
     assert alone is not None and alone.band == fit.RULED_OUT   # the only judge to answer
     split = fit.score_call(call(), {}, {"claude": "Services", "grok": "Software"}, RATINGS)
     assert split is not None and split.band != fit.RULED_OUT and split.score == 39   # counts as poor, the lower of the two
-    assert "Main work Services or Software: judges differ" in split.why
+    assert "Primary focus Services or Software: judges differ" in split.why
 
 
 def test_a_work_tag_that_is_not_the_main_work_never_rules_a_call_out() -> None:
@@ -75,7 +76,7 @@ def test_a_work_tag_that_is_not_the_main_work_never_rules_a_call_out() -> None:
 
 def test_never_on_a_naics_code_or_its_sector_rules_a_call_out() -> None:
     got = fit.score_call(call(naics_code="236220"), {}, BOTH_SOFTWARE, RATINGS)
-    assert got is not None and got.band == fit.RULED_OUT and got.why == ["Ruled out: NAICS 236220 is rated never"]
+    assert got is not None and got.band == fit.RULED_OUT and got.why == ["Ruled out: NAICS 236220 is rated Never"]
     assert fit.sector_of("236220") == "23" and fit.sector_of("325120") == "31-33" and fit.sector_of("481212") == "48-49"
     unrated = fit.score_call(call(naics_code="541611"), {}, BOTH_SOFTWARE, RATINGS)
     assert unrated is not None and unrated.score == 73   # a code nobody rated counts as neutral
@@ -87,7 +88,7 @@ def test_never_on_a_type_rules_a_call_out_when_a_rule_set_it_or_the_judges_agree
     split = fit.score_call(call(), {"claude": ["Sole source"], "grok": ["Proposal"]}, BOTH_SOFTWARE, RATINGS)
     assert split is not None and split.band != fit.RULED_OUT
     ruled = fit.score_call(call(), {"rule": ["OTA"], "claude": ["Sole source"]}, BOTH_SOFTWARE, RATINGS)
-    assert ruled is not None and ruled.band != fit.RULED_OUT and "Type OTA: core" in ruled.why   # the rule's type wins
+    assert ruled is not None and ruled.band != fit.RULED_OUT and "Type OTA: Core" in ruled.why   # the rule's type wins
 
 
 def test_a_keyword_counts_only_as_a_whole_word_and_a_neutral_one_adds_nothing() -> None:
@@ -173,7 +174,7 @@ def test_fit_scores_are_stored_with_their_reasons_for_calls_the_judges_have_name
     assert "Scored 2 of 3 call(s): 1 strong, 1 ruled out." in capsys.readouterr().out
     named = lq.get_call("named")
     assert named["fit_score"] == 73 and named["fit_band"] == "strong"
-    assert "Main work Software: core" in json.loads(named["fit_why"])
+    assert "Primary focus Software: Core" in json.loads(named["fit_why"])
     assert lq.get_call("ruled-out")["fit_band"] == fit.RULED_OUT
     assert lq.get_call("unnamed")["fit_score"] is None
 
