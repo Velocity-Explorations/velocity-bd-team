@@ -48,7 +48,7 @@ def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed
     open_page(page, "/fit")
     if page.locator(".fit-section").count() == 0:
         pytest.skip("this database has no fit ratings yet")
-    assert [t.strip() for t in page.locator(".fit-section h2").all_inner_texts()] == ["Work", "Customer", "Type", "Access", "Keywords", "NAICS"]
+    assert [t.strip() for t in page.locator(".fit-section h2").all_inner_texts()] == ["Capability area", "Customer", "Type", "Access", "Keywords", "NAICS"]   # David, 9 Nov: not "Work"
     assert page.locator(".fit-scale li").count() == 5
     row = page.locator(".fit-section#work tbody tr").filter(has_text="Software").first
     slider = row.locator("input[type=range].fit-slider")   # David, 9 Nov: a slider in place of five buttons
@@ -57,9 +57,9 @@ def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed
     assert slider.get_attribute("aria-valuetext") in ("Never", "Poor", "Neutral", "Good", "Core")
     assert row.locator("input[type=hidden][name=rating]").input_value() in ("never", "poor", "neutral", "good", "core")
     assert row.locator(".fit-mix").count() == 2
-    # David, 9 Nov: one Calls column, with how many are mostly this work under the count on Work rows
+    # David, 9 Nov: one Calls column, with how many have this as their primary focus under the count on capability area rows
     heads = [t.strip() for t in page.locator(".fit-section#work thead th").all_inner_texts()]
-    assert heads[:3] == ["Work", "Rating and note", "Calls"] and "Primary focus of call" not in heads   # David, 9 Nov
+    assert heads[:3] == ["Capability area", "Rating and note", "Calls"] and "Primary focus of call" not in heads   # David, 9 Nov
     assert re.fullmatch(r"\d+ as primary focus", row.locator("td .fit-focus .meta").inner_text().strip())
     assert page.locator(".fit-section#customer .fit-focus").count() == 0
     # and every column header explains itself on hover or keyboard focus
