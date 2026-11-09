@@ -4216,9 +4216,9 @@ button[disabled] {
   white-space: nowrap;
 }
 
-.fit-name {
+.fit-name {   /* a size up from the row (David, 9 Nov 2026) */
   margin-right: 6px;
-  font: var(--type-row-title);
+  font: var(--type-section);
 }
 
 .fit-codes,
