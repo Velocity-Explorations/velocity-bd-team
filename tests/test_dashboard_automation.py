@@ -80,6 +80,9 @@ def test_fit_ratings_shows_one_section_at_a_time_as_tabs(page: Any) -> None:
     if page.locator(".fit-section").count() == 0:
         pytest.skip("this database has no fit ratings yet")
     assert page.locator(".fit-nav").count() == 0 and page.locator(".fit-section .section-head").count() == 0
+    # David, 9 Nov: every row's name, on every tab, is a size up from the rest of the row
+    sizes = page.locator(".fit-section .fit-name").evaluate_all("els => [...new Set(els.map((e) => getComputedStyle(e).fontSize))]")
+    assert sizes == ["16px"], sizes
     assert page.locator("p.fit-status").count() == 0
     assert "within about a minute" in page.locator(".lead-line").inner_text()
     tabs = page.locator(".fit-tabs [role=tab]")
