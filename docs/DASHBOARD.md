@@ -263,6 +263,9 @@ the company's), or cancelled. Dark only.
 `/profile` (PRO-574), from Profile settings in the account menu, keeps each person's settings in
 the ledger's `profiles` table, one row per name in DASHBOARD_USERS, so they follow the person to any
 device (U6). Each person edits their own row; until Google sign-in that is whoever chose the name.
+Every change saves as it is made, with no Save button (David, 9 Nov 2026): a choice at once, a typed
+field a moment after the typing stops or when it is left, and Enter saves now. A note at the corner
+of the window says Saving, Saved or what went wrong (`components/AutoSaveForm.tsx`).
 - **Display name and initials** show on votes, notes, decisions and the account menu. Decisions are
   still recorded under the name in DASHBOARD_USERS.
 - **Picture** (David, 9 Nov 2026) shows in place of the initials in the account button, the account
@@ -280,7 +283,8 @@ device (U6). Each person edits their own row; until Google sign-in that is whoev
   shows everything (U4).
 - **Time zone:** every time shows in it, in place of the dashboard's America/Denver. Deadlines a
   portal wrote as text stay as written (U5).
-- **Reset to defaults** removes the row, so every default applies again.
+- **Reset to defaults** removes the row, so every default applies again. It is a form of its own, so
+  Enter in a field never resets.
 
 ## The write actions
 
