@@ -3,8 +3,8 @@
 A propose tool checks the request, works out what it would do (the preview a person reads
 before approving) and records it in the ledger's change_requests table. It changes nothing
 else. A person approves or rejects it on the dashboard's Requests page, and
-`python run.py --apply-requests` carries out approved requests, except drafts, which wait
-for the Writer.
+`python run.py --apply-requests` carries out approved requests. There is no draft request: a draft
+starts from Start the draft on the dashboard (David, 9 Nov 2026).
 
 `requested_by` is filled in by whatever runs the tool (the Slack bot, the command line),
 never by the model, so it is not among any tool's parameters.
@@ -26,7 +26,6 @@ from assistant.tools import (
     _schema,
     _sentence,
     _when,
-    brief_call,
     preview_keyword_change,
     resolve_portal,
     scraper_health,
@@ -73,8 +72,6 @@ def _status_phrase(req: dict[str, Any]) -> str:
         return f"rejected by {req.get('decided_by') or 'someone'}{note}"
     if status == "approved":
         phrase = f"approved by {req.get('decided_by') or 'someone'}"
-        if req["kind"] == "draft":
-            return phrase + ", waiting for the Writer"
         if req.get("result"):
             return f"{phrase}. {req['result']}"
         return f"{phrase}, to be carried out {APPLY_WHEN}"
@@ -187,24 +184,6 @@ def propose_scan(portal: str, reason: str = "", requested_by: str = "assistant")
                    portal=p.slug, reason=reason, payload={})
 
 
-def propose_draft(call_id: str, notes: str = "", reason: str = "", requested_by: str = "assistant") -> dict[str, Any]:
-    """Ask for a response draft to be started for one call, from its brief."""
-    brief = brief_call(call_id)
-    title = brief["title"]
-    if brief["closed"]:
-        raise ToolError(f"The portal shows '{title}' as closed, so there is nothing to draft.")
-    if brief["days_left"] is not None and brief["days_left"] < 0:
-        raise ToolError(f"The deadline for '{title}' passed {_plural(-brief['days_left'], 'day')} ago.")
-    notes = _clean(notes)
-    text = brief["text"] + (f"\nNotes for the draft: {_sentence(notes)}" if notes else "") + \
-        "\nApproving hands this brief to the Writer to start a response draft. The Writer is not built yet, " \
-        "so an approved draft waits for it."
-    return _record("draft", f"Start a response draft for '{title}'", requested_by,
-                   {"text": text, "deadline": brief["deadline"], "days_left": brief["days_left"]},
-                   portal=_portal_slug(brief.get("portal")), call_id=brief["id"], reason=reason,
-                   payload={"notes": notes})
-
-
 def _short(text: str, limit: int = TITLE_CHARS) -> str:
     if len(text) <= limit:
         return text
@@ -276,10 +255,6 @@ REQUEST_TOOLS = [
                   "reason": REASON_ARG}, ["call_id", "context"]), propose_rereview),
     Tool("propose_scan", "Ask for a scan of one portal now instead of waiting for the weekly run. Needs a person's "
          "approval.", "propose", _schema({"portal": PORTAL_ARG, "reason": REASON_ARG}, ["portal"]), propose_scan),
-    Tool("propose_draft", "Ask for a response draft to be started for one call, from its brief. Needs a person's "
-         "approval; the Writer carries it out.", "propose",
-         _schema({"call_id": CALL_ARG, "notes": {"type": "string", "description": "What the draft should stress."},
-                  "reason": REASON_ARG}, ["call_id"]), propose_draft),
     Tool("propose_fault_report", "Ask for a scraper fault to be filed as a GitHub issue, with the portal's recent "
          "runs as evidence. Needs a person's approval.", "propose",
          _schema({"portal": PORTAL_ARG, "description": {"type": "string", "description": "What went wrong."}},

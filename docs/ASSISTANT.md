@@ -73,7 +73,6 @@ approves it.
 | `propose_keyword_change` | Add or remove broad keywords, tight keywords or blocklist patterns for one portal. The preview lists the stored calls it would newly keep or drop, with a warning for any the team pursued or the AI rated yes. | The portal's `keywords.yaml` is edited (only the lines added or removed, under a dated comment naming the request and the approver) and committed to `main`. Every stored call of that portal is filtered again, and newly kept calls are reviewed. |
 | `propose_rereview` | Run one call's AI review again with context from the team, for example when the AI said no to a call the team thinks fits. Refused for a call the keyword filter rejected; that needs a keyword change. | The reviewer is asked again with "Context from the team: ..." in the prompt. Its answer replaces the old one, and the result says how it changed. |
 | `propose_scan` | Scan one portal now instead of waiting for Monday. The preview says when the last scan ran and how long it took. | One pipeline run for that portal: fetch, filter, review, Slack cards for new calls. |
-| `propose_draft` | Start a response draft for one call. The preview is the call's brief. Refused when the call is closed or its deadline has passed. | Stays approved for the Writer (`drafting/`, not built yet), which will read approved `draft` requests from the ledger and mark them applied. |
 | `propose_fault_report` | File a scraper fault as a GitHub issue. The body is the description, the scraper's health and its recent runs. | Filed with `gh issue create`. Until the repo has a GitHub remote, it stays approved and says so. |
 
 How a request moves:
@@ -124,9 +123,9 @@ python -m assistant requests --status proposed
 Since 7 Nov 2026 (David), Grok answers the team's questions from a panel on every dashboard page. Grok gets the read
 tools above and three propose tools: `propose_keyword_change`, `propose_rereview` and `propose_scan`, each only recording
 a request a person approves on the Requests page, filed only when the person asks, in their name (set by the runner,
-never by Grok) and at most two a question. Not `propose_draft`, since drafts start from Start the draft and nothing
-carries out an approved draft request; not `propose_fault_report`, since an approved one becomes an issue on the public
-repo. The panel links each request Grok filed to the Requests page.
+never by Grok) and at most two a question. Not `propose_fault_report`, since an approved one becomes an issue on the
+public repo. There is no draft request at all since 9 Nov 2026 (David): a draft starts from Start the draft on the call,
+where a person picks the format and the past work to build on. The panel links each request Grok filed to the Requests page.
 
 - **How a question travels:** the dashboard writes it to `chat_messages` with the page it was asked from (migration
   016). `python run.py --assistant`, always running as the scheduled task "velocity-bd-team assistant", takes it within

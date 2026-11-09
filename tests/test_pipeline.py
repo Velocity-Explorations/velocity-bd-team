@@ -419,13 +419,6 @@ def test_apply_fault_report_waits_for_github_then_files(isolated, slack_posts, m
     assert filed[0][1].startswith("Logins fail.") and f"Approved by David Wood (request #{rid})" in filed[0][1]
 
 
-def test_apply_leaves_drafts_for_the_writer(isolated, slack_posts, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(pipeline, "acquire_lock", lambda *a, **k: pytest.fail("drafts are not run.py's to carry out"))
-    rid = approved("draft", "Start a response draft for 'Open call'", call_id="x", payload={"notes": ""})
-    assert pipeline.main(["--apply-requests"]) == 0
-    assert lq.get_request(rid)["status"] == "approved" and slack_posts == []
-
-
 def test_apply_records_a_failure(isolated, slack_posts) -> None:
     rid = approved("rereview", "Re-review a missing call", call_id="missing", payload={"context": "x"})
     assert pipeline.main(["--apply-requests"]) == 1
