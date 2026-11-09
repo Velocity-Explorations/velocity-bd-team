@@ -33,7 +33,13 @@ def open_page(page: Any, path: str) -> None:
 def test_automation_has_six_cards_in_order(page: Any) -> None:
     open_page(page, "/requests")
     labels = [t.strip().lower() for t in page.locator(".view-cards .vt-card__label").all_inner_texts()]
-    assert labels == ["agent update requests", "decided requests", "scans", "scan problems", "judges agree", "fit ratings"]
+    assert labels == ["fit ratings", "agent update requests", "decided requests", "scans", "scan problems", "judges agree"]
+
+
+def test_the_automation_section_opens_on_fit_ratings(page: Any) -> None:
+    """David, 9 Nov: Fit ratings is what shows when Automation opens."""
+    open_page(page, "/")
+    assert page.locator(".topbar nav a", has_text="Automation").get_attribute("href") == "/fit"
 
 
 def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed(page: Any) -> None:

@@ -8,7 +8,7 @@ export const SECTIONS: { key: Section; label: string; href: string }[] = [
   { key: "home", label: "Home", href: "/" },
   { key: "calls", label: "Calls", href: "/review" },
   { key: "proposals", label: "Proposals", href: "/proposals" },
-  { key: "automation", label: "Automation", href: "/requests" },
+  { key: "automation", label: "Automation", href: "/fit" },   // opens on Fit ratings (David, 9 Nov 2026)
 ];
 
 /** What a section's count chip counts, read aloud in place of the bare number (N3). */
