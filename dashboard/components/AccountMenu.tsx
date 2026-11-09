@@ -1,6 +1,7 @@
 import { ChevronDown, LogOut, Settings2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { clearViewer, setViewer, signOutAction } from "@/app/actions";
+import { Avatar } from "@/components/Avatar";
 
 /**
  * Who decides: from the picker (a cookie, until Google sign-in), from a sign-in proxy's header, the one
@@ -8,8 +9,9 @@ import { clearViewer, setViewer, signOutAction } from "@/app/actions";
  */
 export type ViewerMode = "picker" | "header" | "single" | "none" | "session";
 
-/** A person as the menu shows them: the name decisions are recorded under, their shown name and initials (U2). */
-export type MenuPerson = { name: string; label: string; initials: string };
+/** A person as the menu shows them: the name decisions are recorded under, their shown name and initials (U2), and
+ * their picture's address while they have one (David, 9 Nov 2026). */
+export type MenuPerson = { name: string; label: string; initials: string; picture?: string | null };
 
 /**
  * The account menu at the right of the top bar (U1, V1 to V4, PRO-570, PRO-574): the person, Profile
@@ -39,9 +41,7 @@ export function AccountMenu({ viewer, people, mode, why, tableSettings }: {
   return (
     <details className="menu account">
       <summary className="account-button" aria-label={`${shown}, ${viewer ? "deciding" : "cannot decide"}. Account menu`}>
-        <span className="initials" aria-hidden="true">
-          {viewer ? (you?.initials ?? "?") : "?"}
-        </span>
+        <Avatar initials={viewer ? (you?.initials ?? "?") : "?"} picture={viewer ? you?.picture : null} />
         <span className="account-who">
           <span className="account-name">{shown}</span>
           <span className={viewer ? "account-role" : "account-role cannot"}>{viewer ? "Deciding" : "Cannot decide"}</span>
@@ -50,9 +50,7 @@ export function AccountMenu({ viewer, people, mode, why, tableSettings }: {
       </summary>
       <div className="menu-body account-menu">
         <div className="account-head">
-          <span className="initials big" aria-hidden="true">
-            {viewer ? (you?.initials ?? "?") : "?"}
-          </span>
+          <Avatar initials={viewer ? (you?.initials ?? "?") : "?"} picture={viewer ? you?.picture : null} size="big" />
           <span>
             <strong>{shown}</strong>
             <span className="muted">{viewer ? "Decisions are recorded as you" : why}</span>
@@ -105,9 +103,7 @@ function ChooseViewer({ people, title, hint }: { people: MenuPerson[]; title: st
       <p className="hint">{hint}</p>
       {people.map((person) => (
         <button key={person.name} type="submit" name="viewer" value={person.name} className="menu-item">
-          <span className="initials small" aria-hidden="true">
-            {person.initials}
-          </span>
+          <Avatar initials={person.initials} picture={person.picture} size="small" />
           {person.label}
         </button>
       ))}

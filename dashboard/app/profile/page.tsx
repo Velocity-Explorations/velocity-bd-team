@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { resetProfileAction, saveProfileAction } from "@/app/actions";
+import { Avatar } from "@/components/Avatar";
+import { PictureField } from "@/components/PictureField";
 import { preloadShell, Shell } from "@/components/Shell";
 import { Flash } from "@/components/bits";
-import { me } from "@/lib/me";
+import { me, pictureOf } from "@/lib/me";
 import { initials } from "@/lib/nav";
 import { parseDefaultFilters, TIME_ZONES } from "@/lib/profile";
 import { portals, tagOptions } from "@/lib/queries";
@@ -48,6 +50,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: Sear
   const dashboardZone = displayTimeZone();
   const zone = profile?.time_zone ?? "";
   const zones = zone && !TIME_ZONES.includes(zone) ? [...TIME_ZONES, zone] : TIME_ZONES;
+  const picture = viewer ? await pictureOf(viewer) : null;
+  const shownInitials = profile?.initials || initials(profile?.display_name || viewer || "");
 
   return (
     <Shell section={null}>
@@ -72,10 +76,12 @@ export default async function ProfilePage({ searchParams }: { searchParams: Sear
                 <span className="field-label">Initials</span>
                 <input type="text" name="initials" defaultValue={profile?.initials ?? ""} maxLength={3} placeholder={initials(profile?.display_name || viewer)} />
               </label>
-              <span className="initials big" aria-hidden="true">
-                {profile?.initials || initials(profile?.display_name || viewer)}
-              </span>
+              <Avatar initials={shownInitials} picture={picture} size="big" />
             </div>
+          </Setting>
+
+          <Setting name="Picture" help="Shown in place of your initials. A JPEG, PNG, WebP or GIF, cropped to a square; it saves as soon as you choose it.">
+            <PictureField initials={shownInitials} picture={picture} />
           </Setting>
 
           <Setting name="Signed-in account" help="The Google account you signed in with, shown once Google sign-in is live (PRO-477).">

@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `017_draft_suggestions.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `018_profile_pictures.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -554,6 +554,21 @@ devices. Added by `008_pursuits.sql`.
 | default_filters | TEXT JSON | the filters Calls opens with (U4): `{"portals": [...], "tag": "", "state": ""}`, state `open`, `closed` or empty; NULL for none | same |
 | time_zone | TEXT | an IANA time zone such as `America/New_York` (U5); NULL keeps the dashboard's `America/Denver` | same |
 | updated_at | TEXT timestamp, not null | | same |
+
+## Table: profile_pictures
+
+Each person's profile picture (David, 9 Nov 2026), uploaded on Profile settings and shown in place of their initials in
+the account menu, Switch user and Profile settings. Kept apart from `profiles`, so Reset to defaults leaves it. Added by
+`018_profile_pictures.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| name | TEXT, primary key | the person's name, as in `profiles` | Profile settings |
+| picture | TEXT, not null | the picture as base64: a 256 by 256 WebP the dashboard re-encoded from the upload, so none of the file's own data (where a photo was taken, the camera) is kept | same |
+| content_type | TEXT, not null | `image/webp` | same |
+| updated_at | TEXT timestamp, not null | when it was set; the picture's address carries it, so a new picture shows at once | same |
+
+Remove deletes the row, and the initials show again.
 
 ## Table: worker_jobs
 
