@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  draftPageCallId,
   draftBadge,
   draftBlock,
   draftFormat,
@@ -177,4 +178,16 @@ test("No news yet moves the date on, and results read in words", () => {
   assert.equal(pushDate("2026-12-15", 60), "2027-02-13");
   assert.deepEqual(["won", "lost", "withdrawn", "cancelled_by_agency", "odd"].map(resultWord),
     ["won", "lost", "withdrawn", "cancelled by the agency", "odd"]);
+});
+
+test("a draft page's address names its call; the Proposals views and deeper paths do not (9 Nov 2026)", () => {
+  assert.equal(draftPageCallId("/proposals/sam-123"), "sam-123");
+  assert.equal(draftPageCallId("/proposals/sam-123/"), "sam-123");
+  assert.equal(draftPageCallId("/proposals/vulcan%3A42"), "vulcan:42");
+  assert.equal(draftPageCallId("/proposals"), null);
+  assert.equal(draftPageCallId("/proposals/submitted"), null);
+  assert.equal(draftPageCallId("/proposals/results"), null);
+  assert.equal(draftPageCallId("/proposals/a/b"), null);
+  assert.equal(draftPageCallId("/calls"), null);
+  assert.equal(draftPageCallId("/proposals/%E0%A4%A"), null);   // not a valid encoding
 });

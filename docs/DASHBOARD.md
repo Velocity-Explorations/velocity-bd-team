@@ -251,6 +251,9 @@ the company's), or cancelled. Dark only.
   it, so two people's decisions are never mixed up.
 - **Every page:** signed out, every page goes to `/login`, and back to the page asked for after
   sign-in (`proxy.ts`). The sign-in page, its files, Auth.js's routes and `/healthz` need no session.
+  The proxy also answers 404 for a draft page (`/proposals/<call id>`) whose call the ledger does not
+  hold (9 Nov 2026): every page streams from the start (`app/loading.tsx`), which fixes the status at
+  200, so the page's own `notFound()` could show the 404 page but not send the code.
 - **Who decides:** the session alone says who is deciding, checked on every page and action. The name
   picker and its cookie count for nothing, so owner-only actions are enforced rather than courtesy
   checks. Log out is in the account menu and ends the session.
