@@ -304,3 +304,20 @@ export const RESULTS: { value: string; label: string }[] = [
 export function resultWord(result: string): string {
   return result === "cancelled_by_agency" ? "cancelled by the agency" : result;
 }
+
+/** The Proposals views that sit beside the draft pages (app/proposals/submitted and results), so are no call. */
+const PROPOSAL_VIEWS = new Set(["submitted", "results"]);
+
+/**
+ * The call a draft page's address names (/proposals/<call id>), or null for any other address (9 Nov 2026). The proxy
+ * uses it to answer 404 for a call the ledger does not hold.
+ */
+export function draftPageCallId(path: string): string | null {
+  const match = /^\/proposals\/([^/]+)\/?$/.exec(path);
+  if (!match || PROPOSAL_VIEWS.has(match[1])) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}

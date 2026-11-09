@@ -53,3 +53,11 @@ def test_each_address_presses_its_card_and_keeps_the_bar(page: Any, path: str) -
     assert "Portals" in bar.inner_text()
     assert bar.get_by_role("button", name="Table settings").count() == 0
     assert page.locator("table.proposals-table").count() + page.locator(".empty").count() >= 1
+
+
+def test_a_draft_page_for_an_unknown_call_answers_404(page: Any) -> None:
+    """9 Nov 2026: every page streams from the start (app/loading.tsx), so the page's own notFound() could only say so
+    with a 200. The proxy checks the call first, and an unknown one gets Next's 404."""
+    assert page.request.get(URL + "/proposals/no-such-call").status == 404
+    assert page.request.get(URL + "/proposals").status == 200
+    assert page.request.get(URL + "/proposals/submitted").status == 200
