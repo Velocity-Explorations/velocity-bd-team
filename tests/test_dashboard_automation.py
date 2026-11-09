@@ -59,7 +59,7 @@ def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed
     assert row.locator(".fit-mix").count() == 2
     # David, 9 Nov: one Calls column, with how many are mostly this work under the count on Work rows
     heads = [t.strip() for t in page.locator(".fit-section#work thead th").all_inner_texts()]
-    assert heads[:2] == ["Work", "Calls"] and "Primary focus of call" not in heads
+    assert heads[:3] == ["Work", "Rating and note", "Calls"] and "Primary focus of call" not in heads   # David, 9 Nov
     assert re.fullmatch(r"\d+ as primary focus", row.locator("td .fit-focus .meta").inner_text().strip())
     assert page.locator(".fit-section#customer .fit-focus").count() == 0
     # and every column header explains itself on hover or keyboard focus
@@ -86,7 +86,8 @@ def test_a_fit_note_shows_whole_and_saving_it_keeps_the_rating(page: Any) -> Non
             assert form.locator("button.fit-clear").count() == 1
         else:
             assert slider.get_attribute("aria-valuetext") == "not rated" and form.locator("button.fit-clear").count() == 0
-        assert form.locator("button", has_text="Save note").get_attribute("name") is None
+        assert form.locator("button", has_text="Save note").count() == 0   # David, 9 Nov: a note saves as it is typed
+        assert note.is_disabled() == (not rating)   # a note needs a rating
 
 
 def test_fit_ratings_does_not_scroll_sideways_at_a_laptop_width(page: Any) -> None:

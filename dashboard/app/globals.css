@@ -4375,19 +4375,27 @@ button[disabled] {
   font-weight: 600;
 }
 
+/* A rating's note saves as it is typed (David, 9 Nov 2026), so it has the cell's width and grows with its text. */
 .fit-note {
-  display: flex;
-  gap: 6px;
-}
-
-.fit-note {
-  align-items: flex-start;
+  display: grid;
+  gap: 2px;
 }
 
 .fit-note textarea {
-  flex: 1;
+  width: 100%;
   min-width: 0;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
+}
+
+.fit-note textarea:disabled {
+  opacity: 0.6;
+}
+
+.fit-note-state {
+  min-height: 1em;
+  color: var(--ink-3);
+  font: var(--type-detail);
 }
 
 @media (max-width: 900px) {
