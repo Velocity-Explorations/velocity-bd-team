@@ -141,12 +141,12 @@ on the dashboard; `run.py --apply-requests` carries out approved requests. Added
 | Column | Type | Values | Written by |
 |---|---|---|---|
 | id | INTEGER, primary key, auto-increment | the number people see, as in "request #12" | database |
-| kind | TEXT, not null | `keyword_change`, `rereview`, `scan`, `draft`, `fault_report` | propose tool (`create_request`) |
+| kind | TEXT, not null | `keyword_change`, `rereview`, `scan`, `fault_report`; `draft` was retired on 9 Nov 2026 (a draft starts from Start the draft), and the table's check still allows it though nothing writes it | propose tool (`create_request`) |
 | portal | TEXT | portal slug the request concerns, for example `vulcan_sof` | propose tool |
-| call_id | TEXT | `calls.id`, for `rereview` and `draft` | propose tool |
+| call_id | TEXT | `calls.id`, for `rereview` | propose tool |
 | summary | TEXT, not null | one line in words, for example `Vulcan SOF keywords: add broad keyword 'digital twin'` | propose tool |
 | reason | TEXT | why the person asked, in their words | propose tool |
-| payload | TEXT JSON | what to do: `{"changes": {...}}` for a keyword change, with the lists `add_broad`, `remove_broad`, `add_tight`, `remove_tight`, `add_block`, `remove_block`; `{"context": "..."}` for a re-review; `{"notes": "..."}` for a draft; `{"title": "...", "body": "..."}` for a fault report; `{}` for a scan | propose tool |
+| payload | TEXT JSON | what to do: `{"changes": {...}}` for a keyword change, with the lists `add_broad`, `remove_broad`, `add_tight`, `remove_tight`, `add_block`, `remove_block`; `{"context": "..."}` for a re-review; `{"title": "...", "body": "..."}` for a fault report; `{}` for a scan | propose tool |
 | preview | TEXT JSON | object with at least `text`: what approving would do, shown on the dashboard | propose tool |
 | status | TEXT, not null, default `proposed` | `proposed`, `approved`, `rejected`, `applying`, `applied`, `failed` | see the lifecycle below |
 | requested_by | TEXT, not null | who asked: a person's name, or `command line`; set by the code running the tool, never by the model | propose tool |
@@ -155,7 +155,7 @@ on the dashboard; `run.py --apply-requests` carries out approved requests. Added
 | decided_at | TEXT timestamp | | same |
 | decision_note | TEXT | optional note given with the decision | same |
 | applied_at | TEXT timestamp | when it was carried out | `run.py --apply-requests` (`finish_request`) |
-| result | TEXT | what happened, or `Waiting: ...` while an approved request cannot run yet | `run.py --apply-requests`; the Writer, for drafts |
+| result | TEXT | what happened, or `Waiting: ...` while an approved request cannot run yet | `run.py --apply-requests` |
 | updated_at | TEXT timestamp, not null | touched by every write | every writer |
 
 Index: `(status, id)`.

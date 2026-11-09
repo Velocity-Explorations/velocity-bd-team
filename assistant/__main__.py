@@ -15,7 +15,6 @@ Change requests (approved on the dashboard, carried out by `python run.py --appl
     python -m assistant propose keyword vulcan_sof --add-broad "digital twin" --reason "..." --by "David Wood"
     python -m assistant propose rereview <call id> --context "It is a software layer, not hardware."
     python -m assistant propose scan vulcan_sof
-    python -m assistant propose draft <call id> [--notes "Lead with Echo C2."]
     python -m assistant propose fault vulcan_sof --description "Logins have failed twice this week."
     python -m assistant requests [--status proposed]
 
@@ -90,13 +89,10 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--context", required=True)
     s = kinds.add_parser("scan", help="scan one portal now")
     s.add_argument("portal")
-    d = kinds.add_parser("draft", help="start a response draft for one call")
-    d.add_argument("call_id")
-    d.add_argument("--notes", default="")
     f = kinds.add_parser("fault", help="report a scraper fault as a GitHub issue")
     f.add_argument("portal")
     f.add_argument("--description", required=True)
-    for p in (k, r, s, d, f):
+    for p in (k, r, s, f):
         if p is not f:
             p.add_argument("--reason", default="", help="why it is needed")
         p.add_argument("--by", default="command line", help="who is asking (default: command line)")
@@ -112,8 +108,6 @@ def _propose(args: argparse.Namespace) -> dict[str, Any]:
         return requests.propose_rereview(args.call_id, args.context, reason=args.reason, requested_by=args.by)
     if args.kind == "scan":
         return requests.propose_scan(args.portal, reason=args.reason, requested_by=args.by)
-    if args.kind == "draft":
-        return requests.propose_draft(args.call_id, notes=args.notes, reason=args.reason, requested_by=args.by)
     return requests.propose_fault_report(args.portal, args.description, requested_by=args.by)
 
 

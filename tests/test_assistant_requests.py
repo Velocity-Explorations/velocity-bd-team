@@ -73,20 +73,14 @@ def test_propose_scan_says_when_the_last_scan_ran(ledger_db: str, portal: Portal
     assert rq.propose_scan("example")["duplicate"]
 
 
-def test_propose_draft_starts_from_the_brief(ledger_db: str, portal: Portal) -> None:
-    run = lq.start_run("Example")
-    add_call("ex-open", "Open call", run, due_date=due(10), extra={"ex_files_required": ["White paper"]})
-    r = rq.propose_draft("ex-open", notes="Lead with Echo C2.", requested_by="Dana")
-    req = lq.get_request(r["request_id"])
-    assert req["kind"] == "draft" and req["summary"] == "Start a response draft for 'Open call'"
-    assert json.loads(req["payload"]) == {"notes": "Lead with Echo C2."}
-    assert "Files required: White paper." in json.loads(req["preview"])["text"]
-    add_call("ex-past", "Past call", run, due_date=due(-2))
-    with pytest.raises(tools.ToolError, match="passed"):
-        rq.propose_draft("ex-past")
-    add_call("ex-closed", "Closed call", run, due_date=due(5), extra={"ex_closed": True})
-    with pytest.raises(tools.ToolError, match="closed"):
-        rq.propose_draft("ex-closed")
+def test_draft_requests_are_retired(ledger_db: str) -> None:
+    """David, 9 Nov 2026: a draft starts from Start the draft on the dashboard, where a person picks the format and
+    the past work, so no tool or command proposes one and the ledger takes no new draft request."""
+    assert not hasattr(rq, "propose_draft")
+    assert "propose_draft" not in {t.name for t in tools.all_tools()}
+    assert "draft" not in lq.REQUEST_KINDS
+    with pytest.raises(ValueError, match="unknown request kind"):
+        lq.create_request("draft", "Start a response draft for 'Open call'", "Dana", call_id="ex-open")
 
 
 def test_propose_fault_report_writes_an_issue_from_the_evidence(ledger_db: str, portal: Portal) -> None:
@@ -119,7 +113,7 @@ def test_list_change_requests_reads_the_queue(ledger_db: str, portal: Portal) ->
 
 def test_request_tools_are_registered_and_never_take_requested_by() -> None:
     by_name = {t.name: t for t in tools.all_tools()}
-    for name in ("propose_keyword_change", "propose_rereview", "propose_scan", "propose_draft", "propose_fault_report"):
+    for name in ("propose_keyword_change", "propose_rereview", "propose_scan", "propose_fault_report"):
         assert by_name[name].permission == "propose"
         assert "requested_by" not in by_name[name].parameters["properties"]
     assert by_name["list_change_requests"].permission == "read"

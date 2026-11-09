@@ -351,7 +351,8 @@ def list_proposals(portal: str | None = None, outcome: str | None = None) -> lis
 # The assistant's approval queue (docs/ASSISTANT.md). Every status change is guarded by the
 # status it expects, so a request is decided once and carried out once.
 
-REQUEST_KINDS = ("keyword_change", "rereview", "scan", "draft", "fault_report")
+# No 'draft' since 9 Nov 2026 (David): a draft starts from Start the draft. The table's check still allows it.
+REQUEST_KINDS = ("keyword_change", "rereview", "scan", "fault_report")
 REQUEST_OUTCOMES = ("applied", "failed")
 OPEN_REQUEST_STATUSES = ("proposed", "approved", "applying")
 

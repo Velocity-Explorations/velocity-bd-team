@@ -1,7 +1,8 @@
 // Change requests (docs/LEDGER_SCHEMA.md, table change_requests): the allowed values and
 // small parsers for the Requests page. No imports, so `node --test` can load it directly.
 
-export const REQUEST_KINDS = ["keyword_change", "rereview", "scan", "draft", "fault_report"] as const;
+// No "draft" since 9 Nov 2026 (David): a draft starts from Start the draft.
+export const REQUEST_KINDS = ["keyword_change", "rereview", "scan", "fault_report"] as const;
 export const REQUEST_STATUSES = ["proposed", "approved", "rejected", "applying", "applied", "failed"] as const;
 
 export type RequestKind = (typeof REQUEST_KINDS)[number];
@@ -11,7 +12,6 @@ export const KIND_LABELS: Record<RequestKind, string> = {
   keyword_change: "Keyword change",
   rereview: "Re-review",
   scan: "Scan now",
-  draft: "Start a draft",
   fault_report: "Fault report",
 };
 
@@ -43,7 +43,6 @@ export function previewText(preview: string | null | undefined): string {
 /** What happens next, or what happened, for a request that has been decided. */
 export function nextStep(kind: string, status: string, result: string | null): string {
   if (status === "approved") {
-    if (kind === "draft") return "Approved. The Writer starts the draft once it is built.";
     if (result) return result;
     return `Approved. The scan machine carries it out ${APPLY_WHEN}.`;
   }

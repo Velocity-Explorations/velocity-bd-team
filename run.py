@@ -77,7 +77,7 @@ BAD_PAGES_MIN = 3          # alert when at least this many pages read badly...
 BAD_PAGES_SHARE = 0.10     # ...and at least this share of the scan
 LOCK_POLL_S = 15
 REMIND_DAYS = 14
-APPLY_KINDS = ("keyword_change", "rereview", "scan", "fault_report")   # drafts belong to the Writer
+APPLY_KINDS = ("keyword_change", "rereview", "scan", "fault_report")
 SETTINGS_BRANCH = "main"
 BRIEF_TOP = 10              # calls in the Monday brief's Top 10 across portals
 BRIEF_AUTHOR = "pipeline"   # briefs.written_by; a portal's bot may write its own brief later
@@ -1092,9 +1092,9 @@ ASSISTANT_PROPOSES = ("propose_keyword_change", "propose_rereview", "propose_sca
 
 def assistant_tools() -> list[Any]:
     """The tools Ask Grok may call: every read tool, then company_facts, and three propose tools (David, 7 Nov 2026), each
-    only recording a request a person approves on the Requests page. Not propose_draft: drafts start from Start the draft,
-    and nothing carries out an approved draft request. Not propose_fault_report: an approved one becomes a GitHub issue on
-    the public repo, which a person should write."""
+    only recording a request a person approves on the Requests page. Drafts start from Start the draft, so there is no
+    draft request. Not propose_fault_report: an approved one becomes a GitHub issue on the public repo, which a person
+    should write."""
     from assistant.tools import all_tools
 
     return [t for t in all_tools() if t.permission == "read" or t.name in ASSISTANT_PROPOSES] + [company_facts_tool()]
