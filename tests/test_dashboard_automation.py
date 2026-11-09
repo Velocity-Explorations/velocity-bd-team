@@ -79,6 +79,8 @@ def test_a_fit_note_shows_whole_and_saving_it_keeps_the_rating(page: Any) -> Non
     for form in page.locator(".fit-form").all()[:12]:
         note = form.locator("textarea")
         assert note.evaluate("n => n.scrollHeight <= n.clientHeight + 2")   # nothing is cut off
+        assert note.get_attribute("rows") == "3"   # David, 9 Nov: three lines to start, growing with a longer note
+        assert note.evaluate("n => n.clientHeight >= 3 * parseFloat(getComputedStyle(n).lineHeight)")
         rating = form.locator("input[type=hidden][name=rating]").input_value()
         slider = form.locator("input[type=range].fit-slider")
         if rating:   # Save note sends the rating the slider holds; Clear is offered only on a rated row

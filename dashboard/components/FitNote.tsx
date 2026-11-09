@@ -37,7 +37,7 @@ export function FitNote({ id, name, note, rated }: { id: string; name: string; n
     return () => window.clearTimeout(done);
   }, [state]);
 
-  useEffect(() => {   // the box grows with the note, so nothing is hidden behind a scroll bar
+  useEffect(() => {   // three lines to start (David, 9 Nov 2026), growing with a longer note so none of it is hidden
     const el = box.current;
     if (!el) return;
     el.style.height = "auto";
@@ -64,7 +64,7 @@ export function FitNote({ id, name, note, rated }: { id: string; name: string; n
         name="note"
         value={text}
         maxLength={500}
-        rows={Math.max(1, Math.ceil(note.length / 48))}
+        rows={3}
         disabled={!rated}
         placeholder={rated ? "Note: why, or when it changes. It saves as you type." : "Rate it first to add a note"}
         onChange={(event) => {
