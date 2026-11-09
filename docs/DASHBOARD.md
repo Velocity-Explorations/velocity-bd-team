@@ -286,6 +286,10 @@ of the window says Saving, Saved or what went wrong (`components/AutoSaveForm.ts
   preview: a choice saves at once and the bar switches without a reload. Every theme times its loop
   from one clock that runs while the tab is visible, so moving between pages, or the loading
   screen's copy of the bar, carries on from the same frame; reduced motion shows a still frame.
+  Deep field's stars and craft paint opaque greys blended with lighten, so where they overlap the
+  brighter shows, never the sum, and the satellite flies bright (45%) only in a lane clear of every
+  label (not on a phone, where the bar's first row starts at the top). Silver labels keep at least
+  4.5:1 on every frame.
 - **Where the dashboard opens:** Home, or Calls. Opening `/` from outside the dashboard (a bookmark,
   a typed address, a Slack link) takes a person who chose Calls to Needs review. Home stays one
   click away (U3).

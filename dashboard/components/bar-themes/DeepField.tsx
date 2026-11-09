@@ -80,7 +80,7 @@ export function DeepField() {
               "--tile": `${l.tile}px`,
               "--tile-h": `${DEEP_FIELD.tileHeight}px`,
               "--dur": `${l.seconds}s`,
-              "--alpha": l.opacity,
+              "--mix": `${Math.round(l.opacity * 1000) / 10}%`,   // the layer's ink in the ground, opaque (globals.css)
               maskImage: l.mask,
               WebkitMaskImage: l.mask,
             } as CSSProperties
@@ -94,7 +94,34 @@ export function DeepField() {
 
 // ---------------------------------------------------------------- craft
 
-type Craft = { id: number; type: CraftType; dir: 1 | -1; y: number; w: number; ms: number };
+type Craft = { id: number; type: CraftType; dir: 1 | -1; y: number; w: number; ms: number; bright: boolean };
+
+/**
+ * How far below the bar's top its highest text or icon starts, in px (David, 9 Nov 2026). The handoff put the bright
+ * satellite at y 6 on the understanding that labels start at about y 12; on a phone the bar's first row starts at the
+ * very top, so the satellite would cross "BD Team" at 45% ink. Read once per crossing, not per frame.
+ */
+function skyAbove(lane: HTMLElement): number {
+  const bar = lane.closest(".topbar");
+  if (!bar) return 0;
+  const top = lane.getBoundingClientRect().top;
+  let highest = Infinity;
+  const walk = document.createTreeWalker(bar, NodeFilter.SHOW_TEXT);
+  while (walk.nextNode()) {
+    const node = walk.currentNode;
+    if (!node.textContent?.trim() || node.parentElement?.closest(".topbar-fx")) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    for (const rect of range.getClientRects()) highest = Math.min(highest, rect.top - top);
+  }
+  for (const el of bar.querySelectorAll("svg, img")) {
+    if (!el.closest(".topbar-fx")) highest = Math.min(highest, el.getBoundingClientRect().top - top);
+  }
+  return highest;
+}
+
+/** The satellite's bright lane needs this much clear sky above the bar's content: its trail is 1 px at satelliteY. */
+const SATELLITE_CLEARANCE = 4;
 
 function pickType(): CraftType {
   const entries = Object.entries(DEEP_FIELD.craft) as [CraftType, { weight: number }][];
@@ -130,11 +157,14 @@ function CraftLane({ paused }: { paused: boolean }) {
     const type = pickType();
     // Shuttles and rockets always fly left to right; the others pick a side.
     const dir: 1 | -1 = (type === "ufo" || type === "satellite") && Math.random() < 0.5 ? -1 : 1;
-    const y = type === "satellite" ? DEEP_FIELD.satelliteY : 4 + Math.random() * Math.max(0, h - 16);
+    // The satellite flies bright in its lane only where that lane is clear of every label; otherwise it flies like
+    // the rest, in any lane at craft brightness.
+    const bright = type === "satellite" && skyAbove(lane) >= DEEP_FIELD.satelliteY + SATELLITE_CLEARANCE;
+    const y = bright ? DEEP_FIELD.satelliteY : 4 + Math.random() * Math.max(0, h - 16);
     const [lo, hi] = DEEP_FIELD.widthFactor;
     const factor = Math.min(hi, Math.max(lo, w / DEEP_FIELD.referenceWidth));
     const ms = DEEP_FIELD.craft[type].seconds * 1000 * factor;
-    setCraft({ id: ++nextId.current, type, dir, y, w, ms });
+    setCraft({ id: ++nextId.current, type, dir, y, w, ms, bright });
   };
 
   // Fly the current craft across, then clear it and wait for the next one.
@@ -189,7 +219,7 @@ function CraftLane({ paused }: { paused: boolean }) {
     <div ref={laneRef} className="topbar-deep-lane">
       {craft && (
         <div key={craft.id} ref={craftRef} className="topbar-deep-craft" data-dir={craft.dir}>
-          <CraftGlyph type={craft.type} />
+          <CraftGlyph type={craft.type} bright={craft.bright} />
         </div>
       )}
     </div>

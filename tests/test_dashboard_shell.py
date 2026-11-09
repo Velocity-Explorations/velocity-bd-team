@@ -317,3 +317,19 @@ def test_every_bar_theme_keeps_its_timing_through_the_build(page: Any) -> None:
     assert timing["drift_a"] == ["topbar-drift-a", "30s", "infinite", "alternate"]
     assert timing["drift_b"] == ["topbar-drift-b", "30s", "infinite", "alternate"]
     assert timing["stars"] == ["topbar-deep-drift", "90s", "infinite", "normal"]
+
+
+def test_deep_fields_stars_and_craft_never_add_up_behind_a_label(page: Any) -> None:
+    """9 Nov 2026: each star layer and each craft paints its own opaque grey and blends with lighten, so where two
+    overlap the brighter shows, never the sum, and no pixel behind a label is brighter than the brightest single star."""
+    open_page(page, "/review")
+    layers = page.evaluate("""() => [...document.querySelectorAll('header.topbar .topbar-deep-stars')].map(e => {
+      const s = getComputedStyle(e); return [s.mixBlendMode, s.opacity, s.backgroundColor]; })""")
+    assert len(layers) == 3
+    for blend, opacity, colour in layers:
+        assert blend == "lighten" and opacity == "1", (blend, opacity)
+        assert "/" not in colour and "rgba" not in colour, colour   # an opaque grey, not ink at an alpha
+    probe = page.evaluate("""() => { const el = document.createElement('div'); el.className = 'topbar-deep-craft';
+      document.querySelector('header.topbar .topbar-deep').appendChild(el);
+      const blend = getComputedStyle(el).mixBlendMode; el.remove(); return blend; }""")
+    assert probe == "lighten"
