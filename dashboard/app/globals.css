@@ -149,6 +149,7 @@ td.when {
   --fx-ink: var(--ink, #F5F5F5);
   --fx-line: var(--line-subtle, #333333);
   --fx-accent: var(--accent, #FFCB03);
+  --fx-ground: var(--ground, #1E1E1E);
   position: relative;
   isolation: isolate; /* effects paint above the ground, below all bar content */
   /* Not in the handoff: the isolation makes the bar a layer of its own, which would trap the account menu under the
@@ -183,8 +184,11 @@ td.when {
   left: 0;
   width: calc(100% + var(--tile));
   height: 100%;
-  background: var(--fx-ink);
-  opacity: var(--alpha);
+  /* Not the handoff's ink at an opacity: the layer's ink mixed into the ground, opaque, blended with lighten. Where a
+     star passes over another star or a craft, the brighter shows, never the sum, so nothing behind a label is brighter
+     than the brightest single star (David, 9 Nov 2026). Over plain ground it looks the same. */
+  background: color-mix(in srgb, var(--fx-ink) var(--mix), var(--fx-ground));
+  mix-blend-mode: lighten;
   -webkit-mask-repeat: repeat;
   mask-repeat: repeat;
   -webkit-mask-size: var(--tile) var(--tile-h);
@@ -209,6 +213,7 @@ td.when {
   position: absolute;
   left: 0;
   top: 0;
+  mix-blend-mode: lighten; /* over a star, the brighter of the two, as for the stars */
   will-change: transform;
 }
 
