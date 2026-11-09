@@ -59,8 +59,13 @@ def band_of(score: int) -> str:
     return "strong" if score >= STRONG else "possible" if score >= POSSIBLE else "weak"
 
 
+def _said(rating: str) -> str:
+    """A rating as the dashboard's slider names it: core is Core (David, 9 Nov 2026)."""
+    return rating.capitalize()
+
+
 def _ruled_out(what: str) -> Fit:
-    return Fit(0, RULED_OUT, [f"Ruled out: {what} is rated never"])
+    return Fit(0, RULED_OUT, [f"Ruled out: {what} is rated {_said(NEVER)}"])
 
 
 def _judged(names: Sequence[str], group: str, ratings: Mapping[str, str]) -> tuple[float, bool]:
@@ -96,7 +101,7 @@ def _keywords(call: Mapping[str, Any], ratings: Mapping[str, str]) -> tuple[floa
             counted.append((str(word), rating))
     if not counted:
         return VALUES[NEUTRAL], []
-    return sum(VALUES[rating] for _, rating in counted) / len(counted), [f"Keyword {word}: {rating}" for word, rating in counted]
+    return sum(VALUES[rating] for _, rating in counted) / len(counted), [f"Keyword {word}: {_said(rating)}" for word, rating in counted]
 
 
 def band_line(bands: Mapping[str, int]) -> str:
@@ -142,9 +147,9 @@ def score_call(call: Mapping[str, Any], tags_by_source: Mapping[str, Sequence[st
         return None
     work, work_out = _judged(named, "work", ratings)
     if work_out:
-        return _ruled_out(f"main work {' and '.join(named)}")
-    why = [f"Main work {named[0]}: {ratings.get(f'work.{slug(named[0])}', NEUTRAL)}" if len(named) == 1
-           else f"Main work {' or '.join(named)}: judges differ"]
+        return _ruled_out(f"primary focus {' and '.join(named)}")   # the reasons say primary focus (David, 9 Nov 2026)
+    why = [f"Primary focus {named[0]}: {_said(ratings.get(f'work.{slug(named[0])}', NEUTRAL))}" if len(named) == 1
+           else f"Primary focus {' or '.join(named)}: judges differ"]
 
     code = str(call.get("naics_code") or "").strip()
     naics = NEUTRAL
@@ -170,23 +175,23 @@ def score_call(call: Mapping[str, Any], tags_by_source: Mapping[str, Sequence[st
             return _ruled_out(f"type {picked[0]}")
         rating = ratings.get(f"type.{slug(picked[0])}", NEUTRAL)
         if len(set(picked)) == 1 and rating != NEUTRAL:
-            why.append(f"Type {picked[0]}: {rating}")
+            why.append(f"Type {picked[0]}: {_said(rating)}")
     notice = ratings.get(f"notice.{slug(str(call.get('type') or ''))}", NEUTRAL)
     if notice != NEUTRAL:
         kind = (kind + VALUES[notice]) / 2
-        why.append(f"Notice {call.get('type')}: {notice}")
+        why.append(f"Notice {call.get('type')}: {_said(notice)}")
 
     def tagged(group: str) -> list[str]:
         return list(dict.fromkeys(name for names in by_group.get(group, {}).values() for name in names))
 
     customer, customer_name, customer_rating = _best(tagged("customer"), "customer", ratings)
     if customer_rating != NEUTRAL:
-        why.append(f"Customer {customer_name}: {customer_rating}")
+        why.append(f"Customer {customer_name}: {_said(customer_rating)}")
     access, access_name, access_rating = _best(tagged("access"), "access", ratings)
     if access_rating != NEUTRAL:
-        why.append(f"Access {access_name}: {access_rating}")
+        why.append(f"Access {access_name}: {_said(access_rating)}")
     if naics != NEUTRAL:
-        why.append(f"NAICS {code}: {naics}")
+        why.append(f"NAICS {code}: {_said(naics)}")
     keyword, keyword_why = _keywords(call, ratings)
     why += keyword_why
 
