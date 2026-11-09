@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { resetProfileAction } from "@/app/actions";
 import { AutoSaveForm } from "@/components/AutoSaveForm";
+import { BarThemeHelp, BarThemeSetting } from "@/components/bar-themes/BarThemeSetting";
 import { Avatar } from "@/components/Avatar";
 import { PictureField } from "@/components/PictureField";
 import { preloadShell, Shell } from "@/components/Shell";
@@ -25,7 +26,7 @@ const STATES = [
   { value: "closed", label: "Closed" },
 ];
 
-function Setting({ name, help, children }: { name: string; help: string; children: ReactNode }) {
+function Setting({ name, help, children }: { name: string; help: ReactNode; children: ReactNode }) {
   return (
     <div className="setting-row">
       <div className="setting-label">
@@ -84,6 +85,10 @@ export default async function ProfilePage({ searchParams }: { searchParams: Sear
 
             <Setting name="Picture" help="Shown in place of your initials. A JPEG, PNG, WebP or GIF, cropped to a square; it saves as soon as you choose it.">
               <PictureField initials={shownInitials} picture={picture} />
+            </Setting>
+
+            <Setting name="Top bar animation" help={<BarThemeHelp />}>
+              <BarThemeSetting value={profile?.bar_theme} />
             </Setting>
 
             <Setting name="Signed-in account" help="The Google account you signed in with, shown once Google sign-in is live (PRO-477).">

@@ -10,6 +10,8 @@ export type ProfileFields = {
   opens: "home" | "calls";
   default_filters: DefaultFilters | null;
   time_zone: string | null;
+  /** The top bar's theme (David, 9 Nov 2026); null follows the default (lib/barthemes.ts). */
+  bar_theme: string | null;
 };
 
 const NO_FILTERS: DefaultFilters = { portals: [], tag: "", state: "" };
@@ -76,7 +78,7 @@ export function isValidTimeZone(zone: string): boolean {
 export function profileFromForm(
   form: { get(key: string): string[] | undefined },
   name: string,
-  known: { portals: string[]; tags: string[] },
+  known: { portals: string[]; tags: string[]; barThemes: readonly string[]; defaultBarTheme: string },
 ): ProfileFields {
   const one = (key: string) => (form.get(key) ?? [])[0]?.trim() ?? "";
   const displayName = one("display_name").slice(0, 60);
@@ -85,12 +87,14 @@ export function profileFromForm(
   const tag = known.tags.includes(one("tag")) ? one("tag") : "";
   const filters: DefaultFilters = { portals, tag, state: pickState(one("state")) };
   const zone = one("time_zone");
+  const theme = one("bar_theme");
   return {
     display_name: displayName && displayName !== name ? displayName : null,
     initials: initials || null,
     opens: one("opens") === "calls" ? "calls" : "home",
     default_filters: portals.length || tag || filters.state ? filters : null,
     time_zone: isValidTimeZone(zone) ? zone : null,
+    bar_theme: known.barThemes.includes(theme) && theme !== known.defaultBarTheme ? theme : null,
   };
 }
 

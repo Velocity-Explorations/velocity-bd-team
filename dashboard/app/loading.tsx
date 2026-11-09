@@ -1,5 +1,6 @@
 import { Bot, FileText, House, Inbox, Workflow, type LucideIcon } from "lucide-react";
 import Link from "next/link";
+import { TopbarFxCarryOver } from "@/components/bar-themes/TopbarFx";
 import { SECTIONS, type Section } from "@/lib/nav";
 
 const ICONS: Record<Section, LucideIcon> = { home: House, calls: Inbox, proposals: FileText, automation: Workflow };
@@ -14,6 +15,7 @@ export default function Loading() {
   return (
     <>
       <div className="topbar">
+        <TopbarFxCarryOver />
         <Link href="/" className="brand">
           <img src="/velocity-mark-white.png" alt="" width={21} height={16} />
           BD Team

@@ -1,0 +1,189 @@
+/* Bar themes: Deep field (default), Line clear, Ground drift.
+   Append to dashboard/app/globals.css after the .topbar rules. */
+
+/* ---------------------------------------------------------------- shared */
+
+.topbar {
+  /* Map to dashboard/app/theme.css. Change the inner names if they differ. */
+  --fx-ink: var(--ink, #F5F5F5);
+  --fx-line: var(--line, #333333);
+  --fx-accent: var(--accent, #FFCB03);
+  position: relative;
+  isolation: isolate; /* effects paint above the ground, below all bar content */
+}
+
+/* The effect layer: first child of .topbar. Clips here, never on .topbar,
+   so the account menu and other popovers are not cut off. */
+.topbar-fx {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  color: var(--fx-ink);
+}
+
+.topbar-fx[data-paused] * {
+  animation-play-state: paused !important;
+}
+
+/* ---------------------------------------------------------------- deep field */
+
+.topbar-deep-stars {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% + var(--tile));
+  height: 100%;
+  background: var(--fx-ink);
+  opacity: var(--alpha);
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  -webkit-mask-size: var(--tile) var(--tile-h);
+  mask-size: var(--tile) var(--tile-h);
+  -webkit-mask-position: 0 0;
+  mask-position: 0 0;
+  animation: topbar-deep-drift var(--dur) linear infinite;
+  will-change: transform;
+}
+
+@keyframes topbar-deep-drift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(calc(-1 * var(--tile))); }
+}
+
+.topbar-deep-lane { position: absolute; inset: 0; }
+
+.topbar-deep-craft {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.topbar-deep-glyph {
+  position: absolute;
+  left: -10px; /* centre the 20 x 10 glyph on the animated point */
+  top: -5px;
+  display: block;
+  overflow: visible; /* trails extend left of the glyph box */
+}
+
+.topbar-deep-craft[data-dir="-1"] .topbar-deep-glyph { transform: scaleX(-1); }
+
+/* ---------------------------------------------------------------- line clear */
+
+.topbar-lines {
+  /* fade the left edge, where pieces arrive */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 48px);
+  mask-image: linear-gradient(90deg, transparent, #000 48px);
+}
+
+.topbar-lines-cell {
+  position: absolute;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--fx-ink) 2%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fx-ink) 4.5%, transparent);
+  border-radius: 1px;
+  will-change: transform, opacity;
+}
+
+/* ---------------------------------------------------------------- ground drift */
+
+.topbar-drift-track {
+  position: absolute;
+  inset: 0;
+  animation: 30s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+  will-change: transform;
+}
+
+.topbar-drift-a { animation-name: topbar-drift-a; }
+.topbar-drift-b { animation-name: topbar-drift-b; }
+
+/* 45% of the bar width: the pools pass each other near the middle */
+@keyframes topbar-drift-a { to { transform: translateX(45%); } }
+@keyframes topbar-drift-b { to { transform: translateX(-45%); } }
+
+.topbar-drift-pool {
+  position: absolute;
+  top: -100px;
+  width: 640px;
+  height: 256px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--fx-ink) 4.5%, transparent), transparent);
+}
+
+.topbar-drift-a .topbar-drift-pool { left: -200px; }               /* rests behind the mark */
+.topbar-drift-b .topbar-drift-pool { left: calc(100% - 440px); }   /* rests behind the account */
+
+/* ---------------------------------------------------------------- reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar-deep-stars,
+  .topbar-drift-track {
+    animation: none;
+  }
+  /* Deep field renders no craft; Line clear starts no animations,
+     so its cells show the full row. */
+}
+
+/* ---------------------------------------------------------------- settings control */
+/* Replace with the settings page's own option styles if it has them. */
+
+.bar-theme-setting {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bar-theme-setting-legend {
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fx-ink);
+}
+
+.bar-theme-setting-help {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted, #BEBEBE);
+}
+
+.bar-theme-setting-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.bar-theme-setting-option {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--fx-line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.bar-theme-setting-option:hover { border-color: #454545; }
+.bar-theme-setting-option[data-checked] { border-color: var(--fx-accent); }
+
+.bar-theme-setting-option input {
+  grid-row: 1 / span 2;
+  margin: 0;
+  accent-color: var(--fx-accent);
+}
+
+.bar-theme-setting-option input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fx-accent) 32%, transparent);
+}
+
+.bar-theme-setting-name { font-size: 14px; font-weight: 500; color: var(--fx-ink); }
+.bar-theme-setting-desc { grid-column: 2; font-size: 13px; color: var(--muted, #BEBEBE); }

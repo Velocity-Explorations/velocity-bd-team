@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `018_profile_pictures.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `019_bar_theme.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -553,6 +553,7 @@ devices. Added by `008_pursuits.sql`.
 | opens | TEXT, not null, default `home` | where the dashboard opens: `home` or `calls` (U3) | same |
 | default_filters | TEXT JSON | the filters Calls opens with (U4): `{"portals": [...], "tag": "", "state": ""}`, state `open`, `closed` or empty; NULL for none | same |
 | time_zone | TEXT | an IANA time zone such as `America/New_York` (U5); NULL keeps the dashboard's `America/Denver` | same |
+| bar_theme | TEXT | the top bar's theme (migration 019, David 9 Nov 2026): `line-clear` or `ground-drift`; NULL, `deep-field` or a value no longer offered shows Deep field, the default (`dashboard/lib/barthemes.ts`) | same |
 | updated_at | TEXT timestamp, not null | | same |
 
 ## Table: profile_pictures

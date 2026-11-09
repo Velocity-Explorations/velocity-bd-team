@@ -485,3 +485,7 @@ CREATE TABLE IF NOT EXISTS profile_pictures (
   content_type  TEXT NOT NULL,
   updated_at    TEXT NOT NULL
 );
+
+-- 019_bar_theme: the top bar's theme each person picks; NULL shows the default.
+
+ALTER TABLE profiles ADD COLUMN bar_theme TEXT;

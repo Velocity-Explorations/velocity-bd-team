@@ -271,3 +271,49 @@ def test_a_question_asked_in_the_panel_gets_grok_s_answer(page: Any) -> None:
     assert last.get_attribute("data-state") == "done", last.inner_text()
     assert last.locator(".ask-answer").inner_text().strip()
     assert "grok-4.7" in last.locator(".meta").last.inner_text()
+
+
+def test_the_top_bar_draws_its_theme_behind_everything_in_it(page: Any) -> None:
+    """David, 9 Nov 2026: the bar's animation is its first child, under every label, badge, the yellow underline, Ask
+    Grok and the account button, and clipped to the bar so menus are not. Nobody has chosen here, so it is Deep field."""
+    open_page(page, "/review")
+    bar = page.locator("header.topbar")
+    fx = bar.locator(":scope > .topbar-fx")
+    assert fx.count() == 1 and fx.evaluate("e => e === e.parentElement.firstElementChild")
+    assert fx.get_attribute("aria-hidden") == "true"
+    assert "topbar-deep" in (fx.get_attribute("class") or "")
+    assert fx.locator(".topbar-deep-stars").count() == 3
+    style = fx.evaluate("e => { const s = getComputedStyle(e); return [s.position, s.zIndex, s.overflow, s.pointerEvents]; }")
+    assert style == ["absolute", "-1", "hidden", "none"]
+    assert bar.evaluate("e => { const s = getComputedStyle(e); return [s.isolation, s.overflow]; }") == ["isolate", "visible"]
+    for z in bar.locator(":scope > :not(.topbar-fx), nav a, .count-chip").evaluate_all("els => els.map(e => getComputedStyle(e).zIndex)"):
+        assert z in ("auto", "0") or int(z) >= 0, z   # nothing in the bar sits below the animation
+    # the token the theme paints with is the theme's own ink, not the fallback
+    assert bar.evaluate("e => getComputedStyle(e).getPropertyValue('--fx-ink').trim()") == bar.evaluate(
+        "e => getComputedStyle(e).getPropertyValue('--ink').trim()")
+
+
+def test_every_bar_theme_keeps_its_timing_through_the_build(page: Any) -> None:
+    """9 Nov 2026: the build's CSS minifier once turned Ground drift's nameless animation shorthand into
+    `animation: none`, so its pools never moved. Each theme's moving parts, as the built stylesheet styles them."""
+    open_page(page, "/review")
+    timing = page.evaluate("""() => {
+      const probe = (cls, vars) => {
+        const el = document.createElement('div');
+        el.className = cls;
+        Object.entries(vars).forEach(([k, v]) => el.style.setProperty(k, v));
+        document.querySelector('header.topbar .topbar-fx').appendChild(el);
+        const s = getComputedStyle(el);
+        const out = [s.animationName, s.animationDuration, s.animationIterationCount, s.animationDirection];
+        el.remove();
+        return out;
+      };
+      return {
+        drift_a: probe('topbar-drift-track topbar-drift-a', {}),
+        drift_b: probe('topbar-drift-track topbar-drift-b', {}),
+        stars: probe('topbar-deep-stars', { '--dur': '90s', '--tile': '320px' }),
+      };
+    }""")
+    assert timing["drift_a"] == ["topbar-drift-a", "30s", "infinite", "alternate"]
+    assert timing["drift_b"] == ["topbar-drift-b", "30s", "infinite", "alternate"]
+    assert timing["stars"] == ["topbar-deep-drift", "90s", "infinite", "normal"]
