@@ -9,6 +9,43 @@ portal content.
 
 ## Current Session
 
+**Date**: 2026-11-09 (covers 7 to 9 Nov)
+**Focus**: Listing kinds, Ask Grok, draft suggestions, the Fit ratings page reworked, and profile pictures
+
+### What Was Done
+- Listings are Call, Umbrella or Announcement (migration 015, #139); Home's Top 10 has a second tab for umbrellas and announcements to watch (#140). PR #119 merged.
+- Ask Grok: a chat panel on every page, answered by `run.py --assistant` (migration 016, #141 to #143); it may propose keyword changes, re-reviews and scans for a person to approve (#146).
+- Start the draft's Suggest: Claude recommends the format, approval mode, direction and Builds on picks (migration 017, #144, #145).
+- Fit ratings: Automation opens on it (#147); sliders from Never to Core (#148); primary focus inside Calls, header tooltips (#149, #150); Rating and note second, notes save as typed, three lines tall (#151, #152); Work renamed Capability area (#153); fit reasons say primary focus, 296 calls rescored (#154); one section per tab (#155); bigger row names (#156).
+- Profile settings: upload a picture (migration 018 `profile_pictures`, re-encoded with sharp, #157); every change saves as it is made (#158).
+- A brief for Claude Design to ideate a looping top bar animation: `docs/design/topbar-animation` (#159).
+
+### Key Decisions
+- The Top 10 is calls only; umbrellas and announcements go to the watch tab.
+- Ask Grok answers from the ledger and the Drive facts minus SENSITIVE items; anything it proposes waits for a person. `ASSISTANT_DAILY_USD` caps Ask Grok and Suggest together.
+- Pictures sit in their own table so Reset to defaults keeps them; the server re-encodes every upload.
+- Test servers run with `DASHBOARD_DB_MAX=3`: the pooler holds 15 clients (#150).
+
+### Key Files Modified
+| File | Change |
+|------|--------|
+| `assistant/`, `drafting/suggest.py`, `run.py` | Ask Grok, its proposals, draft suggestions |
+| `dashboard/app/fit/page.tsx`, `dashboard/components/Fit*.tsx`, `TopTabs.tsx` | Fit ratings page |
+| `dashboard/components/AskPanel.tsx`, `StartDraftDialog.tsx` | Ask Grok panel, Suggest |
+| `dashboard/components/AutoSaveForm.tsx`, `PictureField.tsx`, `Avatar.tsx`, `app/api/picture/` | Profile autosave and pictures |
+| `review/fit.py`, `review/tags.py` | Listing kinds, fit reason wording |
+
+### In Progress
+- David is testing Ask Grok, Suggest, `/fit` and pictures; the top bar brief waits for a Claude Design run, then a build from that folder.
+- Still unrated on `/fit`: INDOPACOM, `jadc2`, `c4isr`. The draft request kind still says "Writer not built yet".
+- Due: the Unison CUI addendum on 12 Nov; a person must read the AFWERX cycle topics by 25 Nov.
+- Linear catch-up notes for #109 to #159 wait in data/linear/catchup.md until Linear writes resume.
+
+### Blockers
+- None.
+
+## Session: 2026-11-06
+
 **Date**: 2026-11-06 (covers 4 to 6 Nov)
 **Focus**: Scans post a summary, pursued calls in Linear, a faster dashboard, and a fit score from the team's ratings with both judges re-run on the open queue
 
