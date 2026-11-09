@@ -36,8 +36,8 @@ export const SECTIONS: { key: FitSection; label: string; question: string; hint?
   {
     key: "work",
     label: "Work",
-    question: "When this is the main work a call asks for",
-    hint: "A Never here rules a call out only when the judges agree this is its main work.",
+    question: "When this is the primary focus of a call, the work that is most of what the buyer wants",
+    hint: "A Never here rules a call out only when the judges agree this is its primary focus.",
   },
   { key: "customer", label: "Customer", question: "When the call comes from this buyer" },
   { key: "type", label: "Type", question: "When the call is this kind of opportunity" },
