@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { saveFitRatingAction } from "@/app/actions";
 import { AutomationCards } from "@/components/AutomationCards";
+import { FitSlider } from "@/components/FitSlider";
 import { preloadShell, Shell } from "@/components/Shell";
 import { Badge, Flash } from "@/components/bits";
-import { buildFitRows, SCALE, SECTIONS, type FitRow, type Mix } from "@/lib/fitratings";
+import { buildFitRows, SECTIONS, SLIDER, type FitRow, type Mix } from "@/lib/fitratings";
 import { formatTime } from "@/lib/format";
 import { timeZone } from "@/lib/me";
 import { fitOverview, fitRatingInputs } from "@/lib/queries";
@@ -34,7 +35,8 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
       <div className="lead-line">
         <p className="muted">
           How well each tag, keyword and NAICS code fits Velocity. Every call&apos;s fit score is built from these, with its main
-          work counting most, and anything not rated counts as Neutral. Click a rating to change it and click it again to clear it.
+          work counting most, and anything not rated counts as Neutral. Slide a rating from Never to Core; it saves when you let
+          go, and Clear sets it back to not rated.
         </p>
       </div>
 
@@ -48,7 +50,7 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
       ) : (
         <>
           <ul className="fit-scale" aria-label="The rating scale">
-            {SCALE.map((s) => (
+            {SLIDER.map((s) => (
               <li key={s.key} className={`tone-${s.tone}`}>
                 <b>{s.label}{s.points ? <span>{s.points}</span> : null}</b>
                 {s.means}
@@ -151,29 +153,11 @@ function FitRatingRow({ row, tz }: { row: FitRow; tz: string }) {
         <form action={saveFitRatingAction} className="fit-form">
           <input type="hidden" name="key" value={row.key} />
           <input type="hidden" name="name" value={row.name} />
-          <div className="fit-rates" role="group" aria-label={`Rating for ${row.name}`}>
-            {SCALE.map((s) => {
-              const on = row.rating === s.key;
-              return (
-                <button
-                  key={s.key}
-                  type="submit"
-                  name="rating"
-                  value={on ? "clear" : s.key}
-                  aria-pressed={on}
-                  title={on ? `Clear this rating. ${s.means}` : s.means}
-                  className={`fit-rate tone-${s.tone}`}
-                >
-                  {s.label}
-                  {s.points ? <span>{s.points}</span> : null}
-                </button>
-              );
-            })}
-          </div>
+          <FitSlider name={row.name} rating={row.rating} />
           <div className="fit-note">
             <label className="sr-only" htmlFor={`note-${row.key}`}>Note on {row.name}</label>
             <textarea id={`note-${row.key}`} name="note" defaultValue={row.note} maxLength={500} rows={Math.max(1, Math.ceil(row.note.length / 42))} placeholder="Note: why, or when it changes" />
-            <button type="submit" name="rating" value={row.rating ?? ""} className="btn">Save note</button>
+            <button type="submit" className="btn">Save note</button>
           </div>
           {row.changedBy ? <div className="meta">Changed by {row.changedBy}{row.changedAt ? `, ${formatTime(row.changedAt, tz)}` : ""}</div> : null}
         </form>

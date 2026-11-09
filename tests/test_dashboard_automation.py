@@ -49,8 +49,11 @@ def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed
     assert [t.strip() for t in page.locator(".fit-section h2").all_inner_texts()] == ["Work", "Customer", "Type", "Access", "Keywords", "NAICS"]
     assert page.locator(".fit-scale li").count() == 5
     row = page.locator(".fit-section#work tbody tr").filter(has_text="Software").first
-    assert [t.split()[0] for t in row.locator(".fit-rate").all_inner_texts()] == ["Core", "Good", "Neutral", "Poor", "Never"]
-    assert row.locator('.fit-rate[aria-pressed="true"]').count() == 1
+    slider = row.locator("input[type=range].fit-slider")   # David, 9 Nov: a slider in place of five buttons
+    assert slider.count() == 1 and (slider.get_attribute("min"), slider.get_attribute("max")) == ("0", "4")
+    assert [t.strip() for t in row.locator(".fit-stops li").all_inner_texts()] == ["Never", "Poor", "Neutral", "Good", "Core"]
+    assert slider.get_attribute("aria-valuetext") in ("Never", "Poor", "Neutral", "Good", "Core")
+    assert row.locator("input[type=hidden][name=rating]").input_value() in ("never", "poor", "neutral", "good", "core")
     assert row.locator(".fit-mix").count() == 2 and "main work on" in row.inner_text()
     row.locator(".fit-examples summary").click()
     assert row.locator(".fit-examples li").count() >= 1
@@ -63,11 +66,14 @@ def test_a_fit_note_shows_whole_and_saving_it_keeps_the_rating(page: Any) -> Non
     for form in page.locator(".fit-form").all()[:12]:
         note = form.locator("textarea")
         assert note.evaluate("n => n.scrollHeight <= n.clientHeight + 2")   # nothing is cut off
-        pressed = form.locator('.fit-rate[aria-pressed="true"]')
-        save = form.locator("button", has_text="Save note")
-        if pressed.count():
-            assert pressed.get_attribute("value") == "clear"   # pressing the chosen rating clears it
-            assert save.get_attribute("value") in ("core", "good", "neutral", "poor", "never")
+        rating = form.locator("input[type=hidden][name=rating]").input_value()
+        slider = form.locator("input[type=range].fit-slider")
+        if rating:   # Save note sends the rating the slider holds; Clear is offered only on a rated row
+            assert slider.get_attribute("aria-valuetext") == rating.capitalize()
+            assert form.locator("button.fit-clear").count() == 1
+        else:
+            assert slider.get_attribute("aria-valuetext") == "not rated" and form.locator("button.fit-clear").count() == 0
+        assert form.locator("button", has_text="Save note").get_attribute("name") is None
 
 
 def test_fit_ratings_does_not_scroll_sideways_at_a_laptop_width(page: Any) -> None:

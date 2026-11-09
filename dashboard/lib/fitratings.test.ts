@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildFitRows, isRating, sectionOfKey, sectorOf, slug, type EvidenceCall, type RatingRow } from "./fitratings.ts";
+import { buildFitRows, isRating, ratingAt, sectionOfKey, sectorOf, slug, SLIDER, stopOf, type EvidenceCall, type RatingRow } from "./fitratings.ts";
 
 function rated(key: string, section: string, name: string, rating: string, extra: Partial<RatingRow> = {}): RatingRow {
   return { key, section, name, rating, note: null, loaded_at: "2026-11-06T12:00:00Z", changed_by: null, ...extra };
@@ -120,6 +120,18 @@ test("the portal's notice types sit under Type where they have a rating", () => 
   assert.equal(notice?.section, "type");
   assert.equal(notice?.calls, 1);
   assert.equal(rows.filter((r) => r.key.startsWith("notice.")).length, 1);
+});
+
+test("the slider runs from Never to Core, and an unrated row sits at Neutral (David, 9 Nov 2026)", () => {
+  assert.deepEqual(SLIDER.map((s) => s.label), ["Never", "Poor", "Neutral", "Good", "Core"]);
+  assert.equal(stopOf("never"), 0);
+  assert.equal(stopOf("core"), 4);
+  assert.equal(stopOf(null), 2);
+  assert.equal(stopOf("great"), 2);
+  assert.equal(ratingAt(3), "good");
+  assert.equal(ratingAt(-1), "never");
+  assert.equal(ratingAt(9), "core");
+  assert.equal(ratingAt(Number.NaN), "neutral");
 });
 
 test("a rating that isn't on the scale reads as no rating", () => {
