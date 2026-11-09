@@ -11,6 +11,7 @@ Everything needed to redesign the BD triage dashboard in the Velocity Theme, kep
 | [redesign-plan.md](redesign-plan.md) | The delta between today and the handoff, and the phased build plan |
 | [handover-discovery.md](handover-discovery.md) | What exists in the code today, with file and line citations |
 | [dashboard-build-prompts.md](dashboard-build-prompts.md) | Superseded by the handoff and the plan: the earlier prompts for Claude Design and Claude Code |
+| [topbar-animation/](topbar-animation/README.md) | The brief for Claude Design to ideate a looping animation in the top bar (9 Nov 2026), with screenshots of the bar today |
 
 ## Reading order for a design
 
