@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { saveFitRatingAction } from "@/app/actions";
 import { AutomationCards } from "@/components/AutomationCards";
+import { FitNote } from "@/components/FitNote";
 import { FitSlider } from "@/components/FitSlider";
 import { preloadShell, Shell } from "@/components/Shell";
 import { Badge, Flash } from "@/components/bits";
@@ -36,7 +37,7 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
         <p className="muted">
           How well each tag, keyword and NAICS code fits Velocity. Every call&apos;s fit score is built from these, with its
           primary focus (the work that is most of what the buyer wants) counting most, and anything not rated counts as Neutral. Slide a rating from Never to Core; it saves when you let
-          go, and Clear sets it back to not rated.
+          go, and Clear sets it back to not rated. A note saves as you type.
         </p>
       </div>
 
@@ -89,10 +90,10 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
                   <thead>
                     <tr>
                       <th><HeadHelp label={s.label} tip={`What is being rated, what it covers, and example calls. ${s.question}.`} /></th>
+                      <th className="fit-rating-col"><HeadHelp label="Rating and note" tip={RATING_TIP} /></th>
                       <th className="num"><HeadHelp label="Calls" tip={s.key === "work" ? CALLS_WORK_TIP : CALLS_TIP} /></th>
                       <th><HeadHelp label="Judges (yes, maybe, no)" tip={JUDGES_TIP} /></th>
                       <th><HeadHelp label="Team" tip={TEAM_TIP} /></th>
-                      <th className="fit-rating-col"><HeadHelp label="Rating and note" tip={RATING_TIP} /></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -113,8 +114,8 @@ const CALLS_WORK_TIP = "How many calls the keyword filter kept that carry this w
   "the primary focus of: the work that is most of what the buyer wants. A Never rules a call out only when this is its primary focus.";
 const JUDGES_TIP = "Claude's and Grok's newest verdicts on those calls: how many yes, maybe and no.";
 const TEAM_TIP = "What the team decided on those calls: Pursue, Not relevant, Submitted or Dismissed.";
-const RATING_TIP = "How well this fits Velocity, from Never to Core; every call's fit score is built from these. It saves when you " +
-  "let go of the slider, and the note says why.";
+const RATING_TIP = "How well this fits Velocity, from Never to Core; every call's fit score is built from these. The rating saves " +
+  "when you let go of the slider, and the note, which says why, saves as you type.";
 
 /** A column header that explains itself on hover, or on keyboard focus through the TooltipController (David, 9 Nov 2026). */
 function HeadHelp({ label, tip }: { label: string; tip: string }) {
@@ -153,6 +154,15 @@ function FitRatingRow({ row, tz, focus }: { row: FitRow; tz: string; focus: bool
           </details>
         ) : null}
       </td>
+      <td>
+        <form action={saveFitRatingAction} className="fit-form">
+          <input type="hidden" name="key" value={row.key} />
+          <input type="hidden" name="name" value={row.name} />
+          <FitSlider name={row.name} rating={row.rating} />
+          <FitNote id={`note-${row.key}`} name={row.name} note={row.note} rated={Boolean(row.rating)} />
+          {row.changedBy ? <div className="meta">Changed by {row.changedBy}{row.changedAt ? `, ${formatTime(row.changedAt, tz)}` : ""}</div> : null}
+        </form>
+      </td>
       <td className="num">
         {row.calls}
         {focus ? (
@@ -172,19 +182,6 @@ function FitRatingRow({ row, tz, focus }: { row: FitRow; tz: string; focus: bool
         {row.team.length
           ? row.team.map(([status, n]) => <div key={status}>{n} {isDecision(status) ? STATUS_LABELS[status] : status}</div>)
           : <span className="muted">none yet</span>}
-      </td>
-      <td>
-        <form action={saveFitRatingAction} className="fit-form">
-          <input type="hidden" name="key" value={row.key} />
-          <input type="hidden" name="name" value={row.name} />
-          <FitSlider name={row.name} rating={row.rating} />
-          <div className="fit-note">
-            <label className="sr-only" htmlFor={`note-${row.key}`}>Note on {row.name}</label>
-            <textarea id={`note-${row.key}`} name="note" defaultValue={row.note} maxLength={500} rows={Math.max(1, Math.ceil(row.note.length / 42))} placeholder="Note: why, or when it changes" />
-            <button type="submit" className="btn">Save note</button>
-          </div>
-          {row.changedBy ? <div className="meta">Changed by {row.changedBy}{row.changedAt ? `, ${formatTime(row.changedAt, tz)}` : ""}</div> : null}
-        </form>
       </td>
     </tr>
   );
