@@ -2,6 +2,7 @@ import { ArrowRight } from "lucide-react";
 import { cache } from "react";
 import { DecideCell } from "@/components/DecideCell";
 import { DraftBadge } from "@/components/DraftBadge";
+import { PersonName } from "@/components/PersonName";
 import { PortalLogo } from "@/components/PortalLogo";
 import { Badge, FitBadge, TitleLink } from "@/components/bits";
 import { asksReason, yourVote } from "@/lib/decide";
@@ -131,7 +132,7 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide, watch 
                   {call.human_status ? (
                     <>
                       <Badge value={call.human_status} />
-                      <div className="meta">{nameOf(call.human_by)}</div>
+                      <div className="meta"><PersonName by={call.human_by}>{nameOf(call.human_by)}</PersonName></div>
                     </>
                   ) : (
                     <span className="muted">undecided</span>

@@ -131,7 +131,7 @@ export async function Shell({ section, children }: { section: Section | null; ch
       {hidden ? <TableSettings hidden={hidden} /> : null}
       {draft ? (
         <StartDraftDialog
-          people={people.filter((p) => p.name !== viewer).map(({ name, label }) => ({ name, label }))}
+          people={people.filter((p) => p.name !== viewer).map(({ name, label, initials, picture }) => ({ name, label, initials, picture }))}
           owner={viewer ? label(viewer) : null}
           readiness={draft.readiness}
           lastSeen={draft.seenAt ? formatTime(draft.seenAt, tz) : null}

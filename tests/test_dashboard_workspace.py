@@ -456,6 +456,7 @@ def test_the_page_shows_the_header_the_strip_the_steps_and_the_open_card(page: A
     for expected in ("SAM.gov", "White paper", "Owner: David Wood", "Working with: Shaun Jones",
                      "User approval required: every step", "Spent $0.05 of $200.00"):
         assert expected in facts, expected
+    assert page.locator(".ws-facts .person .avatar").count() == 2   # David, 9 Nov: the owner and Shaun, each with a face
     assert "Qualifying" in page.locator(".ws-crumb").inner_text()
     stages = [t.split("\n") for t in page.locator(".ws-strip li").all_inner_texts()]
     assert [s[0].strip().lower() for s in stages] == ["qualify", "plan", "draft", "review", "finalize", "submit"]
@@ -727,6 +728,7 @@ def test_the_owner_changes_who_works_with_them(page: Any, site: dict[str, int]) 
     open_workspace(page, "ws-people")
     page.get_by_role("button", name="People").click()
     panel = page.locator("#ws-people")
+    assert panel.locator(".chip-check .person .avatar").count() == panel.locator(".chip-check").count() > 0
     panel.get_by_label("Lisa Hall").check()
     act(page, panel.get_by_role("button", name="Save who works on it"))
     with ledger():

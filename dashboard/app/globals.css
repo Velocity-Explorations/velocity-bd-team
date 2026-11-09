@@ -439,6 +439,25 @@ details.account[open] > .account-button {
 }
 
 /* A profile picture in place of the initials, the same size and corners (David, 9 Nov 2026). */
+.initials.tiny {
+  width: 16px;
+  height: 16px;
+  font-size: 8px;
+}
+
+/* A name with the person's face before it: votes, notes, Changed by, Working with (David, 9 Nov 2026). */
+.person {
+  white-space: nowrap;
+}
+
+.person > .avatar {
+  margin: -2px 5px 0 0;
+  vertical-align: middle;
+}
+
+.initials.tiny[data-initials]::before {
+  content: attr(data-initials);
+}
 .initials.huge {
   width: 64px;
   height: 64px;

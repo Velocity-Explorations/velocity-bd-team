@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { startDraftAction, suggestDraftAction } from "@/app/actions";
+import { Avatar } from "@/components/Avatar";
 import { POLL_MS } from "@/lib/ask";
 import { FORMATS, folderName } from "@/lib/proposals";
 import { parseSuggestion, suggestStatus, withSuggestedFirst, type Suggestion, type SuggestionRow } from "@/lib/suggest";
@@ -23,7 +24,7 @@ const GIVE_UP_MS = 3 * 60 * 1000;   // stop waiting on a suggestion after three 
  * change. The newest suggestion for the call fills the dialog in when it opens.
  */
 export function StartDraftDialog({ people, owner, readiness, lastSeen, pastWork, indexed, suggests = false }: {
-  people: { name: string; label: string }[];
+  people: { name: string; label: string; initials?: string; picture?: string | null }[];
   owner: string | null;
   readiness: "ready" | "offline" | "not set up";
   lastSeen: string | null;
@@ -245,7 +246,10 @@ export function StartDraftDialog({ people, owner, readiness, lastSeen, pastWork,
                   {people.map((p) => (
                     <label key={p.name} className="chip-check">
                       <input type="checkbox" name="with" value={p.name} />
-                      {p.label}
+                      <span className="person">
+                        <Avatar initials={p.initials ?? "?"} picture={p.picture} size="tiny" />
+                        <span>{p.label}</span>
+                      </span>
                     </label>
                   ))}
                 </div>

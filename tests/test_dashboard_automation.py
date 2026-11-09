@@ -123,6 +123,16 @@ def test_a_fit_note_shows_whole_and_saving_it_keeps_the_rating(page: Any) -> Non
         assert note.is_disabled() == (not rating)   # a note needs a rating
 
 
+def test_a_ratings_changed_by_shows_the_person(page: Any) -> None:
+    """David, 9 Nov 2026: the person who last changed a rating shows with their picture, or their initials."""
+    open_page(page, "/fit")
+    changed = page.locator(".fit-form .meta", has_text="Changed by")
+    if changed.count() == 0:
+        pytest.skip("nobody has changed a rating here yet")
+    for line in changed.all()[:12]:
+        assert line.locator(".person .avatar").count() == 1, line.inner_text()
+
+
 def test_fit_ratings_does_not_scroll_sideways_at_a_laptop_width(page: Any) -> None:
     page.set_viewport_size({"width": 1280, "height": 800})
     open_page(page, "/fit")

@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
+import { PersonName } from "@/components/PersonName";
 import { Badge } from "@/components/bits";
 import { noteSource } from "@/lib/decide";
 import { formatTime } from "@/lib/format";
@@ -87,7 +88,7 @@ export function NotesPanel({ callId, colSpan, notes, nameOf, tz }: {
           <li key={i}>
             <p>{n.text}</p>
             <p className="meta">
-              {n.by ? <span>{nameOf(n.by)}</span> : null}
+              {n.by ? <PersonName by={n.by}>{nameOf(n.by)}</PersonName> : null}
               {n.at ? <span className="when">{formatTime(n.at, tz)}</span> : null}
               <span>{noteSource(n.by)}</span>
             </p>

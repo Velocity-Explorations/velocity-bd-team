@@ -269,7 +269,9 @@ of the window says Saving, Saved or what went wrong (`components/AutoSaveForm.ts
 - **Display name and initials** show on votes, notes, decisions and the account menu. Decisions are
   still recorded under the name in DASHBOARD_USERS.
 - **Picture** (David, 9 Nov 2026) shows in place of the initials in the account button, the account
-  menu, Switch user and this page. Choosing a JPEG, PNG, WebP or GIF saves it at once, apart from
+  menu, Switch user and this page, and small beside the person's name on votes, notes, Home's
+  decided-by lines, Fit ratings' Changed by and a draft's owner and Working with (`PersonName`;
+  someone without a picture shows their initials there, drawn by CSS so they stay out of the text). Choosing a JPEG, PNG, WebP or GIF saves it at once, apart from
   Save: the browser crops the middle square and shrinks it, then the server checks its first bytes
   and re-encodes it with sharp to a 256 by 256 WebP, so nothing of the file but its pixels is kept.
   It lives in `profile_pictures` (migration 018) and is served from `/api/picture?name=...&v=...`,
