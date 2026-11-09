@@ -5,7 +5,7 @@ import { countLabel, initials, SECTIONS } from "./nav.ts";
 test("the bar has four sections, and Automation opens on Agent update requests (N1)", () => {
   assert.deepEqual(
     SECTIONS.map((s) => [s.key, s.label, s.href]),
-    [["home", "Home", "/"], ["calls", "Calls", "/review"], ["proposals", "Proposals", "/proposals"], ["automation", "Automation", "/requests"]],
+    [["home", "Home", "/"], ["calls", "Calls", "/review"], ["proposals", "Proposals", "/proposals"], ["automation", "Automation", "/fit"]],
   );
 });
 

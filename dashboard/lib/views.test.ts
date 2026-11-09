@@ -85,7 +85,7 @@ test("a column filter that matches no view leaves no card pressed (VC4)", () => 
   assert.equal(pressedCard("judges-disagree", { ...none, tier: "tight" }), null);
 });
 
-test("Automation has five cards, each linking its view and marking the open one (PRO-573)", () => {
+test("Automation has six cards, Fit ratings first (David, 9 Nov 2026), each linking its view and marking the open one", () => {
   const row = automationCards({
     current: "problems", waiting: 2, kinds: "a keyword change, a scan", decided: 3, runs: 26,
     lastRun: "last completed 2026-10-24 08:07 MDT", problems: 4, agree: { both: 62, agree: 48 }, ratings: 116,
@@ -93,17 +93,17 @@ test("Automation has five cards, each linking its view and marking the open one 
   assert.deepEqual(
     row.map((c) => [c.label, c.href, c.count, c.description, c.current, c.needsYou]),
     [
+      ["Fit ratings", "/fit", 116, "what every call's fit score is built from", false, false],
       ["Agent update requests", "/requests", 2, "a keyword change, a scan", false, true],
       ["Decided requests", "/requests?view=decided", 3, "the last 50, with their result", false, false],
       ["Scans", "/runs", 26, "last completed 2026-10-24 08:07 MDT", false, false],
       ["Scan problems", "/runs?view=problems", 4, "timeouts and errors", true, false],
       ["Judges agree", "/judges", "77%", "48 of 62 calls", false, false],
-      ["Fit ratings", "/fit", 116, "what every call's fit score is built from", false, false],
     ],
   );
   const none = automationCards({ current: "judges", waiting: 0, kinds: "", decided: 0, runs: 0, lastRun: "", problems: 0, agree: null, ratings: null });
   assert.deepEqual(
     none.map((c) => [c.count, c.description]),
-    [[0, "nothing waiting"], [0, "none decided yet"], [0, "no scans yet"], [0, "no timeouts or errors"], ["none", "no call judged by both yet"], ["none", "nothing rated yet"]],
+    [["none", "nothing rated yet"], [0, "nothing waiting"], [0, "none decided yet"], [0, "no scans yet"], [0, "no timeouts or errors"], ["none", "no call judged by both yet"]],
   );
 });

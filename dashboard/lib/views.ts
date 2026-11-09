@@ -111,8 +111,8 @@ export function callViewCards(input: {
   }));
 }
 
-/** Automation's cards (PRO-573): Agent update requests (the count that needs the viewer), Decided
- *  requests, Scans, Scan problems, Judges agree. */
+/** Automation's cards (PRO-573): Fit ratings first, where the section opens (David, 9 Nov 2026), then Agent update
+ *  requests (the count that needs the viewer), Decided requests, Scans, Scan problems, Judges agree. */
 export function automationCards(input: {
   current: AutomationPage;
   waiting: number;
@@ -128,6 +128,7 @@ export function automationCards(input: {
   const card = (key: AutomationPage, label: string, href: string, count: number | string, description: string, needsYou = false): ViewCard =>
     ({ key, label, href, count, description, current: input.current === key, needsYou });
   return [
+    card("fit", "Fit ratings", "/fit", input.ratings ?? "none", input.ratings ? "what every call's fit score is built from" : "nothing rated yet"),
     card("requests", "Agent update requests", "/requests", input.waiting, input.waiting ? input.kinds : "nothing waiting", true),
     card("decided", "Decided requests", "/requests?view=decided", input.decided, input.decided ? "the last 50, with their result" : "none decided yet"),
     card("runs", "Scans", "/runs", input.runs, input.runs ? input.lastRun : "no scans yet"),
@@ -139,6 +140,5 @@ export function automationCards(input: {
       agree && agree.both ? `${Math.round((100 * agree.agree) / agree.both)}%` : "none",
       agree && agree.both ? `${agree.agree} of ${agree.both} calls` : "no call judged by both yet",
     ),
-    card("fit", "Fit ratings", "/fit", input.ratings ?? "none", input.ratings ? "what every call's fit score is built from" : "nothing rated yet"),
   ];
 }
