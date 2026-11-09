@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cache, type ReactNode } from "react";
 import { AccountMenu, type ViewerMode } from "@/components/AccountMenu";
 import { AskPanel } from "@/components/AskPanel";
+import { TopbarFx } from "@/components/bar-themes/TopbarFx";
 import { MenuController } from "@/components/MenuController";
 import { StartDraftDialog } from "@/components/StartDraftDialog";
 import { TableController } from "@/components/TableController";
@@ -60,7 +61,7 @@ function viewerMode(): { mode: ViewerMode; why: string } {
  * about 60 ms to the ledger.
  */
 const shellData = cache(async (section: Section | null) => {
-  const { viewer } = await me();
+  const { viewer, profile } = await me();
   const startsDrafts = section === "calls" || section === "proposals";
   const [counts, hidden, label, filters, draft, tz, past, members, chat, suggests] = await Promise.all([
     sectionCounts(viewer),
@@ -78,7 +79,7 @@ const shellData = cache(async (section: Section | null) => {
   const people = await Promise.all(members.map(async (p) => ({
     name: p.name, label: label(p.name), initials: await initialsOf(p.name), picture: await pictureOf(p.name),
   })));
-  return { viewer, counts, hidden, label, filters, draft, tz, past, people, chat, suggests };
+  return { viewer, counts, hidden, label, filters, draft, tz, past, people, chat, suggests, barTheme: profile?.bar_theme ?? null };
 });
 
 /** Start loading the frame's data at the top of a page; the Shell picks it up when it renders. */
@@ -87,12 +88,13 @@ export function preloadShell(section: Section | null): void {
 }
 
 export async function Shell({ section, children }: { section: Section | null; children: ReactNode }) {
-  const { viewer, counts, hidden, label, filters, draft, tz, past, people, chat, suggests } = await shellData(section);
+  const { viewer, counts, hidden, label, filters, draft, tz, past, people, chat, suggests, barTheme } = await shellData(section);
   const tableSettings = section === "calls";
   const { mode, why } = viewerMode();
   return (
     <>
       <header className="topbar">
+        <TopbarFx theme={barTheme} />
         <Link href="/" className="brand">
           <img src="/velocity-mark-white.png" alt="" width={21} height={16} />
           BD Team

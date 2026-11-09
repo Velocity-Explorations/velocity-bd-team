@@ -12,6 +12,7 @@ import { isoNow, zonedToIso } from "@/lib/format";
 import { safeFrom, SIGNED_IN_COOKIE } from "@/lib/signin";
 import { timeZone } from "@/lib/me";
 import { aliasesFor } from "@/lib/people";
+import { BAR_THEMES, DEFAULT_BAR_THEME } from "@/lib/barthemes";
 import { MAX_PICTURE_BYTES, PICTURE_SIZE, sniffImage } from "@/lib/picture";
 import { profileFromForm } from "@/lib/profile";
 import { FORMATS } from "@/lib/proposals";
@@ -271,7 +272,12 @@ export async function autoSaveProfileAction(formData: FormData): Promise<Profile
     const [portalList, tagList] = await Promise.all([portals(), tagOptions()]);
     const form = new Map<string, string[]>();
     for (const key of new Set(formData.keys())) form.set(key, formData.getAll(key).map(String));
-    await saveProfile(viewer, profileFromForm(form, viewer, { portals: portalList.map((p) => p.name), tags: tagList.map((t) => t.name) }));
+    await saveProfile(viewer, profileFromForm(form, viewer, {
+      portals: portalList.map((p) => p.name),
+      tags: tagList.map((t) => t.name),
+      barThemes: BAR_THEMES.map((t) => t.id),   // the top bar's theme is checked here, on the server
+      defaultBarTheme: DEFAULT_BAR_THEME,
+    }));
   } catch (err) {
     return { ok: false, message: `Could not save: ${err instanceof Error ? err.message.slice(0, 160) : "database error"}` };
   }

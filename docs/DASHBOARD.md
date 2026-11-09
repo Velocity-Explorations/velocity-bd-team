@@ -279,6 +279,13 @@ of the window says Saving, Saved or what went wrong (`components/AutoSaveForm.ts
   and re-encodes it with sharp to a 256 by 256 WebP, so nothing of the file but its pixels is kept.
   It lives in `profile_pictures` (migration 018) and is served from `/api/picture?name=...&v=...`,
   cached until it changes. Remove brings the initials back; Reset to defaults leaves the picture.
+- **Top bar animation** (David, 9 Nov 2026): Deep field (the default), Line clear or Ground drift, a
+  quiet loop behind the top bar from Claude Design's handoff (`docs/design/topbar-animation/handoff/
+  bar-themes`, built in `components/bar-themes/`). Stored as `profiles.bar_theme` (migration 019);
+  Deep field, no value or an unknown one shows the default (`lib/barthemes.ts`). The bar is the
+  preview: a choice saves at once and the bar switches without a reload. Every theme times its loop
+  from one clock that runs while the tab is visible, so moving between pages, or the loading
+  screen's copy of the bar, carries on from the same frame; reduced motion shows a still frame.
 - **Where the dashboard opens:** Home, or Calls. Opening `/` from outside the dashboard (a bookmark,
   a typed address, a Slack link) takes a person who chose Calls to Needs review. Home stays one
   click away (U3).

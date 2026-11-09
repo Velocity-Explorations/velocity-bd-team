@@ -2,7 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { callsHref, isFreshArrival, isValidTimeZone, parseDefaultFilters, profileFromForm, sameOrigin, withDefaultFilters } from "./profile.ts";
 
-const KNOWN = { portals: ["NSTXL", "SAM.gov", "Vulcan SOF"], tags: ["Software", "Space"] };
+const KNOWN = {
+  portals: ["NSTXL", "SAM.gov", "Vulcan SOF"],
+  tags: ["Software", "Space"],
+  barThemes: ["deep-field", "line-clear", "ground-drift"],
+  defaultBarTheme: "deep-field",
+};
 
 test("default filters read defensively from their JSON, unknown values dropped", () => {
   assert.deepEqual(parseDefaultFilters(JSON.stringify({ portals: ["NSTXL", 3, "SAM.gov"], tag: "Space", state: "open" })),
@@ -27,6 +32,7 @@ test("the form is read and checked: names trimmed, initials letters only, filter
     ["tag", ["Space"]],
     ["state", ["closed"]],
     ["time_zone", ["America/New_York"]],
+    ["bar_theme", ["ground-drift"]],
   ]);
   assert.deepEqual(profileFromForm(form, "David Wood", KNOWN), {
     display_name: "Dave W",
@@ -34,6 +40,7 @@ test("the form is read and checked: names trimmed, initials letters only, filter
     opens: "calls",
     default_filters: { portals: ["NSTXL"], tag: "Space", state: "closed" },
     time_zone: "America/New_York",
+    bar_theme: "ground-drift",
   });
 });
 
@@ -44,6 +51,7 @@ test("what equals the default is stored as no setting", () => {
     ["opens", ["somewhere"]],
     ["tag", ["Not a tag"]],
     ["time_zone", ["Mars/Olympus_Mons"]],
+    ["bar_theme", ["deep-field"]],
   ]);
   assert.deepEqual(profileFromForm(form, "David Wood", KNOWN), {
     display_name: null,
@@ -51,7 +59,10 @@ test("what equals the default is stored as no setting", () => {
     opens: "home",
     default_filters: null,
     time_zone: null,
+    bar_theme: null,
   });
+  // a theme that is not one of the three is no setting either (David, 9 Nov 2026)
+  assert.equal(profileFromForm(new Map([["bar_theme", ["neon-rain"]]]), "David Wood", KNOWN).bar_theme, null);
   assert.equal(profileFromForm(new Map([["display_name", ["x".repeat(80)]]]), "David Wood", KNOWN).display_name, "x".repeat(60));
 });
 

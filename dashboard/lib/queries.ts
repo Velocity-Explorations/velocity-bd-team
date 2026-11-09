@@ -1295,6 +1295,8 @@ export type ProfileRow = {
   opens: string;
   default_filters: string | null;
   time_zone: string | null;
+  /** The top bar's theme (migration 019); null follows the default. */
+  bar_theme: string | null;
   updated_at: string;
 };
 
@@ -1306,21 +1308,33 @@ export function allProfiles(): Promise<Map<string, ProfileRow>> {
 async function readAllProfiles(): Promise<Map<string, ProfileRow>> {
   const db = sql();
   if (!(await hasTable(db, "profiles"))) return new Map();
+  const theme = (await hasColumn(db, "profiles", "bar_theme")) ? db`bar_theme` : db`NULL::text AS bar_theme`;
   const rows = await db<ProfileRow[]>`
-    SELECT name, display_name, initials, opens, default_filters, time_zone, updated_at FROM profiles`;
+    SELECT name, display_name, initials, opens, default_filters, time_zone, ${theme}, updated_at FROM profiles`;
   return new Map(rows.map((r) => [r.name, r]));
 }
 
 /** Profile settings' Save: one row per person, replaced whole. */
 export async function saveProfile(name: string, f: ProfileFields): Promise<void> {
   const now = isoNow();
-  await sql()`
-    INSERT INTO profiles (name, display_name, initials, opens, default_filters, time_zone, updated_at)
-    VALUES (${name}, ${f.display_name}, ${f.initials}, ${f.opens},
-            ${f.default_filters ? JSON.stringify(f.default_filters) : null}, ${f.time_zone}, ${now})
-    ON CONFLICT (name) DO UPDATE SET
-      display_name = EXCLUDED.display_name, initials = EXCLUDED.initials, opens = EXCLUDED.opens,
-      default_filters = EXCLUDED.default_filters, time_zone = EXCLUDED.time_zone, updated_at = EXCLUDED.updated_at`;
+  const db = sql();
+  const filters = f.default_filters ? JSON.stringify(f.default_filters) : null;
+  if (await hasColumn(db, "profiles", "bar_theme")) {
+    await db`
+      INSERT INTO profiles (name, display_name, initials, opens, default_filters, time_zone, bar_theme, updated_at)
+      VALUES (${name}, ${f.display_name}, ${f.initials}, ${f.opens}, ${filters}, ${f.time_zone}, ${f.bar_theme}, ${now})
+      ON CONFLICT (name) DO UPDATE SET
+        display_name = EXCLUDED.display_name, initials = EXCLUDED.initials, opens = EXCLUDED.opens,
+        default_filters = EXCLUDED.default_filters, time_zone = EXCLUDED.time_zone, bar_theme = EXCLUDED.bar_theme,
+        updated_at = EXCLUDED.updated_at`;
+  } else {   // before migration 019 the theme is not kept
+    await db`
+      INSERT INTO profiles (name, display_name, initials, opens, default_filters, time_zone, updated_at)
+      VALUES (${name}, ${f.display_name}, ${f.initials}, ${f.opens}, ${filters}, ${f.time_zone}, ${now})
+      ON CONFLICT (name) DO UPDATE SET
+        display_name = EXCLUDED.display_name, initials = EXCLUDED.initials, opens = EXCLUDED.opens,
+        default_filters = EXCLUDED.default_filters, time_zone = EXCLUDED.time_zone, updated_at = EXCLUDED.updated_at`;
+  }
   forget("profiles");
 }
 

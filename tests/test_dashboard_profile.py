@@ -14,7 +14,8 @@ import pytest
 URL = os.environ.get("DASHBOARD_TEST_URL", "").rstrip("/")
 pytestmark = pytest.mark.skipif(not URL, reason="set DASHBOARD_TEST_URL to a running dashboard")
 
-SETTINGS = ["Name", "Picture", "Signed-in account", "Where the dashboard opens", "Default filters for Calls", "Time zone"]
+SETTINGS = ["Name", "Picture", "Top bar animation", "Signed-in account", "Where the dashboard opens", "Default filters for Calls",
+            "Time zone"]
 
 
 @pytest.fixture()
@@ -95,3 +96,15 @@ def test_profile_settings_offers_a_picture_upload(page: Any) -> None:
 def test_a_missing_picture_is_not_found(page: Any) -> None:
     response = page.request.get(URL + "/api/picture?name=" + "Nobody%20At%20All")
     assert response.status == 404
+
+
+def test_the_top_bar_animation_setting_offers_three_themes(page: Any) -> None:
+    """David, 9 Nov 2026: each person picks the bar's theme; the choice saves at once like every other setting."""
+    if not log_in(page):
+        pytest.skip("this dashboard has nobody to choose")
+    page.goto(URL + "/profile", wait_until="load", timeout=120_000)
+    row = page.locator(".setting-row", has=page.locator(".setting-name", has_text="Top bar animation"))
+    cards = row.locator("label.radio-card")
+    assert [c.locator("strong").inner_text() for c in cards.all()] == ["Deep field", "Line clear", "Ground drift"]
+    assert row.locator("input[type=radio][name=bar_theme]:checked").count() == 1
+    assert "pauses when the tab is hidden" in row.locator(".setting-help").inner_text()

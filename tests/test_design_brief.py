@@ -3,6 +3,7 @@ there, every link between them must resolve, and the text we wrote follows the n
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -76,9 +77,17 @@ def test_github_links_point_at_files_on_main() -> None:
     assert found
 
 
+def _kept(root: Path) -> list[Path]:
+    """The files git keeps under this folder: what we wrote, not a Claude Design export dropped in locally (9 Nov 2026:
+    the top bar board's design system bundle stays on the PC, in .gitignore)."""
+    out = subprocess.run(["git", "ls-files", "-z", "--", root.relative_to(REPO).as_posix()], cwd=REPO,
+                         capture_output=True, text=True, check=True).stdout
+    return [REPO / name for name in out.split("\0") if name]
+
+
 def test_no_en_or_em_dash_in_what_we_wrote() -> None:
     """The guides, spec, prompts and theme follow the writing rule; the snapshot pages keep portal data as captured."""
-    written = [p for p in DESIGN.rglob("*") if p.suffix in TEXT and not (p.parent == SNAPSHOT and p.suffix == ".html")]
+    written = [p for p in _kept(DESIGN) if p.suffix in TEXT and not (p.parent == SNAPSHOT and p.suffix == ".html")]
     assert written
     for path in written:
         assert not DASHES.search(path.read_text(encoding="utf-8")), path.relative_to(DESIGN).as_posix()

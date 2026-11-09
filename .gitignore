@@ -18,3 +18,6 @@ playwright-state/
 
 # Node
 node_modules/
+
+# Claude Design's export of the company design system (9 Nov 2026). The repo is public; it stays on this PC.
+docs/design/topbar-animation/_ds/

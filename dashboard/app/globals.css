@@ -136,6 +136,151 @@ td.when {
   color: var(--accent);
 }
 
+/* ---------------------------------------------------------------- top bar themes
+   Deep field (default), Line clear, Ground drift (David, 9 Nov 2026), from the Claude Design handoff in
+   docs/design/topbar-animation/handoff/bar-themes (bar-themes.css), after the .topbar rules as it asks. The bar's
+   foot rule is .topbar's own border-bottom, painted with its background and so under the layer, as the handoff
+   wants of a rule; the yellow underline is each section link's border, which paints above the layer like the rest
+   of the bar. */
+
+.topbar {
+  /* The handoff's tokens, mapped to theme.css with its fallbacks kept. Its hairline (#333333) is --line-subtle here;
+     this theme's --line is #434343. */
+  --fx-ink: var(--ink, #F5F5F5);
+  --fx-line: var(--line-subtle, #333333);
+  --fx-accent: var(--accent, #FFCB03);
+  position: relative;
+  isolation: isolate; /* effects paint above the ground, below all bar content */
+  /* Not in the handoff: the isolation makes the bar a layer of its own, which would trap the account menu under the
+     page below it. At the menus' own z-index (.menu-body) the bar's menus open over the page again, still under Ask
+     Grok (40) and tooltips (50). */
+  z-index: 20;
+}
+
+/* The effect layer: first child of .topbar. Clips here, never on .topbar, so the account menu and other popovers are
+   not cut off. */
+.topbar-fx {
+  position: absolute;
+  /* Down over the 2px foot rule (.topbar's border), so the layer is the bar's full height as on the board (56 px wide,
+     about 172 px on a phone); the rule paints under it, as the handoff's Layering section has it. */
+  inset: 0 0 -2px;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  color: var(--fx-ink);
+}
+
+.topbar-fx[data-paused] * {
+  animation-play-state: paused !important;
+}
+
+/* Deep field */
+
+.topbar-deep-stars {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% + var(--tile));
+  height: 100%;
+  background: var(--fx-ink);
+  opacity: var(--alpha);
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  -webkit-mask-size: var(--tile) var(--tile-h);
+  mask-size: var(--tile) var(--tile-h);
+  -webkit-mask-position: 0 0;
+  mask-position: 0 0;
+  animation: topbar-deep-drift var(--dur) linear infinite;
+  will-change: transform;
+}
+
+@keyframes topbar-deep-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-1 * var(--tile))); }
+}
+
+.topbar-deep-lane {
+  position: absolute;
+  inset: 0;
+}
+
+.topbar-deep-craft {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.topbar-deep-glyph {
+  position: absolute;
+  left: -10px; /* centre the 20 x 10 glyph on the animated point */
+  top: -5px;
+  display: block;
+  overflow: visible; /* trails extend left of the glyph box */
+}
+
+.topbar-deep-craft[data-dir="-1"] .topbar-deep-glyph {
+  transform: scaleX(-1);
+}
+
+/* Line clear */
+
+.topbar-lines {
+  /* fade the left edge, where pieces arrive */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 48px);
+  mask-image: linear-gradient(90deg, transparent, #000 48px);
+}
+
+.topbar-lines-cell {
+  position: absolute;
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--fx-ink) 2%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fx-ink) 4.5%, transparent);
+  border-radius: 1px;
+  will-change: transform, opacity;
+}
+
+/* Ground drift */
+
+.topbar-drift-track {
+  position: absolute;
+  inset: 0;
+  /* Longhands, not the handoff's nameless shorthand: the build's minifier turns `animation: 30s ... infinite
+     alternate` (no name) into `animation: none`, and the pools never moved. */
+  animation-duration: 30s;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: transform;
+}
+
+.topbar-drift-a { animation-name: topbar-drift-a; }
+.topbar-drift-b { animation-name: topbar-drift-b; }
+
+/* 45% of the bar width: the pools pass each other near the middle */
+@keyframes topbar-drift-a { to { transform: translateX(45%); } }
+@keyframes topbar-drift-b { to { transform: translateX(-45%); } }
+
+.topbar-drift-pool {
+  position: absolute;
+  top: -100px;
+  width: 640px;
+  height: 256px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--fx-ink) 4.5%, transparent), transparent);
+}
+
+.topbar-drift-a .topbar-drift-pool { left: -200px; } /* rests behind the mark */
+.topbar-drift-b .topbar-drift-pool { left: calc(100% - 440px); } /* rests behind the account */
+
+/* Reduced motion: Deep field renders no craft; Line clear starts no animations, so its cells show the full row. */
+@media (prefers-reduced-motion: reduce) {
+  .topbar-deep-stars,
+  .topbar-drift-track {
+    animation: none;
+  }
+}
+
 /* A count in the bar: what is waiting for the viewer. */
 .count-chip {
   display: inline-flex;
@@ -2680,6 +2825,11 @@ dialog.start-draft {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+/* Three choices side by side: the top bar animation (David, 9 Nov 2026). */
+.radio-cards.radio-cards-three {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .radio-card {
