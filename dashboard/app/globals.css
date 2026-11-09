@@ -4193,6 +4193,40 @@ button[disabled] {
   min-width: 240px;
 }
 
+/* A header that explains itself on hover or keyboard focus (David, 9 Nov 2026). */
+.th-help {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+/* Under a Work tag's call count: how many of its calls have it as their primary focus. */
+.fit-focus {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.fit-focus-bar {
+  display: block;
+  width: 72px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line-subtle);
+}
+
+.fit-focus-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.fit-focus .meta {
+  white-space: nowrap;
+}
+
 .fit-name {
   margin-right: 6px;
   font: var(--type-row-title);

@@ -16,6 +16,16 @@ const holder = globalThis as unknown as { __ledgerSql?: Sql };
  */
 export const POOL = { max: 8, idle_timeout: 600, connect_timeout: 10, prepare: false } as const;
 
+/**
+ * The connections this server may hold: DASHBOARD_DB_MAX, between 1 and the default 8. Supabase's session pooler allows
+ * 15 clients across everything on the ledger, and idle connections stay ten minutes, so a second dashboard beside the
+ * live one, such as a test server, sets a small number or runs out.
+ */
+export function poolSize(value: string | undefined): number {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1 && n <= POOL.max ? n : POOL.max;
+}
+
 export function sql(): Sql {
   if (holder.__ledgerSql) return holder.__ledgerSql;
   const url = process.env.DATABASE_URL;
@@ -25,6 +35,6 @@ export function sql(): Sql {
   if (!/^postgres(ql)?:\/\//i.test(url)) {
     throw new Error("DATABASE_URL must be a postgres:// URL. The dashboard does not read the SQLite dev ledger.");
   }
-  holder.__ledgerSql = postgres(url, POOL);
+  holder.__ledgerSql = postgres(url, { ...POOL, max: poolSize(process.env.DASHBOARD_DB_MAX) });
   return holder.__ledgerSql;
 }
