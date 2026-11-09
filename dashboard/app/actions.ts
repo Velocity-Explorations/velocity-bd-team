@@ -12,6 +12,7 @@ import { isoNow, zonedToIso } from "@/lib/format";
 import { safeFrom, SIGNED_IN_COOKIE } from "@/lib/signin";
 import { timeZone } from "@/lib/me";
 import { aliasesFor } from "@/lib/people";
+import { MAX_PICTURE_BYTES, PICTURE_SIZE, sniffImage } from "@/lib/picture";
 import { profileFromForm } from "@/lib/profile";
 import { FORMATS } from "@/lib/proposals";
 import {
@@ -26,6 +27,8 @@ import {
   decideCall,
   decideRequest,
   deleteProfile,
+  deletePicture,
+  savePicture,
   isChangeDecision,
   markSubmitted,
   noGoStep,
@@ -274,6 +277,54 @@ export async function resetProfileAction(): Promise<void> {
   await deleteProfile(viewer);
   revalidatePath("/", "layout");
   backTo("/profile", "notice", "Your profile is back to the defaults.");
+}
+
+export type PictureResult = { ok: boolean; message: string };
+
+/**
+ * Profile settings' picture (David, 9 Nov 2026), saved as soon as it is chosen. The file must be a JPEG, PNG, WebP or GIF
+ * by its own first bytes; sharp then re-encodes it to a 256 by 256 WebP, turned upright, so nothing of the upload but
+ * its pixels is kept: no script, no place or camera data. The viewer changes only their own.
+ */
+export async function savePictureAction(formData: FormData): Promise<PictureResult> {
+  const viewer = await currentViewer();
+  if (!viewer) return { ok: false, message: "Log in (top right) before changing your picture." };
+  const file = formData.get("picture");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a picture first." };
+  if (file.size > MAX_PICTURE_BYTES) return { ok: false, message: "That picture is too large. Choose a smaller one." };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!sniffImage(bytes)) return { ok: false, message: "Use a JPEG, PNG, WebP or GIF picture." };
+  let webp: Buffer;
+  try {
+    const sharp = (await import("sharp")).default;
+    webp = await sharp(bytes, { limitInputPixels: 40_000_000 })
+      .rotate()
+      .resize(PICTURE_SIZE, PICTURE_SIZE, { fit: "cover" })
+      .webp({ quality: 85 })
+      .toBuffer();
+  } catch {
+    return { ok: false, message: "That picture could not be read. Try another." };
+  }
+  try {
+    await savePicture(viewer, webp.toString("base64"), "image/webp");
+  } catch (err) {
+    return { ok: false, message: `Could not save the picture: ${err instanceof Error ? err.message.slice(0, 160) : "database error"}` };
+  }
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Picture saved." };
+}
+
+/** Profile settings' Remove: the viewer's picture goes, and their initials show again. */
+export async function removePictureAction(): Promise<PictureResult> {
+  const viewer = await currentViewer();
+  if (!viewer) return { ok: false, message: "Log in (top right) before changing your picture." };
+  try {
+    await deletePicture(viewer);
+  } catch (err) {
+    return { ok: false, message: `Could not remove the picture: ${err instanceof Error ? err.message.slice(0, 160) : "database error"}` };
+  }
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Picture removed." };
 }
 
 /**

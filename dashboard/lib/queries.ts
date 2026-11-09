@@ -1330,6 +1330,40 @@ export async function deleteProfile(name: string): Promise<void> {
   forget("profiles");
 }
 
+/** When each person's picture was set, by name, without the pictures themselves (David, 9 Nov 2026); empty before migration 018. */
+export function pictureStamps(): Promise<Map<string, string>> {
+  return remember("pictures", keepFor(), async () => {
+    const db = sql();
+    if (!(await hasTable(db, "profile_pictures"))) return new Map();
+    const rows = await db<{ name: string; updated_at: string }[]>`SELECT name, updated_at FROM profile_pictures`;
+    return new Map(rows.map((r) => [r.name, r.updated_at]));
+  });
+}
+
+/** One person's picture, as stored, or null. */
+export async function readPicture(name: string): Promise<{ picture: string; content_type: string; updated_at: string } | null> {
+  const db = sql();
+  if (!(await hasTable(db, "profile_pictures"))) return null;
+  const [row] = await db<{ picture: string; content_type: string; updated_at: string }[]>`
+    SELECT picture, content_type, updated_at FROM profile_pictures WHERE name = ${name}`;
+  return row ?? null;
+}
+
+/** Profile settings' picture: the person's one picture, replaced whole. */
+export async function savePicture(name: string, picture: string, contentType: string): Promise<void> {
+  await sql()`
+    INSERT INTO profile_pictures (name, picture, content_type, updated_at)
+    VALUES (${name}, ${picture}, ${contentType}, ${isoNow()})
+    ON CONFLICT (name) DO UPDATE SET picture = EXCLUDED.picture, content_type = EXCLUDED.content_type, updated_at = EXCLUDED.updated_at`;
+  forget("pictures");
+}
+
+/** Profile settings' Remove: the initials show again. */
+export async function deletePicture(name: string): Promise<void> {
+  await sql()`DELETE FROM profile_pictures WHERE name = ${name}`;
+  forget("pictures");
+}
+
 // ----------------------------------------------------------------- the proposal workspace
 
 /** A pursuit as the workspace shows it (pursuits, migration 008). */

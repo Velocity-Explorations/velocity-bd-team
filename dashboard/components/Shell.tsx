@@ -9,7 +9,7 @@ import { TableController } from "@/components/TableController";
 import { TableSettings } from "@/components/TableSettings";
 import { TooltipController } from "@/components/TooltipController";
 import { formatTime } from "@/lib/format";
-import { defaultFilters, drafting, initialsOf, labeler, me, timeZone } from "@/lib/me";
+import { defaultFilters, drafting, initialsOf, labeler, me, pictureOf, pictures, timeZone } from "@/lib/me";
 import { countLabel, SECTIONS, type Section } from "@/lib/nav";
 import { callsHref } from "@/lib/profile";
 import { aliasesFor } from "@/lib/people";
@@ -73,8 +73,11 @@ const shellData = cache(async (section: Section | null) => {
     team(),
     hasChat().catch(() => false),
     startsDrafts ? hasSuggestions().catch(() => false) : false,
+    pictures(),   // read beside the rest; pictureOf below takes it from the request's cache
   ]);
-  const people = await Promise.all(members.map(async (p) => ({ name: p.name, label: label(p.name), initials: await initialsOf(p.name) })));
+  const people = await Promise.all(members.map(async (p) => ({
+    name: p.name, label: label(p.name), initials: await initialsOf(p.name), picture: await pictureOf(p.name),
+  })));
   return { viewer, counts, hidden, label, filters, draft, tz, past, people, chat, suggests };
 });
 

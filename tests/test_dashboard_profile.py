@@ -14,7 +14,7 @@ import pytest
 URL = os.environ.get("DASHBOARD_TEST_URL", "").rstrip("/")
 pytestmark = pytest.mark.skipif(not URL, reason="set DASHBOARD_TEST_URL to a running dashboard")
 
-SETTINGS = ["Name", "Signed-in account", "Where the dashboard opens", "Default filters for Calls", "Time zone"]
+SETTINGS = ["Name", "Picture", "Signed-in account", "Where the dashboard opens", "Default filters for Calls", "Time zone"]
 
 
 @pytest.fixture()
@@ -59,3 +59,25 @@ def test_profile_settings_shows_each_setting_and_the_menu_links_it(page: Any) ->
     assert names == SETTINGS
     assert page.locator("input[name=opens]").count() == 2
     assert page.locator("select[name=time_zone] option").first.inner_text().endswith("(dashboard default)")
+
+
+def test_profile_settings_offers_a_picture_upload(page: Any) -> None:
+    """David, 9 Nov: a person uploads their own picture, shown in place of their initials. The file box has no name, so
+    the profile's Save never sends it; choosing a file saves the picture on its own."""
+    if not log_in(page):
+        pytest.skip("this dashboard has nobody to choose")
+    page.goto(URL + "/profile", wait_until="load", timeout=120_000)
+    field = page.locator(".picture-field")
+    upload = field.locator("input[type=file]")
+    assert upload.count() == 1 and upload.get_attribute("name") is None
+    assert all(t in (upload.get_attribute("accept") or "") for t in ("image/jpeg", "image/png", "image/webp"))
+    assert field.locator("label", has_text="picture").count() == 1
+    shown = field.locator(".avatar")
+    assert shown.count() == 1   # the picture, or the initials until there is one
+    has_picture = shown.evaluate("e => e.tagName") == "IMG"
+    assert field.locator("button", has_text="Remove").count() == (1 if has_picture else 0)
+
+
+def test_a_missing_picture_is_not_found(page: Any) -> None:
+    response = page.request.get(URL + "/api/picture?name=" + "Nobody%20At%20All")
+    assert response.status == 404

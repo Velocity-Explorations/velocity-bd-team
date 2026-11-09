@@ -3,9 +3,10 @@
 import { headers } from "next/headers";
 import { cache } from "react";
 import { initials } from "./nav";
+import { pictureUrl } from "./picture";
 import { callsHref, isFreshArrival, isValidTimeZone, parseDefaultFilters, withDefaultFilters, type DefaultFilters } from "./profile";
 import { workerReadiness } from "./proposals";
-import { allProfiles, workerStatus, type ProfileRow } from "./queries";
+import { allProfiles, pictureStamps, workerStatus, type ProfileRow } from "./queries";
 import { displayTimeZone } from "./settings";
 import { currentViewer } from "./viewer";
 
@@ -40,6 +41,15 @@ export async function labeler(): Promise<(name: string) => string> {
 export async function initialsOf(name: string): Promise<string> {
   const profile = (await profiles()).get(name);
   return profile?.initials || initials(profile?.display_name || name);
+}
+
+/** When each person's picture was set, read once per request; a failed read shows initials, never a broken frame. */
+export const pictures = cache(() => pictureStamps().catch(() => new Map<string, string>()));
+
+/** Where a person's picture is fetched, or null while they have none (David, 9 Nov 2026). */
+export async function pictureOf(name: string): Promise<string | null> {
+  const at = (await pictures()).get(name);
+  return at ? pictureUrl(name, at) : null;
 }
 
 /** Whether this request opens the dashboard, not a move between its own pages (U3, U4). */

@@ -476,3 +476,12 @@ CREATE TABLE IF NOT EXISTS draft_suggestions (
 
 CREATE INDEX IF NOT EXISTS idx_draft_suggestions_state ON draft_suggestions (state, id);
 CREATE INDEX IF NOT EXISTS idx_draft_suggestions_call ON draft_suggestions (call_id, id);
+
+-- 018_profile_pictures: each person's profile picture, shown in place of their initials.
+
+CREATE TABLE IF NOT EXISTS profile_pictures (
+  name          TEXT PRIMARY KEY,
+  picture       TEXT NOT NULL,
+  content_type  TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
