@@ -9,6 +9,36 @@ portal content.
 
 ## Current Session
 
+**Date**: 2026-11-10 (covers 9 to 10 Nov)
+**Focus**: Top bar themes from Claude Design, Deep field's planets and meteors, faces beside names
+
+### What Was Done
+- Draft request kind retired; a draft starts from Start the draft (#161). Pictures or initials beside names on votes, notes, Changed by and Working with (#162). An unknown call's draft page answers 404 (#163).
+- Top bar themes from the Claude Design handoff: Deep field (default), Line clear, Ground drift, picked in Profile settings (migration 019 `profiles.bar_theme`, #164). Stars and craft blend with lighten so overlaps never add up behind a label (#165).
+- Deep field gains planets: a random sky each visit, rocky, banded, storm or ice, with rings, gas clouds or moons (#166). Then shooting stars, meteor showers and comets at random (#167). Layout and events live in `dashboard/lib/sky.ts`.
+
+### Key Decisions
+- Every part of a theme stays at or under 22% ink, so silver labels keep 4.5:1 (worst measured 4.55:1).
+- Deep field is everyone's default, Shaun included; choosing it saves an empty value, so a new default moves everyone who has not picked another.
+- The company design system bundle (`docs/design/topbar-animation/_ds/`) is gitignored; only `handoff/bar-themes` is committed.
+
+### Key Files Modified
+| File | Change |
+|------|--------|
+| `dashboard/components/bar-themes/` | The three themes, planets, meteors, the shared clock |
+| `dashboard/lib/barthemes.ts`, `lib/sky.ts` | Theme ids and copy; planet sky and sky events |
+| `ledger/migrations/019_bar_theme.sql`, `dashboard/proxy.ts` | Theme column; 404 for unknown drafts |
+
+### In Progress
+- David is watching Deep field and may ask to tune `PLANETS` or `METEORS` in `lib/sky.ts`.
+- Still unrated on `/fit`: INDOPACOM, `jadc2`, `c4isr`. Due: the Unison CUI addendum on 12 Nov; the AFWERX cycle topics read by 25 Nov.
+- Linear catch-up notes for #109 to #167 wait in data/linear/catchup.md until Linear writes resume.
+
+### Blockers
+- None.
+
+## Session: 2026-11-09
+
 **Date**: 2026-11-09 (covers 7 to 9 Nov)
 **Focus**: Listing kinds, Ask Grok, draft suggestions, the Fit ratings page reworked, and profile pictures
 
