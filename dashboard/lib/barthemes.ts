@@ -11,7 +11,8 @@ export const BAR_THEMES: { id: BarTheme; name: string; description: string }[] =
   {
     id: "deep-field",
     name: "Deep field",
-    description: "Faint stars and planets drift behind the bar. Now and then a shuttle, satellite, rocket or UFO crosses.",
+    description:
+      "Faint stars and planets drift behind the bar. Now and then a spacecraft, a shooting star, a meteor shower or a comet crosses.",
   },
   {
     id: "line-clear",

@@ -355,6 +355,19 @@ def test_deep_field_draws_planets_over_the_stars_and_under_the_craft(page: Any) 
     assert inks and max(inks) <= 20, max(inks)
 
 
+def test_deep_fields_shooting_stars_showers_and_comets_fly_in_front_of_the_sky(page: Any) -> None:
+    """David, 10 Nov 2026: now and then a shooting star, a meteor shower or a comet crosses, after the craft lane and
+    blended with lighten like the craft, so over a star or a planet the brighter shows and nothing adds up."""
+    open_page(page, "/review")
+    fx = page.locator("header.topbar > .topbar-deep")
+    order = fx.evaluate("e => [...e.children].map(c => c.className)")
+    assert order[-2:] == ["topbar-deep-lane", "topbar-deep-events"], order
+    probe = fx.evaluate("""e => { const el = document.createElement('div'); el.className = 'topbar-deep-meteor';
+      e.querySelector('.topbar-deep-events').appendChild(el); const s = getComputedStyle(el);
+      const out = [s.mixBlendMode, s.position]; el.remove(); return out; }""")
+    assert probe == ["lighten", "absolute"]
+
+
 def test_deep_fields_planets_keep_their_sky_and_their_place_across_pages(page: Any) -> None:
     """Moving to another page draws the bar afresh; the planets are the same and carry on from where they were."""
     open_page(page, "/review")
