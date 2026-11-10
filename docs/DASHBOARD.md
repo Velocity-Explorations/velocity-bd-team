@@ -298,6 +298,14 @@ of the window says Saving, Saved or what went wrong (`components/AutoSaveForm.ts
   stays the same while moving between pages. Planets paint opaque greys of at most 20% ink in normal
   blending, so they cover the stars behind them and keep silver labels above 4.5:1; the craft fly in
   front of them. Every number to tune is `PLANETS` in `lib/sky.ts`.
+- **Deep field's shooting stars, meteor showers and comets** (David, 10 Nov 2026): the first about
+  9 seconds after a page loads, then one every 6 to 20 seconds, picked at random: a shooting star
+  (one quick streak), a meteor shower (4 to 14 streaks falling the same way over a few seconds,
+  across part of the bar) or, more rarely, a comet (a head, glow and two tails crossing the whole bar
+  in 28 to 60 seconds; never two at once). Size, density and place are random each time. They fly in
+  front of the stars, planets and craft, blended with lighten, at most 22% ink, so labels keep 4.5:1.
+  None with reduced motion; none start while the tab is hidden. Tune them with `METEORS` in
+  `lib/sky.ts`.
 - **Where the dashboard opens:** Home, or Calls. Opening `/` from outside the dashboard (a bookmark,
   a typed address, a Slack link) takes a person who chose Calls to Needs review. Home stays one
   click away (U3).

@@ -229,6 +229,36 @@ td.when {
   transform: scaleX(-1);
 }
 
+/* Shooting stars, meteor showers and comets (David, 10 Nov 2026; deep-field-meteors.tsx): in front of everything in
+   the sky, blended with lighten as the craft are, at most 22% ink. */
+.topbar-deep-events,
+.topbar-deep-event {
+  position: absolute;
+  inset: 0;
+}
+
+.topbar-deep-meteor,
+.topbar-deep-comet {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.topbar-deep-meteor {
+  mix-blend-mode: lighten;
+}
+
+.topbar-deep-streak {
+  position: absolute;
+  border-radius: 1px;
+}
+
+.topbar-deep-comet svg {
+  position: absolute;
+  display: block;
+  overflow: visible;
+}
+
 /* Deep field's planets (David, 10 Nov 2026; not in the handoff). lib/sky.ts lays them out and
    components/bar-themes/deep-field-planets.tsx draws them. The belt holds every planet twice, a loop apart, and moves
    one loop left, as a star tile does. Opaque greys in normal blending: a planet covers the stars behind it, and no part

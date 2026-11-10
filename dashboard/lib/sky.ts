@@ -273,6 +273,169 @@ function moons(p: Planet, n: number, between: Between, rand: () => number): Moon
   return out;
 }
 
+// ---------------------------------------------------------------- shooting stars, meteor showers and comets
+
+// David, 10 Nov 2026: now and then something crosses in front of the stars and planets. A shooting star is one quick
+// streak; a meteor shower a burst of them falling the same way; a comet a slow head and tail across the whole bar. The
+// size, density and place of each is random. Drawn by components/bar-themes/deep-field-meteors.tsx.
+
+export type SkyEventKind = "shooting-star" | "shower" | "comet";
+
+/** A streak, drawn at (x, y) and falling `angle` degrees below the horizontal toward `dir`, `distance` px in `ms`. */
+export type Streak = {
+  x: number;
+  y: number;
+  dir: 1 | -1;
+  angle: number;
+  length: number;
+  width: number;
+  distance: number;
+  ms: number;
+  delay: number;
+  ink: number;
+};
+
+/** A comet's head moves from (from, y0) to (to, y1) in `ms`; its tail trails `tail` px behind. */
+export type Comet = {
+  dir: 1 | -1;
+  from: number;
+  to: number;
+  y0: number;
+  y1: number;
+  head: number;
+  tail: number;
+  ink: number;
+  ms: number;
+};
+
+export type SkyEvent =
+  | { kind: "shooting-star"; streaks: Streak[] }
+  | { kind: "shower"; streaks: Streak[] }
+  | { kind: "comet"; comet: Comet };
+
+/** Every tunable number for shooting stars, showers and comets. */
+export const METEORS = {
+  /** The first event this long after the bar is drawn, then one every gapMs, picked at random in the range. */
+  firstMs: 9000,
+  gapMs: [6000, 20000] as [number, number],
+  /** How often each kind is picked. A comet is never picked while another is crossing. */
+  kinds: { "shooting-star": 0.55, shower: 0.27, comet: 0.18 } as Record<SkyEventKind, number>,
+  /** As bright as a craft's body at most, so silver labels keep 4.5:1. */
+  inkCap: 0.22,
+  /** A streak shows for at least this long, however fast it falls. */
+  minStreakMs: 250,
+  star: {
+    length: [18, 72] as [number, number],
+    width: [0.9, 1.6] as [number, number],
+    speed: [320, 720] as [number, number],
+    angle: [5, 26] as [number, number],
+    distance: [90, 560] as [number, number],
+    ink: [0.16, 0.22] as [number, number],
+  },
+  shower: {
+    count: [4, 14] as [number, number],
+    /** The burst lasts this long, and spreads over this much of the bar. */
+    spanMs: [1500, 5000] as [number, number],
+    spread: [160, 560] as [number, number],
+    /** Each streak's angle is within this many degrees of the shower's. */
+    jitter: 2.5,
+    length: [12, 50] as [number, number],
+    ink: [0.12, 0.2] as [number, number],
+  },
+  comet: {
+    head: [1.2, 2.4] as [number, number],
+    tail: [50, 170] as [number, number],
+    /** Crossing time at a 1440 px bar, scaled with the bar's width as the craft are. */
+    seconds: [28, 60] as [number, number],
+    ink: [0.17, 0.22] as [number, number],
+  },
+};
+
+/** How much of the comet each part carries: the glow round its head, and its tail where it leaves the head. */
+export const COMET_PARTS = { coma: 0.6, tail: 0.55, ion: 0.45 };
+
+/** Every ink an event paints, for the cap. */
+export function eventInks(e: SkyEvent): number[] {
+  if (e.kind === "comet") return [e.comet.ink, ...Object.values(COMET_PARTS).map((k) => e.comet.ink * k)];
+  return e.streaks.map((s) => s.ink);
+}
+
+/** The next event for a bar this size. `rand` is Math.random in the bar, a seeded rng in tests. */
+export function skyEvent(rand: () => number, width: number, height: number, cometCrossing = false): SkyEvent {
+  const between = (lo: number, hi: number) => lo + rand() * (hi - lo);
+  const kinds = (Object.entries(METEORS.kinds) as [SkyEventKind, number][]).filter(
+    ([k]) => !(cometCrossing && k === "comet"),
+  );
+  let pick = rand() * kinds.reduce((s, [, w]) => s + w, 0);
+  const kind = kinds.find(([, w]) => (pick -= w) <= 0)?.[0] ?? "shooting-star";
+  const dir: 1 | -1 = rand() < 0.5 ? 1 : -1;
+
+  if (kind === "comet") {
+    const c = METEORS.comet;
+    const tail = between(...c.tail);
+    const margin = tail + 12;
+    const y0 = between(0.2, 0.8) * height;
+    const y1 = Math.min(0.85 * height, Math.max(0.15 * height, y0 + between(-8, 8)));
+    const factor = Math.min(1.25, Math.max(0.75, width / 1440));
+    const ms = Math.min(c.seconds[1] * 1000, Math.max(c.seconds[0] * 1000, between(...c.seconds) * 1000 * factor));
+    return {
+      kind,
+      comet: {
+        dir,
+        from: dir > 0 ? -margin : width + margin,
+        to: dir > 0 ? width + margin : -margin,
+        y0,
+        y1,
+        head: between(...c.head),
+        tail,
+        ink: between(...c.ink),
+        ms,
+      },
+    };
+  }
+
+  const s = METEORS.star;
+  /** One streak at this angle, starting near (cx), its fall kept inside the bar. */
+  const streak = (angle: number, x: number, length: [number, number], ink: [number, number], delay: number): Streak => {
+    const y = between(0, 0.4) * height;
+    const room = (0.9 * (height - y)) / Math.sin((angle * Math.PI) / 180);
+    const distance = Math.min(room, between(...s.distance));
+    return {
+      x,
+      y,
+      dir,
+      angle,
+      length: between(...length),
+      width: between(...s.width),
+      distance,
+      ms: Math.max(METEORS.minStreakMs, (distance / between(...s.speed)) * 1000),
+      delay,
+      ink: between(...ink),
+    };
+  };
+
+  if (kind === "shooting-star") {
+    return { kind, streaks: [streak(between(...s.angle), between(0.05, 0.95) * width, s.length, s.ink, 0)] };
+  }
+
+  const sh = METEORS.shower;
+  const count = Math.round(between(sh.count[0] - 0.49, sh.count[1] + 0.49));
+  const span = between(...sh.spanMs);
+  const spread = Math.min(width, between(...sh.spread));
+  const centre = between(spread / 2, width - spread / 2);
+  const angle = between(s.angle[0] + sh.jitter, Math.min(16, s.angle[1] - sh.jitter));
+  const streaks = Array.from({ length: count }, () =>
+    streak(
+      angle + between(-sh.jitter, sh.jitter),
+      Math.min(width, Math.max(0, centre + between(-0.5, 0.5) * spread)),
+      sh.length,
+      sh.ink,
+      between(0, span),
+    ),
+  );
+  return { kind, streaks: streaks.sort((a, b) => a.delay - b.delay) };
+}
+
 function extentOf(p: Planet): number {
   return Math.max(
     p.r,

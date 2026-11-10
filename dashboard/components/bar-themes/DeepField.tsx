@@ -3,11 +3,13 @@
 // Bar theme "deep-field" (board concept 1i, Claude Design handoff). The default. Three layers of faint stars drift left
 // behind the bar. One craft at a time (shuttle, satellite, rocket or UFO) crosses now and then, chosen at random.
 // The full spec is docs/design/topbar-animation/handoff/bar-themes/README.md. Not in the handoff (David, 10 Nov 2026):
-// a few planets drift slower still, laid out at random once a visit (lib/sky.ts), over the stars and under the craft.
+// a few planets drift slower still, laid out at random once a visit (lib/sky.ts), over the stars and under the craft;
+// and now and then a shooting star, a meteor shower or a comet crosses in front (deep-field-meteors.tsx).
 
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { planetSky, type Sky } from "@/lib/sky";
 import { CraftGlyph, type CraftType } from "./deep-field-craft";
+import { SkyEvents } from "./deep-field-meteors";
 import { PlanetGlyph } from "./deep-field-planets";
 import { phaseToClock, rng, useReducedMotion, useTabHidden } from "./motion";
 
@@ -135,6 +137,7 @@ export function DeepField() {
         ))}
       </div>
       {!reduced && <CraftLane paused={hidden} />}
+      {!reduced && <SkyEvents paused={hidden} />}
     </div>
   );
 }
