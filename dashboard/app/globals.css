@@ -229,6 +229,104 @@ td.when {
   transform: scaleX(-1);
 }
 
+/* Deep field's planets (David, 10 Nov 2026; not in the handoff). lib/sky.ts lays them out and
+   components/bar-themes/deep-field-planets.tsx draws them. The belt holds every planet twice, a loop apart, and moves
+   one loop left, as a star tile does. Opaque greys in normal blending: a planet covers the stars behind it, and no part
+   of one is brighter than its own grey (at most 20% ink, under the craft's 22%). */
+.topbar-deep-planets {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  animation: topbar-deep-drift var(--dur) linear infinite;
+  will-change: transform;
+}
+
+.topbar-deep-planet,
+.topbar-deep-orbit,
+.topbar-deep-haze {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+}
+
+.topbar-deep-planet svg {
+  position: absolute;
+  display: block;
+  overflow: visible;
+}
+
+/* A moon's two copies follow one orbit; the copy under the body shows on the far half, the one over it on the near
+   half. They swap at the orbit's ends, clear of the planet. Longhands, as for Ground drift's tracks. */
+.topbar-deep-moon {
+  position: absolute;
+  border-radius: 50%;
+  animation-name: topbar-deep-orbit, topbar-deep-near;
+  animation-duration: var(--dur);
+  animation-timing-function: linear;
+  animation-delay: var(--delay);
+  animation-iteration-count: infinite;
+  animation-direction: var(--way);
+}
+
+.topbar-deep-moon-back {
+  animation-name: topbar-deep-orbit, topbar-deep-far;
+}
+
+/* The gas cloud turns slowly and breathes: fades a little and back. */
+.topbar-deep-haze {
+  animation-name: topbar-deep-swirl, topbar-deep-breathe;
+  animation-duration: var(--swirl), var(--breath);
+  animation-timing-function: linear, ease-in-out;
+  animation-delay: var(--delay);
+  animation-iteration-count: infinite;
+  animation-direction: var(--way), alternate;
+}
+
+@keyframes topbar-deep-swirl { to { transform: rotate(360deg); } }
+@keyframes topbar-deep-breathe { to { opacity: 0.6; } }
+@keyframes topbar-deep-near { 0%, 50% { opacity: 1; } 50.01%, 99.99% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes topbar-deep-far { 0%, 50% { opacity: 0; } 50.01%, 99.99% { opacity: 1; } 100% { opacity: 0; } }
+
+/* An ellipse --rx by --ry, in 32 straight steps (under half a px off the curve at the widest orbit). */
+@keyframes topbar-deep-orbit {
+  0% { transform: translate(calc(var(--rx) * 1), calc(var(--ry) * 0)); }
+  3.125% { transform: translate(calc(var(--rx) * 0.9808), calc(var(--ry) * 0.1951)); }
+  6.25% { transform: translate(calc(var(--rx) * 0.9239), calc(var(--ry) * 0.3827)); }
+  9.375% { transform: translate(calc(var(--rx) * 0.8315), calc(var(--ry) * 0.5556)); }
+  12.5% { transform: translate(calc(var(--rx) * 0.7071), calc(var(--ry) * 0.7071)); }
+  15.625% { transform: translate(calc(var(--rx) * 0.5556), calc(var(--ry) * 0.8315)); }
+  18.75% { transform: translate(calc(var(--rx) * 0.3827), calc(var(--ry) * 0.9239)); }
+  21.875% { transform: translate(calc(var(--rx) * 0.1951), calc(var(--ry) * 0.9808)); }
+  25% { transform: translate(calc(var(--rx) * 0), calc(var(--ry) * 1)); }
+  28.125% { transform: translate(calc(var(--rx) * -0.1951), calc(var(--ry) * 0.9808)); }
+  31.25% { transform: translate(calc(var(--rx) * -0.3827), calc(var(--ry) * 0.9239)); }
+  34.375% { transform: translate(calc(var(--rx) * -0.5556), calc(var(--ry) * 0.8315)); }
+  37.5% { transform: translate(calc(var(--rx) * -0.7071), calc(var(--ry) * 0.7071)); }
+  40.625% { transform: translate(calc(var(--rx) * -0.8315), calc(var(--ry) * 0.5556)); }
+  43.75% { transform: translate(calc(var(--rx) * -0.9239), calc(var(--ry) * 0.3827)); }
+  46.875% { transform: translate(calc(var(--rx) * -0.9808), calc(var(--ry) * 0.1951)); }
+  50% { transform: translate(calc(var(--rx) * -1), calc(var(--ry) * 0)); }
+  53.125% { transform: translate(calc(var(--rx) * -0.9808), calc(var(--ry) * -0.1951)); }
+  56.25% { transform: translate(calc(var(--rx) * -0.9239), calc(var(--ry) * -0.3827)); }
+  59.375% { transform: translate(calc(var(--rx) * -0.8315), calc(var(--ry) * -0.5556)); }
+  62.5% { transform: translate(calc(var(--rx) * -0.7071), calc(var(--ry) * -0.7071)); }
+  65.625% { transform: translate(calc(var(--rx) * -0.5556), calc(var(--ry) * -0.8315)); }
+  68.75% { transform: translate(calc(var(--rx) * -0.3827), calc(var(--ry) * -0.9239)); }
+  71.875% { transform: translate(calc(var(--rx) * -0.1951), calc(var(--ry) * -0.9808)); }
+  75% { transform: translate(calc(var(--rx) * 0), calc(var(--ry) * -1)); }
+  78.125% { transform: translate(calc(var(--rx) * 0.1951), calc(var(--ry) * -0.9808)); }
+  81.25% { transform: translate(calc(var(--rx) * 0.3827), calc(var(--ry) * -0.9239)); }
+  84.375% { transform: translate(calc(var(--rx) * 0.5556), calc(var(--ry) * -0.8315)); }
+  87.5% { transform: translate(calc(var(--rx) * 0.7071), calc(var(--ry) * -0.7071)); }
+  90.625% { transform: translate(calc(var(--rx) * 0.8315), calc(var(--ry) * -0.5556)); }
+  93.75% { transform: translate(calc(var(--rx) * 0.9239), calc(var(--ry) * -0.3827)); }
+  96.875% { transform: translate(calc(var(--rx) * 0.9808), calc(var(--ry) * -0.1951)); }
+  100% { transform: translate(calc(var(--rx) * 1), calc(var(--ry) * 0)); }
+}
+
 /* Line clear */
 
 .topbar-lines {
@@ -278,9 +376,13 @@ td.when {
 .topbar-drift-a .topbar-drift-pool { left: -200px; } /* rests behind the mark */
 .topbar-drift-b .topbar-drift-pool { left: calc(100% - 440px); } /* rests behind the account */
 
-/* Reduced motion: Deep field renders no craft; Line clear starts no animations, so its cells show the full row. */
+/* Reduced motion: Deep field renders no craft and its planets stand still, moons where their orbits start; Line clear
+   starts no animations, so its cells show the full row. */
 @media (prefers-reduced-motion: reduce) {
   .topbar-deep-stars,
+  .topbar-deep-planets,
+  .topbar-deep-moon,
+  .topbar-deep-haze,
   .topbar-drift-track {
     animation: none;
   }

@@ -312,11 +312,62 @@ def test_every_bar_theme_keeps_its_timing_through_the_build(page: Any) -> None:
         drift_a: probe('topbar-drift-track topbar-drift-a', {}),
         drift_b: probe('topbar-drift-track topbar-drift-b', {}),
         stars: probe('topbar-deep-stars', { '--dur': '90s', '--tile': '320px' }),
+        planets: probe('topbar-deep-planets', { '--dur': '533s', '--tile': '1600px' }),
+        moon: probe('topbar-deep-moon', { '--dur': '20s', '--delay': '-3s', '--way': 'reverse' }),
+        far_moon: probe('topbar-deep-moon topbar-deep-moon-back', { '--dur': '20s', '--delay': '-3s', '--way': 'normal' }),
+        gas: probe('topbar-deep-haze', { '--swirl': '140s', '--breath': '24s', '--delay': '-9s', '--way': 'reverse' }),
       };
     }""")
     assert timing["drift_a"] == ["topbar-drift-a", "30s", "infinite", "alternate"]
     assert timing["drift_b"] == ["topbar-drift-b", "30s", "infinite", "alternate"]
     assert timing["stars"] == ["topbar-deep-drift", "90s", "infinite", "normal"]
+    assert timing["planets"] == ["topbar-deep-drift", "533s", "infinite", "normal"]
+    assert timing["moon"] == ["topbar-deep-orbit, topbar-deep-near", "20s", "infinite", "reverse"]
+    assert timing["far_moon"] == ["topbar-deep-orbit, topbar-deep-far", "20s", "infinite", "normal"]
+    assert timing["gas"] == ["topbar-deep-swirl, topbar-deep-breathe", "140s, 24s", "infinite", "reverse, alternate"]
+
+
+PLANETS = """() => [...document.querySelectorAll('header.topbar .topbar-deep-planets .topbar-deep-planet')].map(e =>
+  [e.style.left, e.style.top, e.dataset.kind, e.dataset.ring || '', e.dataset.moons || '', e.dataset.haze !== undefined])"""
+
+
+def wait_for_planets(page: Any) -> None:
+    page.wait_for_selector("header.topbar .topbar-deep-planets .topbar-deep-planet", state="attached", timeout=10_000)
+
+
+def test_deep_field_draws_planets_over_the_stars_and_under_the_craft(page: Any) -> None:
+    """David, 10 Nov 2026: planets of random size, kind and place, some with rings, gas or moons, drift behind the bar.
+    Each is drawn twice a loop apart, the loop longer than the bar, and no part of one is brighter than 20% ink."""
+    open_page(page, "/review")
+    wait_for_planets(page)
+    fx = page.locator("header.topbar > .topbar-deep")
+    order = fx.evaluate("e => [...e.children].map(c => c.className)")
+    assert order[:3] == ["topbar-deep-stars"] * 3 and order[3] == "topbar-deep-planets", order
+    planets = page.evaluate(PLANETS)
+    assert len(planets) >= 2 and len(planets) % 2 == 0
+    assert len({p[2] for p in planets}) == len(planets) // 2   # each kind once a sky, drawn twice
+    belt = fx.locator(".topbar-deep-planets")
+    loop = int(belt.get_attribute("data-loop") or 0)
+    assert loop >= fx.evaluate("e => e.clientWidth")
+    assert belt.evaluate("e => [getComputedStyle(e).animationName, getComputedStyle(e).mixBlendMode]") == ["topbar-deep-drift", "normal"]
+    inks = belt.evaluate("""e => [...e.querySelectorAll('[style*="color-mix"]')].flatMap(el =>
+      [...el.getAttribute('style').matchAll(/var\\(--fx-ink\\) ([\\d.]+)%/g)].map(m => Number(m[1])))""")
+    assert inks and max(inks) <= 20, max(inks)
+
+
+def test_deep_fields_planets_keep_their_sky_and_their_place_across_pages(page: Any) -> None:
+    """Moving to another page draws the bar afresh; the planets are the same and carry on from where they were."""
+    open_page(page, "/review")
+    wait_for_planets(page)
+    before = page.evaluate(PLANETS)
+    belt_time = "() => document.querySelector('header.topbar .topbar-deep-planets').getAnimations()[0].currentTime"
+    then = page.evaluate(belt_time)
+    page.locator(".topbar nav a", has_text="Proposals").click()
+    page.wait_for_url("**/proposals**")
+    page.wait_for_timeout(800)
+    wait_for_planets(page)
+    assert page.evaluate(PLANETS) == before
+    assert page.evaluate(belt_time) >= then + 500
 
 
 def test_deep_fields_stars_and_craft_never_add_up_behind_a_label(page: Any) -> None:

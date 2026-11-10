@@ -18,7 +18,12 @@ const SATELLITE = 0.45;
  * a label is brighter than the craft itself (David, 9 Nov 2026). Over plain ground it looks the same as before.
  */
 function tone(ink: number): CSSProperties {
-  return { fill: `color-mix(in srgb, var(--fx-ink) ${Math.round(ink * 1000) / 10}%, var(--fx-ground))` };
+  return { fill: inkColour(ink) };
+}
+
+/** The ink mixed into the ground, opaque: the colour every Deep field part paints with, planets included. */
+export function inkColour(ink: number): string {
+  return `color-mix(in srgb, var(--fx-ink) ${Math.round(ink * 1000) / 10}%, var(--fx-ground))`;
 }
 
 export function CraftGlyph({ type, bright = true }: { type: CraftType; bright?: boolean }) {
