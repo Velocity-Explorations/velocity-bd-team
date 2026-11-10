@@ -4,16 +4,8 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-/** Small deterministic PRNG, so server and client render identical output. */
-export function rng(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+/** Small deterministic PRNG, so server and client render identical output. It lives with Deep field's planets. */
+export { rng } from "@/lib/sky";
 
 /** True when the OS asks for reduced motion. Follows changes live. */
 export function useReducedMotion() {
@@ -71,11 +63,14 @@ export function fxClock(): number {
   return banked + (since === null ? 0 : performance.now() - since);
 }
 
-/** Moves the CSS animations on these elements to the clock, so a bar drawn again shows the frame the last one did. */
-export function phaseToClock(elements: Iterable<Element | null>): void {
+/**
+ * Moves the CSS animations on these elements (and, with `subtree`, everything inside them) to the clock, so a bar
+ * drawn again shows the frame the last one did.
+ */
+export function phaseToClock(elements: Iterable<Element | null>, subtree = false): void {
   const now = fxClock();
   for (const el of elements) {
-    for (const a of el?.getAnimations() ?? []) a.currentTime = now;
+    for (const a of el?.getAnimations({ subtree }) ?? []) a.currentTime = now;
   }
 }
 

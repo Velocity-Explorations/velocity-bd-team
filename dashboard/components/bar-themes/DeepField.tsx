@@ -2,10 +2,13 @@
 
 // Bar theme "deep-field" (board concept 1i, Claude Design handoff). The default. Three layers of faint stars drift left
 // behind the bar. One craft at a time (shuttle, satellite, rocket or UFO) crosses now and then, chosen at random.
-// The full spec is docs/design/topbar-animation/handoff/bar-themes/README.md.
+// The full spec is docs/design/topbar-animation/handoff/bar-themes/README.md. Not in the handoff (David, 10 Nov 2026):
+// a few planets drift slower still, laid out at random once a visit (lib/sky.ts), over the stars and under the craft.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { planetSky, type Sky } from "@/lib/sky";
 import { CraftGlyph, type CraftType } from "./deep-field-craft";
+import { PlanetGlyph } from "./deep-field-planets";
 import { phaseToClock, rng, useReducedMotion, useTabHidden } from "./motion";
 
 /** Every tunable number for the effect lives here. */
@@ -35,7 +38,12 @@ export const DEEP_FIELD = {
   referenceWidth: 1440,
   /** The satellite rides this lane, above every label (labels start at about y 12). */
   satelliteY: 6,
+  // The planets' numbers (speed, how many, sizes, how often rings, gas and moons turn up) are PLANETS in lib/sky.ts.
 };
+
+/** One sky a visit: the same planets while moving between pages, new ones on a reload. */
+let visitSeed: number | null = null;
+const skySeed = () => (visitSeed ??= Math.floor(Math.random() * 2 ** 31));
 
 // ---------------------------------------------------------------- stars
 
@@ -66,6 +74,31 @@ export function DeepField() {
   // Carry on from the frame the last bar showed (motion.ts, the themes' clock), before the first paint.
   useLayoutEffect(() => phaseToClock(stars.current), [reduced]);
 
+  // The planets are laid out for this bar's size, so only in the browser, before the first paint; again on a resize.
+  const belt = useRef<HTMLDivElement>(null);
+  const [sky, setSky] = useState<Sky | null>(null);
+  useLayoutEffect(() => {
+    const fx = belt.current?.parentElement;
+    if (!fx) return;
+    const measure = () => {
+      const w = fx.clientWidth;
+      const h = fx.clientHeight;
+      if (w && h) setSky((s) => (s && s.width === w && s.height === h ? s : planetSky(skySeed(), w, h)));
+    };
+    measure();
+    let wait: number | undefined;
+    const resized = () => {
+      window.clearTimeout(wait);
+      wait = window.setTimeout(measure, 250);
+    };
+    window.addEventListener("resize", resized);
+    return () => {
+      window.removeEventListener("resize", resized);
+      window.clearTimeout(wait);
+    };
+  }, []);
+  useLayoutEffect(() => phaseToClock([belt.current], true), [sky, reduced]);
+
   return (
     <div className="topbar-fx topbar-deep" aria-hidden="true" data-paused={hidden || undefined}>
       {layers.map((l, i) => (
@@ -87,6 +120,20 @@ export function DeepField() {
           }
         />
       ))}
+      {/* Every planet twice, a loop apart; the belt moves one loop left, as a star tile does. */}
+      <div
+        ref={belt}
+        className="topbar-deep-planets"
+        data-loop={sky?.loop}
+        style={sky ? ({ "--tile": `${sky.loop}px`, "--dur": `${sky.seconds}s` } as CSSProperties) : undefined}
+      >
+        {sky?.planets.map((p, i) => (
+          <Fragment key={i}>
+            <PlanetGlyph planet={p} x={p.x} />
+            <PlanetGlyph planet={p} x={p.x + sky.loop} />
+          </Fragment>
+        ))}
+      </div>
       {!reduced && <CraftLane paused={hidden} />}
     </div>
   );

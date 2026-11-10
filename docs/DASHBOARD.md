@@ -290,6 +290,14 @@ of the window says Saving, Saved or what went wrong (`components/AutoSaveForm.ts
   brighter shows, never the sum, and the satellite flies bright (45%) only in a lane clear of every
   label (not on a phone, where the bar's first row starts at the top). Silver labels keep at least
   4.5:1 on every frame.
+- **Deep field's planets** (David, 10 Nov 2026; not in the handoff): two or three planets on a
+  desktop bar, one on a phone, drift left at 3 px a second, slower than the farthest stars. Each
+  visit lays out a new sky (`lib/sky.ts`): a random size, kind (rocky with craters, banded, banded
+  with a storm, or ice with a polar cap) and place, and at random rings (some with a gap), a slowly
+  turning cloud of gas, or one to three moons that pass behind the planet and out in front. The sky
+  stays the same while moving between pages. Planets paint opaque greys of at most 20% ink in normal
+  blending, so they cover the stars behind them and keep silver labels above 4.5:1; the craft fly in
+  front of them. Every number to tune is `PLANETS` in `lib/sky.ts`.
 - **Where the dashboard opens:** Home, or Calls. Opening `/` from outside the dashboard (a bookmark,
   a typed address, a Slack link) takes a person who chose Calls to Needs review. Home stays one
   click away (U3).
