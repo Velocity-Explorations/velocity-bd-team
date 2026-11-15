@@ -10,17 +10,19 @@ portal content.
 ## Current Session
 
 **Date**: 2026-11-10 (covers 9 to 10 Nov)
-**Focus**: Top bar themes from Claude Design, Deep field's planets and meteors, faces beside names
+**Focus**: Top bar themes from Claude Design, Deep field's planets and meteors, faces beside names, a DSIP topic screen
 
 ### What Was Done
 - Draft request kind retired; a draft starts from Start the draft (#161). Pictures or initials beside names on votes, notes, Changed by and Working with (#162). An unknown call's draft page answers 404 (#163).
 - Top bar themes from the Claude Design handoff: Deep field (default), Line clear, Ground drift, picked in Profile settings (migration 019 `profiles.bar_theme`, #164). Stars and craft blend with lighten so overlaps never add up behind a label (#165).
 - Deep field gains planets: a random sky each visit, rocky, banded, storm or ice, with rings, gas clouds or moons (#166). Then shooting stars, meteor showers and comets at random (#167). Layout and events live in `dashboard/lib/sky.ts`.
+- DSIP 27.BZ, 27.BX and 27.TZ: all 102 topics screened against the Company Reference (2 Strong, 4 Moderate; nothing strong in Release 1). Three Navy Release 2 topics (NV021, TZ-NV012, TZ-NV011) added by hand as `DSIP` calls (run 92) and pursued as pursuits 2 to 4; all three wait at go/no-go. How: docs/research/explorations/2026-11-10_manual-call-to-pursuit.md.
 
 ### Key Decisions
 - Every part of a theme stays at or under 22% ink, so silver labels keep 4.5:1 (worst measured 4.55:1).
 - Deep field is everyone's default, Shaun included; choosing it saves an empty value, so a new default moves everyone who has not picked another.
 - The company design system bundle (`docs/design/topbar-animation/_ds/`) is gitignored; only `handoff/bar-themes` is committed.
+- David holds all three DSIP gates and the two Release 1 AFWERX pursuits open; no topic-author questions for these topics.
 
 ### Key Files Modified
 | File | Change |
@@ -31,7 +33,9 @@ portal content.
 
 ### In Progress
 - David is watching Deep field and may ask to tune `PLANETS` or `METEORS` in `lib/sky.ts`.
-- Still unrated on `/fit`: INDOPACOM, `jadc2`, `c4isr`. Due: the Unison CUI addendum on 12 Nov; the AFWERX cycle topics read by 25 Nov.
+- Go/no-go open on pursuits 2 to 4 (DSIP, due 6 Jan 2027) and on pursuit 1 (AFWERX Release 1, due 25 Nov). The screen and shortlist are local in `data/dsip/`.
+- Drive fixes for David: 02 Products PR-11 says VALKYRIE "proposed" while the Register says won; the training-assistant result rests only on PE-04's bio.
+- Still unrated on `/fit`: INDOPACOM, `jadc2`, `c4isr`. The Unison CUI addendum was due 12 Nov; its status was not checked this session.
 - Linear catch-up notes for #109 to #167 wait in data/linear/catchup.md until Linear writes resume.
 
 ### Blockers
