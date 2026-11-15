@@ -31,3 +31,4 @@ instead of restating it.
 
 | Date | Document | Summary | Tags |
 |---|---|---|---|
+| 2026-11-10 | [Putting a call no scanner found through the pursuit flow](explorations/2026-11-10_manual-call-to-pursuit.md) | upsert_call under its own run, kept and reviewed, then Pursue on the dashboard; solicitation files to 00_solicitation, facts as workspace material | pursuits, drafting, dsip, manual-call, worker |
