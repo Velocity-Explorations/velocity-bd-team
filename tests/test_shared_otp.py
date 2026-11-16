@@ -156,3 +156,41 @@ def test_default_fetcher_without_access_names_the_remedy(monkeypatch: pytest.Mon
     with pytest.raises(otp.ConfigError) as exc:
         otp.default_fetcher(SOURCE)
     assert "gog" in str(exc.value) and "VELOCITY_GMAIL_APP_PASSWORD" in str(exc.value)
+
+
+def test_get_otp_stops_at_once_when_the_mailbox_refuses_its_password() -> None:
+    """16 Nov 2026: Gmail refused the app password, and the wait retried it for the full 90 s, then said only that no
+    code came. A refused password won't mend itself, so the wait ends at once and says what to fix."""
+    calls: list[int] = []
+
+    def fetch(mailbox: str) -> list[otp.OtpMessage]:
+        calls.append(1)
+        raise otp.MailboxRefused("Gmail rejected VELOCITY_GMAIL_APP_PASSWORD")
+
+    with pytest.raises(otp.MailboxRefused) as refused:
+        otp.get_otp(SOURCE, 0.0, max_wait=90, mailbox="x", fetch=fetch, sleep=lambda s: None)
+    assert len(calls) == 1
+    assert str(refused.value).startswith("Example portal asked for an emailed sign-in code, and Gmail rejected")
+
+
+def test_an_imap_login_refusal_names_the_setting_and_never_its_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    class RefusingImap:
+        def __init__(self, host: str, timeout: int) -> None:
+            pass
+
+        def login(self, user: str, password: str) -> None:
+            raise otp.imaplib.IMAP4.error("[AUTHENTICATIONFAILED] Invalid credentials (Failure)")
+
+        def logout(self) -> None:
+            pass
+
+    monkeypatch.setattr(otp.imaplib, "IMAP4_SSL", RefusingImap)
+    monkeypatch.setattr(otp, "get", lambda key, default=None: "account@example.invalid")
+    monkeypatch.setattr(otp, "require", lambda key: "abcd efgh ijkl mnop")
+    with pytest.raises(otp.MailboxRefused) as refused:
+        otp.fetch_via_imap(SOURCE, "box@example.invalid")
+    message = str(refused.value)
+    assert "VELOCITY_GMAIL_APP_PASSWORD" in message and "app password" in message
+    assert "abcd" not in message and "abcdefghijklmnop" not in message and "account@example.invalid" not in message
+    whole = f"MailboxRefused: Vulcan SOF asked for an emailed sign-in code, and {message}"
+    assert len(whole) <= 200 and whole.endswith("put it in .env")   # run.py keeps 200 characters of a run's error
