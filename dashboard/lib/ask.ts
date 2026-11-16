@@ -167,3 +167,41 @@ export function askCookie(open: boolean): string {
 export function askLeftOpen(value: string | undefined): boolean {
   return value === "open";
 }
+
+/** The panel's width, as a person drags it (David, 16 Nov 2026): kept per browser in this cookie, in pixels. */
+export const ASK_WIDTH_COOKIE = "ask_width";
+export const ASK_MIN = 320;
+export const ASK_MAX = 760;
+const PAGE_MIN = 480;    // the page beside the panel keeps at least this much
+const TABLE_FITS = 1024; // a page this wide or wider fits every table (tests/test_dashboard_layout.py)
+
+/** A dragged width, kept between the panel's least and most and short enough to leave the page its least. */
+export function fitAskWidth(width: number, windowWidth: number): number {
+  return Math.round(Math.max(ASK_MIN, Math.min(ASK_MAX, windowWidth - PAGE_MIN, width)));
+}
+
+/** The width the cookie holds, or null when it holds none the panel could have (the default width then applies). */
+export function readAskWidth(value: string | undefined): number | null {
+  if (!value || !/^\d{3}$/.test(value)) return null;
+  const width = Number(value);
+  return width >= ASK_MIN && width <= ASK_MAX ? width : null;
+}
+
+/** The document.cookie line that keeps a dragged width, or forgets it for the default. */
+export function askWidthCookie(width: number | null): string {
+  return width === null
+    ? `${ASK_WIDTH_COOKIE}=; path=/; max-age=0; samesite=lax`
+    : `${ASK_WIDTH_COOKIE}=${width}; path=/; max-age=31536000; samesite=lax`;
+}
+
+/**
+ * The panel's width as CSS, and the window width under which the page beside it is narrower than 1024px, where a wide
+ * table scrolls sideways instead of losing its edge. A media query cannot read a custom property, so the panel writes
+ * this beside itself for whatever width it has. Numbers only, so it is safe in a style element.
+ */
+export function askWidthCss(width: number | null): string {
+  const size = width === null ? "clamp(340px, 30vw, 440px)" : `min(${width}px, calc(100vw - ${PAGE_MIN}px))`;
+  const under = TABLE_FITS - 1 + (width ?? 440);
+  return `:root { --ask-width: ${size}; } `
+    + `@media (max-width: ${under}px) { body:has(> .ask-panel:not([hidden])) .table-wrap { overflow-x: auto; } }`;
+}

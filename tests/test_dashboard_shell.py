@@ -317,9 +317,46 @@ def test_on_a_narrow_window_ask_grok_lies_over_the_page(page: Any) -> None:
         dock = box_of(page, "#ask-grok")
         assert dock["width"] <= 460
         assert box_of(page, "main")["right"] > dock["left"]   # the page keeps its width under the panel
+        assert page.locator("#ask-grok .ask-resize").is_hidden()   # nothing to resize against
     finally:
         close_ask(page)
         page.set_viewport_size({"width": 1440, "height": 900})
+
+
+def test_ask_grok_s_width_is_dragged_kept_and_reset(page: Any) -> None:
+    """David, 16 Nov 2026: dragging the panel's left edge widens or narrows it, and this browser keeps the width."""
+    open_page(page, "/calls")
+    try:
+        open_ask(page)
+        start = box_of(page, "#ask-grok")
+        handle = page.locator("#ask-grok .ask-resize")
+        assert handle.get_attribute("role") == "separator" and handle.get_attribute("aria-orientation") == "vertical"
+        edge = box_of(page, "#ask-grok .ask-resize")
+        x, y = (edge["left"] + edge["right"]) / 2, (edge["top"] + edge["bottom"]) / 2
+        page.mouse.move(x, y)
+        page.mouse.down()
+        page.mouse.move(x - 150, y, steps=6)
+        page.mouse.up()
+        page.wait_for_timeout(200)
+        wide = box_of(page, "#ask-grok")
+        assert abs(wide["width"] - (start["width"] + 150)) <= 2
+        assert box_of(page, "main")["right"] <= wide["left"] + 0.5
+        assert handle.get_attribute("aria-valuenow") == str(round(wide["width"]))
+        # the page beside it is now under 1024px, so a wide table scrolls sideways
+        assert page.evaluate("getComputedStyle(document.querySelector('.table-wrap')).overflowX") == "auto"
+        open_page(page, "/calls")   # kept across a reload, from the first paint
+        assert abs(box_of(page, "#ask-grok")["width"] - wide["width"]) <= 1
+        handle.focus()
+        page.keyboard.press("ArrowRight")   # the arrow keys move the edge: right narrows the panel
+        page.wait_for_timeout(200)
+        assert abs(box_of(page, "#ask-grok")["width"] - (wide["width"] - 24)) <= 1
+        handle.dblclick()   # back to the default width
+        page.wait_for_timeout(200)
+        assert abs(box_of(page, "#ask-grok")["width"] - start["width"]) <= 1
+        assert "ask_width=" not in page.evaluate("document.cookie")
+    finally:
+        page.evaluate("document.cookie = 'ask_width=; path=/; max-age=0'")
+        close_ask(page)
 
 
 def test_nobody_can_read_a_thread_without_logging_in(page: Any) -> None:

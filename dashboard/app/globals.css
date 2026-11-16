@@ -548,8 +548,11 @@ main {
 /* The panel, docked at the right from the top of the window to the bottom (David, 16 Nov 2026). From 960 px the page,
    top bar and all, narrows beside it, so nothing lies under it; below that it lies over the page as before. It lives in
    the root layout, beside the page and its loading screen, so the room it takes holds while the page changes. */
+:root {
+  --ask-width: clamp(340px, 30vw, 440px);   /* AskPanel's style element sets the width this browser keeps */
+}
+
 .ask-panel {
-  --ask-width: clamp(340px, 30vw, 440px);
   position: fixed;
   inset: 0 0 0 auto;
   z-index: 40;
@@ -568,7 +571,7 @@ body:has(> main.login) > .ask-panel {
 
 @media (min-width: 960px) {
   body:has(> .ask-panel:not([hidden])):not(:has(> main.login)) {
-    margin-right: clamp(340px, 30vw, 440px);   /* .ask-panel's --ask-width */
+    margin-right: var(--ask-width);
   }
 }
 
@@ -577,6 +580,43 @@ body:has(> main.login) > .ask-panel {
     width: min(460px, 100vw);
     box-shadow: var(--card-shadow);
   }
+
+  .ask-resize {
+    display: none;
+  }
+}
+
+/* The panel's left edge drags wider or narrower; the accent line shows where it is once it is hovered or focused. */
+.ask-resize {
+  position: absolute;
+  inset: 0 auto 0 -4px;
+  z-index: 1;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.ask-resize::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  transition: background var(--transition);
+}
+
+.ask-resize:hover::after,
+.ask-resize:focus-visible::after,
+.ask-resizing .ask-resize::after {
+  background: var(--accent);
+}
+
+.ask-resize:focus-visible {
+  outline: none;   /* the accent line is its focus mark */
+}
+
+.ask-resizing,
+.ask-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
 }
 
 /* Level with the top bar, so the two read as one bar across the window. */
@@ -1798,12 +1838,8 @@ th .th-filter.active {
   }
 }
 
-/* Ask Grok docked takes up to 440px (.ask-panel), so under a 1464px window the page beside it is under 1024px. */
-@media (max-width: 1463px) {
-  body:has(> .ask-panel:not([hidden])) .table-wrap {
-    overflow-x: auto;
-  }
-}
+/* Beside Ask Grok docked, the page can be under 1024px in a wider window; the panel's style element (askWidthCss) sets
+   the window width under which its tables scroll sideways too. */
 
 table {
   width: 100%;
