@@ -43,10 +43,15 @@ test("Not relevant asks why when Claude rated the call yes or maybe (David, 5 No
   assert.equal(asksReason(null), false);
 });
 
-test("the reasons offered are five quick picks", () => {
+test("the reasons offered: the work, the customer, the listing, the time (David, 5 and 16 Nov)", () => {
   assert.deepEqual(NOT_RELEVANT_REASONS.map((r) => r.label), [
-    "Mostly hardware", "Staffing or IT support", "Wrong customer or eligibility", "Too broad, no clear fit", "Award or sole-source notice",
+    "Too large for Velocity", "Too specialized for Velocity", "Mostly hardware", "Cyber or enterprise IT", "Staffing or IT support",
+    "Wrong customer or eligibility",
+    "Too broad, no clear fit", "Planning only, no award", "Umbrella announcement only", "Award or sole-source notice",
+    "Too little time to respond",
   ]);
+  assert.equal(new Set(NOT_RELEVANT_REASONS.map((r) => r.key)).size, NOT_RELEVANT_REASONS.length);
+  for (const r of NOT_RELEVANT_REASONS) assert.deepEqual(readChoice(`not_relevant:${r.key}`), { status: "not_relevant", reason: r.key });
 });
 
 test("a Decide button's value carries the decision and, for Not relevant, its reason", () => {
@@ -61,6 +66,7 @@ test("a Decide button's value carries the decision and, for Not relevant, its re
 test("the reason becomes the decision's note, with the person's own words after it", () => {
   assert.equal(reasonNote("hardware", ""), "Mostly hardware");
   assert.equal(reasonNote("hardware", " the software is a small part of a radar upgrade "), "Mostly hardware: the software is a small part of a radar upgrade");
+  assert.equal(reasonNote("large", "a full JADC2 prime"), "Too large for Velocity: a full JADC2 prime");
   assert.equal(reasonNote("other", "Only open to universities"), "Only open to universities");
   assert.equal(reasonNote("other", "  "), "");
   assert.equal(reasonNote(null, "a note"), "a note");

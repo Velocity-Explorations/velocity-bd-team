@@ -31,14 +31,22 @@ export function noteSource(by: string | null | undefined): "Slack thread reply" 
 /**
  * Why a call Claude liked is not for Velocity (David, 5 Nov): the reason a Not relevant decision carries as its note.
  * The judges' examples show the team's note in place of Claude's own reasoning (review/feedback.py), so a reason is
- * what tells them which part made the whole call wrong.
+ * what tells them which part made the whole call wrong. In order: the work, the customer, the listing, the time. Six
+ * were added on 16 Nov from David's own notes on that week's Top 10 (too large, too specialized) and his calls on the
+ * rest; a key, once used, keeps its meaning, since notes in the ledger carry its label.
  */
 export const NOT_RELEVANT_REASONS = [
+  { key: "large", label: "Too large for Velocity" },
+  { key: "specialized", label: "Too specialized for Velocity" },
   { key: "hardware", label: "Mostly hardware" },
+  { key: "cyber", label: "Cyber or enterprise IT" },
   { key: "staffing", label: "Staffing or IT support" },
   { key: "eligibility", label: "Wrong customer or eligibility" },
   { key: "broad", label: "Too broad, no clear fit" },
+  { key: "planning", label: "Planning only, no award" },
+  { key: "umbrella", label: "Umbrella announcement only" },
   { key: "award", label: "Award or sole-source notice" },
+  { key: "time", label: "Too little time to respond" },
 ] as const;
 
 /** Not relevant asks for a reason only where it disagrees with Claude: a call it rated yes or maybe. */

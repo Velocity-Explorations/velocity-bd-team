@@ -148,9 +148,12 @@ def test_not_relevant_on_a_call_claude_liked_asks_why(page: Any) -> None:
     reasons.locator("summary").click()
     picks = reasons.locator(".reason-body button")
     assert [t.strip() for t in picks.all_inner_texts()] == [
-        "Mostly hardware", "Staffing or IT support", "Wrong customer or eligibility", "Too broad, no clear fit",
-        "Award or sole-source notice", "Save another reason"]
-    assert picks.first.get_attribute("value") == "not_relevant:hardware"
+        "Too large for Velocity", "Too specialized for Velocity", "Mostly hardware", "Cyber or enterprise IT",
+        "Staffing or IT support", "Wrong customer or eligibility", "Too broad, no clear fit", "Planning only, no award",
+        "Umbrella announcement only", "Award or sole-source notice", "Too little time to respond", "Save another reason"]
+    assert picks.first.get_attribute("value") == "not_relevant:large"
+    picks.last.scroll_into_view_if_needed()   # eleven reasons make a long menu: the last one is still reachable
+    assert picks.last.is_visible() and menu.evaluate("m => m.open")
     assert reasons.locator("input[name=reason_text]").is_visible()
     assert menu.evaluate("m => m.open")   # the reasons open inside the Decide menu, which stays open
     page.keyboard.press("Escape")
