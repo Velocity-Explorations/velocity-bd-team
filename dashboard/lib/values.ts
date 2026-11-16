@@ -46,6 +46,16 @@ export function planDecision(
   return note.trim() ? "note" : "noop";
 }
 
+/**
+ * Whether a decision only adds the person's vote, leaving the call's decision as it is: one made from the review queue
+ * while everyone decides every call, once the call has a decision, unless that decision is the person's own. Changing
+ * your own mind changes the call (David, 16 Nov 2026: Pursue then Not relevant on Home's Top 10 left E-ICAM, JVCC and
+ * ERIS at Pursue, so they sat in Proposals' To draft). `aliases` are the names the person's decisions are under.
+ */
+export function keepsCallDecision(keepFlag: boolean, history: boolean, decidedBy: string | null, aliases: string[]): boolean {
+  return keepFlag && history && !(decidedBy !== null && aliases.includes(decidedBy));
+}
+
 export type QueueMode = "each" | "shared";
 
 /**
