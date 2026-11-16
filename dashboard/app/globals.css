@@ -2375,6 +2375,33 @@ details.decide-menu .menu-body {
   font-size: 12.5px;
 }
 
+/* The note box saves itself (CallNote): Saving..., Note saved, or what went wrong, under the box. */
+.call-note-state {
+  display: block;
+  min-height: 1em;
+  margin-top: 3px;
+  color: var(--ink-3);
+  font: var(--type-detail);
+}
+
+.call-note-state.saved {
+  color: var(--good);
+}
+
+.call-note-state.error {
+  color: var(--conflict);
+}
+
+/* Votes: notes from people who left one without voting, with the button to the notes panel. */
+.notes-only {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--ink-2);
+  font: var(--type-small);
+}
+
 /* A 20px note button beside a verdict or a vote: it opens the row's reasons or notes panel. */
 .note-btn {
   width: 20px;

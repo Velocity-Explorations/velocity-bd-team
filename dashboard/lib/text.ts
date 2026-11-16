@@ -45,6 +45,51 @@ export function parseNoteLine(line: string): NoteParts {
   return match ? { at: match[1], by: match[2], text: match[3] } : { at: null, by: null, text: line };
 }
 
+/** A note's stamp as the ledger writes it (isoNow, append_note): what a note box may send back to edit its line. */
+export function isNoteStamp(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value);
+}
+
+/**
+ * A call's notes after a save from a note box (David, 16 Nov 2026). The box's first save adds `[now by] text` and
+ * returns `now`; each later save sends that stamp back and edits its line in place, and an empty box takes the line
+ * away. A stamp matches only `by`'s own line; if that line has gone (a decision took its place), the note starts again.
+ * Every other line, a Slack reply's second line included, stays exactly as it was.
+ */
+export function writeNoteLine(notes: string | null, at: string | null, by: string, text: string, now: string): { notes: string | null; at: string | null } {
+  const lines = notes ? notes.split("\n") : [];
+  const index = at ? lines.findIndex((line) => line.startsWith(`[${at} ${by}] `)) : -1;
+  const stamp = index >= 0 && at ? at : now;
+  const line = noteLine(stamp, by, text);
+  if (index >= 0) {
+    if (line) lines[index] = line;
+    else lines.splice(index, 1);
+  } else if (line) {
+    lines.push(line);
+  } else {
+    return { notes, at: null };
+  }
+  return { notes: lines.join("\n") || null, at: line ? stamp : null };
+}
+
+/**
+ * A call's notes without `by`'s newest line when that line says `text`: the note box saved it as it was typed, and the
+ * decision now carries the same note (behind a Not relevant reason, if one was chosen), so it is not kept twice.
+ */
+export function withoutTypedNote(notes: string | null, by: string, text: string): string | null {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!notes || !clean) return notes;
+  const lines = notes.split("\n");
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const parts = parseNoteLine(lines[i]);
+    if (parts.by !== by) continue;
+    if (parts.text !== clean) return notes;
+    lines.splice(i, 1);
+    return lines.join("\n") || null;
+  }
+  return notes;
+}
+
 export function buildHref(base: string, params: Record<string, string | null | undefined>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

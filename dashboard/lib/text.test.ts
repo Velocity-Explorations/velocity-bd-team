@@ -1,6 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildHref, decidedNotice, escapeLike, firstParam, fromQueue, isClosed, noteLine, parseNoteLine, safeReturnTo, votedHref } from "./text.ts";
+import {
+  buildHref,
+  decidedNotice,
+  escapeLike,
+  firstParam,
+  fromQueue,
+  isClosed,
+  isNoteStamp,
+  noteLine,
+  parseNoteLine,
+  safeReturnTo,
+  votedHref,
+  withoutTypedNote,
+  writeNoteLine,
+} from "./text.ts";
 
 test("noteLine matches the pipeline's append_note format and stays on one line", () => {
   assert.equal(
@@ -55,6 +69,83 @@ test("parseNoteLine splits the stored note format and passes anything else throu
     text: "call back Monday",
   });
   assert.deepEqual(parseNoteLine("free text"), { at: null, by: null, text: "free text" });
+});
+
+const NOW = "2026-11-16T10:00:05Z";
+
+test("a note box's first save adds a line under the person signed in, stamped now", () => {
+  assert.deepEqual(writeNoteLine(null, null, "David Wood", " looks\n  promising ", NOW), {
+    notes: `[${NOW} David Wood] looks promising`,
+    at: NOW,
+  });
+  const before = "[2026-11-01T09:00:00Z U08V7ULPH1N] a Slack reply\nthat ran onto a second line";
+  assert.deepEqual(writeNoteLine(before, null, "David Wood", "mine", NOW), {
+    notes: `${before}\n[${NOW} David Wood] mine`,
+    at: NOW,
+  });
+});
+
+test("a later save from the same box edits its line in place and keeps the line's stamp", () => {
+  const notes = [
+    "[2026-11-16T09:00:00Z Shaun Jones] theirs",
+    "[2026-11-16T09:30:00Z David Wood] draft",
+    "[2026-11-16T09:40:00Z Lisa Hall] later",
+  ].join("\n");
+  assert.deepEqual(writeNoteLine(notes, "2026-11-16T09:30:00Z", "David Wood", "draft, finished", NOW), {
+    notes: notes.replace("] draft", "] draft, finished"),
+    at: "2026-11-16T09:30:00Z",
+  });
+});
+
+test("emptying the box takes its note away", () => {
+  const notes = "[2026-11-16T09:00:00Z Shaun Jones] theirs\n[2026-11-16T09:30:00Z David Wood] draft";
+  assert.deepEqual(writeNoteLine(notes, "2026-11-16T09:30:00Z", "David Wood", "  \n ", NOW), {
+    notes: "[2026-11-16T09:00:00Z Shaun Jones] theirs",
+    at: null,
+  });
+  assert.deepEqual(writeNoteLine("[2026-11-16T09:30:00Z David Wood] draft", "2026-11-16T09:30:00Z", "David Wood", "", NOW), {
+    notes: null,
+    at: null,
+  });
+  assert.deepEqual(writeNoteLine("[2026-11-16T09:00:00Z Shaun Jones] theirs", null, "David Wood", "   ", NOW), {
+    notes: "[2026-11-16T09:00:00Z Shaun Jones] theirs",
+    at: null,
+  });
+});
+
+test("a stamp edits only that person's line; with the line gone the note starts again", () => {
+  const theirs = "[2026-11-16T09:30:00Z Shaun Jones] theirs";
+  assert.deepEqual(writeNoteLine(theirs, "2026-11-16T09:30:00Z", "David Wood", "mine", NOW), {
+    notes: `${theirs}\n[${NOW} David Wood] mine`,
+    at: NOW,
+  });
+  const longer = "[2026-11-16T09:30:00Z David Woodward] his";
+  assert.deepEqual(writeNoteLine(longer, "2026-11-16T09:30:00Z", "David Wood", "mine", NOW), {
+    notes: `${longer}\n[${NOW} David Wood] mine`,
+    at: NOW,
+  });
+});
+
+test("a decision that carries the box's note takes the place of the line the box saved", () => {
+  const notes = [
+    "[2026-11-16T09:00:00Z David Wood] older",
+    "[2026-11-16T09:20:00Z Shaun Jones] theirs",
+    "[2026-11-16T09:30:00Z David Wood] hardware heavy",
+  ].join("\n");
+  assert.equal(withoutTypedNote(notes, "David Wood", " hardware\n heavy "),
+    "[2026-11-16T09:00:00Z David Wood] older\n[2026-11-16T09:20:00Z Shaun Jones] theirs");
+  assert.equal(withoutTypedNote(notes, "David Wood", "older"), notes);   // only the person's newest line
+  assert.equal(withoutTypedNote(notes, "Shaun Jones", "hardware heavy"), notes);   // never someone else's
+  assert.equal(withoutTypedNote(notes, "David Wood", "  "), notes);
+  assert.equal(withoutTypedNote(null, "David Wood", "x"), null);
+  assert.equal(withoutTypedNote("[2026-11-16T09:30:00Z David Wood] only", "David Wood", "only"), null);
+});
+
+test("isNoteStamp takes only the ledger's own timestamps", () => {
+  assert.equal(isNoteStamp("2026-11-16T10:00:05Z"), true);
+  for (const bad of ["", "x", "2026-11-16 10:00:05", "2026-11-16T10:00:05.123Z", "2026-11-16T10:00:05Z] [", null, 5, undefined]) {
+    assert.equal(isNoteStamp(bad), false, String(bad));
+  }
 });
 
 test("a vote from the review queue says the call has left your queue; elsewhere it does not", () => {
