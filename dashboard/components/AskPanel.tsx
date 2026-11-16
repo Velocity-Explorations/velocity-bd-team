@@ -1,9 +1,12 @@
 "use client";
 
 import { MessageSquarePlus, Send, X } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { askGrokAction } from "@/app/actions";
 import {
+  askCookie,
   callHref,
   costLine,
   MAX_QUESTION,
@@ -24,7 +27,7 @@ function newThread(): string {
 function PartView({ part }: { part: Part }) {
   if (!part.href) return part.strong ? <strong>{part.text}</strong> : <>{part.text}</>;
   return part.href.startsWith("/") ? (
-    <a href={part.href}>{part.text}</a>
+    <Link href={part.href}>{part.text}</Link>   // the page changes beside the panel, which stays open
   ) : (
     <a href={part.href} target="_blank" rel="noreferrer">
       {part.text}
@@ -72,14 +75,14 @@ function Message({ m, seenAt, now }: { m: AskMessage; seenAt: string | null; now
         {sources.calls.length || sources.facts.length || sources.requests.length ? (
           <div className="ask-sources">
             {sources.requests.map((r) => (
-              <a key={`r${r.id}`} className="badge tone-warn" href="/requests" title={`${r.summary}: waits for approval on the Requests page`}>
+              <Link key={`r${r.id}`} className="badge tone-warn" href="/requests" title={`${r.summary}: waits for approval on the Requests page`}>
                 Request #{r.id}
-              </a>
+              </Link>
             ))}
             {sources.calls.map((c) => (
-              <a key={c.id} className="badge tone-info" href={callHref(c)} title={`${c.title}, ${c.portal}`}>
+              <Link key={c.id} className="badge tone-info" href={callHref(c)} title={`${c.title}, ${c.portal}`}>
                 {c.title.length > 48 ? `${c.title.slice(0, 46)}...` : c.title}
-              </a>
+              </Link>
             ))}
             {sources.facts.map((f) => (
               <span key={f} className="badge tone-grey" title="An id in 01 Company Reference">
@@ -95,17 +98,23 @@ function Message({ m, seenAt, now }: { m: AskMessage; seenAt: string | null; now
 }
 
 /**
- * Ask Grok (David, 7 Nov 2026): a panel at the right edge of every page, opened from the header's Ask Grok button. The
- * page stays usable beside it. A question goes to the ledger (askGrokAction); while it waits, the panel reads its thread
- * from /api/ask every two seconds, and the answer shows when run.py --assistant has written it. One conversation shows at
- * a time, the person's newest, until they start a new one.
+ * Ask Grok (David, 7 Nov 2026): a panel docked at the right of every page, opened and closed from the header's Ask Grok
+ * button. Since 16 Nov it takes its own column: the page narrows beside it instead of lying under it, and below 960 px,
+ * where there is no room, it lies over the page as before. It lives in the root layout, so changing page keeps it open
+ * with its conversation, its unsent question and any answer on its way; a cookie (ASK_COOKIE) keeps it open across a
+ * reload too. A question goes to the ledger (askGrokAction); while it waits, the panel reads its thread from /api/ask
+ * every two seconds, and the answer shows when run.py --assistant has written it. One conversation shows at a time, the
+ * person's newest, until they start a new one.
  */
-export function AskPanel({ viewer }: { viewer: string | null }) {
-  const dialog = useRef<HTMLDialogElement>(null);
+export function AskPanel({ viewer, initialOpen }: { viewer: string | null; initialOpen: boolean }) {
+  const panel = useRef<HTMLElement>(null);
   const opener = useRef<HTMLElement | null>(null);
+  const moveFocus = useRef(false);   // only a person opening or closing the panel moves focus, never a page change
   const box = useRef<HTMLTextAreaElement>(null);
   const list = useRef<HTMLOListElement>(null);
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const [open, setOpen] = useState(initialOpen);
+  const shown = open && !pathname.startsWith("/login");
   const [thread, setThread] = useState<string | null>(null);
   const [messages, setMessages] = useState<AskMessage[]>([]);
   const [seenAt, setSeenAt] = useState<string | null>(null);
@@ -124,22 +133,25 @@ export function AskPanel({ viewer }: { viewer: string | null }) {
     setNow(Date.parse(data.now) || Date.now());
   }, []);
 
+  const close = useCallback(() => {
+    moveFocus.current = true;
+    setOpen(false);
+  }, []);
+
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
       const trigger = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-opens='ask-grok']") : null;
-      if (!trigger || !dialog.current) return;
-      if (dialog.current.open) {
-        dialog.current.close();
-        return;
-      }
+      if (!trigger) return;
       opener.current = trigger;
-      dialog.current.show();
-      setOpen(true);
-      if (box.current && !box.current.disabled) box.current.focus();
-      else dialog.current.querySelector<HTMLElement>(".ask-close")?.focus();
+      moveFocus.current = true;
+      setOpen((was) => !was);
     };
+    // Escape closes the panel from inside it; on the page it is left to the menus, tooltips and dialogs there.
     const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape" && dialog.current?.open) dialog.current.close();
+      const here = panel.current;
+      if (event.key !== "Escape" || !here || here.hidden || !here.contains(document.activeElement)) return;
+      moveFocus.current = true;
+      setOpen(false);
     };
     document.addEventListener("click", onClick);
     document.addEventListener("keydown", onKey);
@@ -148,6 +160,26 @@ export function AskPanel({ viewer }: { viewer: string | null }) {
       document.removeEventListener("keydown", onKey);
     };
   }, []);
+
+  // Remembered for the next page load, and told to the top bar's button, which each page draws afresh.
+  useEffect(() => {
+    document.cookie = askCookie(open);
+    for (const button of document.querySelectorAll<HTMLElement>("[data-opens='ask-grok']")) {
+      button.setAttribute("aria-expanded", String(open));
+    }
+  }, [open, pathname]);
+
+  useEffect(() => {
+    if (!moveFocus.current) return;
+    moveFocus.current = false;
+    if (open) {
+      if (box.current && !box.current.disabled) box.current.focus();
+      else panel.current?.querySelector<HTMLElement>(".ask-close")?.focus();
+      return;
+    }
+    const back = opener.current?.isConnected ? opener.current : document.querySelector<HTMLElement>("[data-opens='ask-grok']");
+    back?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (open && viewer) load(thread).catch(() => undefined);
@@ -198,16 +230,7 @@ export function AskPanel({ viewer }: { viewer: string | null }) {
   }
 
   return (
-    <dialog
-      ref={dialog}
-      id="ask-grok"
-      className="ask-panel"
-      aria-labelledby="ask-grok-title"
-      onClose={() => {
-        setOpen(false);
-        opener.current?.focus();
-      }}
-    >
+    <aside ref={panel} id="ask-grok" className="ask-panel" aria-labelledby="ask-grok-title" hidden={!shown}>
       <div className="ask-head">
         <h2 id="ask-grok-title">Ask Grok</h2>
         <button type="button" className="btn ask-new" disabled={!viewer || sending}
@@ -215,7 +238,7 @@ export function AskPanel({ viewer }: { viewer: string | null }) {
           <MessageSquarePlus aria-hidden="true" />
           New conversation
         </button>
-        <button type="button" className="ask-close" aria-label="Close Ask Grok" onClick={() => dialog.current?.close()}>
+        <button type="button" className="ask-close" aria-label="Close Ask Grok" onClick={close}>
           <X aria-hidden="true" />
         </button>
       </div>
@@ -258,6 +281,6 @@ export function AskPanel({ viewer }: { viewer: string | null }) {
           </button>
         </div>
       </form>
-    </dialog>
+    </aside>
   );
 }
