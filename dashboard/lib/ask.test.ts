@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { askCookie, askLeftOpen, callHref, costLine, isOffline, parseAnswer, parseSources, statusLine, threadIdOk } from "./ask.ts";
+import { ASK_MAX, ASK_MIN, askCookie, askLeftOpen, askWidthCookie, askWidthCss, callHref, costLine, fitAskWidth, readAskWidth, isOffline, parseAnswer, parseSources, statusLine, threadIdOk } from "./ask.ts";
 
 test("an answer becomes paragraphs and bullet lists, with only same-site and https links made links", () => {
   const blocks = parseAnswer(
@@ -77,4 +77,35 @@ test("the panel's cookie remembers it open from page to page, and forgets it on 
   assert.equal(askLeftOpen(""), false);
   assert.equal(askLeftOpen(undefined), false);
   assert.equal(askLeftOpen("1"), false);
+});
+
+test("a dragged width stays between 320px and 760px, and leaves the page at least 480px", () => {
+  assert.equal(ASK_MIN, 320);
+  assert.equal(ASK_MAX, 760);
+  assert.equal(fitAskWidth(500.4, 1440), 500);
+  assert.equal(fitAskWidth(100, 1440), 320);
+  assert.equal(fitAskWidth(2000, 1440), 760);
+  assert.equal(fitAskWidth(700, 1100), 620);   // 1100 - 480
+  assert.equal(fitAskWidth(700, 700), 320);    // a window too small for both still keeps the smallest panel
+});
+
+test("the width cookie is read only when it holds a width the panel could have", () => {
+  assert.equal(readAskWidth("520"), 520);
+  assert.equal(readAskWidth(undefined), null);
+  assert.equal(readAskWidth(""), null);
+  assert.equal(readAskWidth("abc"), null);
+  assert.equal(readAskWidth("100"), null);
+  assert.equal(readAskWidth("9999"), null);
+  assert.equal(askWidthCookie(520), "ask_width=520; path=/; max-age=31536000; samesite=lax");
+  assert.equal(askWidthCookie(null), "ask_width=; path=/; max-age=0; samesite=lax");
+});
+
+test("the width's CSS sets the panel's width and when tables beside it scroll sideways", () => {
+  const plain = askWidthCss(null);
+  assert.match(plain, /--ask-width: ?clamp\(340px, ?30vw, ?440px\)/);
+  assert.match(plain, /@media \(max-width: ?1463px\)/);
+  const wide = askWidthCss(600);
+  assert.match(wide, /--ask-width: ?min\(600px, ?calc\(100vw - 480px\)\)/);
+  assert.match(wide, /@media \(max-width: ?1623px\)/);   // 1024px of page plus the panel, less a pixel
+  assert.match(wide, /\.table-wrap ?\{ ?overflow-x: ?auto/);
 });

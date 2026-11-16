@@ -354,7 +354,10 @@ beside it rather than lying under it (from a 960 px window; narrower, the panel 
 narrowed page scrolls sideways once the page is under 1024 px. The panel lives in the root layout (`app/layout.tsx`), not
 in each page's Shell, so it stays open as the page changes, keeping its conversation, an unsent question and any answer
 on its way; the `ask_panel` cookie reopens it, already docked, after a reload. Links in an answer change the page beside
-it. A question goes to `chat_messages` (`askGrokAction`, one waiting
+it. Its left edge drags wider or narrower, between 320 and 760 px and always leaving the page 480 px (the arrow keys move
+the edge once it has focus, Shift for bigger steps); a double-click puts back the usual width, and the `ask_width` cookie
+keeps the width for the browser. Since a media query cannot read the width, the panel writes it as a style element
+(`askWidthCss` in lib/ask.ts) with the window width under which the page beside it is under 1024 px. A question goes to `chat_messages` (`askGrokAction`, one waiting
 question a person), `run.py --assistant` answers it with read-only tools (docs/ASSISTANT.md, Ask Grok), and the panel reads
 its thread from `GET /api/ask` every two seconds while an answer is on its way. Each answer shows the change requests Grok filed
 for the person (to Requests, where someone approves them), the calls it names (to All calls) and the Company Reference
