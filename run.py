@@ -48,6 +48,7 @@ import config
 from ledger.db import dry_run_session
 from ledger.db import release as release_connection
 from ledger.queries import (
+    calls_in_run,
     calls_where,
     claim_request,
     finish_request,

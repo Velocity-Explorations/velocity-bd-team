@@ -199,6 +199,16 @@ def test_watch_alerts_when_a_scan_reads_pages_badly(isolated, monkeypatch: pytes
     assert any("read 4 of 4 pages badly" in a and "Page 0" in a for a in isolated)
 
 
+def test_a_scan_scores_fit_for_the_calls_it_saw(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every scan from 8 to 16 Nov 2026 logged "FIT: skipped (NameError ...)": run.py used calls_in_run without
+    importing it, so a scan's new calls waited for --fit-scores or a rating change to get a score."""
+    scored: list[list[str]] = []
+    monkeypatch.setattr(pipeline, "score_fit", lambda rows, write=True: scored.append(sorted(r["id"] for r in rows)) or {})
+    monkeypatch.setattr(registry, "discover", lambda: [fake_portal()])
+    assert pipeline.main(["--no-review"]) == 0
+    assert scored == [["fake-0", "fake-1"]]
+
+
 def watching(watch) -> Portal:
     base = fake_portal()
     return Portal(slug="fake", name="Fake", fetch=base.fetch, filter=base.filter, needs_browser=False, watch=watch)
