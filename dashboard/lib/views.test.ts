@@ -13,7 +13,7 @@ const PARAMS = {
   q: "space",
 };
 const COUNTS: Record<CallCard, number> = {
-  "needs-review": 28, top10: 10, "due-soon": 2, "judges-agree": 19, "judges-disagree": 9, new: 28, all: 187,
+  "needs-review": 28, unsure: 3, top10: 10, "due-soon": 2, "judges-agree": 19, "judges-disagree": 9, new: 28, all: 187,
 };
 
 function cards(current: CallCard | null, perPerson = true) {
@@ -23,20 +23,21 @@ function cards(current: CallCard | null, perPerson = true) {
   });
 }
 
-test("pickCallView knows the queue's six views and falls back to Needs review", () => {
-  for (const view of ["top10", "due-soon", "judges-agree", "judges-disagree", "new"]) assert.equal(pickCallView(view), view);
+test("pickCallView knows the queue's seven views and falls back to Needs review", () => {
+  for (const view of ["unsure", "top10", "due-soon", "judges-agree", "judges-disagree", "new"]) assert.equal(pickCallView(view), view);
   assert.equal(pickCallView(["due-soon", "x"]), "due-soon");
   assert.equal(pickCallView("all"), "needs-review");
   assert.equal(pickCallView(undefined), "needs-review");
 });
 
-test("Calls has seven cards in order, each keeping the bar's filters and dropping the sort and column filters (N6)", () => {
+test("Calls has eight cards in order, each keeping the bar's filters and dropping the sort and column filters (N6)", () => {
   const row = cards("due-soon");
   const kept = "portal=SAM.gov&portal=NSTXL&tag=Software&state=open";
   assert.deepEqual(
     row.map((c) => [c.label, c.href]),
     [
       ["Needs review", `/review?${kept}`],
+      ["Unsure", `/review?view=unsure&${kept}`],
       ["Top 10", `/review?view=top10&${kept}`],
       ["Due soon", `/review?view=due-soon&${kept}`],
       ["Judges agree", `/review?view=judges-agree&${kept}`],
@@ -45,8 +46,8 @@ test("Calls has seven cards in order, each keeping the bar's filters and droppin
       ["All calls", `/calls?${kept}`],
     ],
   );
-  assert.deepEqual(row.map((c) => c.current), [false, false, true, false, false, false, false]);
-  assert.deepEqual(row.map((c) => c.needsYou), [true, false, false, false, false, false, false]);
+  assert.deepEqual(row.map((c) => c.current), [false, false, false, true, false, false, false, false]);
+  assert.deepEqual(row.map((c) => c.needsYou), [true, false, false, false, false, false, false, false]);
   assert.ok(cards(null).every((c) => !c.current));
 });
 
@@ -55,6 +56,7 @@ test("each card says what it counts (VC1)", () => {
     cards("all").map((c) => [c.count, c.description]),
     [
       [28, "every call waiting for you"],
+      [3, "held for the team to settle"],
       [10, "Monday brief, week of 19 Oct, decided or not"],
       [2, "closing by 8 Nov"],
       [19, "same verdict; 77% of all calls, 48 of 62"],
@@ -64,7 +66,7 @@ test("each card says what it counts (VC1)", () => {
     ],
   );
   const shared = callViewCards({ current: "needs-review", params: {}, counts: COUNTS, perPerson: false, dueBy: "8 Nov", newSince: "19 Oct", briefWeek: null, agree: null });
-  assert.deepEqual([shared[0].description, shared[1].description, shared[3].description], ["nobody has decided these", "the live ranking, until the first brief", "same verdict"]);
+  assert.deepEqual([shared[0].description, shared[2].description, shared[4].description], ["nobody has decided these", "the live ranking, until the first brief", "same verdict"]);
 });
 
 test("the judges views set the judges filter themselves", () => {
@@ -106,4 +108,14 @@ test("Automation has six cards, Fit ratings first (David, 9 Nov 2026), each link
     none.map((c) => [c.count, c.description]),
     [["none", "nothing rated yet"], [0, "nothing waiting"], [0, "none decided yet"], [0, "no scans yet"], [0, "no timeouts or errors"], ["none", "no call judged by both yet"]],
   );
+});
+
+test("Unsure is the second card: the calls someone held for the team, which nobody has decided (David, 16 Nov 2026)", () => {
+  const row = cards("unsure");
+  assert.deepEqual(row.slice(0, 3).map((c) => c.label), ["Needs review", "Unsure", "Top 10"]);
+  const card = row[1];
+  assert.equal(card.href, "/review?view=unsure&portal=SAM.gov&portal=NSTXL&tag=Software&state=open");
+  assert.equal(card.count, 3);
+  assert.equal(card.current, true);
+  assert.equal(card.description, "held for the team to settle");
 });

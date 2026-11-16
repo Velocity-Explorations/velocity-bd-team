@@ -22,7 +22,7 @@ def test_migrate_creates_tables_and_is_idempotent(tmp_path: Path) -> None:
                      "011_not_submitted.sql", "012_linear_issues.sql", "013_fit_score.sql", "014_fit_rating_changes.sql",
                      "015_listing.sql", "016_chat.sql",
                      "017_draft_suggestions.sql", "018_profile_pictures.sql",
-                     "019_bar_theme.sql"]
+                     "019_bar_theme.sql", "020_unsure.sql"]
     assert migrate.apply(url) == []
     assert migrate.list_tables(url) == ["briefs", "call_tags", "calls", "change_requests", "chat_messages", "checklist_items", "decisions", "draft_suggestions",
                                          "drive_items", "fit_ratings", "judgments", "linear_issues", "people", "profile_pictures", "profiles", "proposals", "pursuit_events", "pursuit_steps",
@@ -124,5 +124,35 @@ def test_011_keeps_every_proposal_and_lets_one_be_not_submitted(tmp_path: Path, 
                                                                      ("nodate_dsip_y", "not_submitted", None, 0)]
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(insert, ("2026-05-01_dsip_z", "maybe"))
+    finally:
+        conn.close()
+
+
+def test_020_keeps_every_decision_and_lets_one_be_unsure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """David, 16 Nov 2026: Unsure holds a call for the team; it is a vote in decisions, never the call's decision."""
+    url = f"sqlite:///{(tmp_path / 'm.db').as_posix()}"
+    every = migrate.migration_files()
+    monkeypatch.setattr(migrate, "migration_files", lambda: [p for p in every if p.name < "020"])
+    migrate.apply(url)
+    vote = "INSERT INTO decisions (call_id, decided_by, status, note, decided_at) VALUES ('c1', 'David Wood', ?, ?, ?)"
+    conn = sqlite3.connect(tmp_path / "m.db")
+    conn.execute("INSERT INTO calls (id, portal, first_seen_at, last_seen_at, updated_at) VALUES ('c1', 'SAM.gov', 'now', 'now', 'now')")
+    conn.execute(vote, ("pursue", None, "2026-11-16T10:00:00Z"))
+    conn.commit()
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(vote, ("unsure", "is it ours?", "2026-11-16T10:01:00Z"))
+    conn.close()
+    monkeypatch.setattr(migrate, "migration_files", lambda: every)
+    assert migrate.apply(url) == ["020_unsure.sql"]
+    conn = sqlite3.connect(tmp_path / "m.db")
+    try:
+        conn.execute(vote, ("unsure", "is it ours?", "2026-11-16T10:01:00Z"))
+        assert conn.execute("SELECT id, call_id, status, note FROM decisions ORDER BY id").fetchall() == [
+            (1, "c1", "pursue", None), (2, "c1", "unsure", "is it ours?")]
+        assert conn.execute("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_decisions_call'").fetchone()
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(vote, ("maybe", None, "2026-11-16T10:02:00Z"))
+        with pytest.raises(sqlite3.IntegrityError):   # the call's own decision never takes it
+            conn.execute("UPDATE calls SET human_status = 'unsure' WHERE id = 'c1'")
     finally:
         conn.close()

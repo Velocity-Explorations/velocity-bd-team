@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS decisions (
   id          INTEGER PRIMARY KEY @@AUTOINCREMENT@@,
   call_id     TEXT NOT NULL REFERENCES calls (id),
   decided_by  TEXT NOT NULL,
-  status      TEXT NOT NULL CHECK (status IN ('pursue', 'not_relevant', 'submitted', 'dismissed')),
+  status      TEXT NOT NULL CHECK (status IN ('pursue', 'not_relevant', 'submitted', 'dismissed', 'unsure')),
   note        TEXT,
   decided_at  TEXT NOT NULL
 );

@@ -2,7 +2,7 @@
 // and Automation's pages. Switching cards keeps the bar's portal, tag and open or closed filters and
 // drops the sort and the column filters (N6). No imports, so `node --test` can load it directly.
 
-export type CallView = "needs-review" | "top10" | "due-soon" | "judges-agree" | "judges-disagree" | "new";
+export type CallView = "needs-review" | "unsure" | "top10" | "due-soon" | "judges-agree" | "judges-disagree" | "new";
 export type CallCard = CallView | "all";
 export type AutomationPage = "requests" | "decided" | "runs" | "problems" | "judges" | "fit";
 
@@ -17,10 +17,11 @@ export type ViewCard = {
   needsYou: boolean;
 };
 
-const CALL_VIEWS: CallView[] = ["needs-review", "top10", "due-soon", "judges-agree", "judges-disagree", "new"];
+const CALL_VIEWS: CallView[] = ["needs-review", "unsure", "top10", "due-soon", "judges-agree", "judges-disagree", "new"];
 
 export const VIEW_LABELS: Record<CallCard, string> = {
   "needs-review": "Needs review",
+  unsure: "Unsure",
   top10: "Top 10",
   "due-soon": "Due soon",
   "judges-agree": "Judges agree",
@@ -75,8 +76,9 @@ function href(base: string, view: string | null, params: Record<string, string |
 }
 
 /**
- * Calls' cards in order: Needs review (the count that needs the viewer), Top 10, Due soon, Judges
- * agree, Judges disagree, New this week, All calls. `current` null leaves none pressed.
+ * Calls' cards in order: Needs review (the count that needs the viewer), Unsure (the calls someone held for the team,
+ * David 16 Nov 2026), Top 10, Due soon, Judges agree, Judges disagree, New this week, All calls. `current` null leaves
+ * none pressed.
  */
 export function callViewCards(input: {
   current: CallCard | null;
@@ -91,6 +93,7 @@ export function callViewCards(input: {
   const { agree } = input;
   const lines: Record<CallCard, string> = {
     "needs-review": input.perPerson ? "every call waiting for you" : "nobody has decided these",
+    unsure: "held for the team to settle",
     top10: input.briefWeek ? `Monday brief, ${input.briefWeek}, decided or not` : "the live ranking, until the first brief",
     "due-soon": `closing by ${input.dueBy}`,
     "judges-agree": agree && agree.both

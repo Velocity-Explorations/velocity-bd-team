@@ -356,7 +356,15 @@ On a call Claude rated yes or maybe, Not relevant opens its reasons (David, 5 No
 on that week's Top 10), in order of the work, the customer, the listing and the time: Too large for Velocity, Too
 specialized for Velocity, Mostly hardware, Cyber or enterprise IT, Staffing or IT support, Wrong customer or eligibility,
 Too broad with no clear fit, Planning only with no award, Umbrella announcement only, Award or sole-source notice, Too
-little time to respond, or another reason typed in (`lib/decide.ts` NOT_RELEVANT_REASONS). The reason, with any note typed after it, is the decision's note.
+little time to respond, or another reason typed in (`lib/decide.ts` NOT_RELEVANT_REASONS).
+
+Unsure (David, 16 Nov 2026, migration 020) sits in the Decide menu after Not relevant, for a call the person can't
+decide. It holds the call for the team: the person's vote is Unsure, with any note on what is unclear, and it never
+becomes the call's decision. If the call's decision was the person's own, Unsure takes it off the call, which waits
+again. The call leaves that person's Needs review and lists under Calls' Unsure card (second, after Needs review)
+until someone decides it, with the vote's amber chip. Judges and people are never scored against an Unsure vote, and it
+does not start the judges' cutoff (the first real decision does). Unsure is refused while a draft is under way; the
+draft's go/no-go gate settles those. The reason, with any note typed after it, is the decision's note.
 Start the draft suggests what to include (David, 7 Nov 2026), once migration 017 is applied: Suggest what to include asks
 `run.py --assistant` for Claude's recommendation (`drafting/suggest.py`), and the dialog reads it from
 `GET /api/suggestion?call=<id>` every two seconds until it arrives, about half a minute. It fills in the format, the

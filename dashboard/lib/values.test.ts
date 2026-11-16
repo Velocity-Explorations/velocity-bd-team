@@ -1,10 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DECISIONS, HUMAN_STATUSES, isDecision, keepsCallDecision, pickAllowed, pickQueueMode, planDecision } from "./values.ts";
+import { DECISIONS, HUMAN_STATUSES, isDecision, isVote, keepsCallDecision, pickAllowed, pickQueueMode, planDecision, STATUS_LABELS, unsurePlan } from "./values.ts";
 
-test("decisions are exactly the ledger's human_status values", () => {
-  assert.deepEqual(DECISIONS.map((d) => d.value), ["pursue", "not_relevant", "submitted", "dismissed"]);
+test("the Decide menu offers the call's four decisions and Unsure, which is a vote only (David, 16 Nov 2026)", () => {
+  assert.deepEqual(DECISIONS.map((d) => d.value), ["pursue", "not_relevant", "unsure", "submitted", "dismissed"]);
+  assert.deepEqual(DECISIONS.map((d) => d.label), ["Pursue", "Not relevant", "Unsure", "Submitted", "Dismiss"]);
+  assert.equal(STATUS_LABELS.unsure, "Unsure");
   assert.deepEqual([...HUMAN_STATUSES], ["pursue", "not_relevant", "submitted", "dismissed"]);
+  assert.equal(isDecision("unsure"), false);   // a call's own decision never takes it
+  assert.equal(isVote("unsure"), true);
+  assert.equal(isVote("pursue"), true);
+  assert.equal(isVote("maybe"), false);
   assert.equal(isDecision("not_relevant"), true);
   assert.equal(isDecision("maybe"), false);
   assert.equal(isDecision(undefined), false);
@@ -52,4 +58,12 @@ test("a decision from the review queue leaves someone else's decision on the cal
   assert.equal(keepsCallDecision(true, true, null, ["David Wood"]), true);
   assert.equal(keepsCallDecision(false, true, "Shaun", ["David Wood"]), false);
   assert.equal(keepsCallDecision(true, false, "Shaun", ["David Wood"]), false);   // no decisions table: nowhere to keep a vote
+});
+
+test("Unsure clears the call's decision only when it was the person's own, and otherwise adds their vote", () => {
+  assert.equal(unsurePlan({ mine: null, note: "", own: false }), "add");
+  assert.equal(unsurePlan({ mine: "pursue", note: "", own: false }), "add");
+  assert.equal(unsurePlan({ mine: "pursue", note: "", own: true }), "clear");   // David pursued, now unsure: the call waits again
+  assert.equal(unsurePlan({ mine: "unsure", note: "", own: false }), "noop");
+  assert.equal(unsurePlan({ mine: "unsure", note: "who owns the data?", own: false }), "note");
 });

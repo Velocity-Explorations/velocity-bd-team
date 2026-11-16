@@ -41,6 +41,7 @@ function latestByPerson(decisions: DecisionRow[], displayName: (by: string) => s
 function firstDecided(decisions: DecisionRow[]): Map<string, string> {
   const first = new Map<string, string>();
   for (const d of decisions) {
+    if (decisionVerdict(d.status) === null) continue;   // an Unsure vote decides nothing
     const seen = first.get(d.call_id);
     if (seen === undefined || d.decided_at < seen) first.set(d.call_id, d.decided_at);
   }
@@ -109,7 +110,7 @@ export function peopleAgreement(
       let agree = 0;
       for (const [callId, d] of byPerson.get(people[i]) ?? new Map<string, DecisionRow>()) {
         const other = theirs.get(callId);
-        if (!other) continue;
+        if (!other || decisionVerdict(d.status) === null || decisionVerdict(other.status) === null) continue;   // Unsure
         shared += 1;
         if (decisionVerdict(d.status) === decisionVerdict(other.status)) agree += 1;
       }

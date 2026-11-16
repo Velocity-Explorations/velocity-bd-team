@@ -40,10 +40,11 @@ def pressed(page: Any) -> list[str]:
     return [t.strip().lower() for t in page.locator(".view-cards .vt-card[aria-current=page] .vt-card__label").all_inner_texts()]
 
 
-def test_calls_has_seven_cards_in_order(page: Any) -> None:
+def test_calls_has_eight_cards_in_order(page: Any) -> None:
     open_page(page, "/review")
     labels = [t.strip().lower() for t in page.locator(".view-cards .vt-card__label").all_inner_texts()]
-    assert labels == ["needs review", "top 10", "due soon", "judges agree", "judges disagree", "new this week", "all calls"]
+    assert labels == ["needs review", "unsure", "top 10", "due soon", "judges agree", "judges disagree", "new this week",
+                      "all calls"]
 
 
 def test_a_column_filter_that_matches_no_view_leaves_no_card_pressed(page: Any) -> None:
@@ -128,7 +129,7 @@ def test_the_decide_menu_lists_the_four_decisions_and_the_draft_waits_for_the_wo
     menu = first_row(page).locator("details.decide-menu")
     menu.locator(":scope > summary").click()
     items = [t.strip() for t in menu.locator(".menu-body > button, .menu-body > details > summary").all_inner_texts()]
-    assert items == ["Pursue", "Not relevant", "Submitted", "Dismiss", "Pursue and start the draft"]
+    assert items == ["Pursue", "Not relevant", "Unsure", "Submitted", "Dismiss", "Pursue and start the draft"]
     waiting = "Drafting is not set up yet" in menu.locator(":scope > .menu-body > .hint").inner_text()
     assert menu.locator(":scope > .menu-body > button", has_text="Pursue and start the draft").is_disabled() == waiting
     page.keyboard.press("Escape")   # closes the menu without deciding

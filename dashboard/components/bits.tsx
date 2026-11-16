@@ -14,6 +14,7 @@ const TONES: Record<string, string> = {
   submitted: "info",
   not_relevant: "bad",   // the same red as a judge's no (David, 5 Nov)
   dismissed: "grey",
+  unsure: "warn",   // amber: held for the team (David, 16 Nov 2026)
   completed: "good",
   running: "info",
   skipped_timeout: "warn",

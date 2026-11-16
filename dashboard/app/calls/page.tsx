@@ -143,6 +143,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
           params: barParams,
           counts: {
             "needs-review": counts.waiting,
+            unsure: counts.unsure,
             top10: topCount,
             "due-soon": counts.dueSoon,
             "judges-agree": counts.agree,

@@ -62,7 +62,7 @@ import {
 } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
 import { decidedNotice, fromQueue, isNoteStamp, safeReturnTo } from "@/lib/text";
-import { isDecision, STATUS_LABELS } from "@/lib/values";
+import { isDecision, isVote, STATUS_LABELS } from "@/lib/values";
 import { allowlist, currentViewer, team, VIEWER_COOKIE } from "@/lib/viewer";
 import { parseJson, permissions } from "@/lib/workspace";
 
@@ -138,7 +138,7 @@ export async function decide(formData: FormData): Promise<void> {
   const words = choice.reason === "other" ? String(formData.get("reason_text") ?? "").trim() || typed : typed;
   const full = reasonNote(choice.reason, words);   // the reason is the note the judges learn from
   const note = full.slice(0, MAX_NOTE_CHARS);
-  if (!id || !isDecision(status)) backTo(returnTo, "error", "Choose a decision first.");
+  if (!id || !isVote(status)) backTo(returnTo, "error", "Choose a decision first.");
   if (expectedField && !isDecision(expectedField)) backTo(returnTo, "error", "That form is out of date. Reload and try again.");
   const expected = isDecision(expectedField) ? expectedField : null;
   const keepCallDecision = formData.get("keep") === "1";
@@ -159,7 +159,9 @@ export async function decide(formData: FormData): Promise<void> {
   if (result.ok) {
     const stays = result.callStatus && result.callStatus !== status ? ` The call stays ${STATUS_LABELS[result.callStatus]}.` : "";
     const queue = fromQueue(returnTo);
-    const notice = decidedNotice(result.plan, STATUS_LABELS[status], result.title, stays, queue);
+    const notice = result.plan === "clear"   // Unsure on a call whose decision was the person's own
+      ? `Unsure: ${result.title}. Your decision is off the call, which waits for the team under Unsure.`
+      : decidedNotice(result.plan, STATUS_LABELS[status], result.title, stays, queue);
     if (thenDraft && result.callStatus === "pursue") backTo(`/proposals?start=${encodeURIComponent(id)}`, "notice", `${notice} Start the draft below.`);
     backTo(returnTo, "notice", notice, queue && result.plan !== "note" ? result.title : undefined);
   }

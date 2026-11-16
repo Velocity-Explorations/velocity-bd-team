@@ -25,6 +25,7 @@ SECTION_OF = {
     "/review?view=judges-agree": "Calls",
     "/review?view=judges-disagree": "Calls",
     "/review?view=new": "Calls",
+    "/review?view=unsure": "Calls",
     "/calls": "Calls",
     "/proposals": "Proposals",
     "/proposals?view=closing": "Proposals",
@@ -45,6 +46,7 @@ CARD_PAGES = {
     "/review?view=judges-agree": "Judges agree",
     "/review?view=judges-disagree": "Judges disagree",
     "/review?view=new": "New this week",
+    "/review?view=unsure": "Unsure",
     "/calls": "All calls",
     "/requests": "Agent update requests",
     "/requests?view=decided": "Decided requests",
@@ -188,7 +190,7 @@ def test_each_top_10_call_on_home_can_be_decided_there(page: Any) -> None:
     first = rows.first
     first.locator("details.decide-menu > summary").click()
     items = [t.strip() for t in first.locator("details.decide-menu > .menu-body > button, details.decide-menu > .menu-body > details > summary").all_inner_texts()]
-    assert items[:4] == ["Pursue", "Not relevant", "Submitted", "Dismiss"]
+    assert items[:5] == ["Pursue", "Not relevant", "Unsure", "Submitted", "Dismiss"]   # Unsure since 16 Nov 2026
     assert page.url.rstrip("/") == URL   # opening the menu stays on Home; the row's link is not followed
     assert first.locator("input[name=return_to]").get_attribute("value") == "/"
     page.keyboard.press("Escape")   # closes the menu without deciding
@@ -520,3 +522,18 @@ def test_deep_fields_stars_and_craft_never_add_up_behind_a_label(page: Any) -> N
       document.querySelector('header.topbar .topbar-deep').appendChild(el);
       const blend = getComputedStyle(el).mixBlendMode; el.remove(); return blend; }""")
     assert probe == "lighten"
+
+
+def test_the_unsure_view_lists_only_calls_held_for_the_team(page: Any) -> None:
+    """David, 16 Nov 2026: Unsure holds a call for the team; its card is second on Calls, and the calls it lists have no
+    team decision yet, each with someone's amber unsure vote."""
+    open_page(page, "/review?view=unsure")
+    labels = [t.strip().lower() for t in page.locator(".view-cards .vt-card .vt-card__label").all_inner_texts()]
+    assert labels[:3] == ["needs review", "unsure", "top 10"]
+    card = page.locator(".view-cards .vt-card[aria-current=page]")
+    assert card.locator(".vt-card__label").inner_text().strip().lower() == "unsure"
+    rows = page.locator("table.calls-table tbody tr")
+    if rows.count() == 0:
+        assert "hold it for the team" in page.locator(".empty").inner_text()   # nobody is holding a call
+        return
+    assert page.locator("table.calls-table tbody .badge", has_text="unsure").count() >= 1
