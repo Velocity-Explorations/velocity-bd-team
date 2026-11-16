@@ -82,10 +82,13 @@ function NoteButton({ panel, label }: { panel: string; label: string }) {
 /**
  * Votes: each judge's verdict with a note button that opens the reasons panel, flagged when the
  * judges disagree; then, under a dashed rule, each person's latest vote, with a note button when they
- * left a note. `votes` is null where people's votes are not listed.
+ * left a note, and Notes from the people who left one without voting, since a note saves on its own
+ * (David, 16 Nov 2026). `votes` is null where people's votes are not listed.
  */
 export function VotesCell({ callId, verdicts, votes, notesBy, fit }: { callId: string; verdicts: Verdicts; votes: Vote[] | null; notesBy: Set<string>; fit?: Partial<FitColumns> }) {
   const reasons = panelId("reasons", callId);
+  const voters = new Set((votes ?? []).map((v) => v.person));
+  const notesOnly = [...notesBy].filter((person) => !voters.has(person));
   return (
     <td className="votes-cell">
       <div className="judges">
@@ -122,6 +125,12 @@ export function VotesCell({ callId, verdicts, votes, notesBy, fit }: { callId: s
           ) : (
             <span className="muted">nobody yet</span>
           )}
+          {notesOnly.length ? (
+            <p className="notes-only">
+              Notes from {notesOnly.join(", ")}
+              <NoteButton panel={panelId("notes", callId)} label={`Notes from ${notesOnly.join(", ")}`} />
+            </p>
+          ) : null}
           {peopleSplit(votes) ? <span className="badge tone-warn">people disagree</span> : null}
         </div>
       ) : null}

@@ -52,6 +52,8 @@ import {
   type StartResult,
   type WorkspaceResult,
   saveFitRating,
+  saveNote,
+  type NoteResult,
   hasChat,
   questionWaiting,
   askSuggestion,
@@ -59,7 +61,7 @@ import {
   hasSuggestions,
 } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
-import { decidedNotice, fromQueue, safeReturnTo } from "@/lib/text";
+import { decidedNotice, fromQueue, isNoteStamp, safeReturnTo } from "@/lib/text";
 import { isDecision, STATUS_LABELS } from "@/lib/values";
 import { allowlist, currentViewer, team, VIEWER_COOKIE } from "@/lib/viewer";
 import { parseJson, permissions } from "@/lib/workspace";
@@ -132,9 +134,10 @@ export async function decide(formData: FormData): Promise<void> {
   const thenDraft = choice.status === "pursue_draft";   // the Decide menu's Pursue and start the draft (Q9)
   const status = thenDraft ? "pursue" : choice.status;
   const expectedField = String(formData.get("expected") ?? "");
-  const typed = String(formData.get("note") ?? "");
+  const typed = String(formData.get("note") ?? "").slice(0, MAX_NOTE_CHARS);
   const words = choice.reason === "other" ? String(formData.get("reason_text") ?? "").trim() || typed : typed;
-  const note = reasonNote(choice.reason, words).slice(0, MAX_NOTE_CHARS);   // the reason is the note the judges learn from
+  const full = reasonNote(choice.reason, words);   // the reason is the note the judges learn from
+  const note = full.slice(0, MAX_NOTE_CHARS);
   if (!id || !isDecision(status)) backTo(returnTo, "error", "Choose a decision first.");
   if (expectedField && !isDecision(expectedField)) backTo(returnTo, "error", "That form is out of date. Reload and try again.");
   const expected = isDecision(expectedField) ? expectedField : null;
@@ -145,7 +148,9 @@ export async function decide(formData: FormData): Promise<void> {
 
   let result: DecideResult;
   try {
-    result = await decideCall({ id, status, expected, keepCallDecision, by: viewer, aliases: aliasesFor(viewer, allowlist()), note });
+    // The note box saved what it holds as it was typed; when the decision's note carries all of it, that line gives way to the decision's.
+    const carried = words === typed && full.length <= MAX_NOTE_CHARS ? typed : "";
+    result = await decideCall({ id, status, expected, keepCallDecision, by: viewer, aliases: aliasesFor(viewer, allowlist()), note, typed: carried });
   } catch (err) {
     const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
     backTo(returnTo, "error", `Could not save the decision: ${detail}`);
@@ -159,6 +164,26 @@ export async function decide(formData: FormData): Promise<void> {
     backTo(returnTo, "notice", notice, queue && result.plan !== "note" ? result.title : undefined);
   }
   backTo(returnTo, "error", result.reason);
+}
+
+/**
+ * A call's note box (David, 16 Nov 2026): what is typed saves itself under the person signed in, with no decision
+ * needed. `at` is the stamp an earlier save from the same box returned, so the box edits its own note. Called from the
+ * box's script, so it returns what happened instead of redirecting, and nothing is revalidated: the page would be drawn
+ * again at every pause in the typing, and the box already shows the note.
+ */
+export async function saveNoteAction(input: { callId?: unknown; at?: unknown; text?: unknown }): Promise<NoteResult> {
+  const viewer = await currentViewer();
+  if (!viewer) return { ok: false, reason: "Log in (top right) before adding a note." };
+  const callId = typeof input?.callId === "string" ? input.callId.trim().slice(0, 300) : "";
+  if (!callId) return { ok: false, reason: "Choose a call first." };
+  const at = isNoteStamp(input?.at) ? input.at : null;
+  const text = typeof input?.text === "string" ? input.text.slice(0, MAX_NOTE_CHARS) : "";
+  try {
+    return await saveNote({ id: callId, by: viewer, at, text });
+  } catch (err) {
+    return { ok: false, reason: `Could not save the note: ${err instanceof Error ? err.message.slice(0, 160) : "database error"}` };
+  }
 }
 
 /**

@@ -11,7 +11,7 @@ import type { TagOption, TagRow } from "./tags";
 import { isoNow } from "./format";
 import type { RequestChoice } from "./requests";
 import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
-import { escapeLike, noteLine } from "./text";
+import { escapeLike, noteLine, withoutTypedNote, writeNoteLine } from "./text";
 import { isDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
 import type { AskMessage } from "./ask";
@@ -654,7 +654,8 @@ async function latestDecisionBy(db: Db, callId: string, aliases: string[]): Prom
  * everyone decides every call) once the call has one. Otherwise `expected` is the decision
  * the page showed; if the call changed since (another tab, another person), nothing is
  * written and the reason says what it is now. `aliases` are the names the person's earlier
- * decisions are recorded under.
+ * decisions are recorded under. `typed` is what the note box held when the decision's note
+ * includes it: the box saved it already (saveNote), so the decision's line takes that line's place.
  */
 export async function decideCall(input: {
   id: string;
@@ -664,6 +665,7 @@ export async function decideCall(input: {
   by: string;
   aliases: string[];
   note: string;
+  typed?: string;
 }): Promise<DecideResult> {
   const db = sql();
   const history = await hasTable(db, "decisions");
@@ -672,8 +674,8 @@ export async function decideCall(input: {
   const now = isoNow();
   const line = noteLine(now, input.by, input.note) || null;
   const result = await db.begin(async (tx): Promise<DecideResult> => {
-    const [call] = await tx<{ title: string | null; human_status: string | null; human_by: string | null }[]>`
-      SELECT title, human_status, human_by FROM calls WHERE id = ${input.id} FOR UPDATE`;
+    const [call] = await tx<{ title: string | null; human_status: string | null; human_by: string | null; human_notes: string | null }[]>`
+      SELECT title, human_status, human_by, human_notes FROM calls WHERE id = ${input.id} FOR UPDATE`;
     if (!call) return { ok: false, reason: "That call is no longer in the ledger." };
     if (drafts) {
       // A call whose draft is under way is marked submitted at its Submit gate, which records the confirmation (P7).
@@ -692,14 +694,14 @@ export async function decideCall(input: {
     }
     const plan = planDecision(current, input.status, input.note, history ? mine : current, keep);
     if (plan === "noop") return { ok: false, reason: "Nothing to save: choose a different decision or add a note." };
+    // The row is locked, so the notes read above are the ones this writes over.
+    const kept = line && input.typed ? withoutTypedNote(call.human_notes, input.by, input.typed) : call.human_notes;
+    const notes = line ? (kept ? `${kept}\n${line}` : line) : kept;
     await tx`
       UPDATE calls
       SET ${plan === "decide" ? tx`human_status = ${input.status}, human_by = ${input.by}, human_at = ${now},` : tx``}
           updated_at = ${now},
-          human_notes = CASE
-            WHEN ${line}::text IS NULL THEN human_notes
-            ELSE COALESCE(NULLIF(human_notes, '') || chr(10), '') || ${line}::text
-          END
+          human_notes = ${notes}
       WHERE id = ${input.id}`;
     if (history && plan !== "note") {
       await tx`
@@ -710,6 +712,28 @@ export async function decideCall(input: {
   });
   if (result.ok) forget("top10");   // before the first brief, the live Top 10 leaves out decided calls
   return result;
+}
+
+export type NoteResult = { ok: true; at: string | null } | { ok: false; reason: string };
+
+/**
+ * A save from a call's note box (David, 16 Nov 2026): the note goes on human_notes under the person signed in, with
+ * no decision and nothing else on the call changed. `at` is the stamp an earlier save from the same box returned, so
+ * the box edits its own line rather than adding another (writeNoteLine). The result's `at` is the line's stamp, or
+ * null once the box is empty.
+ */
+export async function saveNote(input: { id: string; by: string; at: string | null; text: string }): Promise<NoteResult> {
+  const db = sql();
+  const now = isoNow();
+  return db.begin(async (tx): Promise<NoteResult> => {
+    const [call] = await tx<{ human_notes: string | null }[]>`SELECT human_notes FROM calls WHERE id = ${input.id} FOR UPDATE`;
+    if (!call) return { ok: false, reason: "That call is no longer in the ledger." };
+    const next = writeNoteLine(call.human_notes, input.at, input.by, input.text, now);
+    if (next.notes !== call.human_notes) {
+      await tx`UPDATE calls SET human_notes = ${next.notes}, updated_at = ${now} WHERE id = ${input.id}`;
+    }
+    return { ok: true, at: next.at };
+  });
 }
 
 // ------------------------------------------------------------------ tags

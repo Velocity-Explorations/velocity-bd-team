@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { decide } from "@/app/actions";
 import { Badge, toneOf } from "@/components/bits";
+import { CallNote } from "@/components/CallNote";
 import { decideLabel, dueLine, NOT_RELEVANT_REASONS, type VoteLike } from "@/lib/decide";
 import { formatTime } from "@/lib/format";
 import { stepLabel } from "@/lib/proposals";
@@ -17,7 +18,8 @@ export type DecideMode = "waiting" | "mixed" | "all";
 /**
  * The Decide cell (Q9, Q14, PRO-572). The Decide menu lists Pursue, Not relevant, Submitted and
  * Dismiss, each with its tone square and word; choosing one records it at once, with the note when
- * Add a note was opened. Pursue and start the draft waits for the proposal workspace (P8). Where the
+ * Add a note holds one. The note saves itself as it is typed, decision or not (CallNote, David,
+ * 16 Nov 2026). Pursue and start the draft waits for the proposal workspace (P8). Where the
  * view mixes calls you have and have not decided, the cell says which: needs your decision (with
  * when it is due, within 14 days) or You: and your decision. The button carries the accent border
  * on a call waiting for you, and reads Decide, Change or Add yours. A pursued call with no draft shows
@@ -159,7 +161,7 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
         {note ? (
           <details className="add-note">
             <summary className="btn-text">Add a note</summary>
-            <textarea name="note" maxLength={2000} rows={3} placeholder="Sent with the decision you choose" aria-label={`Note on ${call.title || call.id}`} />
+            <CallNote callId={call.id} title={call.title || call.id} />
           </details>
         ) : null}
       </form>
