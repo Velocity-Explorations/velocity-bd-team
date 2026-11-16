@@ -9,6 +9,35 @@ portal content.
 
 ## Current Session
 
+**Date**: 2026-11-16 (covers 15 to 16 Nov)
+**Focus**: PRO-477 move to Velocity's cluster, notes that save themselves and sit beside each vote, DSIP topics as calls, fit scoring fixed
+
+### What Was Done
+- PRO-477 stage 1 (dashboard on the production cluster, ledger still on Supabase) is built on the local branch `david/pro-477-host-the-dashboard-on-gke-with-alec` (worktree `C:\Projects\velocity-bd-team-pro-477`). It stays unpushed until Alec answers the public-repo question. The infra tfvars PR waits on his review. His 11 questions are in `data/hosting/questions-for-alec.md` (local).
+- A note under Add a note saves itself as it is typed, under the signed-in name, with no decision needed (#172). Each person's notes show beside their vote on hover, focus or click, which replaces the Notes panel (#175).
+- DSIP (#178) makes each DoD SBIR/STTR topic a call (`dsip-<topic>`):
+  - Read from SBIR.gov's copy, because DSIP's robots.txt bars every robot, AI browsers included.
+  - DSIP DOCX files a person drops in `data/dsip/inbox` cover releases SBIR.gov misses.
+  - A new PORTAL `watch` hook alerts on any open cycle with no topics.
+  - First live run (105): 102 new topics, Claude 9 yes, 26 maybe, 67 no; Grok 14 yes, 5 maybe, 83 no.
+- Fit scoring: no scan had scored fit since a12a71d (6 Nov, a missing import). Fixed (#181), then `--fit-scores` re-scored 477 of 569 calls. DSIP has 26 strong.
+
+### Key Decisions
+- No robot on DSIP (PRO-536 stands). On 16 Nov SBIR.gov had all 79 Release 2 topics and none of Release 1's 23, hence the drop folder and the watch.
+- DSIP keeps every topic for both judges, with an empty blocklist: the shared one drops topics that mention repair.
+- An autosaved note edits its own line. A decision that carries the typed note replaces that line, so the judges still read "reason: note".
+
+### In Progress
+- PRO-477 waits on Alec: his answers, the tfvars review and secretVersionAdder. Then push the branch and deploy.
+- Three strong DSIP Release 1 topics (DAF27TZ01-DV001, DAF27BZ01-DV012, DAF27TZ01-DV003) close 25 Nov and are not assessed yet.
+- 92 reviewed calls have no fit score because no judge named their main work. `--rejudge-open` would fix that; it hasn't been priced or run.
+- The open items from 10 Nov below still stand.
+
+### Blockers
+- PRO-477: Alec.
+
+## Session: 2026-11-10
+
 **Date**: 2026-11-10 (covers 9 to 10 Nov)
 **Focus**: Top bar themes from Claude Design, Deep field's planets and meteors, faces beside names, a DSIP topic screen
 
