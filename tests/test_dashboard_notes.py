@@ -1,7 +1,10 @@
-"""A call's note box saves itself (David, 16 Nov 2026), driven in a browser against a throwaway Postgres, never the
-live ledger: a note typed under Add a note is stored under the person signed in a second after the typing stops or on
-leaving the box, with no decision needed and without touching the call's decision; editing the box edits that note,
-emptying it takes it away, and a decision chosen while the box holds the note keeps one line for it.
+"""A call's notes (David, 16 Nov 2026), driven in a browser against a throwaway Postgres, never the live ledger.
+
+A note typed under Add a note is stored under the person signed in a second after the typing stops or on leaving the
+box, with no decision needed and without touching the call's decision; editing the box edits that note, emptying it
+takes it away, and a decision chosen while the box holds the note keeps one line for it. Each person's notes show in a
+box beside their vote: on hover, on keyboard focus, or kept open by a click; someone who left a note without voting
+gets a line of their own.
 
 Opt in with WORKSPACE_TESTS=1 after `npm run build` in dashboard/. The tests start a postgres:17-alpine container
 (Docker) and the built dashboard on port 8004 against it, and remove both at the end.
@@ -37,7 +40,7 @@ PEOPLE = "David Wood,Shaun Jones,Lisa Hall"
 PURSUED = "notes-pursued"     # the team pursued it; David said not relevant
 EDITED = "notes-edited"       # undecided: the box is typed into, edited and emptied
 DECIDED = "notes-decided"     # undecided: a note typed, then a decision chosen
-NO_VOTE = "notes-no-vote"     # a note from someone who has not voted
+VOTED = "notes-voted"         # Shaun voted and left two notes; Lisa left one without voting
 SIGNED_OUT = "notes-signed-out"
 
 
@@ -100,8 +103,11 @@ def seed() -> None:
     lq.set_human(PURSUED, "pursue", "Shaun Jones")   # the call's decision is Shaun's Pursue; David's own is Not relevant
     _call(EDITED, "Note box edited call")
     _call(DECIDED, "Note box decided call")
-    _call(NO_VOTE, "Note box call nobody voted on")
-    lq.append_note(NO_VOTE, "worth a look once the topic posts", "Lisa Hall")
+    _call(VOTED, "Note box call with notes beside the votes")
+    lq.set_human(VOTED, "pursue", "Shaun Jones")
+    lq.append_note(VOTED, "talked to the program manager", "Shaun Jones")
+    lq.append_note(VOTED, "worth a look once the topic posts", "Lisa Hall")
+    lq.append_note(VOTED, "they want a demo in March", "Shaun Jones")
     _call(SIGNED_OUT, "Note box call while signed out")
 
 
@@ -206,6 +212,10 @@ def test_a_note_saves_itself_under_the_person_signed_in_and_leaves_the_decision_
     call = call_of(PURSUED)
     assert (call["human_status"], call["human_by"]) == ("pursue", "Shaun Jones")
     assert decisions_of(PURSUED) == [("David Wood", "not_relevant", None), ("Shaun Jones", "pursue", None)]
+    row = row_of(page, PURSUED, "Note box pursued call")   # the next visit shows it beside David's vote
+    tip = tip_of(page, row.locator("ul.votes > li", has_text="David Wood").locator("button[data-note-tip]"))
+    tip.wait_for(state="visible", timeout=3_000)
+    assert "We have never focused on identity management" in tip.inner_text()
 
 
 def test_editing_the_box_edits_its_note_and_emptying_it_takes_the_note_away(page: Any) -> None:
@@ -243,14 +253,48 @@ def test_a_decision_chosen_with_a_typed_note_keeps_one_line_for_it(page: Any) ->
     assert decisions_of(DECIDED) == [("David Wood", "pursue", "call the program manager first")]
 
 
-def test_notes_from_someone_with_no_vote_open_from_votes(page: Any) -> None:
+def tip_of(page: Any, button: Any, hover: bool = True) -> Any:
+    """The box beside a vote that the note button shows; hovered first unless told otherwise."""
+    if hover:
+        button.hover()
+    return page.locator(f"[id='{button.get_attribute('data-note-tip')}']")
+
+
+def test_a_persons_notes_show_beside_their_vote_on_hover_and_a_click_keeps_them_open(page: Any) -> None:
     log_in(page, "David Wood")
-    row = row_of(page, NO_VOTE, "Note box call nobody voted on")
-    votes = row.locator("td.votes-cell .people-votes")
-    assert "Notes from Lisa Hall" in votes.inner_text()
-    votes.locator(".note-btn").click()
-    panel = page.locator(f"tr.panel-row[data-for='{NO_VOTE}']:has-text('worth a look once the topic posts')")
-    panel.wait_for(state="visible", timeout=5_000)
+    row = row_of(page, VOTED, "Note box call with notes beside the votes")
+    button = row.locator("ul.votes > li", has_text="Shaun Jones").locator("button[data-note-tip]")
+    tip = tip_of(page, button, hover=False)
+    assert tip.is_hidden()
+    button.hover()
+    tip.wait_for(state="visible", timeout=3_000)
+    text = tip.inner_text()
+    assert text.index("talked to the program manager") < text.index("they want a demo in March"), text
+    assert "worth a look" not in text   # Lisa's note sits beside her name, not his
+    tip_box, button_box = tip.bounding_box(), button.bounding_box()
+    assert tip_box and button_box and tip_box["x"] >= button_box["x"] + button_box["width"]   # beside the vote
+    page.mouse.move(5, 5)
+    tip.wait_for(state="hidden", timeout=3_000)
+    button.click()
+    page.mouse.move(5, 5)
+    page.wait_for_timeout(600)
+    assert tip.is_visible()   # a click keeps it open after the mouse leaves
+    row.locator(".judge .who").first.click()   # until a click elsewhere (the box covers the column to its right)
+    tip.wait_for(state="hidden", timeout=3_000)
+
+
+def test_a_note_from_someone_with_no_vote_sits_beside_their_name_and_opens_from_the_keyboard(page: Any) -> None:
+    log_in(page, "David Wood")
+    row = row_of(page, VOTED, "Note box call with notes beside the votes")
+    lisa = row.locator("ul.votes > li", has_text="Lisa Hall")
+    assert "no vote" in lisa.inner_text()
+    button = lisa.locator("button[data-note-tip]")
+    tip = tip_of(page, button, hover=False)
+    button.focus()
+    tip.wait_for(state="visible", timeout=3_000)
+    assert "worth a look once the topic posts" in tip.inner_text()
+    page.keyboard.press("Escape")
+    tip.wait_for(state="hidden", timeout=3_000)
 
 
 def test_signed_out_the_box_says_to_log_in_and_saves_nothing(page: Any) -> None:

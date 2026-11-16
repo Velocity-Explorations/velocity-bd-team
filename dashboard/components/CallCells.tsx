@@ -10,12 +10,13 @@ import { callDetails, deadlineNote, noDeadlineLabel, type Detail } from "@/lib/d
 import { descriptionCell, splitDetails } from "@/lib/description";
 import { fitBadge, type FitColumns } from "@/lib/fit";
 import { listingBadge } from "@/lib/listing";
-import { formatDue } from "@/lib/format";
+import { noteSource } from "@/lib/decide";
+import { formatDue, formatTime } from "@/lib/format";
 import { daysLeftText } from "@/lib/home";
 import { JUDGES, judgesConflict, judgesDisagree, type Verdicts } from "@/lib/judges";
 import { peopleSplit, type Vote } from "@/lib/scoreboard";
 import { withoutTags, type TagBadge } from "@/lib/tags";
-import { isClosed } from "@/lib/text";
+import { isClosed, type NoteParts, type PersonNotes } from "@/lib/text";
 import { isDecision, STATUS_LABELS } from "@/lib/values";
 
 type CallFields = Parameters<typeof callDetails>[0] & {
@@ -80,15 +81,54 @@ function NoteButton({ panel, label }: { panel: string; label: string }) {
 }
 
 /**
+ * A person's notes beside their vote (David, 16 Nov 2026): the note button shows them in a box beside it on hover or
+ * keyboard focus, and a click keeps the box open until a click elsewhere or Escape (TableController). Each note with
+ * when it was written, and Slack thread reply where it came from one.
+ */
+function NoteTip({ id, person, notes, tz }: { id: string; person: string; notes: NoteParts[]; tz: string }) {
+  return (
+    <>
+      <button type="button" className="note-btn" data-note-tip={id} aria-describedby={id} aria-expanded="false" aria-label={person ? `${person}'s notes` : "Unsigned notes"}>
+        <MessageSquareText aria-hidden="true" />
+      </button>
+      <div id={id} className="note-tip" role="tooltip" hidden>
+        {notes.map((n, i) => (
+          <div key={i} className="note-tip-item">
+            <p>{n.text}</p>
+            {n.at || noteSource(n.by) === "Slack thread reply" ? (
+              <p className="meta">
+                {n.at ? <span className="when">{formatTime(n.at, tz)}</span> : null}
+                {noteSource(n.by) === "Slack thread reply" ? <span>Slack thread reply</span> : null}
+              </p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/**
  * Votes: each judge's verdict with a note button that opens the reasons panel, flagged when the
- * judges disagree; then, under a dashed rule, each person's latest vote, with a note button when they
- * left a note, and Notes from the people who left one without voting, since a note saves on its own
+ * judges disagree; then, under a dashed rule, each person's latest vote, with their notes beside it
+ * (NoteTip), and a line for anyone who left a note without voting, since a note saves on its own
  * (David, 16 Nov 2026). `votes` is null where people's votes are not listed.
  */
-export function VotesCell({ callId, verdicts, votes, notesBy, fit }: { callId: string; verdicts: Verdicts; votes: Vote[] | null; notesBy: Set<string>; fit?: Partial<FitColumns> }) {
+export function VotesCell({ callId, verdicts, votes, notes, tz, fit }: {
+  callId: string;
+  verdicts: Verdicts;
+  votes: Vote[] | null;
+  notes: PersonNotes[];
+  tz: string;
+  fit?: Partial<FitColumns>;
+}) {
   const reasons = panelId("reasons", callId);
   const voters = new Set((votes ?? []).map((v) => v.person));
-  const notesOnly = [...notesBy].filter((person) => !voters.has(person));
+  const noVote = notes.filter((group) => !voters.has(group.person));
+  const tipFor = (person: string) => {
+    const index = notes.findIndex((group) => group.person === person);
+    return index < 0 ? null : <NoteTip id={`note-tip-${index}-${callId}`} person={person} notes={notes[index].notes} tz={tz} />;
+  };
   return (
     <td className="votes-cell">
       <div className="judges">
@@ -113,24 +153,24 @@ export function VotesCell({ callId, verdicts, votes, notesBy, fit }: { callId: s
       </div>
       {votes ? (
         <div className="people-votes">
-          {votes.length ? (
+          {votes.length || noVote.length ? (
             <ul className="notes votes">
               {votes.map((v) => (
                 <li key={v.person}>
                   <PersonName by={v.person}>{v.person}:</PersonName> {isDecision(v.status) ? STATUS_LABELS[v.status] : v.status}
-                  {notesBy.has(v.person) ? <NoteButton panel={panelId("notes", callId)} label={`${v.person}'s notes`} /> : null}
+                  {tipFor(v.person)}
+                </li>
+              ))}
+              {noVote.map((group) => (
+                <li key={`notes:${group.person}`}>
+                  {group.person ? <PersonName by={group.person}>{group.person}:</PersonName> : "Unsigned:"} <span className="muted">no vote</span>
+                  {tipFor(group.person)}
                 </li>
               ))}
             </ul>
           ) : (
             <span className="muted">nobody yet</span>
           )}
-          {notesOnly.length ? (
-            <p className="notes-only">
-              Notes from {notesOnly.join(", ")}
-              <NoteButton panel={panelId("notes", callId)} label={`Notes from ${notesOnly.join(", ")}`} />
-            </p>
-          ) : null}
           {peopleSplit(votes) ? <span className="badge tone-warn">people disagree</span> : null}
         </div>
       ) : null}
