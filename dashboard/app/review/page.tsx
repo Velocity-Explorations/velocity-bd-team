@@ -66,6 +66,8 @@ const VERDICT_CHOICES = [
 function emptyTitle(view: CallView, filtered: boolean, perPerson: boolean): string {
   if (filtered) return "No calls match these filters.";
   switch (view) {
+    case "unsure":
+      return "Nobody is holding a call as unsure.";
     case "top10":
       return "Nothing to rank yet.";
     case "due-soon":
@@ -181,6 +183,7 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
           params: barParams,
           counts: {
             "needs-review": counts.waiting,
+            unsure: counts.unsure,
             top10: topCount,
             "due-soon": counts.dueSoon,
             "judges-agree": counts.agree,
@@ -216,10 +219,12 @@ export default async function NeedsReviewPage({ searchParams }: { searchParams: 
           <div className="empty">
             <p className="title">{emptyTitle(view, filtered, perPerson)}</p>
             <p className="muted">
-              New yes and maybe calls land here after each scan.{" "}
-              {perPerson
-                ? "A call leaves your list when you decide it and stays on everyone else's until they do."
-                : "Deciding takes a call off this list."}{" "}
+              {view === "unsure"
+                ? "Choose Unsure in a call's Decide menu to hold it for the team; deciding it takes it off this list."
+                : <>New yes and maybe calls land here after each scan.{" "}
+                  {perPerson
+                    ? "A call leaves your list when you decide it and stays on everyone else's until they do."
+                    : "Deciding takes a call off this list."}</>}{" "}
               {filtered ? <a href={viewHome}>Clear filters</a> : <>Change a call&apos;s decision on <a href="/calls">All calls</a>.</>}
             </p>
           </div>

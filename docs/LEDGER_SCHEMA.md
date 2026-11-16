@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `019_bar_theme.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `020_unsure.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -205,7 +205,7 @@ and `human_at`).
 | id | INTEGER, primary key, auto-increment | | database |
 | call_id | TEXT, not null | `calls.id` | the dashboard's decide action, `set_human` |
 | decided_by | TEXT, not null | the person's name from `DASHBOARD_USERS`; a Slack user id for decisions made in Slack before 2026-10-17 | same |
-| status | TEXT, not null | `pursue`, `not_relevant`, `submitted`, `dismissed` | same |
+| status | TEXT, not null | `pursue`, `not_relevant`, `submitted`, `dismissed`, `unsure` (since 020: the person can't decide and holds the call for the team; never copied to `calls.human_status`, so the call keeps no team decision, and no judge is scored against it) | same |
 | note | TEXT | the note given with the decision, also appended to `calls.human_notes` | same |
 | decided_at | TEXT timestamp, not null | when the person decided | same |
 
@@ -723,7 +723,7 @@ JOIN judgments AS j ON j.call_id = c.id
 WHERE c.human_status IS NOT NULL
   AND j.id = (SELECT MAX(e.id) FROM judgments AS e
               WHERE e.call_id = c.id AND e.judge = j.judge
-                AND e.rated_at < COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id),
+                AND e.rated_at < COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id AND d.status <> 'unsure'),
                                           c.human_at))
 GROUP BY j.judge
 ORDER BY j.judge;

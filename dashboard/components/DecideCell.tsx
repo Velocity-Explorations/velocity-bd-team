@@ -6,7 +6,7 @@ import { decideLabel, dueLine, NOT_RELEVANT_REASONS, type VoteLike } from "@/lib
 import { formatTime } from "@/lib/format";
 import { stepLabel } from "@/lib/proposals";
 import type { DraftInfo } from "@/lib/queries";
-import { DECISIONS, isDecision, STATUS_LABELS } from "@/lib/values";
+import { DECISIONS, isDecision, isVote, STATUS_LABELS } from "@/lib/values";
 
 /**
  * Where the cell sits: `waiting`, the queue's views that hold only calls waiting for the viewer;
@@ -63,7 +63,7 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
       ) : null}
       {mode !== "waiting" && viewer && yours ? (
         <div className="your-status">
-          <span className={`badge tone-${toneOf(yours.status)}`}>You: {isDecision(yours.status) ? STATUS_LABELS[yours.status] : yours.status}</span>
+          <span className={`badge tone-${toneOf(yours.status)}`}>You: {isVote(yours.status) ? STATUS_LABELS[yours.status] : yours.status}</span>
           <div className="meta when">{formatTime(yours.decided_at, tz)}</div>
         </div>
       ) : null}

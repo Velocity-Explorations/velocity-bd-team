@@ -58,3 +58,17 @@ test("votesByCall keeps each person's latest decision, oldest first, and peopleS
     { person: "B", status: "dismissed", decided_at: "t2" },
   ]), true);
 });
+
+test("an Unsure vote is no verdict: it never agrees or disagrees, and does not start the judges' cutoff", () => {
+  const rows: DecisionRow[] = [
+    { call_id: "u1", decided_by: "David Wood", status: "unsure", decided_at: "2026-11-16T10:00:00Z" },
+    { call_id: "u1", decided_by: "Shaun Jones", status: "unsure", decided_at: "2026-11-16T10:05:00Z" },
+    { call_id: "u2", decided_by: "David Wood", status: "unsure", decided_at: "2026-11-16T10:00:00Z" },
+    { call_id: "u2", decided_by: "Shaun Jones", status: "pursue", decided_at: "2026-11-16T12:00:00Z" },
+  ];
+  assert.deepEqual(peopleAgreement(rows, (n) => n), []);
+  assert.equal(peopleSplit([{ person: "a", status: "unsure", decided_at: "x" }, { person: "b", status: "pursue", decided_at: "y" }]), false);
+  const judged: JudgmentRow[] = [{ call_id: "u2", judge: "claude", verdict: "yes", rated_at: "2026-11-16T11:00:00Z" }];
+  const shaun = personRecords(rows, judged, ["claude"], (n) => n).find((r) => r.person === "Shaun Jones");
+  assert.deepEqual(shaun?.withJudge.claude, { judged: 1, matches: 1 });   // Claude's 11:00 yes came before the first real decision
+});

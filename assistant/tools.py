@@ -28,7 +28,8 @@ from portals.shared import keyword_filter as kf
 from portals.shared.keyword_filter import Keywords, decide, load_keywords
 
 UTC = timezone.utc
-STATUS_LABELS = {"pursue": "Pursue", "not_relevant": "Not relevant", "submitted": "Submitted", "dismissed": "Dismissed"}
+STATUS_LABELS = {"pursue": "Pursue", "not_relevant": "Not relevant", "submitted": "Submitted", "dismissed": "Dismissed",
+                 "unsure": "Unsure"}   # Unsure is a person's vote only, never a call's decision (migration 020)
 POSITIVE = {"pursue", "submitted"}
 NEGATIVE = {"not_relevant", "dismissed"}
 VERDICTS = ("yes", "maybe", "no")

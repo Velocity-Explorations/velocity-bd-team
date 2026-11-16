@@ -6,23 +6,47 @@ export const FILTER_RESULTS = ["pending", "kept", "rejected"] as const;
 
 export type Decision = (typeof HUMAN_STATUSES)[number];
 
-/** The four triage decisions, in button order. */
-export const DECISIONS: { value: Decision; label: string }[] = [
+/**
+ * What a person can say about a call: the call's four decisions, and Unsure (David, 16 Nov 2026, migration 020), which
+ * holds the call for the team. Unsure is a vote in `decisions` only; the call's own decision (human_status) never
+ * takes it, so the call waits under Calls' Unsure view until someone decides it.
+ */
+export const VOTES = [...HUMAN_STATUSES, "unsure"] as const;
+export type Vote = (typeof VOTES)[number];
+
+/** The Decide menu, in button order. */
+export const DECISIONS: { value: Vote; label: string }[] = [
   { value: "pursue", label: "Pursue" },
   { value: "not_relevant", label: "Not relevant" },
+  { value: "unsure", label: "Unsure" },
   { value: "submitted", label: "Submitted" },
   { value: "dismissed", label: "Dismiss" },
 ];
 
-export const STATUS_LABELS: Record<Decision, string> = {
+export const STATUS_LABELS: Record<Vote, string> = {
   pursue: "Pursue",
   not_relevant: "Not relevant",
+  unsure: "Unsure",
   submitted: "Submitted",
   dismissed: "Dismissed",
 };
 
 export function isDecision(value: unknown): value is Decision {
   return typeof value === "string" && (HUMAN_STATUSES as readonly string[]).includes(value);
+}
+
+export function isVote(value: unknown): value is Vote {
+  return typeof value === "string" && (VOTES as readonly string[]).includes(value);
+}
+
+/**
+ * What Unsure does, given the person's own latest vote (`mine`) and whether the call's decision is theirs (`own`).
+ * "clear" takes their decision off the call, which then waits for the team again; "add" records their Unsure beside
+ * whatever the call has; "note" only appends the note to an Unsure they already gave.
+ */
+export function unsurePlan(input: { mine: string | null; note: string; own: boolean }): "clear" | "add" | "note" | "noop" {
+  if (input.mine === "unsure") return input.note.trim() ? "note" : "noop";
+  return input.own ? "clear" : "add";
 }
 
 export type DecisionPlan = "decide" | "add" | "note" | "noop";

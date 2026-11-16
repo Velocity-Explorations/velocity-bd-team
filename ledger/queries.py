@@ -544,7 +544,7 @@ JOIN judgments AS j ON j.call_id = c.id
 WHERE c.human_status IS NOT NULL
   AND j.id = (SELECT MAX(e.id) FROM judgments AS e
               WHERE e.call_id = c.id AND e.judge = j.judge
-                AND e.rated_at < COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id),
+                AND e.rated_at < COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id AND d.status <> 'unsure'),
                                           c.human_at))
 GROUP BY j.judge
 ORDER BY j.judge

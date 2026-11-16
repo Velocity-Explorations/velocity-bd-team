@@ -12,7 +12,7 @@ import { isoNow } from "./format";
 import type { RequestChoice } from "./requests";
 import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine, withoutTypedNote, writeNoteLine } from "./text";
-import { isDecision, keepsCallDecision, planDecision, type Decision } from "./values";
+import { isDecision, keepsCallDecision, planDecision, unsurePlan, type Decision, type Vote } from "./values";
 import { parseTop } from "./brief";
 import type { AskMessage } from "./ask";
 import type { SuggestionRow } from "./suggest";
@@ -274,6 +274,16 @@ function waitingWhere(db: Db, perPerson: boolean, waitingFor: string[] | null) {
         : db`human_status IS NULL`}`;
 }
 
+/**
+ * The calls someone held for the team (Unsure, David 16 Nov 2026): nobody has decided them, and at least one person's
+ * newest vote on them is Unsure. Whatever the judges said, since anyone may be unsure of any call.
+ */
+function heldWhere(db: Db) {
+  return db`human_status IS NULL
+      AND EXISTS (SELECT 1 FROM decisions AS d WHERE d.call_id = calls.id AND d.status = 'unsure'
+                  AND d.id = (SELECT MAX(n.id) FROM decisions AS n WHERE n.call_id = d.call_id AND n.decided_by = d.decided_by))`;
+}
+
 /** A deadline from today through the next DUE_SOON_DAYS days. */
 function dueSoon(db: Db) {
   return db`${dueDate(db)} BETWEEN CURRENT_DATE AND CURRENT_DATE + ${DUE_SOON_DAYS}::int`;
@@ -349,7 +359,7 @@ export type QueueFilters = PanelFilters & Keywords & { verdict: string; tier: st
 /** The queue's WHERE: the view's calls under the bar's and the headers' filters. */
 function queueWhere(db: Db, f: QueueFilters, perPerson: boolean, waitingFor: string[] | null) {
   return db`
-    WHERE ${f.view === "top10" ? db`id IN ${db(f.ids ?? [])}` : waitingWhere(db, perPerson, waitingFor)}
+    WHERE ${f.view === "top10" ? db`id IN ${db(f.ids ?? [])}` : f.view === "unsure" ? heldWhere(db) : waitingWhere(db, perPerson, waitingFor)}
       ${f.view === "due-soon" ? db`AND ${dueSoon(db)}` : db``}
       ${f.view === "new" ? db`AND first_seen_at >= ${newSince()}` : db``}
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
@@ -373,16 +383,20 @@ function newSince(now: Date = new Date()): string {
   return isoNow(new Date(now.getTime() - NEW_DAYS * 24 * 3600 * 1000));
 }
 
-export type QueueCounts = { waiting: number; dueSoon: number; yes: number; agree: number; disagree: number; fresh: number };
+export type QueueCounts = { waiting: number; dueSoon: number; yes: number; agree: number; disagree: number; fresh: number; unsure: number };
 
 /**
  * The waiting calls' view counts under the bar's filters (VC2); the column filters do not narrow them:
- * all of them, Due soon, yes, Judges agree, Judges disagree and New this week.
+ * all of them, Due soon, yes, Judges agree, Judges disagree and New this week; and the calls held Unsure.
  */
 export async function queueCounts(f: BarFilters, waitingFor: string[] | null): Promise<QueueCounts> {
   const db = sql();
-  const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
-  const [row] = await db<{ waiting: number; due_soon: number; yes: number; agree: number; disagree: number; fresh: number }[]>`
+  const history = await hasTable(db, "decisions");
+  const perPerson = Boolean(waitingFor?.length) && history;
+  const held = history
+    ? db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls WHERE ${heldWhere(db)} ${panelWhere(db, barOnly(f))}`
+    : Promise.resolve([{ n: 0 }]);
+  const [[row], [unsure]] = await Promise.all([db<{ waiting: number; due_soon: number; yes: number; agree: number; disagree: number; fresh: number }[]>`
     SELECT COUNT(*)::int AS waiting,
            COUNT(*) FILTER (WHERE ${dueSoon(db)})::int AS due_soon,
            COUNT(*) FILTER (WHERE ai_verdict = 'yes')::int AS yes,
@@ -391,10 +405,10 @@ export async function queueCounts(f: BarFilters, waitingFor: string[] | null): P
            COUNT(*) FILTER (WHERE first_seen_at >= ${newSince()})::int AS fresh
     FROM calls
     WHERE ${waitingWhere(db, perPerson, waitingFor)}
-      ${panelWhere(db, barOnly(f))}`;
+      ${panelWhere(db, barOnly(f))}`, held]);
   return {
     waiting: row?.waiting ?? 0, dueSoon: row?.due_soon ?? 0, yes: row?.yes ?? 0,
-    agree: row?.agree ?? 0, disagree: row?.disagree ?? 0, fresh: row?.fresh ?? 0,
+    agree: row?.agree ?? 0, disagree: row?.disagree ?? 0, fresh: row?.fresh ?? 0, unsure: unsure?.n ?? 0,
   };
 }
 
@@ -634,7 +648,7 @@ export function callsPage(f: CallFilters, limit = PAGE_SIZE, offset = 0): CallId
 }
 
 export type DecideResult =
-  | { ok: true; title: string; plan: "decide" | "add" | "note"; callStatus: Decision | null }
+  | { ok: true; title: string; plan: "decide" | "add" | "note" | "clear"; callStatus: Decision | null }
   | { ok: false; reason: string };
 
 /** The newest decision recorded under any of these names on a call, or null. */
@@ -656,10 +670,12 @@ async function latestDecisionBy(db: Db, callId: string, aliases: string[]): Prom
  * written and the reason says what it is now. `aliases` are the names the person's earlier
  * decisions are recorded under. `typed` is what the note box held when the decision's note
  * includes it: the box saved it already (saveNote), so the decision's line takes that line's place.
+ * Unsure (migration 020) is a vote only: it never becomes the call's decision, and when the call's decision was the
+ * person's own it takes it off the call ("clear"), which then waits for the team again (unsurePlan).
  */
 export async function decideCall(input: {
   id: string;
-  status: Decision;
+  status: Vote;
   expected: Decision | null;
   keepCallDecision: boolean;
   by: string;
@@ -669,7 +685,8 @@ export async function decideCall(input: {
 }): Promise<DecideResult> {
   const db = sql();
   const history = await hasTable(db, "decisions");
-  const drafts = input.status === "submitted" && (await hasTable(db, "pursuits"));
+  const drafts = (input.status === "submitted" || input.status === "unsure") && (await hasTable(db, "pursuits"));
+  if (input.status === "unsure" && !history) return { ok: false, reason: "Unsure needs the decisions table (migration 004)." };
   const mine = history ? await latestDecisionBy(db, input.id, input.aliases) : null;
   const now = isoNow();
   const line = noteLine(now, input.by, input.note) || null;
@@ -680,7 +697,14 @@ export async function decideCall(input: {
     if (drafts) {
       // A call whose draft is under way is marked submitted at its Submit gate, which records the confirmation (P7).
       const [working] = await tx`SELECT 1 FROM pursuits WHERE call_id = ${input.id} AND state = 'working'`;
-      if (working) return { ok: false, reason: "This call has a draft under way: mark it submitted at the Submit gate in its workspace." };
+      if (working) {
+        return {
+          ok: false,
+          reason: input.status === "unsure"
+            ? "This call has a draft under way: settle it at the draft's go/no-go gate in its workspace."
+            : "This call has a draft under way: mark it submitted at the Submit gate in its workspace.",
+        };
+      }
     }
     const current = isDecision(call.human_status) ? call.human_status : null;
     const keep = keepsCallDecision(input.keepCallDecision, history, call.human_by, input.aliases);
@@ -692,7 +716,10 @@ export async function decideCall(input: {
           : "Its decision was cleared meanwhile. Nothing saved; reload and try again.",
       };
     }
-    const plan = planDecision(current, input.status, input.note, history ? mine : current, keep);
+    const own = current !== null && call.human_by !== null && input.aliases.includes(call.human_by);
+    const plan = input.status === "unsure"
+      ? unsurePlan({ mine, note: input.note, own })
+      : planDecision(current, input.status, input.note, history ? mine : current, keep);
     if (plan === "noop") return { ok: false, reason: "Nothing to save: choose a different decision or add a note." };
     // The row is locked, so the notes read above are the ones this writes over.
     const kept = line && input.typed ? withoutTypedNote(call.human_notes, input.by, input.typed) : call.human_notes;
@@ -700,6 +727,7 @@ export async function decideCall(input: {
     await tx`
       UPDATE calls
       SET ${plan === "decide" ? tx`human_status = ${input.status}, human_by = ${input.by}, human_at = ${now},` : tx``}
+          ${plan === "clear" ? tx`human_status = NULL, human_by = NULL, human_at = NULL,` : tx``}
           updated_at = ${now},
           human_notes = ${notes}
       WHERE id = ${input.id}`;
@@ -708,7 +736,8 @@ export async function decideCall(input: {
         INSERT INTO decisions (call_id, decided_by, status, note, decided_at)
         VALUES (${input.id}, ${input.by}, ${input.status}, ${input.note.trim() || null}, ${now})`;
     }
-    return { ok: true, title: call.title ?? input.id, plan, callStatus: plan === "decide" ? input.status : current };
+    const callStatus = plan === "decide" && isDecision(input.status) ? input.status : plan === "clear" ? null : current;
+    return { ok: true, title: call.title ?? input.id, plan, callStatus };
   });
   if (result.ok) forget("top10");   // before the first brief, the live Top 10 leaves out decided calls
   return result;
@@ -806,7 +835,7 @@ export async function judgeRecords(): Promise<JudgeRecord[] | null> {
         WHERE c.human_status IS NOT NULL
           AND j.id = (SELECT MAX(e.id) FROM judgments AS e
                       WHERE e.call_id = c.id AND e.judge = j.judge
-                        AND e.rated_at < COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id),
+                        AND e.rated_at < COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id AND d.status <> 'unsure'),
                                                   c.human_at))
         GROUP BY j.judge
         ORDER BY j.judge
@@ -830,11 +859,11 @@ export async function scoreboardRows(): Promise<{ decisions: DecisionRow[]; judg
       db<JudgmentRow[]>`
         SELECT j.call_id, j.judge, j.verdict, j.rated_at
         FROM judgments AS j
-        WHERE EXISTS (SELECT 1 FROM decisions AS d WHERE d.call_id = j.call_id)
+        WHERE EXISTS (SELECT 1 FROM decisions AS d WHERE d.call_id = j.call_id AND d.status <> 'unsure')
         ORDER BY j.id`,
       db<DecidedCall[]>`
         SELECT c.id, c.title, c.url, c.human_status AS status,
-               COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id), c.human_at) AS decided_at
+               COALESCE((SELECT MIN(d.decided_at) FROM decisions AS d WHERE d.call_id = c.id AND d.status <> 'unsure'), c.human_at) AS decided_at
         FROM calls AS c
         WHERE c.human_status IS NOT NULL
         ORDER BY 5 DESC, c.id`,
