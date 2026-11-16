@@ -7,6 +7,7 @@ import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type T
 import { signIn, signOut } from "@/auth";
 import { MAX_QUESTION, threadIdOk } from "@/lib/ask";
 import { readChoice, reasonNote } from "@/lib/decide";
+import { readListingChoice } from "@/lib/listing";
 import { isRating, sectionOfKey } from "@/lib/fitratings";
 import { isoNow, zonedToIso } from "@/lib/format";
 import { safeFrom, SIGNED_IN_COOKIE } from "@/lib/signin";
@@ -27,6 +28,7 @@ import {
   decideChange,
   decideCall,
   decideRequest,
+  setTeamListing,
   deleteProfile,
   deletePicture,
   savePicture,
@@ -130,6 +132,8 @@ function backTo(returnTo: string, key: "notice" | "error", message: string, vote
 export async function decide(formData: FormData): Promise<void> {
   const returnTo = safeReturnTo(formData.get("return_to"));
   const id = String(formData.get("id") ?? "").trim();
+  const kind = readListingChoice(formData.get("status"));   // Umbrella announcement only, or This is a call (16 Nov 2026)
+  if (kind) return tagListing(id, kind, returnTo);
   const choice = readChoice(formData.get("status"));   // Not relevant may carry its reason ("not_relevant:hardware")
   const thenDraft = choice.status === "pursue_draft";   // the Decide menu's Pursue and start the draft (Q9)
   const status = thenDraft ? "pursue" : choice.status;
@@ -166,6 +170,24 @@ export async function decide(formData: FormData): Promise<void> {
     backTo(returnTo, "notice", notice, queue && result.plan !== "note" ? result.title : undefined);
   }
   backTo(returnTo, "error", result.reason);
+}
+
+/** The Decide menu's listing item: a tag, not a decision, so nothing is voted and the judges learn nothing from it. */
+async function tagListing(id: string, listing: "Umbrella" | "Call", returnTo: string): Promise<void> {
+  if (!id) backTo(returnTo, "error", "Choose a call first.");
+  if (!(await currentViewer())) backTo(returnTo, "error", "Log in (top right) before tagging a call.");
+  let result: Awaited<ReturnType<typeof setTeamListing>>;
+  try {
+    result = await setTeamListing({ id, listing });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
+    backTo(returnTo, "error", `Could not tag the call: ${detail}`);
+  }
+  revalidatePath("/", "layout");
+  if (!result.ok) backTo(returnTo, "error", result.reason);
+  backTo(returnTo, "notice", listing === "Umbrella"
+    ? `Umbrella announcement only: ${result.title}. It has left Needs review.`
+    : `This is a call: ${result.title}. It is back in Needs review if nobody has decided it.`);
 }
 
 /**

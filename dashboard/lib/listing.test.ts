@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isWatch, listingBadge, topTab } from "./listing.ts";
+import { isWatch, listingBadge, listingChoice, readListingChoice, topTab } from "./listing.ts";
 
 test("umbrellas and announcements are the listings to watch; a call or no kind yet is not", () => {
   assert.equal(isWatch("Umbrella"), true);
@@ -27,4 +27,16 @@ test("Home opens the calls tab unless the link asks for the watch list", () => {
   assert.equal(topTab("watch"), "watch");
   assert.equal(topTab(["watch", "calls"]), "watch");
   assert.equal(topTab("nonsense"), "calls");
+});
+
+test("a person tags a listing from the Decide menu: Umbrella announcement only, or back to a call (David, 16 Nov 2026)", () => {
+  assert.deepEqual(listingChoice(null), { value: "listing:Umbrella", label: "Umbrella announcement only" });
+  assert.deepEqual(listingChoice("Call"), { value: "listing:Umbrella", label: "Umbrella announcement only" });
+  assert.deepEqual(listingChoice("Umbrella"), { value: "listing:Call", label: "This is a call" });
+  assert.deepEqual(listingChoice("Announcement"), { value: "listing:Call", label: "This is a call" });
+  assert.equal(readListingChoice("listing:Umbrella"), "Umbrella");
+  assert.equal(readListingChoice("listing:Call"), "Call");
+  assert.equal(readListingChoice("listing:Announcement"), null);   // the menu offers only these two
+  assert.equal(readListingChoice("pursue"), null);
+  assert.equal(readListingChoice(null), null);
 });

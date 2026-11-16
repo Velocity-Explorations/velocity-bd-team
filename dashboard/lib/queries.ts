@@ -284,6 +284,11 @@ function heldWhere(db: Db) {
                   AND d.id = (SELECT MAX(n.id) FROM decisions AS n WHERE n.call_id = d.call_id AND n.decided_by = d.decided_by))`;
 }
 
+/** Umbrellas and announcements are not rated, so they are not waiting (David, 16 Nov 2026); no kind yet counts as a call. */
+function ratedKindWhere(db: Db, kinds: boolean) {
+  return kinds ? db`AND (listing IS NULL OR listing NOT IN ${db(WATCH)})` : db``;
+}
+
 /** A deadline from today through the next DUE_SOON_DAYS days. */
 function dueSoon(db: Db) {
   return db`${dueDate(db)} BETWEEN CURRENT_DATE AND CURRENT_DATE + ${DUE_SOON_DAYS}::int`;
@@ -340,14 +345,15 @@ export async function reviewQueue(
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(db, "decisions"));
   if (f.view === "top10" && !f.ids?.length) return { rows: [], total: 0, perPerson };
   const summary = summaryColumn(db, await hasColumn(db, "calls", "ai_summary"));
-  const fit = fitColumns(db, await hasFitScore(), await hasListing());
+  const kinds = await hasListing();
+  const fit = fitColumns(db, await hasFitScore(), kinds);
   const [count, rows] = await Promise.all([
-    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${queueWhere(db, f, perPerson, waitingFor)}`,
+    db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls ${queueWhere(db, f, perPerson, waitingFor, kinds)}`,
     db<QueueRow[]>`
       SELECT id, portal, title, url, type, department, naics_code, set_aside, ai_verdict, ai_reasoning, ${summary}, due_date,
              (${dueDate(db)} - CURRENT_DATE)::int AS days_left, left(description, ${DESCRIPTION_READ}::int) AS description,
              match_tier, first_seen_at, extra, human_status, human_notes, ${fit}
-      FROM calls ${queueWhere(db, f, perPerson, waitingFor)}
+      FROM calls ${queueWhere(db, f, perPerson, waitingFor, kinds)}
       ${panelOrder(db, f)}
       LIMIT ${page.limit} OFFSET ${page.offset}`,
   ]);
@@ -357,9 +363,10 @@ export async function reviewQueue(
 export type QueueFilters = PanelFilters & Keywords & { verdict: string; tier: string; view?: CallView; ids?: string[] };
 
 /** The queue's WHERE: the view's calls under the bar's and the headers' filters. */
-function queueWhere(db: Db, f: QueueFilters, perPerson: boolean, waitingFor: string[] | null) {
+function queueWhere(db: Db, f: QueueFilters, perPerson: boolean, waitingFor: string[] | null, kinds: boolean) {
   return db`
     WHERE ${f.view === "top10" ? db`id IN ${db(f.ids ?? [])}` : f.view === "unsure" ? heldWhere(db) : waitingWhere(db, perPerson, waitingFor)}
+      ${f.view === "top10" || f.view === "unsure" ? db`` : ratedKindWhere(db, kinds)}
       ${f.view === "due-soon" ? db`AND ${dueSoon(db)}` : db``}
       ${f.view === "new" ? db`AND first_seen_at >= ${newSince()}` : db``}
       ${f.verdict ? db`AND ai_verdict = ${f.verdict}` : db``}
@@ -372,8 +379,9 @@ function queueWhere(db: Db, f: QueueFilters, perPerson: boolean, waitingFor: str
 export async function queuePage(f: QueueFilters, waitingFor: string[] | null, page: { limit: number; offset: number }): Promise<CallIds> {
   if (f.view === "top10") return f.ids ?? [];
   const perPerson = Boolean(waitingFor?.length) && (await hasTable(sql(), "decisions"));
+  const kinds = await hasListing();
   return {
-    page: (db) => db`(SELECT id FROM calls ${queueWhere(db, f, perPerson, waitingFor)} ${panelOrder(db, f)}
+    page: (db) => db`(SELECT id FROM calls ${queueWhere(db, f, perPerson, waitingFor, kinds)} ${panelOrder(db, f)}
                       LIMIT ${page.limit} OFFSET ${page.offset})`,
   };
 }
@@ -393,6 +401,7 @@ export async function queueCounts(f: BarFilters, waitingFor: string[] | null): P
   const db = sql();
   const history = await hasTable(db, "decisions");
   const perPerson = Boolean(waitingFor?.length) && history;
+  const kinds = await hasListing();
   const held = history
     ? db<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM calls WHERE ${heldWhere(db)} ${panelWhere(db, barOnly(f))}`
     : Promise.resolve([{ n: 0 }]);
@@ -405,6 +414,7 @@ export async function queueCounts(f: BarFilters, waitingFor: string[] | null): P
            COUNT(*) FILTER (WHERE first_seen_at >= ${newSince()})::int AS fresh
     FROM calls
     WHERE ${waitingWhere(db, perPerson, waitingFor)}
+      ${ratedKindWhere(db, kinds)}
       ${panelWhere(db, barOnly(f))}`, held]);
   return {
     waiting: row?.waiting ?? 0, dueSoon: row?.due_soon ?? 0, yes: row?.yes ?? 0,
@@ -650,6 +660,27 @@ export function callsPage(f: CallFilters, limit = PAGE_SIZE, offset = 0): CallId
 export type DecideResult =
   | { ok: true; title: string; plan: "decide" | "add" | "note" | "clear"; callStatus: Decision | null }
   | { ok: false; reason: string };
+
+/**
+ * A person tags a call's kind of listing (David, 16 Nov 2026): Umbrella from the Decide menu's "Umbrella announcement
+ * only", or Call from "This is a call". Kept in call_tags under source "team" (migration 021), which listing_of reads
+ * first, so the next run keeps it; calls.listing changes at once, so the call leaves or rejoins Needs review now.
+ */
+export async function setTeamListing(input: { id: string; listing: "Umbrella" | "Call" }): Promise<{ ok: true; title: string } | { ok: false; reason: string }> {
+  const db = sql();
+  if (!(await hasListing())) return { ok: false, reason: "Listing kinds need migration 015." };
+  const now = isoNow();
+  const result = await db.begin(async (tx) => {
+    const [call] = await tx<{ title: string | null }[]>`SELECT title FROM calls WHERE id = ${input.id} FOR UPDATE`;
+    if (!call) return { ok: false as const, reason: "That call is no longer in the ledger." };
+    await tx`DELETE FROM call_tags WHERE call_id = ${input.id} AND source = 'team' AND tag IN ${tx(["Call", ...WATCH])}`;
+    await tx`INSERT INTO call_tags (call_id, tag, source, tagged_at) VALUES (${input.id}, ${input.listing}, 'team', ${now})`;
+    await tx`UPDATE calls SET listing = ${input.listing}, updated_at = ${now} WHERE id = ${input.id}`;
+    return { ok: true as const, title: call.title ?? input.id };
+  });
+  if (result.ok) forget("top10");
+  return result;
+}
 
 /** The newest decision recorded under any of these names on a call, or null. */
 async function latestDecisionBy(db: Db, callId: string, aliases: string[]): Promise<string | null> {

@@ -355,8 +355,15 @@ and the line the box saved gives way to the decision's, so the note is kept once
 On a call Claude rated yes or maybe, Not relevant opens its reasons (David, 5 Nov 2026; six added 16 Nov from his notes
 on that week's Top 10), in order of the work, the customer, the listing and the time: Too large for Velocity, Too
 specialized for Velocity, Mostly hardware, Cyber or enterprise IT, Staffing or IT support, Wrong customer or eligibility,
-Too broad with no clear fit, Planning only with no award, Umbrella announcement only, Award or sole-source notice, Too
-little time to respond, or another reason typed in (`lib/decide.ts` NOT_RELEVANT_REASONS).
+Too broad with no clear fit, Planning only with no award, Award or sole-source notice, Too little time to respond, or
+another reason typed in (`lib/decide.ts` NOT_RELEVANT_REASONS).
+
+Umbrella announcement only (David, 16 Nov 2026) is not a reason but a listing tag, the last item in the Decide menu
+below a rule. Umbrellas and announcements are not rated, so Needs review, its views and their counts leave out every
+call whose kind (`calls.listing`) is Umbrella or Announcement, whoever said so; All calls and Home's Top 10 to watch
+still list them. The item tags a call Umbrella under source `team` (call_tags, migration 021), which `review/tags.py`
+listing_of reads before the rule's and the judges', so the next run keeps it. On a call already tagged an umbrella or
+announcement it reads This is a call and puts the call back. Nothing is voted, and the judges learn nothing from it.
 
 Unsure (David, 16 Nov 2026, migration 020) sits in the Decide menu after Not relevant, for a call the person can't
 decide. It holds the call for the team: the person's vote is Unsure, with any note on what is unclear, and it never
