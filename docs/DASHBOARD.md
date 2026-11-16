@@ -352,9 +352,11 @@ a decision chosen while it holds a note carries the note as before (after a Not 
 and the line the box saved gives way to the decision's, so the note is kept once
 (`lib/text.ts` withoutTypedNote).
 
-On a call Claude rated yes or maybe, Not relevant opens its reasons (David, 5 Nov 2026): Mostly hardware, Staffing or
-IT support, Wrong customer or eligibility, Too broad with no clear fit, Award or sole-source notice, or another reason
-typed in (`lib/decide.ts` NOT_RELEVANT_REASONS). The reason, with any note typed after it, is the decision's note.
+On a call Claude rated yes or maybe, Not relevant opens its reasons (David, 5 Nov 2026; six added 16 Nov from his notes
+on that week's Top 10), in order of the work, the customer, the listing and the time: Too large for Velocity, Too
+specialized for Velocity, Mostly hardware, Cyber or enterprise IT, Staffing or IT support, Wrong customer or eligibility,
+Too broad with no clear fit, Planning only with no award, Umbrella announcement only, Award or sole-source notice, Too
+little time to respond, or another reason typed in (`lib/decide.ts` NOT_RELEVANT_REASONS). The reason, with any note typed after it, is the decision's note.
 Start the draft suggests what to include (David, 7 Nov 2026), once migration 017 is applied: Suggest what to include asks
 `run.py --assistant` for Claude's recommendation (`drafting/suggest.py`), and the dialog reads it from
 `GET /api/suggestion?call=<id>` every two seconds until it arrives, about half a minute. It fills in the format, the
