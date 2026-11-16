@@ -2392,16 +2392,6 @@ details.decide-menu .menu-body {
   color: var(--conflict);
 }
 
-/* Votes: notes from people who left one without voting, with the button to the notes panel. */
-.notes-only {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0;
-  color: var(--ink-2);
-  font: var(--type-small);
-}
-
 /* A 20px note button beside a verdict or a vote: it opens the row's reasons or notes panel. */
 .note-btn {
   width: 20px;
@@ -2427,6 +2417,49 @@ ul.votes li {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* A person's notes in a box beside their vote (TableController places it, fixed to the window, from the button). */
+.note-tip {
+  position: fixed;
+  z-index: 60;
+  width: max-content;
+  max-width: 320px;
+  max-height: min(50vh, 360px);
+  overflow-y: auto;
+  padding: 8px 10px;
+  background: var(--line-subtle);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  color: var(--ink);
+  font: 400 12.5px/1.45 var(--font-body);
+  text-align: left;
+  white-space: normal;
+}
+
+.note-tip[hidden] {
+  display: none;
+}
+
+.note-tip p {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.note-tip .meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 3px;
+  color: var(--ink-3);
+  font: var(--type-detail);
+}
+
+.note-tip-item + .note-tip-item {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
 }
 
 /* Each judge's name, badge and note button stay on one line. */
@@ -2475,8 +2508,7 @@ tr.panel-row > td {
   margin: 6px 0 4px;
 }
 
-.panel-reasons p,
-.panel-notes p {
+.panel-reasons p {
   margin: 4px 0;
   font: var(--type-small);
   color: var(--ink-2);
@@ -2488,19 +2520,12 @@ tr.panel-row > td {
   gap: 8px;
 }
 
-.panel-sources,
-.panel-notes {
+.panel-sources {
   margin: 4px 0 0;
   padding: 0;
   list-style: none;
   font: var(--type-small);
   color: var(--ink-2);
-}
-
-.panel-notes li + li {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line-subtle);
 }
 
 /* The row whose panel is open, and the call opened from Home's Top 10 (Q15). */

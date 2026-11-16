@@ -5,7 +5,7 @@ import { DecideCell } from "@/components/DecideCell";
 import { DraftBadge } from "@/components/DraftBadge";
 import { FilterBar } from "@/components/FilterBar";
 import { HeaderCell } from "@/components/HeaderCell";
-import { NotesPanel, ReasonsPanel } from "@/components/RowPanels";
+import { ReasonsPanel } from "@/components/RowPanels";
 import { preloadShell, Shell } from "@/components/Shell";
 import { ViewCards } from "@/components/ViewCards";
 import { Badge, Flash, PageLinks } from "@/components/bits";
@@ -43,7 +43,7 @@ import { defaultsRedirect, drafting, labeler, timeZone } from "@/lib/me";
 import { draftBlock, draftFormat } from "@/lib/proposals";
 import { hiddenColumns, queueMode } from "@/lib/settings";
 import { tagsByCall } from "@/lib/tags";
-import { firstParam, parseNoteLine } from "@/lib/text";
+import { firstParam, notesByPerson } from "@/lib/text";
 import { FILTER_RESULTS, HUMAN_STATUSES, pickAllowed, VERDICTS } from "@/lib/values";
 import { callViewCards, DUE_SOON_DAYS, NEW_DAYS } from "@/lib/views";
 import { allowlist, currentViewer } from "@/lib/viewer";
@@ -260,7 +260,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
               </thead>
               <tbody>
                 {rows.map((r) => {
-                  const notes = (r.human_notes ?? "").split("\n").filter(Boolean).map(parseNoteLine);
+                  const notes = notesByPerson(r.human_notes, nameOf);   // each person's notes, shown beside their vote
                   const callVotes = votes.get(r.id) ?? [];
                   const verdicts = verdictsFor(judged.get(r.id), r.ai_verdict, r.ai_reasoning);
                   const rank = top.ids.indexOf(r.id);
@@ -287,7 +287,8 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                           callId={r.id}
                           verdicts={verdicts}
                           votes={callVotes.map((v) => ({ ...v, person: label(v.person) }))}
-                          notesBy={new Set(notes.map((n) => nameOf(n.by)).filter(Boolean))}
+                          notes={notes}
+                          tz={tz}
                           fit={r}
                         />
                       ) : null}
@@ -319,7 +320,6 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                       verdicts={verdicts}
                       sources={detailSources(callDetails(r), deadlineNote(r.extra))}
                     />,
-                    notes.length ? <NotesPanel key={`notes-${r.id}`} callId={r.id} colSpan={colSpan} notes={notes} nameOf={nameOf} tz={tz} /> : null,
                   ];
                 })}
               </tbody>

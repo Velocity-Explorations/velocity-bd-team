@@ -45,6 +45,38 @@ export function parseNoteLine(line: string): NoteParts {
   return match ? { at: match[1], by: match[2], text: match[3] } : { at: null, by: null, text: line };
 }
 
+/**
+ * A call's human_notes as notes: each `[at by] text` line starts one, and a line with no stamp after it belongs to it
+ * (a Slack thread reply that ran onto a second line). A line with no stamp and no note before it stands alone, unsigned.
+ */
+export function notesOf(humanNotes: string | null): NoteParts[] {
+  const notes: NoteParts[] = [];
+  for (const line of (humanNotes ?? "").split("\n")) {
+    if (!line.trim()) continue;
+    const parts = parseNoteLine(line);
+    const last = notes[notes.length - 1];
+    if (parts.at === null && last) last.text = `${last.text}\n${line.trim()}`;
+    else notes.push(parts.at === null ? { at: null, by: null, text: line.trim() } : parts);
+  }
+  return notes;
+}
+
+export type PersonNotes = { person: string; notes: NoteParts[] };
+
+/**
+ * Each person's notes on a call, under the name their vote shows (`nameOf`, which maps a Slack id to its person), in
+ * the order they first wrote, each person's own in the order written: what the note box beside a vote shows (David,
+ * 16 Nov 2026). Unsigned notes come under "".
+ */
+export function notesByPerson(humanNotes: string | null, nameOf: (by: string | null) => string): PersonNotes[] {
+  const groups = new Map<string, NoteParts[]>();
+  for (const note of notesOf(humanNotes)) {
+    const person = note.by ? nameOf(note.by) : "";
+    groups.set(person, [...(groups.get(person) ?? []), note]);
+  }
+  return [...groups].map(([person, notes]) => ({ person, notes }));
+}
+
 /** A note's stamp as the ledger writes it (isoNow, append_note): what a note box may send back to edit its line. */
 export function isNoteStamp(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value);

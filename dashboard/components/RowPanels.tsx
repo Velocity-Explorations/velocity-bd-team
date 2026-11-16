@@ -1,14 +1,11 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
-import { PersonName } from "@/components/PersonName";
 import { Badge } from "@/components/bits";
-import { noteSource } from "@/lib/decide";
-import { formatTime } from "@/lib/format";
 import { JUDGES, type Verdicts } from "@/lib/judges";
-import type { NoteParts } from "@/lib/text";
 
-/** A panel's element id: one reasons and one notes panel per call, under its row. */
-export function panelId(kind: "reasons" | "notes", callId: string): string {
+/** A panel's element id: one reasons panel per call, under its row. A person's notes sit beside their vote (NoteTip in
+ *  CallCells) since 16 Nov 2026, in place of the notes panel. */
+export function panelId(kind: "reasons", callId: string): string {
   return `${kind}-${callId}`;
 }
 
@@ -69,32 +66,6 @@ export function ReasonsPanel({ callId, colSpan, verdicts, sources, open = false 
           </ul>
         </>
       ) : null}
-    </Panel>
-  );
-}
-
-/** Notes (PRO-572): each note with who left it, when, and where: on the dashboard or a Slack thread reply. */
-export function NotesPanel({ callId, colSpan, notes, nameOf, tz }: {
-  callId: string;
-  colSpan: number;
-  notes: NoteParts[];
-  nameOf: (by: string | null) => string;
-  tz: string;
-}) {
-  return (
-    <Panel id={panelId("notes", callId)} callId={callId} colSpan={colSpan} title="Notes" open={false}>
-      <ul className="panel-notes">
-        {notes.map((n, i) => (
-          <li key={i}>
-            <p>{n.text}</p>
-            <p className="meta">
-              {n.by ? <PersonName by={n.by}>{nameOf(n.by)}</PersonName> : null}
-              {n.at ? <span className="when">{formatTime(n.at, tz)}</span> : null}
-              <span>{noteSource(n.by)}</span>
-            </p>
-          </li>
-        ))}
-      </ul>
     </Panel>
   );
 }

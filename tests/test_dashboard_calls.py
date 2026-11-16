@@ -95,16 +95,15 @@ def first_row(page: Any) -> Any:
 
 def test_each_vote_and_each_note_shows_the_person_beside_their_name(page: Any) -> None:
     """David, 9 Nov 2026: a small picture, or the person's initials while they have none, beside every name on a vote
-    and on a note."""
+    and on a note. Since 16 Nov a person's notes sit beside their vote, or on a line of their own without one."""
     votes = page.locator("table.calls-table td.votes-cell ul.votes > li")
-    notes = page.locator("table.calls-table .panel-notes li .meta")
     for path in ("/calls?status=pursue", "/calls?state=closed", "/calls"):   # decided calls carry the votes
         open_page(page, path)
-        if votes.count() or notes.count():
+        if votes.count():
             break
     else:
         pytest.skip("nobody has voted or left a note yet")
-    for item in votes.all()[:20] + [n for n in notes.all()[:20] if n.locator(".person").count()]:
+    for item in votes.all()[:20]:
         face = item.locator(".person .avatar")
         assert face.count() == 1, item.inner_text()
         # a picture, or initials drawn by CSS so they stay out of the line's text
@@ -161,7 +160,7 @@ def test_not_relevant_on_a_call_claude_liked_asks_why(page: Any) -> None:
 
 def test_a_note_button_opens_the_reasons_panel_and_close_hands_focus_back(page: Any) -> None:
     open_page(page, "/review")
-    button = page.locator("table.calls-table .note-btn").first
+    button = page.locator("table.calls-table .note-btn[data-panel]").first
     if button.count() == 0:
         pytest.skip("no waiting call has a judge's reason")
     panel = page.locator(f"[id='{button.get_attribute('data-panel')}']")

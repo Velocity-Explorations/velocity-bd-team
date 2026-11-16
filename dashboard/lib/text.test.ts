@@ -9,6 +9,8 @@ import {
   isClosed,
   isNoteStamp,
   noteLine,
+  notesByPerson,
+  notesOf,
   parseNoteLine,
   safeReturnTo,
   votedHref,
@@ -139,6 +141,42 @@ test("a decision that carries the box's note takes the place of the line the box
   assert.equal(withoutTypedNote(notes, "David Wood", "  "), notes);
   assert.equal(withoutTypedNote(null, "David Wood", "x"), null);
   assert.equal(withoutTypedNote("[2026-11-16T09:30:00Z David Wood] only", "David Wood", "only"), null);
+});
+
+test("notesOf reads each stamped line as a note and joins a Slack reply's later lines to it", () => {
+  const notes = [
+    "[2026-11-01T09:00:00Z U08V7ULPH1N] a reply",
+    "that ran onto a second line",
+    "",
+    "[2026-11-16T09:30:00Z David Wood] call the PM",
+  ].join("\n");
+  assert.deepEqual(notesOf(notes), [
+    { at: "2026-11-01T09:00:00Z", by: "U08V7ULPH1N", text: "a reply\nthat ran onto a second line" },
+    { at: "2026-11-16T09:30:00Z", by: "David Wood", text: "call the PM" },
+  ]);
+  assert.deepEqual(notesOf("written by hand\n[2026-11-16T09:30:00Z David Wood] x"), [
+    { at: null, by: null, text: "written by hand" },
+    { at: "2026-11-16T09:30:00Z", by: "David Wood", text: "x" },
+  ]);
+  assert.deepEqual(notesOf(null), []);
+  assert.deepEqual(notesOf(""), []);
+});
+
+test("notesByPerson groups each person's notes under the name shown on their vote, in the order they wrote them", () => {
+  const notes = [
+    "[2026-11-01T09:00:00Z U08V7ULPH1N] from Slack",
+    "[2026-11-02T09:00:00Z Lisa Hall] hers",
+    "[2026-11-03T09:00:00Z David Wood] then the dashboard",
+  ].join("\n");
+  const nameOf = (by: string | null) => (by === "U08V7ULPH1N" ? "David Wood" : by ?? "");
+  assert.deepEqual(notesByPerson(notes, nameOf), [
+    { person: "David Wood", notes: [
+      { at: "2026-11-01T09:00:00Z", by: "U08V7ULPH1N", text: "from Slack" },
+      { at: "2026-11-03T09:00:00Z", by: "David Wood", text: "then the dashboard" },
+    ] },
+    { person: "Lisa Hall", notes: [{ at: "2026-11-02T09:00:00Z", by: "Lisa Hall", text: "hers" }] },
+  ]);
+  assert.deepEqual(notesByPerson("by hand", nameOf), [{ person: "", notes: [{ at: null, by: null, text: "by hand" }] }]);
 });
 
 test("isNoteStamp takes only the ledger's own timestamps", () => {
