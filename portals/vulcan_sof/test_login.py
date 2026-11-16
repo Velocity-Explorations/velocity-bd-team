@@ -4,7 +4,7 @@
     python -m portals.vulcan_sof.test_login --bad-password   # expect a clean False
 
 On success it opens the calls listing, saves data/after_login.png, and prints the URL and
-the number of anchors whose href contains collectionUuid. Exit code 0 on success, 1 on a
+the number of call links (/call/<uuid>, or collectionUuid before 16 Nov 2026). Exit code 0 on success, 1 on a
 failed login, 2 on a configuration problem.
 """
 from __future__ import annotations
@@ -51,9 +51,9 @@ def main(argv: list[str] | None = None) -> int:
         url = open_calls(page)
         SCREENSHOT.parent.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(SCREENSHOT), full_page=True, timeout=15_000)
-        count = page.evaluate("() => document.querySelectorAll('a[href*=\"collectionUuid\"]').length")
+        count = page.evaluate("() => document.querySelectorAll('a[href*=\"collectionUuid\"], a[href*=\"/call/\"]').length")
         print(f"calls listing URL: {url}")
-        print(f"collectionUuid anchors: {count}")
+        print(f"call links: {count}")
         print(f"saved {SCREENSHOT.relative_to(REPO_ROOT)}")
         return 0
     finally:
