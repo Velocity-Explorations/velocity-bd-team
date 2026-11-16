@@ -212,7 +212,8 @@ and `human_at`).
 Index: `(call_id, id)`. Rows are only added. A person who changes their mind adds a row; their
 newest row is their decision. A row that does not change the call's decision (agreeing with
 it, or any decision after the first made from the review queue while everyone decides every
-call) leaves `calls` as it is.
+call, unless the call's decision is the person's own) leaves `calls` as it is. Changing your own
+decision changes the call (since 16 Nov 2026).
 
 ## Table: briefs
 

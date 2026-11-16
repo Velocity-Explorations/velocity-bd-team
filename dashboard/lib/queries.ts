@@ -12,7 +12,7 @@ import { isoNow } from "./format";
 import type { RequestChoice } from "./requests";
 import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine, withoutTypedNote, writeNoteLine } from "./text";
-import { isDecision, planDecision, type Decision } from "./values";
+import { isDecision, keepsCallDecision, planDecision, type Decision } from "./values";
 import { parseTop } from "./brief";
 import type { AskMessage } from "./ask";
 import type { SuggestionRow } from "./suggest";
@@ -651,7 +651,7 @@ async function latestDecisionBy(db: Db, callId: string, aliases: string[]): Prom
  * format, and a row in `decisions` (migration 004) so every person's decision is kept.
  * Choosing the decision a call already has, when it is someone else's, adds yours without
  * changing the call; so does any decision with `keepCallDecision` (the review queue while
- * everyone decides every call) once the call has one. Otherwise `expected` is the decision
+ * everyone decides every call) once the call has someone else's (keepsCallDecision). Otherwise `expected` is the decision
  * the page showed; if the call changed since (another tab, another person), nothing is
  * written and the reason says what it is now. `aliases` are the names the person's earlier
  * decisions are recorded under. `typed` is what the note box held when the decision's note
@@ -683,7 +683,7 @@ export async function decideCall(input: {
       if (working) return { ok: false, reason: "This call has a draft under way: mark it submitted at the Submit gate in its workspace." };
     }
     const current = isDecision(call.human_status) ? call.human_status : null;
-    const keep = input.keepCallDecision && history;
+    const keep = keepsCallDecision(input.keepCallDecision, history, call.human_by, input.aliases);
     if (current !== input.expected && !keep) {
       return {
         ok: false,

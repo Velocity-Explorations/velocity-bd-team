@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DECISIONS, HUMAN_STATUSES, isDecision, pickAllowed, pickQueueMode, planDecision } from "./values.ts";
+import { DECISIONS, HUMAN_STATUSES, isDecision, keepsCallDecision, pickAllowed, pickQueueMode, planDecision } from "./values.ts";
 
 test("decisions are exactly the ledger's human_status values", () => {
   assert.deepEqual(DECISIONS.map((d) => d.value), ["pursue", "not_relevant", "submitted", "dismissed"]);
@@ -42,4 +42,14 @@ test("pickQueueMode: everyone decides every call unless the queue is set to shar
   assert.equal(pickQueueMode(undefined), "each");
   assert.equal(pickQueueMode(" Shared "), "shared");
   assert.equal(pickQueueMode("anything else"), "each");
+});
+
+test("a decision from the review queue leaves someone else's decision on the call, never the person's own", () => {
+  // David, 16 Nov 2026: Pursue then Not relevant on Home's Top 10 left E-ICAM, JVCC and ERIS at Pursue.
+  assert.equal(keepsCallDecision(true, true, "David Wood", ["David Wood", "David"]), false);
+  assert.equal(keepsCallDecision(true, true, "David", ["David Wood", "David"]), false);
+  assert.equal(keepsCallDecision(true, true, "Shaun", ["David Wood"]), true);
+  assert.equal(keepsCallDecision(true, true, null, ["David Wood"]), true);
+  assert.equal(keepsCallDecision(false, true, "Shaun", ["David Wood"]), false);
+  assert.equal(keepsCallDecision(true, false, "Shaun", ["David Wood"]), false);   // no decisions table: nowhere to keep a vote
 });
