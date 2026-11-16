@@ -92,3 +92,16 @@ def test_login_with_bad_page_returns_false_without_raising(page, monkeypatch: py
 
     monkeypatch.setattr(page, "goto", fake_goto)
     assert auth.login(page, None, "user@example.invalid", "pw") is False
+
+
+def test_login_lets_a_refused_mailbox_through_so_the_run_says_what_to_fix(monkeypatch: pytest.MonkeyPatch) -> None:
+    """login() turns every other failure into False; a refused code mailbox reaches the run's error instead."""
+    from portals.shared.otp import MailboxRefused
+    from portals.vulcan_sof import auth
+
+    def refused(page: object, username: str, password: str) -> bool:
+        raise MailboxRefused("Vulcan SOF asked for an emailed sign-in code, and Gmail rejected VELOCITY_GMAIL_APP_PASSWORD")
+
+    monkeypatch.setattr(auth, "_login", refused)
+    with pytest.raises(MailboxRefused):
+        auth.login(object(), None, "u", "p")   # type: ignore[arg-type]

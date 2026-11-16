@@ -128,7 +128,7 @@ for review, the Proposal Library, drafting, and dashboard. Rules:
   Drive: gog drive (list / download / export) for the Proposal Library folder
   If gog is unavailable on this machine, implement the same calls with the Gmail and Drive APIs behind the same function signatures.
   Current state (2026-10-16): gog is not installed. OTP mail is read over Gmail IMAP with a Google app password
-  (VELOCITY_GMAIL_APP_USERNAME, VELOCITY_GMAIL_APP_PASSWORD in .env); portals/vulcan_sof/otp.py switches to gog automatically once it is on PATH.
+  (VELOCITY_GMAIL_APP_USERNAME, VELOCITY_GMAIL_APP_PASSWORD in .env); portals/shared/otp.py switches to gog automatically once it is on PATH.
 - LLM for review and briefs: Anthropic API via ANTHROPIC_API_KEY
   (claude-haiku-5-5 for per-call review, claude-sonnet-5-5 for proposal briefs)
 - The Writer (drafting/) drafts with claude-sonnet-5-5 on ANTHROPIC_API_KEY. WRITER_MODEL=grok-4.7 would switch it

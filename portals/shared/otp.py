@@ -68,6 +68,11 @@ class OtpMessage:
 Fetcher = Callable[[str], list[OtpMessage]]
 
 
+class MailboxRefused(RuntimeError):
+    """The mailbox refused the sign-in itself, which no retry mends (16 Nov 2026: Gmail rejected the app password
+    and Vulcan SOF's run waited 90 s for nothing). Names the setting to fix, never its value."""
+
+
 def extract_code(text: str, pattern: re.Pattern[str]) -> str | None:
     """The last code the pattern finds in the text, or None."""
     found = pattern.findall(text or "")
@@ -102,6 +107,9 @@ def get_otp(
         remaining = int(deadline - time.time())
         try:
             messages = fetch(mailbox)
+        except MailboxRefused as exc:
+            log.error("Mailbox refused the sign-in: %s", exc)
+            raise MailboxRefused(f"{source.portal} asked for an emailed sign-in code, and {exc}") from exc
         except Exception as exc:   # tool missing, timeout, non-zero exit, parse error
             log.warning("Mailbox fetch failed (%s: %s); retrying, %ds left", type(exc).__name__, str(exc)[:120], remaining)
             continue
@@ -202,7 +210,13 @@ def fetch_via_imap(source: OtpSource, mailbox: str) -> list[OtpMessage]:
     since = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%d-%b-%Y")
     conn = imaplib.IMAP4_SSL(IMAP_HOST, timeout=CALL_TIMEOUT_S)
     try:
-        conn.login(account, password)
+        try:
+            conn.login(account, password)
+        except imaplib.IMAP4.error:
+            # Short enough that the run's error (cut at 200 characters in run.py) keeps what to do.
+            raise MailboxRefused(
+                "Gmail rejected VELOCITY_GMAIL_APP_PASSWORD: make a new app password for that account and put it in .env"
+            ) from None
         conn.select("INBOX", readonly=True)
         status, data = conn.search(None, "FROM", f'"{source.sender}"', "SUBJECT", f'"{source.subject}"', "SINCE", since)
         if status != "OK":

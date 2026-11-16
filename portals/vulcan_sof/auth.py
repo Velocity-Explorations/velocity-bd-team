@@ -16,7 +16,7 @@ from typing import Any
 
 from playwright.sync_api import BrowserContext, ElementHandle, Page
 
-from portals.shared.otp import OtpSource, get_otp
+from portals.shared.otp import MailboxRefused, OtpSource, get_otp
 from portals.shared.session import cookie_path, load_cookies, save_cookies
 
 log = logging.getLogger("vulcan_sof.auth")
@@ -158,7 +158,8 @@ def _settle(page: Page, after_ms: int) -> None:
 
 
 def login(page: Page, context: BrowserContext | None, username: str, password: str) -> bool:
-    """Cookie-first login. Returns True when the calls listing is reachable. Never raises."""
+    """Cookie-first login. Returns True when the calls listing is reachable. Raises only MailboxRefused, when the code
+    mailbox refuses its own sign-in, so the run's error says what to fix instead of "login returned False"."""
     try:
         if context is not None and _restore_session(page, context):
             return True
@@ -166,6 +167,8 @@ def login(page: Page, context: BrowserContext | None, username: str, password: s
         if ok and context is not None:
             save_cookies(context, COOKIE_FILE)
         return ok
+    except MailboxRefused:   # get_otp logged it; the page has nothing to add
+        raise
     except Exception as exc:
         log.error("Login failed with %s: %s", type(exc).__name__, str(exc)[:200])
         _log_failure_context(page)

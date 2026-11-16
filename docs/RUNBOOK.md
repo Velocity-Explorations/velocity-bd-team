@@ -136,6 +136,11 @@ its own in `data/<slug>/cookies.json`.
 - If the login keeps failing at the passcode step, check that the app password still works:
   `python -c "from config import require; from portals.shared import otp; from portals.vulcan_sof.auth import VULCAN_OTP; print(len(otp.fetch_via_imap(VULCAN_OTP, require(VULCAN_OTP.mailbox_key))))"`
   should print a number, not an authentication error.
+- A run whose error on Runs starts `MailboxRefused` means Gmail rejected the app password itself (first seen
+  16 Nov 2026, run 103): the wait for the code stops at once instead of retrying. Sign in to Google as the account in
+  VELOCITY_GMAIL_APP_USERNAME, make a new app password at myaccount.google.com/apppasswords (2-Step Verification must
+  be on), put it after VELOCITY_GMAIL_APP_PASSWORD= in `.env`, check it with the command above, then run
+  `python run.py --portal vulcan_sof`. Changing that account's Google password revokes its app passwords.
 - Vulcan may skip the code entirely when it has seen this machine recently. That is normal.
 
 ## Scheduled runs
