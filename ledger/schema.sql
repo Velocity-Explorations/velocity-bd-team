@@ -171,7 +171,7 @@ CREATE TABLE IF NOT EXISTS call_tags (
   id          INTEGER PRIMARY KEY @@AUTOINCREMENT@@,
   call_id     TEXT NOT NULL REFERENCES calls (id),
   tag         TEXT NOT NULL,
-  source      TEXT NOT NULL CHECK (source IN ('rule', 'claude', 'grok')),
+  source      TEXT NOT NULL CHECK (source IN ('rule', 'claude', 'grok', 'team')),
   tagged_at   TEXT NOT NULL,
   UNIQUE (call_id, tag, source)
 );

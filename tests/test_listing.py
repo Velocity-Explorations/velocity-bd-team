@@ -29,6 +29,16 @@ def test_a_call_s_listing_is_the_rule_s_then_claude_s_then_grok_s(by_source: dic
     assert tags.listing_of(by_source, TAGS) == expected
 
 
+@pytest.mark.parametrize(("by_source", "expected"), [
+    ({"team": ["Umbrella"], "rule": ["Call"], "claude": ["Call"]}, "Umbrella"),   # a person's tag beats the rule's
+    ({"team": ["Call"], "claude": ["Umbrella"], "grok": ["Announcement"]}, "Call"),   # and puts a wrongly tagged one back
+])
+def test_a_person_s_listing_tag_comes_first(by_source: dict[str, list[str]], expected: str) -> None:
+    """David, 16 Nov 2026: a person tags a listing Umbrella announcement only from the Decide menu (source "team"),
+    and the next run keeps it."""
+    assert tags.listing_of(by_source, TAGS) == expected
+
+
 def test_scoring_stores_each_call_s_listing_even_before_anything_is_rated(ledger_db: str) -> None:
     seed("umbrella", "SAM.gov", "maybe", 20.5)
     seed("plain", "SAM.gov", "yes", 20.5)

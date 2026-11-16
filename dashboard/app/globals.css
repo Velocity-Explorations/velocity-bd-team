@@ -2329,6 +2329,13 @@ details.decide-menu .menu-body {
   min-width: 15rem;
 }
 
+/* The Decide menu's listing tag (Umbrella announcement only, or This is a call) is not a decision: a rule sets it apart. */
+.menu-body .menu-listing {
+  margin-top: 4px;
+  border-top: 1px solid var(--line-subtle);
+  border-radius: 0;
+}
+
 .menu-item .sq {
   flex: none;
   width: 6px;

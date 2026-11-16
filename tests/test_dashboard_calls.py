@@ -129,7 +129,8 @@ def test_the_decide_menu_lists_the_four_decisions_and_the_draft_waits_for_the_wo
     menu = first_row(page).locator("details.decide-menu")
     menu.locator(":scope > summary").click()
     items = [t.strip() for t in menu.locator(".menu-body > button, .menu-body > details > summary").all_inner_texts()]
-    assert items == ["Pursue", "Not relevant", "Unsure", "Submitted", "Dismiss", "Pursue and start the draft"]
+    assert items == ["Pursue", "Not relevant", "Unsure", "Submitted", "Dismiss", "Pursue and start the draft",
+                     "Umbrella announcement only"]   # a listing tag, not a decision (David, 16 Nov 2026)
     waiting = "Drafting is not set up yet" in menu.locator(":scope > .menu-body > .hint").inner_text()
     assert menu.locator(":scope > .menu-body > button", has_text="Pursue and start the draft").is_disabled() == waiting
     page.keyboard.press("Escape")   # closes the menu without deciding
@@ -150,7 +151,7 @@ def test_not_relevant_on_a_call_claude_liked_asks_why(page: Any) -> None:
     assert [t.strip() for t in picks.all_inner_texts()] == [
         "Too large for Velocity", "Too specialized for Velocity", "Mostly hardware", "Cyber or enterprise IT",
         "Staffing or IT support", "Wrong customer or eligibility", "Too broad, no clear fit", "Planning only, no award",
-        "Umbrella announcement only", "Award or sole-source notice", "Too little time to respond", "Save another reason"]
+        "Award or sole-source notice", "Too little time to respond", "Save another reason"]
     assert picks.first.get_attribute("value") == "not_relevant:large"
     picks.last.scroll_into_view_if_needed()   # eleven reasons make a long menu: the last one is still reachable
     assert picks.last.is_visible() and menu.evaluate("m => m.open")
@@ -272,3 +273,17 @@ def test_a_table_page_stays_light(page: Any, path: str) -> None:
     response = page.request.get(URL + path)
     assert response.ok
     assert len(response.body()) < 3_000_000
+
+
+def test_needs_review_leaves_out_umbrellas_and_announcements(page: Any) -> None:
+    """David, 16 Nov 2026: umbrellas and announcements are not rated, so Needs review has none, whoever tagged them;
+    All calls still lists them."""
+    open_page(page, "/review")
+    kinds = page.locator("table.calls-table tbody .badge", has_text=re.compile(r"^(umbrella|announcement)$"))
+    assert kinds.count() == 0
+    open_page(page, "/calls?q=Release 2")
+    if page.locator("table.calls-table tbody .badge", has_text=re.compile(r"^umbrella$")).count():
+        row = page.locator("table.calls-table tbody tr", has=page.locator(".badge", has_text=re.compile(r"^umbrella$"))).first
+        row.locator("details.decide-menu > summary").click()
+        assert row.locator(".menu-body > button", has_text="This is a call").count() == 1
+        page.keyboard.press("Escape")

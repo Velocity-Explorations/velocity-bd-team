@@ -3,6 +3,7 @@ import { decide } from "@/app/actions";
 import { Badge, toneOf } from "@/components/bits";
 import { CallNote } from "@/components/CallNote";
 import { decideLabel, dueLine, NOT_RELEVANT_REASONS, type VoteLike } from "@/lib/decide";
+import { listingChoice } from "@/lib/listing";
 import { formatTime } from "@/lib/format";
 import { stepLabel } from "@/lib/proposals";
 import type { DraftInfo } from "@/lib/queries";
@@ -29,7 +30,7 @@ export type DecideMode = "waiting" | "mixed" | "all";
  * which the judges learn from (David, 5 Nov).
  */
 export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, returnTo, keep, note, tz, draft, drafting, start, startIn, askReason }: {
-  call: { id: string; title: string | null; human_status: string | null; human_at?: string | null; days_left: number | null };
+  call: { id: string; title: string | null; human_status: string | null; human_at?: string | null; days_left: number | null; listing?: string | null };
   mode: DecideMode;
   viewer: string | null;
   yours: VoteLike | null;
@@ -119,6 +120,10 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
                 Pursue and start the draft
               </button>
             )}
+            <button type="submit" name="status" value={listingChoice(call.listing).value} className="menu-item menu-listing">
+              <span className="sq" aria-hidden="true" />
+              {listingChoice(call.listing).label}
+            </button>
             <p className="hint">
               {draft || (drafting && !start.block)
                 ? "Choosing records it at once."

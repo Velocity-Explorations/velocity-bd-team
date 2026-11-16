@@ -47,7 +47,7 @@ test("the reasons offered: the work, the customer, the listing, the time (David,
   assert.deepEqual(NOT_RELEVANT_REASONS.map((r) => r.label), [
     "Too large for Velocity", "Too specialized for Velocity", "Mostly hardware", "Cyber or enterprise IT", "Staffing or IT support",
     "Wrong customer or eligibility",
-    "Too broad, no clear fit", "Planning only, no award", "Umbrella announcement only", "Award or sole-source notice",
+    "Too broad, no clear fit", "Planning only, no award", "Award or sole-source notice",
     "Too little time to respond",
   ]);
   assert.equal(new Set(NOT_RELEVANT_REASONS.map((r) => r.key)).size, NOT_RELEVANT_REASONS.length);
@@ -70,4 +70,9 @@ test("the reason becomes the decision's note, with the person's own words after 
   assert.equal(reasonNote("other", "Only open to universities"), "Only open to universities");
   assert.equal(reasonNote("other", "  "), "");
   assert.equal(reasonNote(null, "a note"), "a note");
+});
+
+test("Umbrella announcement only is a listing tag now, not a Not relevant reason (David, 16 Nov 2026)", () => {
+  assert.equal(NOT_RELEVANT_REASONS.some((r) => r.key === "umbrella"), false);
+  assert.deepEqual(readChoice("not_relevant:umbrella"), { status: "not_relevant", reason: null });   // an old form: the words alone
 });

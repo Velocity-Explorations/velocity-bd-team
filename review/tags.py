@@ -105,9 +105,10 @@ def parse_tags(text: str, tags: TagList) -> list[str]:
 
 
 def listing_of(tags_by_source: Mapping[str, Sequence[str]], tags: TagList) -> str | None:
-    """The call's kind of listing: the rule's where the portal's own type settles it, else Claude's, else Grok's (as for
-    verdicts, Claude's stands when the judges differ). None until someone has said, which counts as a call."""
-    for source in ("rule", "claude", "grok"):
+    """The call's kind of listing: a person's own tag first (source "team", the dashboard's Decide menu, David 16 Nov
+    2026), then the rule's where the portal's own type settles it, else Claude's, else Grok's (as for verdicts, Claude's
+    stands when the judges differ). None until someone has said, which counts as a call."""
+    for source in ("team", "rule", "claude", "grok"):
         found = next((name for name in tags_by_source.get(source) or [] if tags.group_of(name) == LISTING), None)
         if found:
             return found
