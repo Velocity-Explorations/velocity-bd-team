@@ -545,35 +545,48 @@ main {
   height: 15px;
 }
 
-/* The panel: the right edge under the top bar; the page stays usable beside it. */
-dialog.ask-panel {
+/* The panel, docked at the right from the top of the window to the bottom (David, 16 Nov 2026). From 960 px the page,
+   top bar and all, narrows beside it, so nothing lies under it; below that it lies over the page as before. It lives in
+   the root layout, beside the page and its loading screen, so the room it takes holds while the page changes. */
+.ask-panel {
+  --ask-width: clamp(340px, 30vw, 440px);
   position: fixed;
-  inset: var(--top-bar-height) 0 0 auto;
+  inset: 0 0 0 auto;
   z-index: 40;
-  width: min(460px, 100vw);
-  height: calc(100vh - var(--top-bar-height));
-  max-width: 100vw;
-  max-height: none;
-  margin: 0;
-  padding: 0;
-  background: var(--surface);
-  color: var(--ink);
-  border: 0;
-  border-left: 1px solid var(--line);
-  box-shadow: var(--card-shadow);
-}
-
-dialog.ask-panel[open] {
   display: flex;
   flex-direction: column;
+  width: var(--ask-width);
+  background: var(--surface);
+  color: var(--ink);
+  border-left: 1px solid var(--line);
 }
 
+.ask-panel[hidden],
+body:has(> main.login) > .ask-panel {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  body:has(> .ask-panel:not([hidden])):not(:has(> main.login)) {
+    margin-right: clamp(340px, 30vw, 440px);   /* .ask-panel's --ask-width */
+  }
+}
+
+@media (max-width: 959.98px) {
+  .ask-panel {
+    width: min(460px, 100vw);
+    box-shadow: var(--card-shadow);
+  }
+}
+
+/* Level with the top bar, so the two read as one bar across the window. */
 .ask-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
+  min-height: var(--top-bar-height);
+  padding: 0 16px;
+  border-bottom: var(--top-bar-rule);
 }
 
 .ask-head h2 {
@@ -1781,6 +1794,13 @@ th .th-filter.active {
    open past its edge; narrower, a table scrolls sideways on its own. */
 @media (max-width: 1023px) {
   .table-wrap {
+    overflow-x: auto;
+  }
+}
+
+/* Ask Grok docked takes up to 440px (.ask-panel), so under a 1464px window the page beside it is under 1024px. */
+@media (max-width: 1463px) {
+  body:has(> .ask-panel:not([hidden])) .table-wrap {
     overflow-x: auto;
   }
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { callHref, costLine, isOffline, parseAnswer, parseSources, statusLine, threadIdOk } from "./ask.ts";
+import { askCookie, askLeftOpen, callHref, costLine, isOffline, parseAnswer, parseSources, statusLine, threadIdOk } from "./ask.ts";
 
 test("an answer becomes paragraphs and bullet lists, with only same-site and https links made links", () => {
   const blocks = parseAnswer(
@@ -68,4 +68,13 @@ test("a thread id is one the panel could have made", () => {
   assert.equal(threadIdOk("short"), false);
   assert.equal(threadIdOk("has spaces in it and more"), false);
   assert.equal(threadIdOk(null), false);
+});
+
+test("the panel's cookie remembers it open from page to page, and forgets it on close", () => {
+  assert.equal(askCookie(true), "ask_panel=open; path=/; max-age=31536000; samesite=lax");
+  assert.equal(askCookie(false), "ask_panel=; path=/; max-age=0; samesite=lax");
+  assert.equal(askLeftOpen("open"), true);
+  assert.equal(askLeftOpen(""), false);
+  assert.equal(askLeftOpen(undefined), false);
+  assert.equal(askLeftOpen("1"), false);
 });

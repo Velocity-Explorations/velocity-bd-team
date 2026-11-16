@@ -349,13 +349,19 @@ for the person to change before Start the draft. The newest suggestion for a cal
 again; Suggest again asks for a new one.
 
 Ask Grok (David, 7 Nov 2026): an Ask Grok button in the top bar, on every page once migration 016 is applied, opens a
-panel at the right edge; the page stays usable beside it. A question goes to `chat_messages` (`askGrokAction`, one waiting
+panel docked at the right, from the top of the window to the bottom. Since 16 Nov the page, top bar and all, narrows
+beside it rather than lying under it (from a 960 px window; narrower, the panel lies over the page), and a table in the
+narrowed page scrolls sideways once the page is under 1024 px. The panel lives in the root layout (`app/layout.tsx`), not
+in each page's Shell, so it stays open as the page changes, keeping its conversation, an unsent question and any answer
+on its way; the `ask_panel` cookie reopens it, already docked, after a reload. Links in an answer change the page beside
+it. A question goes to `chat_messages` (`askGrokAction`, one waiting
 question a person), `run.py --assistant` answers it with read-only tools (docs/ASSISTANT.md, Ask Grok), and the panel reads
 its thread from `GET /api/ask` every two seconds while an answer is on its way. Each answer shows the change requests Grok filed
 for the person (to Requests, where someone approves them), the calls it names (to All calls) and the Company Reference
 ids it cites, then the model, the tools it called and about what it cost. A person
 sees only their own conversations; New conversation starts another. The panel says Grok is offline when the assistant's
-heartbeat is over two minutes old. Escape or the close button closes it.
+heartbeat is over two minutes old. The close button, the top bar's button again, or Escape from inside the panel closes
+it; Escape on the page is left to the page's menus and dialogs.
 
 The judges' examples of recent decisions (`review/feedback.py`) show that note in place of Claude's own reasoning,
 so the reason is what tells both judges which part made the whole call wrong for Velocity. With no note, Claude's

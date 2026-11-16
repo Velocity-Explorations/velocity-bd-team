@@ -153,3 +153,17 @@ export function statusLine(state: string, seenAt: string | null, now: number = D
 export function threadIdOk(id: string | null | undefined): id is string {
   return typeof id === "string" && /^[A-Za-z0-9-]{16,64}$/.test(id);
 }
+
+/** The cookie that keeps the panel open from page to page and across a reload (David, 16 Nov 2026), so the first paint
+ *  of a page already leaves the panel its room. Not sensitive: it says only whether the panel was left open. */
+export const ASK_COOKIE = "ask_panel";
+
+/** The document.cookie line that remembers the panel open, or forgets it. */
+export function askCookie(open: boolean): string {
+  return open ? `${ASK_COOKIE}=open; path=/; max-age=31536000; samesite=lax` : `${ASK_COOKIE}=; path=/; max-age=0; samesite=lax`;
+}
+
+/** Whether the cookie says the panel was left open. */
+export function askLeftOpen(value: string | undefined): boolean {
+  return value === "open";
+}

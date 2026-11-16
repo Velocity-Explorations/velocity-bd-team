@@ -208,33 +208,118 @@ def test_a_not_relevant_decision_wears_the_red_of_a_judges_no(page: Any) -> None
 
 # ---------------------------------------------------------------------- Ask Grok (David, 7 Nov 2026)
 
+ASK_OPEN = "(() => { const p = document.querySelector('#ask-grok'); return !!p && !p.hidden; })()"
+
+
 def open_ask(page: Any) -> Any:
     """Open Ask Grok from the top bar, again if the page had not finished starting; skip before migration 016."""
     button = page.locator("header.topbar button.ask-button")
     if button.count() == 0:
         pytest.skip("Ask Grok is not set up here (migration 016)")
+    if page.evaluate(ASK_OPEN):
+        return page.locator("aside#ask-grok")
     for _ in range(3):
         button.click()
         try:
-            page.wait_for_function("document.querySelector('#ask-grok').open", timeout=5_000)
-            return page.locator("dialog#ask-grok")
+            page.wait_for_function(ASK_OPEN, timeout=5_000)
+            return page.locator("aside#ask-grok")
         except Exception:
             continue
     raise AssertionError("Ask Grok did not open")
 
 
-def test_ask_grok_opens_beside_the_page_and_closes_back_to_its_button(page: Any) -> None:
+def close_ask(page: Any) -> None:
+    """Close Ask Grok with its own button, so the next test starts with it closed (it stays open from page to page)."""
+    if page.evaluate(ASK_OPEN):
+        page.locator("#ask-grok button.ask-close").click()
+        page.wait_for_function(f"!{ASK_OPEN}", timeout=5_000)
+
+
+def box_of(page: Any, selector: str) -> dict[str, float]:
+    return page.evaluate(f"(() => {{ const r = document.querySelector({selector!r}).getBoundingClientRect(); "
+                         "return {left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width}; })()")
+
+
+def test_ask_grok_docks_beside_the_page_and_closes_back_to_its_button(page: Any) -> None:
+    """David, 16 Nov 2026: the panel takes a docked area at the right, and the page narrows beside it, nothing under it."""
     open_page(page, "/calls")
-    panel = open_ask(page)
-    assert panel.locator("h2").inner_text().strip() == "Ask Grok"
-    assert page.locator("main").is_visible() and page.locator("header.topbar nav a").first.is_enabled()
-    box = panel.locator("textarea")
-    if box.is_disabled():   # nobody is logged in on this test server
-        assert "Log in" in (box.get_attribute("placeholder") or "")
-        assert panel.locator("button[type=submit]").is_disabled()
-    page.keyboard.press("Escape")
-    page.wait_for_function("!document.querySelector('#ask-grok').open", timeout=5_000)
-    assert page.evaluate("document.activeElement && document.activeElement.classList.contains('ask-button')")
+    width = page.viewport_size["width"]
+    try:
+        panel = open_ask(page)
+        assert panel.locator("h2").inner_text().strip() == "Ask Grok"
+        dock = box_of(page, "#ask-grok")
+        assert dock["top"] == 0 and abs(dock["right"] - width) < 1 and 320 <= dock["width"] <= 480
+        assert box_of(page, "main")["right"] <= dock["left"] + 0.5
+        assert box_of(page, "header.topbar")["right"] <= dock["left"] + 0.5
+        assert page.evaluate("document.documentElement.scrollWidth") <= width   # no sideways scroll
+        if box_of(page, "main")["right"] < 1024 and page.locator(".table-wrap").count():
+            # the page beside the panel is under 1024px, so a wide table scrolls sideways rather than losing its edge
+            assert page.evaluate("getComputedStyle(document.querySelector('.table-wrap')).overflowX") == "auto"
+        assert page.locator("header.topbar nav a").first.is_enabled()
+        box = panel.locator("textarea")
+        if box.is_disabled():   # nobody is logged in on this test server
+            assert "Log in" in (box.get_attribute("placeholder") or "")
+            assert panel.locator("button[type=submit]").is_disabled()
+        panel.locator("button.ask-close").focus()
+        page.keyboard.press("Escape")
+        page.wait_for_function(f"!{ASK_OPEN}", timeout=5_000)
+        assert page.evaluate("document.activeElement && document.activeElement.classList.contains('ask-button')")
+        assert page.locator("header.topbar button.ask-button").get_attribute("aria-expanded") == "false"
+        assert box_of(page, "main")["right"] > dock["left"] + 100   # the page takes the whole width again
+    finally:
+        close_ask(page)
+
+
+def test_escape_on_the_page_leaves_ask_grok_open(page: Any) -> None:
+    """Escape closes the panel only from inside it: on the page it closes a menu or a tooltip and nothing more."""
+    open_page(page, "/calls")
+    try:
+        open_ask(page)
+        assert page.locator("header.topbar button.ask-button").get_attribute("aria-expanded") == "true"
+        page.evaluate("document.activeElement && document.activeElement.blur()")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        assert page.evaluate(ASK_OPEN)
+    finally:
+        close_ask(page)
+
+
+def test_ask_grok_stays_open_from_page_to_page_and_across_a_reload(page: Any) -> None:
+    """David, 16 Nov 2026: changing page keeps the panel open and in place; it is the same panel, not a new one."""
+    open_page(page, "/calls")
+    try:
+        open_ask(page)
+        page.evaluate("window.__askPanel = document.querySelector('#ask-grok')")
+        page.locator("header.topbar nav a", has_text="Proposals").click()
+        page.wait_for_url(re.compile(r"/proposals"), timeout=60_000)
+        page.wait_for_selector("header.topbar nav a[aria-current=page]:has-text('Proposals')", timeout=60_000)
+        assert page.evaluate(ASK_OPEN)
+        assert page.evaluate("window.__askPanel === document.querySelector('#ask-grok')")   # never closed and rebuilt
+        assert box_of(page, "main")["right"] <= box_of(page, "#ask-grok")["left"] + 0.5
+        open_page(page, "/runs")   # a full page load: the panel opens where it was, already docked
+        assert page.evaluate(ASK_OPEN)
+        assert box_of(page, "main")["right"] <= box_of(page, "#ask-grok")["left"] + 0.5
+        assert page.locator("header.topbar button.ask-button").get_attribute("aria-expanded") == "true"
+        close_ask(page)
+        open_page(page, "/runs")
+        assert not page.evaluate(ASK_OPEN)
+        assert box_of(page, "main")["right"] > page.viewport_size["width"] - 100
+    finally:
+        close_ask(page)
+
+
+def test_on_a_narrow_window_ask_grok_lies_over_the_page(page: Any) -> None:
+    """Below 960 px there is no room beside the page, so the panel lies over it as before."""
+    page.set_viewport_size({"width": 800, "height": 900})
+    try:
+        open_page(page, "/calls")
+        open_ask(page)
+        dock = box_of(page, "#ask-grok")
+        assert dock["width"] <= 460
+        assert box_of(page, "main")["right"] > dock["left"]   # the page keeps its width under the panel
+    finally:
+        close_ask(page)
+        page.set_viewport_size({"width": 1440, "height": 900})
 
 
 def test_nobody_can_read_a_thread_without_logging_in(page: Any) -> None:
@@ -271,6 +356,7 @@ def test_a_question_asked_in_the_panel_gets_grok_s_answer(page: Any) -> None:
     assert last.get_attribute("data-state") == "done", last.inner_text()
     assert last.locator(".ask-answer").inner_text().strip()
     assert "grok-4.7" in last.locator(".meta").last.inner_text()
+    close_ask(page)
 
 
 def test_the_top_bar_draws_its_theme_behind_everything_in_it(page: Any) -> None:

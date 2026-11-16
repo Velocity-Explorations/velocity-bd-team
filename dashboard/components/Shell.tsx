@@ -1,14 +1,15 @@
 import { Bot, FileText, House, Inbox, Workflow, type LucideIcon } from "lucide-react";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { cache, type ReactNode } from "react";
 import { AccountMenu, type ViewerMode } from "@/components/AccountMenu";
-import { AskPanel } from "@/components/AskPanel";
 import { TopbarFx } from "@/components/bar-themes/TopbarFx";
 import { MenuController } from "@/components/MenuController";
 import { StartDraftDialog } from "@/components/StartDraftDialog";
 import { TableController } from "@/components/TableController";
 import { TableSettings } from "@/components/TableSettings";
 import { TooltipController } from "@/components/TooltipController";
+import { ASK_COOKIE, askLeftOpen } from "@/lib/ask";
 import { formatTime } from "@/lib/format";
 import { defaultFilters, drafting, initialsOf, labeler, me, pictureOf, pictures, timeZone } from "@/lib/me";
 import { countLabel, SECTIONS, type Section } from "@/lib/nav";
@@ -90,6 +91,7 @@ export function preloadShell(section: Section | null): void {
 export async function Shell({ section, children }: { section: Section | null; children: ReactNode }) {
   const { viewer, counts, hidden, label, filters, draft, tz, past, people, chat, suggests, barTheme } = await shellData(section);
   const tableSettings = section === "calls";
+  const askOpen = askLeftOpen((await cookies()).get(ASK_COOKIE)?.value);   // the panel itself is in app/layout.tsx
   const { mode, why } = viewerMode();
   return (
     <>
@@ -122,7 +124,7 @@ export async function Shell({ section, children }: { section: Section | null; ch
           })}
         </nav>
         {chat ? (
-          <button type="button" className="ask-button" data-opens="ask-grok" aria-controls="ask-grok">
+          <button type="button" className="ask-button" data-opens="ask-grok" aria-controls="ask-grok" aria-expanded={askOpen}>
             <Bot aria-hidden="true" />
             Ask Grok
           </button>
@@ -144,7 +146,6 @@ export async function Shell({ section, children }: { section: Section | null; ch
           suggests={suggests}
         />
       ) : null}
-      {chat ? <AskPanel viewer={viewer} /> : null}
       <MenuController />
       <TooltipController />
       <TableController />
