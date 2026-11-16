@@ -237,8 +237,9 @@ Try any tool from the command line, for example `python -m assistant explain <ca
 `python -m assistant deadlines`; `python -m assistant tools` lists them all. Three scheduled
 jobs run from run.py: deadline reminders daily at 08:00 (`--remind`), the weekly summary on
 Mondays at 09:00 (`--post-summary`), and approved change requests daily at 12:07 and 17:07
-(`--apply-requests`). Every scan also alerts when it reads too many pages badly. Details in
-docs/ASSISTANT.md.
+(`--apply-requests`). Every scan also alerts when it reads too many pages badly, and a portal can add a check of its own
+(PORTAL `watch`): DSIP alerts on any open AFWERX or SpaceWERX cycle with no topics, for a person to
+drop the release's DSIP files in data/dsip/inbox (portals/dsip/NOTES.md). Details in docs/ASSISTANT.md.
 
 The weekly summary also stores its week for the dashboard's Monday brief (`/brief`).
 `python run.py --write-brief` stores this week's brief without posting to Slack, for example to

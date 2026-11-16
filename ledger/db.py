@@ -86,6 +86,12 @@ def is_sqlite(conn: Any) -> bool:
 _shared: Any = None
 
 
+def in_dry_run() -> bool:
+    """True inside dry_run_session: the ledger's writes will be rolled back, so a step that also changes files
+    (an adapter moving files it has read, for example) leaves them as they are."""
+    return _shared is not None
+
+
 @contextmanager
 def dry_run_session(url: str | None = None) -> Iterator[Any]:
     """Run a whole pipeline against one connection and roll it back at the end."""
