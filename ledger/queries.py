@@ -132,6 +132,23 @@ def get_call(call_id: str) -> dict[str, Any] | None:
         return one(q(conn, "SELECT * FROM calls WHERE id = ?", (call_id,)))
 
 
+def calls_on(portals: Sequence[str]) -> list[dict[str, Any]]:
+    """Every call on these portals: id, portal, title, type, due_date and extra, read from its JSON (an empty dict
+    when it is not an object). DSIP reads AFWERX's and SpaceWERX's cycles here, and its own topics."""
+    if not portals:
+        return []
+    with tx() as conn:
+        found = rows(q(conn, f"SELECT id, portal, title, type, due_date, extra FROM calls WHERE portal IN ({_placeholders(len(portals))})",
+                       tuple(portals)))
+    for row in found:
+        try:
+            extra = json.loads(row["extra"] or "{}")
+        except (TypeError, ValueError):
+            extra = {}
+        row["extra"] = extra if isinstance(extra, dict) else {}
+    return found
+
+
 def sam_notices_on(portal: str, key: str) -> dict[str, str]:
     """SAM.gov notice ids that a portal's calls carry in extra[key], each with its call id.
     SSC Front Door reposts SAM.gov notices; the SAM.gov adapter skips those (PRO-525)."""

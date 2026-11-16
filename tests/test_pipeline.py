@@ -199,6 +199,30 @@ def test_watch_alerts_when_a_scan_reads_pages_badly(isolated, monkeypatch: pytes
     assert any("read 4 of 4 pages badly" in a and "Page 0" in a for a in isolated)
 
 
+def watching(watch) -> Portal:
+    base = fake_portal()
+    return Portal(slug="fake", name="Fake", fetch=base.fetch, filter=base.filter, needs_browser=False, watch=watch)
+
+
+def test_a_portals_watch_is_alerted_after_a_completed_scan(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(registry, "discover", lambda: [watching(lambda run_id: [f"velocity-bd-team: Fake run {run_id} has a cycle with no topics."])])
+    assert pipeline.main(["--no-review"]) == 0
+    assert any(a.startswith("velocity-bd-team: Fake run 1 has a cycle with no topics.") and "Log:" in a for a in isolated)
+
+
+def test_a_watch_waits_for_a_real_scan_and_a_failing_watch_never_stops_one(isolated, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(registry, "discover", lambda: [watching(lambda run_id: ["velocity-bd-team: not on a dry run."])])
+    assert pipeline.main(["--no-review", "--dry-run"]) == 0
+    assert not any("not on a dry run" in a for a in isolated)
+
+    def broken(run_id: int) -> list[str]:
+        raise RuntimeError("the ledger hiccuped")
+
+    monkeypatch.setattr(registry, "discover", lambda: [watching(broken)])
+    assert pipeline.main(["--no-review"]) == 0
+    assert lq.get_call("fake-0") is not None and not isolated
+
+
 
 # ------------------------------------------------------------------ scheduled Slack posts
 

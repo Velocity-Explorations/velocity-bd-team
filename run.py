@@ -228,6 +228,21 @@ def watch_quality(portal: Portal, run_id: int, log_path: Path) -> None:
               f"The page layout may have changed. Log: {log_path}")
 
 
+def watch_portal(portal: Portal, run_id: int, log_path: Path) -> None:
+    """A portal's own checks after a completed scan (its PORTAL "watch"): each message it returns is alerted. A check
+    that fails is logged and skipped, never stopping the scan."""
+    if portal.watch is None:
+        return
+    try:
+        messages = portal.watch(run_id)
+    except Exception as exc:
+        log.warning("WATCH: %s skipped (%s: %s)", portal.name, type(exc).__name__, str(exc)[:120])
+        return
+    for message in messages:
+        log.warning("WATCH: %s", message)
+        alert(f"{message} Log: {log_path}")
+
+
 def run_filter(portal: Portal) -> int:
     pending = calls_where(portal=portal.name, filter_result="pending")
     if pending:
@@ -960,6 +975,7 @@ def run_portal(portal: Portal, args: argparse.Namespace, log_path: Path) -> dict
                 alert(f"velocity-bd-team: {portal.name} fetch {status}. {error}. Log: {log_path}")
             elif not args.dry_run:
                 watch_quality(portal, run_id, log_path)
+                watch_portal(portal, run_id, log_path)
 
         t0 = time.time()
         counts["filtered"] = run_filter(portal)

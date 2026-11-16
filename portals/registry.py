@@ -10,6 +10,7 @@
         "keywords": Path,                # optional: this portal's keywords.yaml
         "how_to_submit": "one line",     # optional: how a response is submitted
         "notes": Path,                   # optional: NOTES.md, what the assistant should know
+        "watch": fn(run_id) -> [str],    # optional: checks after a completed scan; run.py alerts each message
     }
 
 Adding a portal means adding a package; run.py never changes. portals/shared/ holds the
@@ -44,6 +45,7 @@ class Portal:
     keywords: Path | None = None
     how_to_submit: str = ""
     notes: Path | None = None
+    watch: Callable[[int], list[str]] | None = None
 
 
 def _from_dict(spec: dict[str, Any], module_name: str) -> Portal:
@@ -60,6 +62,7 @@ def _from_dict(spec: dict[str, Any], module_name: str) -> Portal:
         keywords=Path(spec["keywords"]) if spec.get("keywords") else None,
         how_to_submit=str(spec.get("how_to_submit") or ""),
         notes=Path(spec["notes"]) if spec.get("notes") else None,
+        watch=spec.get("watch"),
     )
 
 

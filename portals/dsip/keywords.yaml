@@ -1,0 +1,33 @@
+# Relevance filter for the Defense Department's SBIR and STTR topics on DSIP (David, 16 Nov 2026). Every row is
+# one topic, and each description opens "A DoD SBIR ..." or "A DoD STTR ...", so the broad keywords keep them all
+# and both judges rate every topic: that is the point of reading them one by one. The tight keywords are the other
+# portals', so a topic that names Velocity's work ranks tight; the blocklist is empty (below). Matching is plain
+# substring on lowercased title + description. An approved keyword change on the dashboard edits this file and
+# filters the portal's stored calls again.
+
+broad_keywords:
+  - sbir
+  - sttr
+
+tight_keywords:
+  - artificial intelligence
+  - machine learning
+  - autonomous systems
+  - command and control
+  - computer vision
+  - natural language processing
+  - cobol modernization
+  - legacy modernization
+  - transcription
+  - translation
+  - sensor fusion
+  - c5isr
+  - software defined
+  - ai hardware
+  - edge ai
+  - autonomous vehicle
+  - multi-agent
+
+# Empty on purpose: the other portals' blocklist is for procurement notices (repair services, spare parts, NSNs), and
+# it would drop real topics, such as a Navy topic on guidance for "complex diagnostic and repair tasks" the team pursued.
+blocklist_patterns: []

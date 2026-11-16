@@ -92,6 +92,13 @@ Kept by the Coordinator. Read before starting work; update in your PR if your ch
 - Phase 6 (LLM review): `python -m review.run_review` reviews kept, unreviewed rows of the latest run
   with claude-haiku-5-5. On 2026-10-16: 58 rows, yes 17, maybe 33, no 8, 206 s. Model failure yields
   "maybe" with a "Review error" reason, never "no".
+- DSIP (2026-11-16): portals/dsip/ makes each Defense Department SBIR and STTR topic a call of its own
+  (id `dsip-<topic number>`, portal DSIP), reviewed by both judges (David). DSIP's robots.txt forbids automated
+  access, so the topics come from SBIR.gov's copy (its open Department of War topics: 82 on 16 Nov, about 90
+  requests a second apart, 167 s) and from DSIP topic DOCX files a person drops in data/dsip/inbox. After each
+  scan a watch alerts on any open AFWERX or SpaceWERX cycle with no topics: on 16 Nov SBIR.gov had all 79 topics
+  of Release 2 and none of the 23 of Release 1 (27.BZ, 27.BX and 27.TZ). Keywords keep every topic; the
+  blocklist is empty. Runs with the Sunday scan. Notes: portals/dsip/NOTES.md.
 - APFIT (2026-10-24): portals/apfit/ reads the cycle-status posts on the APFIT page, one request
   a run: one call per cycle with its status, and how a company takes part (through a government
   sponsor). A cycle in final selection, evaluation or awarded is closed; both on 24 Oct were, so
