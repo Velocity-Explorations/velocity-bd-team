@@ -194,3 +194,99 @@ def test_an_imap_login_refusal_names_the_setting_and_never_its_value(monkeypatch
     assert "abcd" not in message and "abcdefghijklmnop" not in message and "account@example.invalid" not in message
     whole = f"MailboxRefused: Vulcan SOF asked for an emailed sign-in code, and {message}"
     assert len(whole) <= 200 and whole.endswith("put it in .env")   # run.py keeps 200 characters of a run's error
+
+
+# ---------------------------------------------------------------- Gmail API through the service account (16 Nov 2026)
+
+def _raw(text: str) -> str:
+    import base64
+
+    mail = "Date: Mon, 16 Nov 2026 12:00:00 +0000\nContent-Type: text/plain\n\n" + text
+    return base64.urlsafe_b64encode(mail.encode()).decode()
+
+
+class _Req:
+    def __init__(self, result: object = None, error: Exception | None = None) -> None:
+        self.result, self.error = result, error
+
+    def execute(self) -> object:
+        if self.error:
+            raise self.error
+        return self.result
+
+
+def _gmail(listing: _Req, asked: dict[str, object]) -> object:
+    class Messages:
+        def list(self, userId: str, q: str, maxResults: int) -> _Req:
+            asked.update(user=userId, q=q, max=maxResults)
+            return listing
+
+        def get(self, userId: str, id: str, format: str) -> _Req:
+            asked.update(format=format)
+            return _Req({"id": id, "internalDate": "1794830400000", "raw": _raw(BODY)})
+
+    class Users:
+        def messages(self) -> Messages:
+            return Messages()
+
+    class Gmail:
+        def users(self) -> Users:
+            return Users()
+
+    return Gmail()
+
+
+def test_the_gmail_api_is_chosen_once_its_account_is_named(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    """David, 16 Nov 2026: on Velocity's GKE the code is read through the Gmail API by the service account, which
+    survives password changes; an app password stays the fallback until the admin's grant is in."""
+    key = tmp_path / "key.json"
+    key.write_text("{}", encoding="utf-8")
+    settings = {"OTP_GMAIL_ACCOUNT": "bd@example.invalid", "GOOGLE_SERVICE_ACCOUNT_FILE": str(key), "VELOCITY_GMAIL_APP_PASSWORD": "x"}
+    monkeypatch.setattr(otp.shutil, "which", lambda name: None)
+    monkeypatch.setattr(otp, "get", lambda k, d=None: settings.get(k, d))
+    assert otp.default_fetcher(SOURCE).func is otp.fetch_via_gmail_api
+    del settings["OTP_GMAIL_ACCOUNT"]
+    assert otp.default_fetcher(SOURCE).func is otp.fetch_via_imap
+    settings["OTP_GMAIL_ACCOUNT"] = "bd@example.invalid"
+    settings["GOOGLE_SERVICE_ACCOUNT_FILE"] = str(tmp_path / "missing.json")   # no key file: not the API
+    assert otp.default_fetcher(SOURCE).func is otp.fetch_via_imap
+
+
+def test_gmail_api_search_is_built_from_the_source_and_reads_the_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    asked: dict[str, object] = {}
+    seen: list[str] = []
+    monkeypatch.setattr(otp, "get", lambda k, d=None: {"OTP_GMAIL_ACCOUNT": "bd@example.invalid"}.get(k, d))
+    monkeypatch.setattr(otp, "gmail_service", lambda account: seen.append(account) or _gmail(_Req({"messages": [{"id": "m1"}]}), asked))
+    messages = otp.fetch_via_gmail_api(SOURCE, "not-an-address")
+    assert seen == ["bd@example.invalid"]   # the named account, whatever the portal's mailbox setting holds
+    assert asked["user"] == "me" and asked["max"] == 3 and asked["format"] == "raw"
+    assert asked["q"] == 'from:codes@example.invalid subject:"Your sign-in code" newer_than:1d'
+    assert otp.extract_code(messages[0].body, SOURCE.pattern) == "482913"
+    assert messages[0].received_at == 1794830400.0
+
+
+def test_gmail_api_with_no_mail_is_an_empty_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(otp, "get", lambda k, d=None: {"OTP_GMAIL_ACCOUNT": "bd@example.invalid"}.get(k, d))
+    monkeypatch.setattr(otp, "gmail_service", lambda account: _gmail(_Req({"resultSizeEstimate": 0}), {}))
+    assert otp.fetch_via_gmail_api(SOURCE, "x") == []
+
+
+@pytest.mark.parametrize(("error", "says"), [
+    (Exception("('unauthorized_client: Client is unauthorized to retrieve access tokens using this method', ...)"),
+     "domain-wide delegation"),
+    (Exception("<HttpError 403 ... Gmail API has not been used in project 123 before or it is disabled.>"), "Gmail API is off"),
+])
+def test_gmail_api_refusals_say_what_the_admin_must_do(monkeypatch: pytest.MonkeyPatch, error: Exception, says: str) -> None:
+    monkeypatch.setattr(otp, "get", lambda k, d=None: {"OTP_GMAIL_ACCOUNT": "bd@example.invalid"}.get(k, d))
+    monkeypatch.setattr(otp, "gmail_service", lambda account: _gmail(_Req(error=error), {}))
+    with pytest.raises(otp.MailboxRefused) as refused:
+        otp.fetch_via_gmail_api(SOURCE, "x")
+    whole = f"MailboxRefused: Vulcan SOF asked for an emailed sign-in code, and {refused.value}"
+    assert says in whole and len(whole) <= 200 and "bd@example.invalid" not in whole
+
+
+def test_a_passing_gmail_api_error_keeps_the_wait_going(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(otp, "get", lambda k, d=None: {"OTP_GMAIL_ACCOUNT": "bd@example.invalid"}.get(k, d))
+    monkeypatch.setattr(otp, "gmail_service", lambda account: _gmail(_Req(error=TimeoutError("slow")), {}))
+    with pytest.raises(TimeoutError):   # get_otp logs it and polls again
+        otp.fetch_via_gmail_api(SOURCE, "x")
