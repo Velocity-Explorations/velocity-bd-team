@@ -7,11 +7,14 @@
     code = get_otp(VULCAN_OTP, sent_after=time.time())   # polls up to 90 s; "123456" or None
 
 Each portal describes its code mail once, as an OtpSource; everything else is shared.
-Mail access is one of two backends, picked at call time:
+Mail access is one of three backends, picked at call time:
 
-- gog CLI (preferred, see AGENTS.md): ``gog gmail search`` then ``gog gmail read``.
-- Gmail IMAP (when gog is absent): logs in as VELOCITY_GMAIL_APP_USERNAME with
-  VELOCITY_GMAIL_APP_PASSWORD, a Google app password. Standard library only.
+- gog CLI, when it is on PATH: ``gog gmail search`` then ``gog gmail read``.
+- Gmail API (David, 16 Nov 2026, the way for Velocity's GKE): the Google service account in
+  GOOGLE_SERVICE_ACCOUNT_FILE reads OTP_GMAIL_ACCOUNT's mail read-only, by domain-wide delegation that a Workspace
+  admin grants (docs/RUNBOOK.md). No password, so a password change cannot break it.
+- Gmail IMAP: logs in as VELOCITY_GMAIL_APP_USERNAME with VELOCITY_GMAIL_APP_PASSWORD, a Google app password.
+  Standard library only. The fallback until the delegation is granted.
 
 Both expose the same shape: ``fetch(mailbox) -> list[OtpMessage]`` newest first. Every
 mailbox call has its own 15 s timeout, and every failure logs and keeps polling.
@@ -19,6 +22,7 @@ Logging the code itself is acceptable; nothing else from the mailbox is logged.
 """
 from __future__ import annotations
 
+import base64
 import email
 import email.utils
 import imaplib
@@ -33,6 +37,8 @@ from datetime import datetime, timedelta, timezone
 from email.message import Message
 from functools import partial
 from html import unescape
+from pathlib import Path
+from typing import Any
 
 from config import ConfigError, get, require
 
@@ -42,6 +48,7 @@ CALL_TIMEOUT_S = 15
 POLL_SECONDS = 5
 CLOCK_SKEW_S = 30   # mail timestamps are whole seconds and the sender's clock is not ours
 IMAP_HOST = "imap.gmail.com"
+GMAIL_READONLY = "https://www.googleapis.com/auth/gmail.readonly"
 
 
 @dataclass(frozen=True)
@@ -131,16 +138,25 @@ def get_otp(
 
 # ------------------------------------------------------------------ backend selection
 
+def service_account_key() -> Path | None:
+    """The Google service account's key file (GOOGLE_SERVICE_ACCOUNT_FILE), when it is set and exists."""
+    raw = (get("GOOGLE_SERVICE_ACCOUNT_FILE") or "").strip().strip('"')
+    return Path(raw) if raw and Path(raw).is_file() else None
+
+
 def default_fetcher(source: OtpSource) -> Fetcher:
     if shutil.which("gog"):
         log.info("Code mail backend: gog CLI")
         return partial(fetch_via_gog, source)
+    if (get("OTP_GMAIL_ACCOUNT") or "").strip() and service_account_key():
+        log.info("Code mail backend: Gmail API (service account)")
+        return partial(fetch_via_gmail_api, source)
     if get("VELOCITY_GMAIL_APP_PASSWORD"):
         log.info("Code mail backend: Gmail IMAP")
         return partial(fetch_via_imap, source)
     raise ConfigError(
-        "No mailbox access for sign-in codes: install the gog CLI (AGENTS.md) or set "
-        "VELOCITY_GMAIL_APP_PASSWORD in .env for Gmail IMAP."
+        "No mailbox access for sign-in codes: set OTP_GMAIL_ACCOUNT with GOOGLE_SERVICE_ACCOUNT_FILE for the Gmail "
+        "API, set VELOCITY_GMAIL_APP_PASSWORD for Gmail IMAP, or install the gog CLI (docs/RUNBOOK.md)."
     )
 
 
@@ -179,6 +195,58 @@ def fetch_via_gog(source: OtpSource, mailbox: str) -> list[OtpMessage]:
     for thread_id, received in parse_gog_search(stdout):
         body = _run_gog(["gmail", "read", thread_id, "--account", mailbox])
         messages.append(OtpMessage(body=body, received_at=received, day_precision=True))
+    return messages
+
+
+# --------------------------------------------------------------------------- Gmail API
+
+def gmail_service(account: str) -> Any:
+    """Gmail v1 as `account`, through the service account's domain-wide delegation, read-only, 15 s a call."""
+    import google_auth_httplib2
+    import httplib2
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+
+    key = service_account_key()
+    if key is None:
+        raise ConfigError("GOOGLE_SERVICE_ACCOUNT_FILE is not set to an existing key file")
+    credentials = service_account.Credentials.from_service_account_file(str(key), scopes=[GMAIL_READONLY]).with_subject(account)
+    http = google_auth_httplib2.AuthorizedHttp(credentials, http=httplib2.Http(timeout=CALL_TIMEOUT_S))
+    return build("gmail", "v1", http=http, cache_discovery=False)
+
+
+def _refusal(exc: Exception) -> str | None:
+    """What the admin must do, when Google's answer is a refusal that no retry mends; None for anything passing."""
+    text = str(exc)
+    if "unauthorized_client" in text or "Client is unauthorized" in text:
+        return "Google refused the service account read-only Gmail: grant it in domain-wide delegation (docs/RUNBOOK.md)"
+    if "has not been used in project" in text or "accessNotConfigured" in text or "SERVICE_DISABLED" in text:
+        return "the Gmail API is off in the service account's Cloud project: turn it on (docs/RUNBOOK.md)"
+    return None
+
+
+def fetch_via_gmail_api(source: OtpSource, mailbox: str) -> list[OtpMessage]:
+    """The newest three code mails in OTP_GMAIL_ACCOUNT's mailbox. `mailbox`, the portal's own setting, is not used:
+    the account named for the Gmail API is the one read."""
+    account = (get("OTP_GMAIL_ACCOUNT") or "").strip()
+    if not account:
+        raise ConfigError("OTP_GMAIL_ACCOUNT is not set: name the mailbox the Gmail API reads")
+    query = f'from:{source.sender} subject:"{source.subject}" newer_than:1d'
+    try:
+        api = gmail_service(account).users().messages()
+        found = api.list(userId="me", q=query, maxResults=3).execute()
+        messages: list[OtpMessage] = []
+        for ref in found.get("messages", []):
+            full = api.get(userId="me", id=ref["id"], format="raw").execute()
+            parsed = email.message_from_bytes(base64.urlsafe_b64decode(full["raw"].encode()))
+            received = int(full["internalDate"]) / 1000 if full.get("internalDate") else None
+            messages.append(OtpMessage(body=message_text(parsed), received_at=received))
+    except Exception as exc:
+        refusal = _refusal(exc)
+        if refusal:
+            raise MailboxRefused(refusal) from None
+        raise
+    messages.sort(key=lambda m: m.received_at or 0, reverse=True)
     return messages
 
 

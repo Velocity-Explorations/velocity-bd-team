@@ -55,3 +55,4 @@ def test_pipeline_github_token_is_a_known_key() -> None:
 def test_google_service_account_file_is_a_known_key() -> None:
     """The proposal workspace's worker reaches Drive and Sheets with a service account key file (PRO-567)."""
     assert "GOOGLE_SERVICE_ACCOUNT_FILE" in config.KNOWN_KEYS
+    assert "OTP_GMAIL_ACCOUNT" in config.KNOWN_KEYS   # the mailbox the Gmail API reads for sign-in codes (16 Nov 2026)

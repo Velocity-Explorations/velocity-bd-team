@@ -143,6 +143,25 @@ its own in `data/<slug>/cookies.json`.
   `python run.py --portal vulcan_sof`. Changing that account's Google password revokes its app passwords.
 - Vulcan may skip the code entirely when it has seen this machine recently. That is normal.
 
+### Reading the code through the Gmail API (the way for GKE)
+
+David chose on 16 Nov 2026 to read sign-in codes through the Gmail API with the Google service account the worker
+already uses for Drive, rather than an app password: no password to change or revoke, no browser sign-in, and on GKE
+it can run without a key file. Once `OTP_GMAIL_ACCOUNT` is set in `.env` (the mailbox Vulcan sends its code to, today
+the Vulcan login's own address) and `GOOGLE_SERVICE_ACCOUNT_FILE` points at the key, the scanner uses it before the app
+password. Two one-time steps, both by someone with the rights:
+
+1. Google Cloud Console, project `velocity-bd-team`: APIs and services, Library, Gmail API, Enable.
+2. Google Admin console (a Workspace super admin): Security, Access and data control, API controls, Manage domain wide
+   delegation, Add new. Client ID: the service account's (bd-worker@velocity-bd-team.iam.gserviceaccount.com; its
+   numeric client ID is on the service account's Details page). OAuth scope, exactly:
+   `https://www.googleapis.com/auth/gmail.readonly`. Authorize. It can take a few minutes to apply.
+
+The grant lets that service account read, never change, any mailbox in the Workspace; the scanner asks for one. Keep
+the key file outside the repo as it is today. If a run's error says Google refused the delegation or that the Gmail API
+is off, one of the two steps is missing. On GKE, a fresh container may not keep Vulcan's cookies, so Vulcan is likely to
+ask for a code on every scan there; keep `data/vulcan_sof/cookies.json` on a persistent volume.
+
 ## Scheduled runs
 
 `scripts\install-schedule.ps1` registers a Windows Task Scheduler task named
