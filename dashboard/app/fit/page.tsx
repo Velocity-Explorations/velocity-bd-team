@@ -8,7 +8,7 @@ import { PersonName } from "@/components/PersonName";
 import { preloadShell, Shell } from "@/components/Shell";
 import { TopTabs } from "@/components/TopTabs";
 import { Badge, Flash } from "@/components/bits";
-import { arrangeFitRows, buildFitRows, pickFitSort, SECTIONS, SLIDER, type FitRow, type FitSort, type Mix } from "@/lib/fitratings";
+import { arrangeFitRows, buildFitRows, FIT_POSSIBLE, FIT_STRONG, FIT_VALUES, FIT_WEIGHTS, pickFitSort, SECTIONS, SLIDER, type FitRow, type FitSort, type Mix } from "@/lib/fitratings";
 import { formatTime } from "@/lib/format";
 import { timeZone } from "@/lib/me";
 import { fitOverview, fitRatingInputs } from "@/lib/queries";
@@ -73,6 +73,7 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
               </li>
             ))}
           </ul>
+          <FitRules />
           <FitFind query={query} sort={sort} />
           <TopTabs
             param="section"
@@ -234,5 +235,69 @@ function MixLine({ who, mix }: { who: string; mix: Mix }) {
         {mix.map((n, i) => (n ? <span key={i} className={`seg seg-${i}`} style={{ flexGrow: n }} /> : null))}
       </span>
     </div>
+  );
+}
+
+/**
+ * How the fit score works (David, 18 Nov 2026), so anyone can review the rules: the weights, how each part reads the
+ * ratings, the bands, what rules a call out and the caps. The numbers come from FIT_WEIGHTS, FIT_VALUES and the cutoffs,
+ * which tests/test_fit.py holds equal to review/fit.py's.
+ */
+function FitRules() {
+  const v = FIT_VALUES;
+  return (
+    <details className="fit-rules">
+      <summary>How the fit score works</summary>
+      <div className="fit-rules-body">
+        <p>
+          Each call scores 0 to 100. Every part counts the rating of what the call holds (Core {v.core}, Good {v.good},
+          Neutral {v.neutral}, Poor {v.poor}, Never {v.never}) times the part&apos;s weight, so the primary focus counts
+          most. Anything nobody rated counts as Neutral, so a call with nothing rated scores {FIT_POSSIBLE}.
+        </p>
+        <div className="table-wrap">
+          <table className="fit-weights">
+            <thead>
+              <tr>
+                <th>Part</th>
+                <th className="num">Weight</th>
+                <th>What it takes from the call</th>
+              </tr>
+            </thead>
+            <tbody>
+              {FIT_WEIGHTS.map((w) => (
+                <tr key={w.key}>
+                  <td>{w.part}</td>
+                  <td className="num">{w.percent}%</td>
+                  <td>{w.takes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li>
+            <strong>Bands:</strong> strong is {FIT_STRONG} and up, possible is {FIT_POSSIBLE} to {FIT_STRONG - 1}, and weak is
+            below {FIT_POSSIBLE}.
+          </li>
+          <li>
+            <strong>Ruled out (score 0):</strong> a Never on the call&apos;s primary focus (only when every judge&apos;s choice is
+            rated Never), on its type, or on its NAICS code. A Never on a customer, an access tag or a keyword only lowers
+            the score.
+          </li>
+          <li>
+            <strong>Caps:</strong> when both judges say no, the score stops at {FIT_POSSIBLE - 1}, weak, since a verdict reads
+            the whole call. A Direct to Phase II topic stops at {FIT_STRONG - 1}, possible: it is open only with Phase I-level
+            work Velocity did itself.
+          </li>
+          <li>
+            <strong>No score yet:</strong> until a judge names the call&apos;s primary focus.
+          </li>
+          <li>
+            Each call&apos;s reasons panel shows its own parts under Why this score. The Top 10 ranks the judges&apos; yeses
+            first, then what closes within 60 days, then this score.
+          </li>
+        </ul>
+      </div>
+    </details>
   );
 }

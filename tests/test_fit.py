@@ -324,3 +324,19 @@ def test_rejudging_covers_open_undecided_calls_and_a_rerun_skips_those_already_d
     assert "Claude judged 0 of 0 call(s); Grok judged 1 of 1." in capsys.readouterr().out
     assert len(claude.prompts) == 2
     assert lq.main_work_by_call() == {call_id: {"claude": "Software", "grok": "Software"} for call_id in ("no-deadline", "open-1")}
+
+
+def test_the_fit_ratings_page_states_the_scores_rules_as_the_scoring_uses_them() -> None:
+    """The page's "How the fit score works" box (18 Nov 2026) reads its numbers from dashboard/lib/fitratings.ts; they must
+    be the weights, values, cutoffs and caps review/fit.py scores with, so the page never explains a score it does not give."""
+    import re
+
+    from review import fit as rules
+
+    page = (Path(__file__).resolve().parent.parent / "dashboard" / "lib" / "fitratings.ts").read_text(encoding="utf-8")
+    weights = {key: int(pct) for key, pct in re.findall(r'key: "(\w+)", percent: (\d+)', page)}
+    assert weights == {key: round(100 * share) for key, share in rules.WEIGHTS.items()}
+    values = dict(re.findall(r"(\w+): ([\d.]+)", re.search(r"FIT_VALUES[^=]*= \{([^}]*)\}", page).group(1)))
+    assert {key: float(value) for key, value in values.items()} == rules.VALUES
+    assert int(re.search(r"FIT_STRONG = (\d+)", page).group(1)) == rules.STRONG
+    assert int(re.search(r"FIT_POSSIBLE = (\d+)", page).group(1)) == rules.POSSIBLE
