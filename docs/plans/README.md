@@ -6,5 +6,6 @@ Offline copies of the four build plans (open in a browser). The live, editable v
 - proposal-library-plan.html: Phases A to F. Proposal Library of past proposals on Drive, outcomes register, retrieval. Not built yet.
 - draft-ready-upgrade.html: U1 and U2. The draft queue the Writer Plan needs.
 - writer-plan.html: Phases W0 to W5. Port of the proposal-drafting pipeline, its draft queue and worker, and delivery to Drive.
+- color-team.md: a proposal, not built (18 Nov 2026). How the Writer could split into color team role agents, with the two points that stay with people.
 
 Since 17 Oct 2026 the dashboard makes every decision and Slack only informs. The plans were revised on 18 Oct to match. Each phase is a self-contained prompt for an agent, with "Your part" boxes for the human. Follow AGENTS.md for how agents work together in this repo.
