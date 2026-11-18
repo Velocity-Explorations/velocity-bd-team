@@ -72,7 +72,7 @@ def test_hover_only_text_shows_on_keyboard_focus(page: Any) -> None:
         pytest.skip("no call on this ledger shows a detail with hover text")
     text = tipped.get_attribute("title")
     tipped.focus()
-    tip = page.locator("[role=tooltip]")
+    tip = page.locator(".tooltip[role=tooltip]")   # TooltipController's; each vote's note box is a hidden tooltip too (#175)
     tip.wait_for(state="visible", timeout=2000)
     assert tip.inner_text().strip() == text.strip()
     page.keyboard.press("Escape")
