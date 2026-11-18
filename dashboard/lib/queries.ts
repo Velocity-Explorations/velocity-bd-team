@@ -2158,3 +2158,27 @@ export async function ratePick(input: { week: string; callId: string; by: string
     DO UPDATE SET rating = EXCLUDED.rating, comment = EXCLUDED.comment, rated_at = EXCLUDED.rated_at`;
   return { ok: true, title: pick.title };
 }
+
+// ----------------------------------------------------------------- each portal's newest scan (Task 6, 18 Nov 2026)
+
+/**
+ * Each portal's newest scan that wrote to the ledger, one row per portal by name: dry runs and calls added by hand
+ * (component `<slug>_manual`) are left out.
+ */
+export async function latestPortalRuns(): Promise<RunRow[]> {
+  const db = sql();
+  const rows = await db<RunRow[]>`
+    SELECT DISTINCT ON (portal) id, component, portal, started_at, finished_at, status, stage_counts, error, log_path, dry_run
+    FROM runs
+    WHERE portal IS NOT NULL AND dry_run = 0 AND RIGHT(component, 7) <> '_manual'
+    ORDER BY portal, started_at DESC, id DESC`;
+  return [...rows].sort((a, b) => (a.portal ?? "").localeCompare(b.portal ?? ""));
+}
+
+/** How many of these calls each portal holds, by the portal's name: this week's Top 10 by portal. */
+export async function portalsOf(ids: string[]): Promise<Map<string, number>> {
+  if (!ids.length) return new Map();
+  const rows = await sql()<{ portal: string; n: number }[]>`
+    SELECT portal, COUNT(*)::int AS n FROM calls WHERE id IN ${sql()(ids)} GROUP BY portal`;
+  return new Map(rows.map((r) => [r.portal, r.n]));
+}

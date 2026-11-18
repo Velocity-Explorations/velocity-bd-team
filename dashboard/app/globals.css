@@ -5127,3 +5127,18 @@ button[disabled] {
   display: block;
   margin-top: 4px;
 }
+
+/* Scans: the newest scan of each portal (Task 6, 18 Nov 2026). */
+.portal-scans {
+  margin-bottom: 20px;
+}
+
+.portal-scans .portal-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-scans td.look-at .badge {
+  white-space: nowrap;
+}
