@@ -5147,3 +5147,35 @@ button[disabled] {
 .top-ten .meta.closed-since {
   color: var(--caution);
 }
+
+/* Fit ratings: how the fit score works (David, 18 Nov 2026). */
+.fit-rules {
+  margin: 0 0 16px;
+  border: 1px solid var(--line);
+}
+
+.fit-rules > summary {
+  padding: 8px 12px;
+  color: var(--ink);
+  font: var(--type-row-title);
+  cursor: pointer;
+}
+
+.fit-rules-body {
+  padding: 0 12px 12px;
+  color: var(--ink-2);
+  font: var(--type-small);
+}
+
+.fit-rules-body p,
+.fit-rules-body ul {
+  margin: 8px 0;
+}
+
+.fit-rules-body li + li {
+  margin-top: 4px;
+}
+
+.fit-rules .fit-weights td:last-child {
+  color: var(--ink-3);
+}

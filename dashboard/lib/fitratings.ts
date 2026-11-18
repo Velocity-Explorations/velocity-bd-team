@@ -372,3 +372,20 @@ export function arrangeFitRows(rows: FitRow[], query: string, sort: FitSort): Fi
   if (sort === "calls") return found.sort((a, b) => b.calls - a.calls);
   return found;
 }
+
+/**
+ * How review/fit.py scores a call, for the Fit ratings page's "How the fit score works" (David, 18 Nov 2026): the same
+ * weights, rating values and band cutoffs, which tests/test_fit.py holds equal to the scoring's, so the page never
+ * explains a score the scoring does not give.
+ */
+export const FIT_WEIGHTS: { part: string; key: string; percent: number; takes: string }[] = [
+  { part: "Primary focus", key: "work", percent: 45, takes: "The capability area the judges name as most of what the buyer wants. If they name different ones, the lower rating counts." },
+  { part: "Customer", key: "customer", percent: 15, takes: "The best-rated customer tag on the call." },
+  { part: "Type", key: "type", percent: 15, takes: "The call's own type, else the judges'. A rated SAM.gov notice type is averaged in." },
+  { part: "NAICS", key: "naics", percent: 10, takes: "The call's code, or its sector when the code is not rated." },
+  { part: "Keywords", key: "keyword", percent: 10, takes: "The average of the rated keywords that appear in the call as whole words." },
+  { part: "Access", key: "access", percent: 5, takes: "The best-rated access tag, such as a set-aside." },
+];
+export const FIT_VALUES: Record<Rating, number> = { core: 1, good: 0.75, neutral: 0.5, poor: 0.25, never: 0 };
+export const FIT_STRONG = 70;
+export const FIT_POSSIBLE = 50;

@@ -74,6 +74,21 @@ def test_fit_ratings_lists_each_section_with_its_evidence_and_one_rating_pressed
     assert row.locator(".fit-examples li").count() >= 1
 
 
+def test_fit_ratings_explains_how_the_score_is_worked_out(page: Any) -> None:
+    """David, 18 Nov 2026: anyone can pull up the score's rules: the weights, the cutoffs, what rules a call out, the caps."""
+    open_page(page, "/fit")
+    if page.locator(".fit-section").count() == 0:
+        pytest.skip("this database has no fit ratings yet")
+    box = page.locator("details.fit-rules")
+    assert box.locator("summary").inner_text().strip() == "How the fit score works"
+    box.locator("summary").click()
+    rows = [" ".join(r.locator("td").nth(i).inner_text().strip() for i in (0, 1)) for r in box.locator("table.fit-weights tbody tr").all()]
+    assert rows == ["Primary focus 45%", "Customer 15%", "Type 15%", "NAICS 10%", "Keywords 10%", "Access 5%"]
+    text = " ".join(box.inner_text().split())
+    for words in ("70 and up", "50 to 69", "below 50", "scores 50", "Direct to Phase II", "both judges say no"):
+        assert words in text, words
+
+
 def test_fit_ratings_shows_one_section_at_a_time_as_tabs(page: Any) -> None:
     """David, 9 Nov: the section links became tabs, keeping their not-rated counts; the heading above each table went,
     its rule is one line under the tabs, and the scores' status joined the lead paragraph."""
