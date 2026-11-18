@@ -9,6 +9,29 @@ portal content.
 
 ## Current Session
 
+**Date**: 2026-11-18 (beside the two 18 Nov entries below)
+**Focus**: Screening the strong DSIP topics, Direct to Phase II on fit, PRO-477's hosting plan
+
+### What Was Done
+- The first live DSIP scan (run 105, 16 Nov) stored 105 topics. A screen of the 12 that fit called strong found none worth pursuing. Each is Not relevant under David's name, with its reason as the note, so the judges learn from it:
+  - Release 1 (closes 25 Nov): DV001, DV012 and DV003. All three are Direct to Phase II, and each fails the prior-work gate.
+  - Release 2 Phase I (closes 6 Jan): seven were too specialized or mostly hardware. NV501 (USSF damage assessment analytics, $150K, 3 months) got a full alignment and was a no-go, because its core is sensor fusion. Its rules are saved locally in `data/dsip/nv501/`.
+- #185: a Direct to Phase II call scores at most 69 (possible) on fit, with the reason in its fit line. 12 undecided DSIP topics moved from strong to possible.
+- PRO-477: `docs/plans/pro-477-hosting.md` is on the local branch (6c68365). It covers what still runs on the scan PC, the stage 2 plan, and every open value for David and Alec (Task 8 from the dashboard session).
+
+### Key Decisions
+- Direct to Phase II is possible at best on fit: it needs Phase I-level work Velocity did itself, and no tag shows that.
+- DSIP topics get a quick read against their hard gates (prior-work proof, STTR partner, ITAR paperwork) before any full alignment.
+
+### In Progress
+- PRO-477 waits on Alec: the questions, the tfvars PR and secretVersionAdder. The plan page lists every open value. The branch stays unpushed.
+- The 92 calls no judge has named the main work of are with velocity-bd-team-cb (`--rejudge-open`).
+
+### Blockers
+- PRO-477: Alec.
+
+## Session: 2026-11-18
+
 **Date**: 2026-11-18
 **Focus**: The nine dashboard tasks from the 9 Nov review with Shaun, one PR each (task list and decisions kept locally in data/tasks/)
 
