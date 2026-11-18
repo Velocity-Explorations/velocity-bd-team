@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseSuggestion, suggestStatus, withSuggestedFirst } from "./suggest.ts";
+import { parseSuggestion, suggestionInFlight, suggestStatus, withSuggestedFirst } from "./suggest.ts";
 
 const FORMATS = ["White paper", "RFI response", "Full proposal"];
 
@@ -39,4 +39,21 @@ test("the status says what the person waits on", () => {
   assert.equal(suggestStatus("working", "2026-11-07T14:59:50Z", now), "Claude is reading the call and your past work, about half a minute");
   assert.equal(suggestStatus("queued", "2026-11-07T14:40:00Z", now), "The assistant is offline, so the suggestion waits until it is back");
   assert.equal(suggestStatus("done", null, now), "");
+});
+
+test("from the click, the status says the request is on its way (Task 2, 18 Nov 2026)", () => {
+  const now = Date.parse("2026-11-18T15:00:00Z");
+  assert.equal(suggestStatus("asking", null, now), "Asking Claude...");
+  assert.equal(suggestStatus("asking", "2026-11-18T14:00:00Z", now), "Asking Claude...");   // sending, whatever the heartbeat
+});
+
+test("Start waits while a suggestion is on its way from a running assistant, not while one is parked offline", () => {
+  const now = Date.parse("2026-11-18T15:00:00Z");
+  assert.equal(suggestionInFlight("asking", null, now), true);
+  assert.equal(suggestionInFlight("queued", "2026-11-18T14:59:50Z", now), true);
+  assert.equal(suggestionInFlight("working", "2026-11-18T14:59:50Z", now), true);
+  assert.equal(suggestionInFlight("queued", "2026-11-18T14:40:00Z", now), false);   // offline: the request waits, Start does not
+  assert.equal(suggestionInFlight("queued", null, now), false);
+  assert.equal(suggestionInFlight("done", "2026-11-18T14:59:50Z", now), false);
+  assert.equal(suggestionInFlight("failed", "2026-11-18T14:59:50Z", now), false);
 });

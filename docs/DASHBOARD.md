@@ -169,6 +169,22 @@ It is refused, with the reason, when:
 A worker that has gone quiet for ten minutes does not refuse: the dialog says when it was last seen,
 and Discovery waits in the queue.
 
+While the dialog waits on the server (Task 2 of the 9 Nov review, 18 Nov 2026; on 9 Nov the draft was started 15
+seconds before its suggestion came):
+
+- **Suggest:** from the click it says Asking Claude... with a turning ring, then Claude is reading the call and your
+  past work. Start is held back, with Start waits for Claude's suggestion beside it, until the suggestion lands, fails
+  or is given up after three minutes (one took 31 seconds on 9 Nov). A request parked while the assistant is offline
+  (no heartbeat for two minutes) holds nothing back, so a draft can start without it (`lib/suggest.ts`
+  suggestionInFlight).
+- **Errors:** a request that does not go through, a failed suggestion and one that never came each say so, with Retry,
+  which asks again.
+- **Start:** it says Starting... with a turning ring while the form posts, and Suggest and Retry wait for it. The notice
+  on Drafting says where the draft shows up: under Drafting, in its workspace, and in its own folder in the Proposal
+  Library's 02 Submissions on Drive (`lib/proposals.ts` startedNotice).
+
+`tests/test_dashboard_draft_loading.py` drives these in a browser against a throwaway Postgres (WORKSPACE_TESTS=1).
+
 Wherever a call with a draft is listed (Home's Top 10, every Calls view, every Proposals view), a
 badge on its own line under its details says where the draft stands (DB1, DB2): draft started, step
 N, Go or no-go, draft finished at the Submit gate, submitted with its date, no-go, or draft closed.

@@ -1,17 +1,20 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { LoaderCircle, Sparkles } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { startDraftAction, suggestDraftAction } from "@/app/actions";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useFormStatus } from "react-dom";
+import { startDraftAction, suggestDraftAction, type SuggestResult } from "@/app/actions";
 import { Avatar } from "@/components/Avatar";
 import { POLL_MS } from "@/lib/ask";
 import { FORMATS, folderName } from "@/lib/proposals";
-import { parseSuggestion, suggestStatus, withSuggestedFirst, type Suggestion, type SuggestionRow } from "@/lib/suggest";
+import { parseSuggestion, suggestionInFlight, suggestStatus, withSuggestedFirst, type Suggestion, type SuggestionRow } from "@/lib/suggest";
 
 type Chosen = { id: string; title: string; portal: string; due: string; format: string };
 type Approval = "every_step" | "key_gates";
-const GIVE_UP_MS = 3 * 60 * 1000;   // stop waiting on a suggestion after three minutes
+// Stop waiting on a suggestion after three minutes. On 9 Nov one took 31 seconds; the assistant answers from the scan PC,
+// and three minutes covers a slow answer without holding Start back for long.
+const GIVE_UP_MS = 3 * 60 * 1000;
 
 /**
  * Start the draft (P6, PRO-576), one dialog per page. Any button marked data-start-draft opens it for
@@ -22,6 +25,11 @@ const GIVE_UP_MS = 3 * 60 * 1000;   // stop waiting on a suggestion after three 
  * With `suggests` (migration 017; David, 7 Nov 2026), Suggest what to include asks Claude, through run.py --assistant,
  * for the format, the approval mode, a Direction and the past work to build on, and fills them in for the person to
  * change. The newest suggestion for the call fills the dialog in when it opens.
+ *
+ * Waiting on the server (Task 2, 18 Nov 2026): from the click, Suggest says Asking Claude... with a turning ring, then
+ * what Claude is doing; Suggest and Start are held back while the suggestion is on its way from a running assistant
+ * (suggestionInFlight), and a request that does not go through, a failed suggestion or one that never came says so with
+ * Retry. Start says Starting... while the form posts, and Suggest waits for it.
  */
 export function StartDraftDialog({ people, owner, readiness, lastSeen, pastWork, indexed, suggests = false }: {
   people: { name: string; label: string; initials?: string; picture?: string | null }[];
@@ -127,6 +135,7 @@ export function StartDraftDialog({ people, owner, readiness, lastSeen, pastWork,
       setSuggestError("No suggestion yet. It will fill in the next time you open this dialog, or ask again.");
       return;
     }
+    if (waiting.state === "asking") return;   // the request is still being sent: askForSuggestion reads when it lands
     const timer = window.setTimeout(() => read(call.id, true).catch(() => undefined), POLL_MS);
     return () => window.clearTimeout(timer);
   }, [call, waiting, read]);
@@ -134,14 +143,25 @@ export function StartDraftDialog({ people, owner, readiness, lastSeen, pastWork,
   async function askForSuggestion() {
     if (!call) return;
     setSuggestError("");
-    const result = await suggestDraftAction({ callId: call.id });
+    setWaiting({ state: "asking", seenAt: null, now: Date.now(), since: Date.now() });   // something shows from the click
+    let result: SuggestResult;
+    try {
+      result = await suggestDraftAction({ callId: call.id });
+    } catch {
+      setWaiting(null);
+      setSuggestError("The request did not go through. Check the connection, then try again.");
+      return;
+    }
     if (!result.ok) {
+      setWaiting(null);
       setSuggestError(result.reason);
       return;
     }
-    setWaiting({ state: "queued", seenAt: null, now: Date.now(), since: Date.now() });
+    setWaiting((w) => ({ state: "queued", seenAt: null, now: Date.now(), since: w?.since ?? Date.now() }));
     await read(call.id, true).catch(() => undefined);
   }
+
+  const inFlight = waiting ? suggestionInFlight(waiting.state, waiting.seenAt, waiting.now) : false;
 
   const close = () => dialog.current?.close();
   const today = new Date().toISOString().slice(0, 10);
@@ -181,18 +201,26 @@ export function StartDraftDialog({ people, owner, readiness, lastSeen, pastWork,
 
           {suggests ? (
             <div className="suggest-bar">
-              <button type="button" className="btn" onClick={() => void askForSuggestion()} disabled={Boolean(waiting) || !owner}>
+              <HeldButton className="btn suggest-ask" onClick={() => void askForSuggestion()} held={Boolean(waiting) || !owner}>
                 <Sparkles aria-hidden="true" />
                 {suggestion ? "Suggest again" : "Suggest what to include"}
-              </button>
+              </HeldButton>
               <span className="hint" role="status">
+                {inFlight ? <LoaderCircle className="spin" aria-hidden="true" /> : null}
                 {waiting
                   ? suggestStatus(waiting.state, waiting.seenAt, waiting.now)
                   : suggestion
                     ? `Filled in from Claude's suggestion${suggestedAt ? ` of ${suggestedAt.slice(0, 16).replace("T", " ")} UTC` : ""}. Change anything before you start.`
                     : "Claude can recommend the format, how to approve, a direction and the past work to build on."}
               </span>
-              {suggestError ? <p className="error-text">{suggestError}</p> : null}
+              {suggestError ? (
+                <div className="suggest-error">
+                  <p className="error-text" role="alert">{suggestError}</p>
+                  <HeldButton className="btn suggest-retry" onClick={() => void askForSuggestion()} held={Boolean(waiting) || !owner}>
+                    Retry
+                  </HeldButton>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -299,16 +327,41 @@ export function StartDraftDialog({ people, owner, readiness, lastSeen, pastWork,
           </div>
 
           <div className="settings-actions">
-            <span />
+            {inFlight ? <span className="hint">Start waits for Claude&apos;s suggestion.</span> : <span />}
             <button type="button" onClick={close}>
               Cancel
             </button>
-            <button type="submit" className="btn-primary fn-approve" disabled={readiness === "not set up" || !owner}>
-              Start the draft
-            </button>
+            <StartButton held={readiness === "not set up" || !owner || inFlight} />
           </div>
         </form>
       ) : null}
     </dialog>
+  );
+}
+
+/** A button in the dialog held back while asked to be, and while the form posts Start (useFormStatus). */
+function HeldButton({ className, onClick, held, children }: { className: string; onClick: () => void; held: boolean; children: ReactNode }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="button" className={className} onClick={onClick} disabled={held || pending}>
+      {children}
+    </button>
+  );
+}
+
+/** Start the draft: Starting... with a turning ring while the form posts, so a second click cannot send it again. */
+function StartButton({ held }: { held: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className="btn-primary fn-approve" disabled={held || pending}>
+      {pending ? (
+        <>
+          <LoaderCircle className="spin" aria-hidden="true" />
+          Starting...
+        </>
+      ) : (
+        "Start the draft"
+      )}
+    </button>
   );
 }

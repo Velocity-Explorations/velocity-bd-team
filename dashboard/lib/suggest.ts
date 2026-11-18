@@ -52,10 +52,29 @@ export function withSuggestedFirst<T extends { id: string }>(groups: { title: st
   return [{ title: "Suggested by Claude", items: first }, ...rest];
 }
 
-/** What a waiting suggestion says while the person waits. */
-export function suggestStatus(state: string, seenAt: string | null, now: number = Date.now()): string {
-  if (state !== "queued" && state !== "working") return "";
+/** Whether the assistant has gone quiet: never seen, or not for two minutes. */
+function offline(seenAt: string | null, now: number): boolean {
   const seen = seenAt ? Date.parse(seenAt) : Number.NaN;
-  if (Number.isNaN(seen) || now - seen > OFFLINE_MS) return "The assistant is offline, so the suggestion waits until it is back";
+  return Number.isNaN(seen) || now - seen > OFFLINE_MS;
+}
+
+/**
+ * What a waiting suggestion says while the person waits. `asking` is the dialog's own state from the click until the
+ * request is stored (Task 2, 18 Nov 2026), so something shows at once; queued and working are the stored request's.
+ */
+export function suggestStatus(state: string, seenAt: string | null, now: number = Date.now()): string {
+  if (state === "asking") return "Asking Claude...";
+  if (state !== "queued" && state !== "working") return "";
+  if (offline(seenAt, now)) return "The assistant is offline, so the suggestion waits until it is back";
   return "Claude is reading the call and your past work, about half a minute";
+}
+
+/**
+ * Whether a suggestion is on its way from an assistant that is running (Task 2, 18 Nov 2026), so the dialog holds Start
+ * back until it lands: on 9 Nov the draft was started 15 seconds before its suggestion came. A request parked while the
+ * assistant is offline holds nothing back, so a draft can still start without it.
+ */
+export function suggestionInFlight(state: string, seenAt: string | null, now: number = Date.now()): boolean {
+  if (state === "asking") return true;
+  return (state === "queued" || state === "working") && !offline(seenAt, now);
 }
