@@ -8,7 +8,8 @@ Each part is worth what its rating is worth (VALUES), weighted by WEIGHTS, so ma
 rated counts as neutral, and a call with nothing but neutral ratings scores 50. A Never rules a call out (score 0) only
 on its main work, its type or its NAICS code, because a Never on one work tag among several would rule out calls the team
 pursues: the judges tag every kind of work a call touches. On what the judges name, it takes all of them to agree. A call
-both judges rate no is weak at best: a verdict reads the whole call, which tag ratings cannot.
+both judges rate no is weak at best: a verdict reads the whole call, which tag ratings cannot. A Direct to Phase II topic is
+possible at best: it is open only with Phase I-level work the company did itself, which no tag shows (David, 18 Nov 2026).
 """
 from __future__ import annotations
 
@@ -31,6 +32,8 @@ POSSIBLE = 50
 RULED_OUT = "ruled out"
 BANDS = ("strong", "possible", "weak", RULED_OUT)
 SECTOR_RANGES = ("31-33", "44-45", "48-49")   # NAICS sectors that span several first-two-digit codes
+D2P2 = re.compile(r"(?i)\bdirect[ -]to[ -]phase[ -]ii\b|\bd2p2\b")   # DSIP writes the type "SBIR Direct to Phase II"
+D2P2_WHY = "Direct to Phase II: needs Phase I-level work Velocity did itself"
 
 
 @dataclass(frozen=True)
@@ -198,6 +201,9 @@ def score_call(call: Mapping[str, Any], tags_by_source: Mapping[str, Sequence[st
     total = (WEIGHTS["work"] * work + WEIGHTS["customer"] * customer + WEIGHTS["type"] * kind
              + WEIGHTS["naics"] * VALUES[naics] + WEIGHTS["keyword"] * keyword + WEIGHTS["access"] * access)
     score = int(100 * total + 0.5 + 1e-9)
+    if score >= STRONG and D2P2.search(f"{call.get('type') or ''} {call.get('title') or ''}"):
+        score = STRONG - 1
+        why.append(D2P2_WHY)
     if verdicts and len(verdicts) >= 2 and all(verdict == "no" for verdict in verdicts.values()) and score >= POSSIBLE:
         score = POSSIBLE - 1
         why.append("Both judges said no")
