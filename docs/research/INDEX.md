@@ -8,6 +8,7 @@ instead of restating it.
 
 | Date | Document | Summary | Tags |
 |---|---|---|---|
+| 2026-11-16 | [How the scanner reads Vulcan SOF's emailed sign-in code](decisions/2026-11-16_sign-in-code-mailbox.md) | Gmail API through the service account for GKE over an app password or gog; app password meanwhile, pending a super admin's grant | vulcan, otp, gmail, gke, auth |
 | 2026-10-19 | [Hidden windows for the scheduled tasks](decisions/2026-10-19_hidden-task-windows.md) | conhost --headless over pythonw, S4U or VBScript; Last Run Result always reads 0 | scheduler, windows, task-scheduler |
 
 ## Investigations

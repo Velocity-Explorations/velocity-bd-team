@@ -9,6 +9,43 @@ portal content.
 
 ## Current Session
 
+**Date**: 2026-11-18 (covers 16 to 18 Nov, the session beside the one below)
+**Focus**: Ask Grok docked beside the page, Decide menu (reasons, Unsure, umbrella tag), Vulcan SOF scanning again, fit ratings
+
+### What Was Done
+- Ask Grok docks at the right and the page narrows beside it. It lives in the root layout, so it stays open across pages and reloads (#170), and its left edge drags to resize, kept per browser (#171).
+- Decide menu:
+  - six more Not relevant reasons from David's notes on the week's Top 10 (#173);
+  - changing your own decision from the review queue now changes the call (#174);
+  - Unsure holds a call for the team, with its own view on Calls (#176, migration 020);
+  - Umbrella announcement only is a listing tag (call_tags source `team`, migration 021), and Needs review leaves out umbrellas and announcements (#180).
+- Vulcan SOF run 103 failed: Vulcan asked for an emailed code for the first time, and Gmail rejected the app password.
+  - A refused mailbox now ends the wait with a clear error (#177).
+  - A Gmail API backend through the service account is built (#179) but off: it needs a super admin's grant.
+  - David made a new app password.
+  - Vulcan had also redesigned its pages, so each call is now read from the call feed its page loads (#183). Run 107 read 60 calls, ids kept, no deadline lost.
+- Ledger changes at David's approval:
+  - migrations 020 and 021, each dry-run first;
+  - E-ICAM, JVCC and ERIS set to Not relevant (the #174 bug had left them at pursue);
+  - TRANSCOM AoI 901's newest note set to Cyber or enterprise IT;
+  - DAF 27.BZ Release 2's decision cleared;
+  - fit ratings: INDOPACOM core, jadc2 and c4isr neutral.
+- Re-judge: the unscored, undecided calls are all closed, which `--rejudge-open` skips by design. Grok judged the one open call.
+
+### Key Decisions
+- Unsure is a vote, never the call's decision; nobody is scored against it. Umbrellas and announcements are not rated, whoever tagged them.
+- Vulcan is read from its call feed, not the page text. Dates keep the stored Mountain-time form, and a call keeps its type while that is still one of its objectives.
+- Sign-in codes on GKE: the Gmail API through the service account (decisions/2026-11-16_sign-in-code-mailbox.md). An app password is used meanwhile.
+
+### In Progress
+- Gmail API for codes needs a Workspace super admin: Gmail API on in project velocity-bd-team, and gmail.readonly for the service account in domain-wide delegation (RUNBOOK). Then uncomment OTP_GMAIL_ACCOUNT in .env.
+- On GKE, keep data/vulcan_sof/cookies.json on a persistent volume, or Vulcan asks for a code on every scan.
+
+### Blockers
+- Gmail API for codes: a super admin.
+
+## Session: 2026-11-16
+
 **Date**: 2026-11-16 (covers 15 to 16 Nov)
 **Focus**: PRO-477 move to Velocity's cluster, notes that save themselves and sit beside each vote, DSIP topics as calls, fit scoring fixed
 
@@ -30,7 +67,7 @@ portal content.
 ### In Progress
 - PRO-477 waits on Alec: his answers, the tfvars review and secretVersionAdder. Then push the branch and deploy.
 - Three strong DSIP Release 1 topics (DAF27TZ01-DV001, DAF27BZ01-DV012, DAF27TZ01-DV003) close 25 Nov and are not assessed yet.
-- 92 reviewed calls have no fit score because no judge named their main work. `--rejudge-open` would fix that; it hasn't been priced or run.
+- 92 reviewed calls had no fit score because no judge named their main work. Resolved 18 Nov: every undecided one is closed (see the entry above).
 - The open items from 10 Nov below still stand.
 
 ### Blockers
