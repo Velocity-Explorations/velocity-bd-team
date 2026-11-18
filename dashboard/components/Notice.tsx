@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { NOTICE_KEYS } from "@/lib/decide";
 
 const WORDS = { good: "Done", conflict: "Refused", info: "Note" } as const;
 
@@ -24,7 +25,7 @@ export function Notice({ tone, children }: { tone: keyof typeof WORDS; children:
   const close = () => {
     setOpen(false);
     const url = new URL(window.location.href);
-    for (const key of ["notice", "error", "voted", "row"]) url.searchParams.delete(key);
+    for (const key of NOTICE_KEYS) url.searchParams.delete(key);
     window.history.replaceState(window.history.state, "", url);
   };
   return (

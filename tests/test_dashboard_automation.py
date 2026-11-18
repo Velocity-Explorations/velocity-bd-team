@@ -32,10 +32,11 @@ def open_page(page: Any, path: str) -> None:
     page.wait_for_timeout(300)
 
 
-def test_automation_has_six_cards_in_order(page: Any) -> None:
+def test_automation_has_seven_cards_in_order(page: Any) -> None:
     open_page(page, "/requests")
     labels = [t.strip().lower() for t in page.locator(".view-cards .vt-card__label").all_inner_texts()]
-    assert labels == ["fit ratings", "agent update requests", "decided requests", "scans", "scan problems", "judges agree"]
+    assert labels == ["fit ratings", "top 10 reviews", "agent update requests", "decided requests", "scans", "scan problems",
+                      "judges agree"]   # Top 10 reviews since 18 Nov 2026 (Task 5)
 
 
 def test_the_automation_section_opens_on_fit_ratings(page: Any) -> None:

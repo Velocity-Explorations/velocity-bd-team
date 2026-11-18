@@ -14,6 +14,7 @@ import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine, withoutTypedNote, writeNoteLine } from "./text";
 import { alreadySaved, isDecision, keepsCallDecision, planDecision, unsurePlan, type Decision, type Vote } from "./values";
 import { parseTop } from "./brief";
+import type { PickRating, PickRow } from "./toppicks";
 import type { AskMessage } from "./ask";
 import type { SuggestionRow } from "./suggest";
 import { WATCH } from "./listing";
@@ -2101,4 +2102,59 @@ export async function refreshLibrary(input: { by: string }): Promise<WorkspaceRe
       VALUES ('drive_refresh', NULL, NULL, 'queued', ${input.by}, ${now}, ${now})`;
     return { ok: true, notice: "The worker refreshes the Proposal Library's list when no step is waiting." };
   });
+}
+
+// ----------------------------------------------------------------- the Top 10's picks, rated (Task 5, 18 Nov 2026)
+
+/** Whether picks can be rated: migration 022 is applied. */
+export async function hasTopRatings(): Promise<boolean> {
+  return hasTable(sql(), "top10_ratings");
+}
+
+/** Every rating of the picks in these weeks' Top 10s. */
+export async function topPickRatings(weeks: string[]): Promise<PickRow[]> {
+  if (!weeks.length || !(await hasTopRatings())) return [];
+  const rows = await sql()<PickRow[]>`
+    SELECT week_of, call_id, rated_by, rating, comment, rated_at FROM top10_ratings WHERE week_of IN ${sql()(weeks)} ORDER BY id`;
+  return [...rows];
+}
+
+/** The newest weeks' Top 10s, newest first, each with its picks as the brief listed them. */
+export async function reviewBriefs(limit = 8): Promise<{ week: string; picks: { id: string; title: string; portal: string | null }[] }[]> {
+  const rows = await sql()<{ week_of: string; body: string | null }[]>`
+    SELECT DISTINCT ON (week_of) week_of, body FROM briefs WHERE portal IS NULL ORDER BY week_of DESC, id DESC LIMIT ${limit}`;
+  return rows.flatMap((r) => {
+    const top = parseTop(r.body);
+    return top ? [{ week: r.week_of, picks: top.top.map((c) => ({ id: c.id, title: c.title, portal: c.portal })) }] : [];
+  });
+}
+
+/** For Automation's card: how many ratings the newest week's picks have, and from how many people; null before 022. */
+export async function topRatingsSummary(): Promise<{ ratings: number; people: number } | null> {
+  if (!(await hasTopRatings())) return null;
+  const [row] = await sql()<{ ratings: number; people: number }[]>`
+    SELECT COUNT(*)::int AS ratings, COUNT(DISTINCT rated_by)::int AS people FROM top10_ratings
+    WHERE week_of = (SELECT MAX(week_of) FROM briefs WHERE portal IS NULL)`;
+  return row ?? { ratings: 0, people: 0 };
+}
+
+/**
+ * A person rates a pick in a week's Top 10 (Task 5, 18 Nov 2026): Good pick, Not a fit or Unsure, with an optional
+ * comment, apart from their decision on the call. Only a call that week's brief listed in its Top 10 can be rated, and
+ * rating it again replaces the person's rating for that week.
+ */
+export async function ratePick(input: { week: string; callId: string; by: string; rating: PickRating; comment: string | null }):
+  Promise<{ ok: true; title: string } | { ok: false; reason: string }> {
+  const db = sql();
+  if (!(await hasTopRatings())) return { ok: false, reason: "Rating the Top 10 needs migration 022." };
+  const [brief] = await db<{ body: string | null }[]>`
+    SELECT body FROM briefs WHERE portal IS NULL AND week_of = ${input.week} ORDER BY id DESC LIMIT 1`;
+  const pick = parseTop(brief?.body)?.top.find((c) => c.id === input.callId);
+  if (!pick) return { ok: false, reason: "That call is not in that week's Top 10. Reload and try again." };
+  await db`
+    INSERT INTO top10_ratings (week_of, call_id, rated_by, rating, comment, rated_at)
+    VALUES (${input.week}, ${input.callId}, ${input.by}, ${input.rating}, ${input.comment}, ${isoNow()})
+    ON CONFLICT (week_of, call_id, rated_by)
+    DO UPDATE SET rating = EXCLUDED.rating, comment = EXCLUDED.comment, rated_at = EXCLUDED.rated_at`;
+  return { ok: true, title: pick.title };
 }

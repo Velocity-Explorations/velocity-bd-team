@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useFormStatus } from "react-dom";
 import { startDraftAction, suggestDraftAction, type SuggestResult } from "@/app/actions";
 import { Avatar } from "@/components/Avatar";
+import { NOTICE_KEYS } from "@/lib/decide";
 import { POLL_MS } from "@/lib/ask";
 import { FORMATS, folderName } from "@/lib/proposals";
 import { parseSuggestion, suggestionInFlight, suggestStatus, withSuggestedFirst, type Suggestion, type SuggestionRow } from "@/lib/suggest";
@@ -60,7 +61,7 @@ export function StartDraftDialog({ people, owner, readiness, lastSeen, pastWork,
       opener.current = trigger;
       const url = new URL(window.location.href);
       url.searchParams.delete("start");
-      for (const key of ["notice", "error", "voted", "row"]) url.searchParams.delete(key);
+      for (const key of NOTICE_KEYS) url.searchParams.delete(key);
       setReturnTo(`${url.pathname}${url.search}`);
       const chosen = { id: data.startDraft ?? "", title: data.title ?? "", portal: data.portal ?? "", due: data.due ?? "", format: data.format ?? FORMATS[0] };
       setFormat(FORMATS.includes(chosen.format) ? chosen.format : FORMATS[0]);

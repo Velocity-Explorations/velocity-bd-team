@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
 import { signIn, signOut } from "@/auth";
 import { MAX_QUESTION, threadIdOk } from "@/lib/ask";
-import { readChoice, reasonNote, rowAnchor } from "@/lib/decide";
+import { NOTICE_KEYS, readChoice, reasonNote, rowAnchor } from "@/lib/decide";
+import { isPickRating, MAX_PICK_COMMENT, PICK_LABELS } from "@/lib/toppicks";
 import { readListingChoice } from "@/lib/listing";
 import { isRating, sectionOfKey } from "@/lib/fitratings";
 import { isoNow, zonedToIso } from "@/lib/format";
@@ -61,6 +62,7 @@ import {
   askSuggestion,
   callExists,
   hasSuggestions,
+  ratePick,
 } from "@/lib/queries";
 import { isRequestChoice } from "@/lib/requests";
 import { decidedNotice, fromQueue, isNoteStamp, safeReturnTo } from "@/lib/text";
@@ -113,10 +115,7 @@ export async function suggestDraftAction(input: { callId?: unknown }): Promise<S
 
 function backTo(returnTo: string, key: "notice" | "error", message: string, voted?: string, anchor?: string, row?: string): never {
   const url = new URL(returnTo, "http://dashboard.local");
-  url.searchParams.delete("notice");
-  url.searchParams.delete("error");
-  url.searchParams.delete("voted");
-  url.searchParams.delete("row");
+  for (const name of NOTICE_KEYS) url.searchParams.delete(name);
   url.searchParams.set(key, message);
   if (voted) url.searchParams.set("voted", voted);   // the queue links the notice to the call on All calls
   if (row) url.searchParams.set("row", row);   // the call whose Decide cell says what happened (Task 1, 18 Nov 2026)
@@ -196,6 +195,43 @@ async function tagListing(id: string, listing: "Umbrella" | "Call", returnTo: st
   backTo(returnTo, "notice", listing === "Umbrella"
     ? `Umbrella announcement only: ${result.title}. It has left Needs review.`
     : `This is a call: ${result.title}. It is back in Needs review if nobody has decided it.`);
+}
+
+/**
+ * Rate a pick in this week's Top 10 from Home (Task 5 of the 9 Nov review, 18 Nov 2026): Good pick, Not a fit or Unsure,
+ * with an optional comment, apart from the person's decision on the call. The page comes back to the row, whose control
+ * says Saved or why not (`rated`). Nothing ranks calls by it.
+ */
+export async function rateTopPickAction(formData: FormData): Promise<void> {
+  const returnTo = safeReturnTo(formData.get("return_to"), "/");
+  const week = String(formData.get("week") ?? "").trim();
+  const callId = String(formData.get("call_id") ?? "").trim().slice(0, 300);
+  const rating = String(formData.get("rating") ?? "");
+  const comment = String(formData.get("comment") ?? "").trim().slice(0, MAX_PICK_COMMENT) || null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(week) || !callId || !isPickRating(rating)) {
+    backToPick(returnTo, callId, "error", "That form is out of date. Reload and try again.");
+  }
+  const viewer = await currentViewer();
+  if (!viewer) backToPick(returnTo, callId, "error", "Log in (top right) before rating a pick.");
+  let result: Awaited<ReturnType<typeof ratePick>>;
+  try {
+    result = await ratePick({ week, callId, by: viewer, rating, comment });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
+    backToPick(returnTo, callId, "error", `Could not save the rating: ${detail}`);
+  }
+  revalidatePath("/", "layout");
+  if (!result.ok) backToPick(returnTo, callId, "error", result.reason);
+  backToPick(returnTo, callId, "notice", `${PICK_LABELS[rating]}: ${result.title}.`);
+}
+
+/** Back to the pick's row on Home, whose rating control says Saved or why not (`rated`, Task 5). */
+function backToPick(returnTo: string, callId: string, key: "notice" | "error", message: string): never {
+  const url = new URL(returnTo, "http://dashboard.local");
+  for (const name of NOTICE_KEYS) url.searchParams.delete(name);
+  url.searchParams.set(key, message);
+  if (callId) url.searchParams.set("rated", callId);
+  redirect(`${url.pathname}${url.search}${callId ? `#${rowAnchor(callId)}` : ""}`);
 }
 
 /**

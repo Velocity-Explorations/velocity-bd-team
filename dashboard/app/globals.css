@@ -5017,3 +5017,113 @@ button[disabled] {
 .clamp.judge-reason + .clamp.judge-reason {
   margin-top: 6px;
 }
+
+/* Home's Top 10: is it a good pick? (Task 5, 18 Nov 2026) Three choices, a reason if wanted, and everyone else's. */
+.top-ten th.pick {
+  width: 116px;
+}
+
+/* Below 1280px the description and reasons hide; the deadline's time wraps under its date, so the call keeps room. */
+@media (max-width: 1279px) {
+  .top-ten th.due {
+    width: 120px;
+  }
+}
+
+.pick-choices {
+  display: grid;
+  gap: 4px;
+}
+
+.pick-choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  font: var(--type-detail);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pick-choice::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: var(--tone);
+}
+
+.pick-choice:hover:not(:disabled) {
+  border-color: var(--tone-line);
+  color: var(--ink);
+}
+
+.pick-choice.on {
+  border-color: var(--tone-line);
+  background: var(--tone-wash);
+  color: var(--ink);
+}
+
+.pick-why > summary {
+  margin-top: 6px;
+}
+
+.pick-why textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12.5px;
+}
+
+.pick-outcome {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 0;
+  color: var(--tone);
+  font: var(--type-detail);
+}
+
+.pick-outcome svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.pick-others {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font: var(--type-detail);
+  color: var(--ink-2);
+}
+
+.pick-others li + li {
+  margin-top: 4px;
+}
+
+/* Automation's Top 10 reviews (Task 5): one table per week, a column per reviewer. */
+.review-week {
+  margin: 0 0 28px;
+}
+
+.review-week h2 {
+  margin: 0 0 4px;
+  font: var(--type-section);
+}
+
+.review-week .review-summary {
+  margin: 0 0 10px;
+}
+
+.review-week td.agreement .badge {
+  white-space: nowrap;
+}
+
+.review-week td[data-person] .muted {
+  display: block;
+  margin-top: 4px;
+}

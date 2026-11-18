@@ -90,3 +90,6 @@ export function reasonNote(reason: string | null, words: string): string {
   if (!label) return own;
   return own ? `${label}: ${own}` : label;
 }
+
+/** The address keys a write's answer brings back (the notice and where it applies), dropped together when it closes. */
+export const NOTICE_KEYS = ["notice", "error", "voted", "row", "rated"] as const;
