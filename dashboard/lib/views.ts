@@ -4,7 +4,7 @@
 
 export type CallView = "needs-review" | "unsure" | "top10" | "due-soon" | "judges-agree" | "judges-disagree" | "new";
 export type CallCard = CallView | "all";
-export type AutomationPage = "requests" | "decided" | "runs" | "problems" | "judges" | "fit";
+export type AutomationPage = "requests" | "decided" | "runs" | "problems" | "judges" | "fit" | "reviews";
 
 /** One card: its band, number and line, where it goes, and whether it is the open view. */
 export type ViewCard = {
@@ -134,12 +134,16 @@ export function automationCards(input: {
   problems: number;
   agree: { both: number; agree: number } | null;
   ratings: number | null;
+  reviews?: { ratings: number; people: number } | null;
 }): ViewCard[] {
+  const reviews = input.reviews;
   const { agree } = input;
   const card = (key: AutomationPage, label: string, href: string, count: number | string, description: string, needsYou = false): ViewCard =>
     ({ key, label, href, count, description, current: input.current === key, needsYou });
   return [
     card("fit", "Fit ratings", "/fit", input.ratings ?? "none", input.ratings ? "what every call's fit score is built from" : "nothing rated yet"),
+    card("reviews", "Top 10 reviews", "/top10-reviews", reviews?.ratings || "none",   // Task 5, 18 Nov 2026
+      reviews?.ratings ? `this week's picks rated, by ${reviews.people} ${reviews.people === 1 ? "person" : "people"}` : "no pick rated yet"),
     card("requests", "Agent update requests", "/requests", input.waiting, input.waiting ? input.kinds : "nothing waiting", true),
     card("decided", "Decided requests", "/requests?view=decided", input.decided, input.decided ? "the last 50, with their result" : "none decided yet"),
     card("runs", "Scans", "/runs", input.runs, input.runs ? input.lastRun : "no scans yet"),

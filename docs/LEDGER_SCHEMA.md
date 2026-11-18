@@ -5,7 +5,7 @@ every component reads and writes these tables through `ledger/queries.py`, and t
 dashboard reads them directly. This document is complete enough to build against on its
 own.
 
-Current migration: `021_team_tags.sql`. The full current schema is in `ledger/schema.sql`.
+Current migration: `022_top10_ratings.sql`. The full current schema is in `ledger/schema.sql`.
 
 ## Conventions
 
@@ -232,6 +232,26 @@ nothing. Added by `005_briefs.sql`.
 
 Index: `(week_of, id)`. Writing a week's part again replaces that part, so a rerun never
 duplicates it. The dashboard only reads this table.
+
+## Table: top10_ratings
+
+What each person thinks of each pick in a week's Top 10 (Task 5 of the 9 Nov review, 18 Nov 2026), kept apart from
+their decision on the call in `decisions`, so someone can call a pick right for the list and still not pursue it.
+Written by the dashboard from Home's Top 10; read by Automation's Top 10 reviews (`/top10-reviews`), which shows where
+people agree. Nothing ranks calls by it. Added by `022_top10_ratings.sql`.
+
+| Column | Type | Values | Written by |
+|---|---|---|---|
+| id | INTEGER, primary key, auto-increment | | database |
+| week_of | TEXT date, not null | `briefs.week_of` of the week whose Top 10 held the pick | the dashboard's rate action |
+| call_id | TEXT, not null | `calls.id`, a pick in that week's Top 10 or Top 10 to watch | same |
+| rated_by | TEXT, not null | the person signed in, as in `decisions.decided_by` | same |
+| rating | TEXT, not null | `good_pick`, `not_a_fit`, `unsure` | same |
+| comment | TEXT | why, at most 300 characters; NULL when none was given | same |
+| rated_at | TEXT timestamp, not null | when the person last rated it | same |
+
+Unique: `(week_of, call_id, rated_by)`: rating a pick again replaces that person's row for that week. Index:
+`(week_of, call_id)`. A call picked in two weeks is rated in each.
 
 ## Table: call_tags
 

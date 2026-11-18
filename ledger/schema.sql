@@ -489,3 +489,18 @@ CREATE TABLE IF NOT EXISTS profile_pictures (
 -- 019_bar_theme: the top bar's theme each person picks; NULL shows the default.
 
 ALTER TABLE profiles ADD COLUMN bar_theme TEXT;
+
+-- 022_top10_ratings: each person's rating of each pick in a week's Top 10, apart from their decision on the call.
+
+CREATE TABLE IF NOT EXISTS top10_ratings (
+  id         INTEGER PRIMARY KEY @@AUTOINCREMENT@@,
+  week_of    TEXT NOT NULL,
+  call_id    TEXT NOT NULL REFERENCES calls (id),
+  rated_by   TEXT NOT NULL,
+  rating     TEXT NOT NULL CHECK (rating IN ('good_pick', 'not_a_fit', 'unsure')),
+  comment    TEXT,
+  rated_at   TEXT NOT NULL,
+  UNIQUE (week_of, call_id, rated_by)
+);
+
+CREATE INDEX IF NOT EXISTS idx_top10_ratings_week ON top10_ratings (week_of, call_id);

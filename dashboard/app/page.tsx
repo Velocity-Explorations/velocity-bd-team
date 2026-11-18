@@ -13,14 +13,17 @@ import { topTab } from "@/lib/listing";
 import { overdueCount, sortIntoViews } from "@/lib/proposals";
 import { aliasesFor, displayPerson } from "@/lib/people";
 import {
+  hasTopRatings,
   judgeAgreement,
   lastCompletedRun,
   listRuns,
   proposalCalls,
   queueCounts,
+  topPickRatings,
   topTenIds,
   waitingRequests,
 } from "@/lib/queries";
+import { picksFor } from "@/lib/toppicks";
 import { drafting, labeler, openingRedirect, timeZone } from "@/lib/me";
 import { queueMode } from "@/lib/settings";
 import { firstParam } from "@/lib/text";
@@ -77,6 +80,10 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const run = latest[0];
   const overdue = overdueCount(proposals.submitted, new Date().toISOString().slice(0, 10));
   const decide = { viewer, keep: Boolean(waitingFor?.length), drafting: worker.readiness !== "not set up" };
+  // Rating this week's picks (Task 5, 18 Nov 2026): only a Monday brief's Top 10 has a week to rate, and only after 022.
+  const rate = top.week && (await hasTopRatings())
+    ? { week: top.week, ...picksFor(await topPickRatings([top.week]), top.week, viewer) }
+    : undefined;
 
   const cards: ViewCard[] = [
     {
@@ -134,7 +141,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
               label: "Top 10 calls",
               count: top.ids.length,
               note: topSource(top.week),
-              panel: <TopTenTable ids={top.ids} description tz={tz} nameOf={(by) => label(displayPerson(by, users))} decide={decide} />,
+              panel: <TopTenTable ids={top.ids} description tz={tz} nameOf={(by) => label(displayPerson(by, users))} decide={decide} rate={rate} />,
             },
             {
               key: "watch",

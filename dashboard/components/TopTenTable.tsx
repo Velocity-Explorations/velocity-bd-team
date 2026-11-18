@@ -1,6 +1,8 @@
 import { ArrowRight } from "lucide-react";
 import { cache } from "react";
+import { rateTopPickAction } from "@/app/actions";
 import { DecideCell } from "@/components/DecideCell";
+import { DecideButton, RowOutcome } from "@/components/DecideControls";
 import { DraftBadge } from "@/components/DraftBadge";
 import { PersonName } from "@/components/PersonName";
 import { PortalLogo } from "@/components/PortalLogo";
@@ -10,6 +12,7 @@ import { descriptionCell } from "@/lib/description";
 import { formatDue } from "@/lib/format";
 import { daysLeftText, topTenOrder } from "@/lib/home";
 import { verdictsFor } from "@/lib/judges";
+import { MAX_PICK_COMMENT, PICK_LABELS, PICK_RATINGS, PICK_TONES, type PickRated } from "@/lib/toppicks";
 import { fitBadge } from "@/lib/fit";
 import { listingBadge } from "@/lib/listing";
 import { displayPerson } from "@/lib/people";
@@ -33,6 +36,13 @@ const topTenData = cache(async (key: string) => {
  *  (the queue's "keep"), and whether drafting is set up. */
 export type TopTenDecide = { viewer: string | null; keep: boolean; drafting: boolean };
 
+/** Home's rating of the week's picks (Task 5, 18 Nov 2026): the brief's week, the viewer's own ratings and everyone else's. */
+export type TopTenRate = {
+  week: string;
+  mine: Map<string, PickRated>;
+  others: Map<string, { person: string; rating: string; comment: string | null }[]>;
+};
+
 /** Start reading the Top 10 as soon as its ids are known, beside the page's other queries. */
 export function preloadTopTen(ids: string[]): void {
   topTenData(JSON.stringify(ids)).catch(() => undefined);
@@ -47,12 +57,13 @@ export function preloadTopTen(ids: string[]): void {
  * does not hold. An umbrella or announcement wears its badge. With `decide` (Home), each row also has the Decide menu,
  * and a decision comes back to Home.
  */
-export async function TopTenTable({ ids, description, tz, nameOf, decide, watch = false }: {
+export async function TopTenTable({ ids, description, tz, nameOf, decide, rate, watch = false }: {
   ids: string[];
   description: boolean;
   tz: string;
   nameOf: (by: string | null) => string;
   decide?: TopTenDecide;
+  rate?: TopTenRate;
   watch?: boolean;
 }) {
   const { byId, order, judged, drafts, votes } = await topTenData(JSON.stringify(ids));
@@ -82,6 +93,7 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide, watch 
             <th className="decision">Decision now</th>
             {description ? <th className="wide">Summary description</th> : null}
             <th className="wide">Judges&apos; reasons</th>
+            {rate ? <th className="pick">Good pick?</th> : null}
             {decide ? <th className="decide">Decide</th> : null}
             <th className="row-arrow">
               <span className="sr-only">Open</span>
@@ -159,6 +171,7 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide, watch 
                   <p className="clamp judge-reason"><b>Claude</b> {verdicts.claude?.reasoning ?? "not reviewed"}</p>
                   <p className="clamp judge-reason"><b>Grok</b> {verdicts.grok?.reasoning ?? "not yet"}</p>
                 </td>
+                {rate ? <PickCell id={id} title={call.title || call.id} rate={rate} nameOf={nameOf} /> : null}
                 {decide ? (
                   <DecideCell
                     call={call}
@@ -187,5 +200,50 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide, watch 
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * Is this a good pick for the Top 10? (Task 5 of the 9 Nov review, 18 Nov 2026): the viewer rates the pick Good pick, Not
+ * a fit or Unsure, with a reason if they want, apart from their decision on the call; everyone else's ratings show under.
+ */
+function PickCell({ id, title, rate, nameOf }: { id: string; title: string; rate: TopTenRate; nameOf: (by: string | null) => string }) {
+  const mine = rate.mine.get(id);
+  const others = rate.others.get(id) ?? [];
+  return (
+    <td className="pick">
+      <form action={rateTopPickAction} className="pick-form">
+        <input type="hidden" name="week" value={rate.week} />
+        <input type="hidden" name="call_id" value={id} />
+        <input type="hidden" name="return_to" value="/" />
+        <div className="pick-choices" role="group" aria-label={`Is ${title} a good pick for this week's Top 10?`}>
+          {PICK_RATINGS.map((r) => (
+            <DecideButton key={r} name="rating" value={r} pressed={mine?.rating === r}
+              className={`pick-choice tone-${PICK_TONES[r]}${mine?.rating === r ? " on" : ""}`}>
+              {PICK_LABELS[r]}
+            </DecideButton>
+          ))}
+        </div>
+        <details className="pick-why" open={Boolean(mine?.comment)}>
+          <summary className="btn-text">{mine?.comment ? "Why" : "Add why"}</summary>
+          <textarea name="comment" rows={2} maxLength={MAX_PICK_COMMENT} defaultValue={mine?.comment ?? ""}
+            aria-label={`Why, for ${title}`} placeholder="A few words; saved with the rating" />
+        </details>
+        <RowOutcome callId={id} param="rated" className="pick-outcome" />
+        {others.length ? (
+          <ul className="pick-others">
+            {others.map((o) => (
+              <li key={o.person}>
+                <PersonName by={o.person}>{nameOf(o.person)}</PersonName>{" "}
+                <span className={`badge tone-${PICK_TONES[o.rating as keyof typeof PICK_TONES] ?? "none"}`}>
+                  {PICK_LABELS[o.rating as keyof typeof PICK_LABELS] ?? o.rating}
+                </span>
+                {o.comment ? <span className="muted"> {o.comment}</span> : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </form>
+    </td>
   );
 }

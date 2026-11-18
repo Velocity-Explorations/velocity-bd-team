@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { NOTICE_KEYS } from "@/lib/decide";
 import { FIT_SORT_LABELS, FIT_SORTS, type FitSort } from "@/lib/fitratings";
 
 const SETTLE_MS = 400;   // a search applies once the typing stops
@@ -19,7 +20,7 @@ export function FitFind({ query, sort }: { query: string; sort: FitSort }) {
 
   const go = (next: { q?: string; sort?: FitSort }) => {
     const url = new URL(window.location.href);   // the open section is in the address (TopTabs keeps it there)
-    for (const key of ["notice", "error", "row"]) url.searchParams.delete(key);
+    for (const key of NOTICE_KEYS) url.searchParams.delete(key);
     const q = (next.q ?? text).trim();
     if (q) url.searchParams.set("q", q);
     else url.searchParams.delete("q");

@@ -23,11 +23,11 @@ def test_migrate_creates_tables_and_is_idempotent(tmp_path: Path) -> None:
                      "015_listing.sql", "016_chat.sql",
                      "017_draft_suggestions.sql", "018_profile_pictures.sql",
                      "019_bar_theme.sql", "020_unsure.sql",
-                     "021_team_tags.sql"]
+                     "021_team_tags.sql", "022_top10_ratings.sql"]
     assert migrate.apply(url) == []
     assert migrate.list_tables(url) == ["briefs", "call_tags", "calls", "change_requests", "chat_messages", "checklist_items", "decisions", "draft_suggestions",
                                          "drive_items", "fit_ratings", "judgments", "linear_issues", "people", "profile_pictures", "profiles", "proposals", "pursuit_events", "pursuit_steps",
-                                         "pursuits", "runs", "schema_migrations", "slop_scans", "step_changes", "tag_list",
+                                         "pursuits", "runs", "schema_migrations", "slop_scans", "step_changes", "tag_list", "top10_ratings",
                                          "worker_jobs", "workers"]
 
 
@@ -173,7 +173,7 @@ def test_021_keeps_every_tag_and_lets_a_person_tag_a_call_s_listing(tmp_path: Pa
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(tag, ("Umbrella", "team"))
     conn.close()
-    monkeypatch.setattr(migrate, "migration_files", lambda: every)
+    monkeypatch.setattr(migrate, "migration_files", lambda: [p for p in every if p.name < "022"])
     assert migrate.apply(url) == ["021_team_tags.sql"]
     conn = sqlite3.connect(tmp_path / "m.db")
     try:
@@ -185,5 +185,26 @@ def test_021_keeps_every_tag_and_lets_a_person_tag_a_call_s_listing(tmp_path: Pa
             conn.execute(tag, ("Umbrella", "team"))   # still one row per call, tag and source
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(tag, ("Call", "someone"))
+    finally:
+        conn.close()
+
+
+def test_022_keeps_one_top_10_rating_per_week_pick_and_person(tmp_path: Path) -> None:
+    """Task 5 of the 9 Nov review (18 Nov 2026): a pick is rated Good pick, Not a fit or Unsure, apart from decisions."""
+    url = f"sqlite:///{(tmp_path / 'm.db').as_posix()}"
+    migrate.apply(url)
+    conn = sqlite3.connect(tmp_path / "m.db")
+    try:
+        conn.execute("INSERT INTO calls (id, portal, first_seen_at, last_seen_at, updated_at) VALUES ('c1', 'SAM.gov', 'now', 'now', 'now')")
+        rate = "INSERT INTO top10_ratings (week_of, call_id, rated_by, rating, comment, rated_at) VALUES (?, 'c1', ?, ?, ?, 'now')"
+        conn.execute(rate, ("2026-11-16", "David Wood", "good_pick", "fits"))
+        conn.execute(rate, ("2026-11-16", "Shaun Jones", "not_a_fit", None))
+        conn.execute(rate, ("2026-11-09", "David Wood", "unsure", None))   # another week's Top 10 keeps its own
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(rate, ("2026-11-16", "David Wood", "unsure", None))   # one per week, pick and person
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(rate, ("2026-11-23", "David Wood", "pursue", None))   # a rating, not a decision
+        assert conn.execute("SELECT COUNT(*) FROM top10_ratings").fetchone() == (3,)
+        assert conn.execute("SELECT COUNT(*) FROM decisions").fetchone() == (0,)
     finally:
         conn.close()

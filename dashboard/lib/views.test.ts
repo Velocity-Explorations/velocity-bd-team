@@ -87,15 +87,17 @@ test("a column filter that matches no view leaves no card pressed (VC4)", () => 
   assert.equal(pressedCard("judges-disagree", { ...none, tier: "tight" }), null);
 });
 
-test("Automation has six cards, Fit ratings first (David, 9 Nov 2026), each linking its view and marking the open one", () => {
+test("Automation has seven cards, Fit ratings first and Top 10 reviews second (Task 5, 18 Nov 2026), each linking its view and marking the open one", () => {
   const row = automationCards({
     current: "problems", waiting: 2, kinds: "a keyword change, a scan", decided: 3, runs: 26,
     lastRun: "last completed 2026-10-24 08:07 MDT", problems: 4, agree: { both: 62, agree: 48 }, ratings: 116,
+    reviews: { ratings: 5, people: 2 },
   });
   assert.deepEqual(
     row.map((c) => [c.label, c.href, c.count, c.description, c.current, c.needsYou]),
     [
       ["Fit ratings", "/fit", 116, "what every call's fit score is built from", false, false],
+      ["Top 10 reviews", "/top10-reviews", 5, "this week's picks rated, by 2 people", false, false],
       ["Agent update requests", "/requests", 2, "a keyword change, a scan", false, true],
       ["Decided requests", "/requests?view=decided", 3, "the last 50, with their result", false, false],
       ["Scans", "/runs", 26, "last completed 2026-10-24 08:07 MDT", false, false],
@@ -106,7 +108,8 @@ test("Automation has six cards, Fit ratings first (David, 9 Nov 2026), each link
   const none = automationCards({ current: "judges", waiting: 0, kinds: "", decided: 0, runs: 0, lastRun: "", problems: 0, agree: null, ratings: null });
   assert.deepEqual(
     none.map((c) => [c.count, c.description]),
-    [["none", "nothing rated yet"], [0, "nothing waiting"], [0, "none decided yet"], [0, "no scans yet"], [0, "no timeouts or errors"], ["none", "no call judged by both yet"]],
+    [["none", "nothing rated yet"], ["none", "no pick rated yet"], [0, "nothing waiting"], [0, "none decided yet"], [0, "no scans yet"],
+      [0, "no timeouts or errors"], ["none", "no call judged by both yet"]],
   );
 });
 
@@ -123,4 +126,10 @@ test("Unsure is the second card: the calls someone held for the team, which nobo
 test("the Scans card puts the last scan's time on a line of its own, so its date never breaks at a hyphen (Task 3, 18 Nov 2026)", () => {
   assert.equal(lastRunLine("2026-11-16 11:46 MST"), "last completed\n2026-11-16 11:46 MST");
   assert.equal(lastRunLine(""), "none completed yet");
+});
+
+test("one person's ratings this week say so in the singular", () => {
+  const row = automationCards({ current: "reviews", waiting: 0, kinds: "", decided: 0, runs: 0, lastRun: "", problems: 0, agree: null,
+    ratings: null, reviews: { ratings: 1, people: 1 } });
+  assert.deepEqual([row[1].count, row[1].description, row[1].current], [1, "this week's picks rated, by 1 person", true]);
 });
