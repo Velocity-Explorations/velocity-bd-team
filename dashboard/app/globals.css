@@ -2700,16 +2700,21 @@ tr.row-link:focus-visible .row-arrow {
   width: 32px;
 }
 
-.top-ten th:nth-child(3) {
+/* Columns by name, not position (Task 4, 18 Nov 2026): the Fit column, added on 6 Nov, had shifted the counted widths
+   one place, so Fit took Claude's 76px and "69 possible" ran into Claude's badge. */
+.top-ten th.due {
   width: 170px;
 }
 
-.top-ten th:nth-child(4),
-.top-ten th:nth-child(5) {
+.top-ten th.fit {
+  width: 112px;
+}
+
+.top-ten th.judge {
   width: 76px;
 }
 
-.top-ten th:nth-child(6) {
+.top-ten th.decision {
   width: 104px;
 }
 
@@ -4974,4 +4979,40 @@ button[disabled] {
 
 .fit-table tr.fit-none td {
   padding: 16px 12px;
+}
+
+/* Why this score, at the top of the reasons panel (Task 4, 18 Nov 2026). */
+.panel-why {
+  margin: 6px 0 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-why .why-headline {
+  margin: 4px 0;
+  font: var(--type-row-title);
+  color: var(--ink);
+}
+
+.panel-why .why-parts {
+  margin: 4px 0;
+  padding-left: 18px;
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+.panel-why .why-note,
+.panel-why .why-rank {
+  margin: 4px 0;
+  font: var(--type-small);
+  color: var(--ink-2);
+}
+
+/* Home's Top 10: each judge's reason, three lines at most. */
+.clamp.judge-reason {
+  -webkit-line-clamp: 3;
+}
+
+.clamp.judge-reason + .clamp.judge-reason {
+  margin-top: 6px;
 }

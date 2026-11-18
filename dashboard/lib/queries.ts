@@ -156,7 +156,9 @@ function summaryColumn(db: Db, present: boolean) {
 /** Each call's fit score (migration 013), or NULLs before the migration is applied. A fragment, so never awaited. */
 /** The score's columns and the call's kind of listing (migration 015), or NULLs where the migration is not applied. */
 function fitColumns(db: Db, present: boolean, listing: boolean) {
-  const score = present ? db`fit_score, fit_band, fit_why` : db`NULL::int AS fit_score, NULL::text AS fit_band, NULL::text AS fit_why`;
+  const score = present
+    ? db`fit_score, fit_band, fit_why, matched_keywords`
+    : db`NULL::int AS fit_score, NULL::text AS fit_band, NULL::text AS fit_why, matched_keywords`;   // matched_keywords: Why this score
   return listing ? db`${score}, listing` : db`${score}, NULL::text AS listing`;
 }
 

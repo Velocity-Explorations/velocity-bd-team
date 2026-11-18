@@ -75,13 +75,13 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide, watch 
           <tr>
             <th className="rank">#</th>
             <th>Call</th>
-            <th>Deadline</th>
-            <th>Fit</th>
-            <th>Claude</th>
-            <th>Grok</th>
-            <th>Decision now</th>
+            <th className="due">Deadline</th>
+            <th className="fit">Fit</th>
+            <th className="judge">Claude</th>
+            <th className="judge">Grok</th>
+            <th className="decision">Decision now</th>
             {description ? <th className="wide">Summary description</th> : null}
-            <th className="wide">Claude&apos;s reason</th>
+            <th className="wide">Judges&apos; reasons</th>
             {decide ? <th className="decide">Decide</th> : null}
             <th className="row-arrow">
               <span className="sr-only">Open</span>
@@ -121,7 +121,7 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide, watch 
                   {formatDue(call.due_date, tz) || <span className="muted">no deadline</span>}
                   {call.days_left !== null ? <div className="meta">{daysLeftText(call.days_left)}</div> : null}
                 </td>
-                <td>
+                <td className="fit">
                   {fitBadge(call) ? <FitBadge row={call} /> : <span className="muted">not yet</span>}
                 </td>
                 <td>
@@ -155,7 +155,9 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide, watch 
                   </td>
                 ) : null}
                 <td className="wide reason">
-                  <p className="clamp">{call.ai_reasoning ?? ""}</p>
+                  {/* Both judges' reasons (Task 4, 18 Nov 2026): Grok gives one with every verdict. */}
+                  <p className="clamp judge-reason"><b>Claude</b> {verdicts.claude?.reasoning ?? "not reviewed"}</p>
+                  <p className="clamp judge-reason"><b>Grok</b> {verdicts.grok?.reasoning ?? "not yet"}</p>
                 </td>
                 {decide ? (
                   <DecideCell
