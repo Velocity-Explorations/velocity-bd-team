@@ -320,6 +320,8 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                       colSpan={colSpan}
                       verdicts={verdicts}
                       sources={detailSources(callDetails(r), deadlineNote(r.extra))}
+                      fit={r}
+                      rank={rank >= 0 ? { place: rank + 1, daysLeft: r.days_left } : null}
                     />,
                   ];
                 })}

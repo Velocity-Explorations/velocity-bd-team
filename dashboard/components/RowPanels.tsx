@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/bits";
+import { rankReason, whyThisScore, type FitColumns } from "@/lib/fit";
 import { JUDGES, type Verdicts } from "@/lib/judges";
 
 /** A panel's element id: one reasons panel per call, under its row. A person's notes sit beside their vote (NoteTip in
@@ -34,16 +35,46 @@ function Panel({ id, callId, colSpan, title, open, children }: {
   );
 }
 
-/** Reasons (PRO-572): both judges' verdicts and reasons, then where the call's details come from. */
-export function ReasonsPanel({ callId, colSpan, verdicts, sources, open = false }: {
+/**
+ * Reasons (PRO-572): why the call scored what it did, both judges' verdicts and reasons, then where the call's details
+ * come from. Why this score (Task 4, 18 Nov 2026) shows only what was computed: the score and band, each part
+ * review/fit.py rated, the keywords the filter matched, and, for a call in this week's Top 10, how its rule ranked it.
+ */
+export function ReasonsPanel({ callId, colSpan, verdicts, sources, fit, rank, open = false }: {
   callId: string;
   colSpan: number;
   verdicts: Verdicts;
   sources: { text: string; source: string }[];
+  fit?: Partial<FitColumns>;
+  rank?: { place: number; daysLeft: number | null } | null;
   open?: boolean;
 }) {
+  const why = fit ? whyThisScore(fit) : null;
   return (
     <Panel id={panelId("reasons", callId)} callId={callId} colSpan={colSpan} title="Reasons" open={open}>
+      {why ? (
+        <div className="panel-why">
+          <p className="menu-title">Why this score</p>
+          <p className="why-headline">{why.headline}</p>
+          {why.parts.length ? (
+            <ul className="why-parts">
+              {why.parts.map((part) => <li key={part}>{part}</li>)}
+            </ul>
+          ) : null}
+          {why.matched.length ? (
+            <p className="why-note">
+              Keywords the filter matched: {why.matched.join(", ")}. Each counts only where the team rated it and it stands
+              as a whole word; anything not rated counts as Neutral and is not listed.
+            </p>
+          ) : null}
+          {rank ? (
+            <p className="why-rank">
+              <strong>#{rank.place} in this week&apos;s Top 10.</strong>{" "}
+              {rankReason({ claude: verdicts.claude?.verdict ?? null, grok: verdicts.grok?.verdict ?? null, daysLeft: rank.daysLeft, score: fit?.fit_score ?? null })}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="panel-reasons">
         {JUDGES.map(({ key, label }) => (
           <div key={key}>
