@@ -334,3 +334,41 @@ export function buildFitRows(input: { ratings: RatingRow[]; tags: TagRow[]; call
   ]).forEach(add);
   return rows;
 }
+
+/**
+ * How the page lists a section's rows (Task 3, 18 Nov 2026): in the list's own order, with anything not rated first; by
+ * name; by rating, from Core to Never with the unrated last; or by calls, most first.
+ */
+export const FIT_SORTS = ["list", "name", "rating", "calls"] as const;
+export type FitSort = (typeof FIT_SORTS)[number];
+
+export const FIT_SORT_LABELS: Record<FitSort, string> = {
+  list: "Not rated first",
+  name: "Name, A to Z",
+  rating: "Rating, Core to Never",
+  calls: "Calls, most first",
+};
+
+/** The sort the address asks for, if the page offers it. */
+export function pickFitSort(raw: string | null | undefined): FitSort {
+  return (FIT_SORTS as readonly string[]).includes(raw ?? "") ? (raw as FitSort) : "list";
+}
+
+/**
+ * A section's rows as the page shows them (Task 3, 18 Nov 2026): those holding every word searched for in their name,
+ * what they cover, their note or a NAICS code or its title, in any case, in the order chosen. A tie keeps the list's
+ * order.
+ */
+export function arrangeFitRows(rows: FitRow[], query: string, sort: FitSort): FitRow[] {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const found = rows.filter((r) => {
+    if (!words.length) return true;
+    const text = [r.name, r.covers, r.note, ...r.codes.flatMap((c) => [c.code, c.title])].join(" ").toLowerCase();
+    return words.every((w) => text.includes(w));
+  });
+  const order = (r: FitRow) => (r.rating ? RATINGS.indexOf(r.rating) : RATINGS.length);
+  if (sort === "name") return found.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+  if (sort === "rating") return found.sort((a, b) => order(a) - order(b));
+  if (sort === "calls") return found.sort((a, b) => b.calls - a.calls);
+  return found;
+}

@@ -116,6 +116,14 @@ export function callViewCards(input: {
 
 /** Automation's cards (PRO-573): Fit ratings first, where the section opens (David, 9 Nov 2026), then Agent update
  *  requests (the count that needs the viewer), Decided requests, Scans, Scan problems, Judges agree. */
+/**
+ * The Scans card's line (Task 3, 18 Nov 2026): the last scan's time on a line of its own, so a narrow card wraps between
+ * the words and never inside the date, which it broke at a hyphen at 1024px.
+ */
+export function lastRunLine(finished: string): string {
+  return finished ? `last completed\n${finished}` : "none completed yet";
+}
+
 export function automationCards(input: {
   current: AutomationPage;
   waiting: number;

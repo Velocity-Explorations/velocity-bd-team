@@ -2220,6 +2220,7 @@ ul.votes {
 
 .vt-card__description {
   align-self: start;
+  white-space: pre-line;   /* a line break in the words starts a new line (the Scans card's time, Task 3) */
   padding: 0 14px 14px;
   font: 400 12px/1.4 var(--font-label);
   color: var(--ink-3);
@@ -4935,4 +4936,42 @@ button[disabled] {
   .fit-scale {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Fit ratings: find and sort (Task 3, 18 Nov 2026), a saved rating that says so, and a failed save at its row. */
+.fit-find {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 16px;
+  margin: 0 0 12px;
+}
+
+.fit-find .field {
+  display: grid;
+  gap: 4px;
+}
+
+.fit-find input[type="search"] {
+  width: 280px;
+}
+
+.fit-find .fit-find-count {
+  align-self: center;
+  color: var(--ink-3);
+  font: var(--type-detail);
+}
+
+.fit-slider-state.saved {
+  color: var(--good);
+}
+
+.fit-slider-error {
+  margin: 4px 0 0;
+  color: var(--tone);
+  font: var(--type-detail);
+}
+
+.fit-table tr.fit-none td {
+  padding: 16px 12px;
 }
