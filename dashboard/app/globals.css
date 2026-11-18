@@ -2701,7 +2701,8 @@ tr.row-link:focus-visible .row-arrow {
 }
 
 /* Columns by name, not position (Task 4, 18 Nov 2026): the Fit column, added on 6 Nov, had shifted the counted widths
-   one place, so Fit took Claude's 76px and "69 possible" ran into Claude's badge. */
+   one place, so Fit took Claude's 76px and "69 possible" ran into Claude's badge. The verdict columns are verdict-col,
+   not judge: .judge is the Votes cell's flex line, and as a header it stacked Claude and Grok in one column. */
 .top-ten th.due {
   width: 170px;
 }
@@ -2710,7 +2711,7 @@ tr.row-link:focus-visible .row-arrow {
   width: 112px;
 }
 
-.top-ten th.judge {
+.top-ten th.verdict-col {
   width: 76px;
 }
 

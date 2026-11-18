@@ -77,8 +77,8 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide, watch 
             <th>Call</th>
             <th className="due">Deadline</th>
             <th className="fit">Fit</th>
-            <th className="judge">Claude</th>
-            <th className="judge">Grok</th>
+            <th className="verdict-col">Claude</th>
+            <th className="verdict-col">Grok</th>
             <th className="decision">Decision now</th>
             {description ? <th className="wide">Summary description</th> : null}
             <th className="wide">Judges&apos; reasons</th>
