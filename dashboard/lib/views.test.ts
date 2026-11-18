@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { automationCards, callViewCards, pickCallView, pressedCard, viewJudges, type CallCard } from "./views.ts";
+import { automationCards, callViewCards, lastRunLine, pickCallView, pressedCard, viewJudges, type CallCard } from "./views.ts";
 
 const PARAMS = {
   portal: ["SAM.gov", "NSTXL"],
@@ -118,4 +118,9 @@ test("Unsure is the second card: the calls someone held for the team, which nobo
   assert.equal(card.count, 3);
   assert.equal(card.current, true);
   assert.equal(card.description, "held for the team to settle");
+});
+
+test("the Scans card puts the last scan's time on a line of its own, so its date never breaks at a hyphen (Task 3, 18 Nov 2026)", () => {
+  assert.equal(lastRunLine("2026-11-16 11:46 MST"), "last completed\n2026-11-16 11:46 MST");
+  assert.equal(lastRunLine(""), "none completed yet");
 });

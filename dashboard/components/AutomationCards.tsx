@@ -3,7 +3,7 @@ import { formatTime } from "@/lib/format";
 import { kindsLine } from "@/lib/home";
 import { countDecidedRequests, countProblemRuns, countRuns, fitRatingCount, judgeAgreement, lastCompletedRun, waitingRequests } from "@/lib/queries";
 import { timeZone } from "@/lib/me";
-import { automationCards, type AutomationPage } from "@/lib/views";
+import { automationCards, lastRunLine, type AutomationPage } from "@/lib/views";
 
 /** Automation's row of view cards (PRO-570, PRO-573): Agent update requests, Decided requests, Scans, Scan problems, Judges agree, Fit ratings. */
 export async function AutomationCards({ current }: { current: AutomationPage }) {
@@ -27,7 +27,7 @@ export async function AutomationCards({ current }: { current: AutomationPage }) 
         decided,
         runs,
         problems,
-        lastRun: finished ? `last completed ${finished}` : "none completed yet",
+        lastRun: lastRunLine(finished),
         agree: agreement,
         ratings,
       })}

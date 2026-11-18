@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildFitRows, isRating, ratingAt, sectionOfKey, sectorOf, slug, SLIDER, stopOf, type EvidenceCall, type RatingRow } from "./fitratings.ts";
+import { arrangeFitRows, buildFitRows, isRating, pickFitSort, ratingAt, sectionOfKey, sectorOf, slug, SLIDER, stopOf, type EvidenceCall, type FitRow, type RatingRow } from "./fitratings.ts";
 
 function rated(key: string, section: string, name: string, rating: string, extra: Partial<RatingRow> = {}): RatingRow {
   return { key, section, name, rating, note: null, loaded_at: "2026-11-06T12:00:00Z", changed_by: null, ...extra };
@@ -137,4 +137,48 @@ test("the slider runs from Never to Core, and an unrated row sits at Neutral (Da
 test("a rating that isn't on the scale reads as no rating", () => {
   const rows = buildFitRows({ ratings: [rated("work.software", "work", "Software", "great")], tags: TAGS, calls: [], callTags: [], judges: [] });
   assert.equal(rows.find((r) => r.key === "work.software")?.rating, null);
+});
+
+// ------------------------------------------------------------------ finding and sorting rows (Task 3, 18 Nov 2026)
+
+function fitRow(key: string, name: string, extra: Partial<FitRow> = {}): FitRow {
+  return {
+    key, section: "keyword", name, covers: "", kind: "", rating: null, note: "", changedBy: null, changedAt: null, calls: 0,
+    mainWork: null, claude: [0, 0, 0], grok: [0, 0, 0], team: [], examples: [], codes: [], ...extra,
+  };
+}
+
+const LIST = [
+  fitRow("keyword.autonomy", "autonomy", { calls: 12 }),
+  fitRow("keyword.data", "data", { rating: "good", calls: 144 }),
+  fitRow("keyword.radar", "radar", { rating: "never", calls: 9, note: "hardware, we pass" }),
+  fitRow("keyword.ai", "AI", { rating: "core", calls: 86, covers: "artificial intelligence and machine learning" }),
+  fitRow("naics.541715", "R&D in the physical sciences", { rating: "poor", calls: 30, codes: [{ code: "541715", title: "R&D", calls: 30 }] }),
+];
+
+test("the list's own order keeps rows as they came, nothing rated first", () => {
+  assert.deepEqual(arrangeFitRows(LIST, "", "list").map((r) => r.name), LIST.map((r) => r.name));
+});
+
+test("rows sort by name, by rating from Core to Never with the unrated last, or by calls, most first", () => {
+  assert.deepEqual(arrangeFitRows(LIST, "", "name").map((r) => r.name), ["AI", "autonomy", "data", "R&D in the physical sciences", "radar"]);
+  assert.deepEqual(arrangeFitRows(LIST, "", "rating").map((r) => r.name), ["AI", "data", "R&D in the physical sciences", "radar", "autonomy"]);
+  assert.deepEqual(arrangeFitRows(LIST, "", "calls").map((r) => r.name), ["data", "AI", "R&D in the physical sciences", "autonomy", "radar"]);
+});
+
+test("a search finds rows by name, what they cover, their note or a NAICS code, ignoring case", () => {
+  assert.deepEqual(arrangeFitRows(LIST, "AUTO", "list").map((r) => r.name), ["autonomy"]);
+  assert.deepEqual(arrangeFitRows(LIST, "machine learning", "list").map((r) => r.name), ["AI"]);
+  assert.deepEqual(arrangeFitRows(LIST, "pass", "list").map((r) => r.name), ["radar"]);
+  assert.deepEqual(arrangeFitRows(LIST, "5417", "list").map((r) => r.name), ["R&D in the physical sciences"]);
+  assert.deepEqual(arrangeFitRows(LIST, "  ", "list").length, LIST.length);
+  assert.deepEqual(arrangeFitRows(LIST, "quantum", "list"), []);
+});
+
+test("only the sorts the page offers are taken from the address", () => {
+  assert.equal(pickFitSort("calls"), "calls");
+  assert.equal(pickFitSort("rating"), "rating");
+  assert.equal(pickFitSort("name"), "name");
+  assert.equal(pickFitSort("bogus"), "list");
+  assert.equal(pickFitSort(undefined), "list");
 });

@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { saveFitRatingAction } from "@/app/actions";
 import { AutomationCards } from "@/components/AutomationCards";
+import { FitFind } from "@/components/FitFind";
 import { FitNote } from "@/components/FitNote";
 import { FitSlider } from "@/components/FitSlider";
 import { PersonName } from "@/components/PersonName";
 import { preloadShell, Shell } from "@/components/Shell";
 import { TopTabs } from "@/components/TopTabs";
 import { Badge, Flash } from "@/components/bits";
-import { buildFitRows, SECTIONS, SLIDER, type FitRow, type Mix } from "@/lib/fitratings";
+import { arrangeFitRows, buildFitRows, pickFitSort, SECTIONS, SLIDER, type FitRow, type FitSort, type Mix } from "@/lib/fitratings";
 import { formatTime } from "@/lib/format";
 import { timeZone } from "@/lib/me";
 import { fitOverview, fitRatingInputs } from "@/lib/queries";
@@ -27,6 +28,8 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
   const [inputs, overview, tz] = await Promise.all([fitRatingInputs(), fitOverview(), timeZone()]);
   const rows = inputs ? buildFitRows(inputs) : [];
   const unrated = rows.filter((r) => !r.rating).length;
+  const query = firstParam(sp.q, 100);   // find and sort the rows (Task 3, 18 Nov 2026)
+  const sort = pickFitSort(firstParam(sp.sort, 20));
   const bands = overview ? BANDS.filter((b) => overview.bands[b]).map((b) => `${overview.bands[b]} ${b}`).join(", ") : "";
   const job = overview?.job;
   const status = [   // the scores' status, at the end of the lead (David, 9 Nov 2026)
@@ -70,13 +73,14 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
               </li>
             ))}
           </ul>
+          <FitFind query={query} sort={sort} />
           <TopTabs
             param="section"
             label="Fit rating sections"
             className="fit-tabs"
             initial={firstParam(sp.section, 20)}
             tabs={SECTIONS.map((s) => {   // one section at a time (David, 9 Nov 2026)
-              const own = rows.filter((r) => r.section === s.key);
+              const own = arrangeFitRows(rows.filter((r) => r.section === s.key), query, sort);
               const open = own.filter((r) => !r.rating).length;
               return {
                 key: s.key,
@@ -84,7 +88,7 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
                 count: own.length,
                 badge: open ? <span className="badge tone-warn">{open} not rated</span> : undefined,
                 note: `Each rating counts ${s.question.charAt(0).toLowerCase()}${s.question.slice(1)}. ${s.hint ?? ""}`.trim(),
-                panel: <FitSectionTable section={s} rows={own} tz={tz} />,
+                panel: <FitSectionTable section={s} rows={own} tz={tz} query={query} sort={sort} />,
               };
             })}
           />
@@ -95,22 +99,42 @@ export default async function FitRatingsPage({ searchParams }: { searchParams: S
 }
 
 /** One section's table, the panel of its tab. */
-function FitSectionTable({ section: s, rows, tz }: { section: (typeof SECTIONS)[number]; rows: FitRow[]; tz: string }) {
+function FitSectionTable({ section: s, rows, tz, query, sort }: {
+  section: (typeof SECTIONS)[number];
+  rows: FitRow[];
+  tz: string;
+  query: string;
+  sort: FitSort;
+}) {
   return (
     <section id={s.key} className="fit-section" aria-label={s.label}>
       <div className="table-wrap">
         <table className="fit-table">
           <thead>
             <tr>
-              <th><HeadHelp label={s.label} tip={`What is being rated, what it covers, and example calls. ${s.question}.`} /></th>
-              <th className="fit-rating-col"><HeadHelp label="Rating and note" tip={RATING_TIP} /></th>
-              <th className="num"><HeadHelp label="Calls" tip={s.key === "work" ? CALLS_WORK_TIP : CALLS_TIP} /></th>
+              <th aria-sort={sort === "name" ? "ascending" : undefined}>
+                <HeadHelp label={s.label} tip={`What is being rated, what it covers, and example calls. ${s.question}.`} />
+              </th>
+              <th className="fit-rating-col" aria-sort={sort === "rating" ? "descending" : undefined}>
+                <HeadHelp label="Rating and note" tip={RATING_TIP} />
+              </th>
+              <th className="num" aria-sort={sort === "calls" ? "descending" : undefined}>
+                <HeadHelp label="Calls" tip={s.key === "work" ? CALLS_WORK_TIP : CALLS_TIP} />
+              </th>
               <th><HeadHelp label="Judges (yes, maybe, no)" tip={JUDGES_TIP} /></th>
               <th><HeadHelp label="Team" tip={TEAM_TIP} /></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => <FitRatingRow key={row.key} row={row} tz={tz} focus={s.key === "work"} />)}
+            {rows.length ? (
+              rows.map((row) => <FitRatingRow key={row.key} row={row} tz={tz} focus={s.key === "work"} />)
+            ) : (
+              <tr className="fit-none">
+                <td colSpan={5} className="muted">
+                  {query ? `Nothing in ${s.label} matches “${query}”.` : `Nothing in ${s.label} yet.`}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -167,7 +191,7 @@ function FitRatingRow({ row, tz, focus }: { row: FitRow; tz: string; focus: bool
         <form action={saveFitRatingAction} className="fit-form">
           <input type="hidden" name="key" value={row.key} />
           <input type="hidden" name="name" value={row.name} />
-          <FitSlider name={row.name} rating={row.rating} />
+          <FitSlider fitKey={row.key} name={row.name} rating={row.rating} />
           <FitNote id={`note-${row.key}`} name={row.name} note={row.note} rated={Boolean(row.rating)} />
           {row.changedBy ? (
             <div className="meta">
