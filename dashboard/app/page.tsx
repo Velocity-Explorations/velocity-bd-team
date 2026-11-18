@@ -6,13 +6,14 @@ import { TopTabs } from "@/components/TopTabs";
 import { preloadTopTen, TopTenTable } from "@/components/TopTenTable";
 import { ViewCards } from "@/components/ViewCards";
 import { Flash } from "@/components/bits";
-import { weekLabel } from "@/lib/brief";
+import { topTenLine, weekLabel } from "@/lib/brief";
 import { formatAgo, formatTime } from "@/lib/format";
 import { dayMonth, kindsLine } from "@/lib/home";
 import { topTab } from "@/lib/listing";
 import { overdueCount, sortIntoViews } from "@/lib/proposals";
 import { aliasesFor, displayPerson } from "@/lib/people";
 import {
+  countScannedPortals,
   hasTopRatings,
   judgeAgreement,
   lastCompletedRun,
@@ -36,13 +37,6 @@ export const metadata: Metadata = { title: "Home | BD Team" };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-/** Where the Top 10 comes from, in one line (H2). */
-function topSource(week: string | null): string {
-  return week
-    ? `From the Monday brief, ${weekLabel(week)}, with each call's decision as of now.`
-    : "No Monday brief yet, so this is the live ranking: yes from both judges, then yes from one; inside each, what closes within 60 days, then the best fit.";
-}
-
 /** What the list to watch holds, in one line (David, 7 Nov 2026). */
 function watchSource(week: string | null): string {
   const what = "Umbrellas (standing CSOs, BAAs and cycles whose calls come under them) and announcements (nothing to submit yet), ranked like the Top 10";
@@ -63,7 +57,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const waitingFor = queueMode() === "each" && viewer ? aliasesFor(viewer, users) : null;
   const tz = await timeZone();
   const label = await labeler();
-  const [queue, requests, proposals, top, latest, lastRun, agreement, worker] = await Promise.all([
+  const [queue, requests, proposals, top, latest, lastRun, agreement, worker, scanned] = await Promise.all([
     queueCounts({ portals: [], state: "", tag: "" }, waitingFor),
     waitingRequests(),
     proposalCalls({ portals: [], state: "", tag: "" }).then(sortIntoViews),
@@ -76,6 +70,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     lastCompletedRun(),
     judgeAgreement(),
     drafting(),
+    countScannedPortals(),
   ]);
   const run = latest[0];
   const overdue = overdueCount(proposals.submitted, new Date().toISOString().slice(0, 10));
@@ -140,7 +135,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
               key: "calls",
               label: "Top 10 calls",
               count: top.ids.length,
-              note: topSource(top.week),
+              note: topTenLine({ madeAt: top.madeAt ? formatTime(top.madeAt, tz) : null, rankedBy: top.rankedBy, portals: scanned }),
               panel: <TopTenTable ids={top.ids} description tz={tz} nameOf={(by) => label(displayPerson(by, users))} decide={decide} rate={rate} />,
             },
             {

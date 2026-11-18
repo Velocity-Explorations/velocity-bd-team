@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boardHref, closesText, judgesSentence, parseBrief, parseTop, weekLabel } from "./brief.ts";
+import { boardHref, closesText, judgesSentence, parseBrief, parseTop, topTenLine, weekLabel } from "./brief.ts";
 
 const portalBody = JSON.stringify({
   portal: "Vulcan SOF",
@@ -94,4 +94,23 @@ test("judgesSentence reads like the Slack summary's line", () => {
 test("each portal's board links to that portal's calls (PRO-573)", () => {
   assert.equal(boardHref("SAM.gov"), "/calls?portal=SAM.gov");
   assert.equal(boardHref("SSC Front Door"), "/calls?portal=SSC+Front+Door");
+});
+
+test("the Top 10's line says when the brief picked it, from how many portals, which calls and by what rule (Task 9, 18 Nov 2026)", () => {
+  const rule = "yes from both judges, then yes from one; inside each, what closes within 60 days, then the highest fit score, the nearest deadline and the newest";
+  assert.equal(topTenLine({ madeAt: "2026-11-16 09:00 MST", rankedBy: rule, portals: 12 }),
+    "Picked 2026-11-16 09:00 MST by the Monday brief, from the open calls across 12 portals that nobody had decided, that "
+    + "the keyword filter kept, that Claude rated yes or maybe and that the fit score had not ruled out. Ranked by yes from "
+    + "both judges, then yes from one; inside each, what closes within 60 days, then the highest fit score, the nearest "
+    + "deadline and the newest. It holds until next Monday's brief: each decision shows as of now, and a pick that has "
+    + "closed since says so under its deadline. Forecasts, announcements and umbrellas are on the next tab.");
+});
+
+test("before the first brief the line says the ranking is live, and a brief without its rule takes today's", () => {
+  assert.equal(topTenLine({ madeAt: null, rankedBy: "", portals: 1 }),
+    "No Monday brief yet, so this is the live ranking of the open calls across 1 portal that nobody has decided, that the "
+    + "keyword filter kept, that Claude rated yes or maybe and that the fit score has not ruled out: yes from both judges, "
+    + "then yes from one; inside each, what closes within 60 days, then the highest fit score, the nearest deadline and the "
+    + "newest. Forecasts, announcements and umbrellas are on the next tab.");
+  assert.match(topTenLine({ madeAt: "2026-11-09 09:00 MST", rankedBy: "", portals: 11 }), /Ranked by yes from both judges/);
 });

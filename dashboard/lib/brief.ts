@@ -151,3 +151,30 @@ export function judgesSentence(judges: JudgeLine[]): string {
 export function boardHref(portal: string): string {
   return `/calls?${new URLSearchParams({ portal }).toString()}`;
 }
+
+/**
+ * The ranking the live Top 10 and the Monday brief use (RANKING in assistant/tools.py, David, 6 Nov 2026), for a brief
+ * that did not store its own.
+ */
+const RANKING = "yes from both judges, then yes from one; inside each, what closes within 60 days, then the highest fit score, "
+  + "the nearest deadline and the newest";
+
+/**
+ * The line above Home's Top 10 (Task 9 of the 9 Nov review, 18 Nov 2026): when the Monday brief picked it, from how many
+ * portals, which calls (as assistant/tools.py open_undecided and _waiting pick them: open, nobody's decision, kept by the
+ * keyword filter, Claude's yes or maybe, not ruled out by the fit score, calls only), and the rule the brief stored for
+ * ranking them. `madeAt` is the brief's created_at in the viewer's time zone, or null before the first brief.
+ */
+export function topTenLine(input: { madeAt: string | null; rankedBy: string; portals: number }): string {
+  const across = `${input.portals} ${input.portals === 1 ? "portal" : "portals"}`;
+  const elsewhere = "Forecasts, announcements and umbrellas are on the next tab.";
+  if (!input.madeAt) {
+    return `No Monday brief yet, so this is the live ranking of the open calls across ${across} that nobody has decided, that `
+      + "the keyword filter kept, that Claude rated yes or maybe and that the fit score has not ruled out: "
+      + `${RANKING}. ${elsewhere}`;
+  }
+  return `Picked ${input.madeAt} by the Monday brief, from the open calls across ${across} that nobody had decided, that the `
+    + "keyword filter kept, that Claude rated yes or maybe and that the fit score had not ruled out. "
+    + `Ranked by ${input.rankedBy || RANKING}. It holds until next Monday's brief: each decision shows as of now, and a pick `
+    + `that has closed since says so under its deadline. ${elsewhere}`;
+}

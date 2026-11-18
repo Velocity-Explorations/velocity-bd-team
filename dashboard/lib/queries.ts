@@ -510,15 +510,18 @@ export async function liveTopTen(watch = false): Promise<string[]> {
 
 /** This week's Top 10 and top 10 to watch: the newest Monday brief's, in its order, or the live ranking before the first
  *  brief (H2), and for a brief written before the watch list began. One query for the newest week's ranking. */
-export function topTenIds(): Promise<{ ids: string[]; watch: string[]; week: string | null }> {
+/** This week's Top 10: the ids, the list to watch, the brief's week, when it was made and the rule it ranked by. */
+export type TopTen = { ids: string[]; watch: string[]; week: string | null; madeAt: string | null; rankedBy: string };
+
+export function topTenIds(): Promise<TopTen> {
   return remember("top10", keepFor(), readTopTenIds);
 }
 
-async function readTopTenIds(): Promise<{ ids: string[]; watch: string[]; week: string | null }> {
-  let newest: { week_of: string; body: string | null } | undefined;
+async function readTopTenIds(): Promise<TopTen> {
+  let newest: { week_of: string; body: string | null; created_at: string } | undefined;
   try {
-    [newest] = await sql()<{ week_of: string; body: string | null }[]>`
-      SELECT week_of, body FROM briefs WHERE portal IS NULL AND week_of = (SELECT MAX(week_of) FROM briefs)
+    [newest] = await sql()<{ week_of: string; body: string | null; created_at: string }[]>`
+      SELECT week_of, body, created_at FROM briefs WHERE portal IS NULL AND week_of = (SELECT MAX(week_of) FROM briefs)
       ORDER BY id DESC LIMIT 1`;
   } catch {
     newest = undefined;   // briefs table missing (migration 005)
@@ -526,10 +529,20 @@ async function readTopTenIds(): Promise<{ ids: string[]; watch: string[]; week: 
   const top = newest ? parseTop(newest.body) : null;
   if (newest && top) {
     const watch = top.watch ? top.watch.map((c) => c.id) : await liveTopTen(true);
-    return { ids: top.top.map((c) => c.id), watch, week: newest.week_of };
+    return { ids: top.top.map((c) => c.id), watch, week: newest.week_of, madeAt: newest.created_at, rankedBy: top.rankedBy };
   }
   const [ids, watch] = await Promise.all([liveTopTen(), liveTopTen(true)]);
-  return { ids, watch, week: null };
+  return { ids, watch, week: null, madeAt: null, rankedBy: "" };
+}
+
+/** How many portals a scan has completed for (Task 9, 18 Nov 2026): what the Top 10 is drawn from. */
+export function countScannedPortals(): Promise<number> {
+  return remember("scanned-portals", keepFor(), async () => {
+    const [row] = await sql()<{ n: number }[]>`
+      SELECT COUNT(DISTINCT portal)::int AS n FROM runs
+      WHERE portal IS NOT NULL AND status = 'completed' AND dry_run = 0 AND RIGHT(component, 7) <> '_manual'`;
+    return row?.n ?? 0;
+  });
 }
 
 /** "New calls this week" from LEDGER_SCHEMA.md, as a count. */
