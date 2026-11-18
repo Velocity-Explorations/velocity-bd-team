@@ -7,8 +7,8 @@ import { preloadShell, Shell } from "@/components/Shell";
 import { Badge, toneOf } from "@/components/bits";
 import { filterHref, pickMany } from "@/lib/filters";
 import { formatAgo, formatDuration, formatTime, parseStageCounts } from "@/lib/format";
-import { listRuns, runPortals } from "@/lib/queries";
-import { isProblem, isStale, pickRunsSort, runHeadline } from "@/lib/runs";
+import { latestPortalRuns, listRuns, portalsOf, runPortals, topTenIds } from "@/lib/queries";
+import { isProblem, isStale, pickRunsSort, portalScan, runHeadline } from "@/lib/runs";
 import { timeZone } from "@/lib/me";
 import { firstParam } from "@/lib/text";
 
@@ -44,6 +44,10 @@ export default async function ScansPage({ searchParams }: { searchParams: Search
   const portals = pickMany(sp.portal, known);
   const dir = pickRunsSort(sp.dir);
   const runs = await listRuns(100, { portals, problems: view === "problems", dir });
+  // Each portal's newest scan, and this week's Top 10 by portal (Task 6, 18 Nov 2026), on Scans only.
+  const [byPortal, topByPortal] = view === "problems"
+    ? [[], new Map<string, number>()]
+    : await Promise.all([latestPortalRuns(), topTenIds().then((top) => portalsOf(top.ids))]);
   const tz = await timeZone();
   const now = new Date();
   const latest = runs[0];
@@ -125,6 +129,68 @@ export default async function ScansPage({ searchParams }: { searchParams: Search
             ) : (
               <p className="muted">No log link for this run.</p>
             )}
+          </div>
+        </section>
+      ) : null}
+
+      {byPortal.length ? (
+        <section className="content-card portal-scans" aria-label="Latest scan by portal">
+          <p className="content-card__label">
+            <span>Latest scan by portal</span>
+          </p>
+          <div className="content-card__body">
+            <p className="muted">
+              Each portal&apos;s newest scan, what it read, and how many of this week&apos;s Top 10 came from it. A portal with
+              nothing open finds nothing too, so Found nothing is a look, not a failure.
+            </p>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Portal</th>
+                    <th>Last scan</th>
+                    <th>Status</th>
+                    <th className="num">Fetched</th>
+                    <th className="num">Filtered</th>
+                    <th className="num">Reviewed</th>
+                    <th className="num">New</th>
+                    <th className="num">In this week&apos;s Top 10</th>
+                    <th>Look at</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byPortal.map((run) => {
+                    const line = portalScan({ ...run, portal: run.portal ?? run.component }, now);
+                    const shown = (n: number | null) => (n === null ? <span className="muted">none</span> : n);
+                    return (
+                      <tr key={run.id} data-portal={run.portal ?? run.component}>
+                        <td>
+                          <span className="portal-cell">
+                            <PortalLogo portal={run.portal ?? run.component} />
+                            {run.portal ?? run.component}
+                          </span>
+                        </td>
+                        <td className="when">
+                          {formatTime(run.started_at, tz)}
+                          <div className="meta">{formatAgo(run.started_at, now)}</div>
+                        </td>
+                        <td>
+                          <Badge value={isStale(run, now) ? "error" : run.status} />
+                        </td>
+                        <td className="num">{shown(line.fetched)}</td>
+                        <td className="num">{shown(line.filtered)}</td>
+                        <td className="num">{shown(line.reviewed)}</td>
+                        <td className="num">{shown(line.added)}</td>
+                        <td className="num">{topByPortal.get(run.portal ?? "") ?? 0}</td>
+                        <td className="look-at">
+                          {line.flag ? <span className={`badge tone-${line.tone}`}>{line.flag}</span> : <span className="muted">nothing</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       ) : null}
