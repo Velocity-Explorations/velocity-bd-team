@@ -9,6 +9,33 @@ portal content.
 
 ## Current Session
 
+**Date**: 2026-11-18
+**Focus**: The nine dashboard tasks from the 9 Nov review with Shaun, one PR each (task list and decisions kept locally in data/tasks/)
+
+### What Was Done
+- Task 1 (#186): the Decide menu says Saving, comes back to the row and says Saved; a repeat is Already saved. On 9 Nov the Pursue had saved on the first click; only the feedback failed.
+- Task 2 (#188): Start the draft shows Asking Claude from the click and holds Start until the suggestion lands; errors offer Retry.
+- Task 3 (#189): Fit ratings gets Find and Sort; the slider says Saved; a failed save shows at its row; the Scans card's date no longer breaks.
+- Task 4 (#190): Why this score in the reasons panel; Grok's reason beside Claude's on Home. #190's `judge` class stacked Home's headers for about an hour; #191 fixed it with an alignment test.
+- Task 5 (#192): Good pick? on Home's Top 10 and Automation's Top 10 reviews; migration 022 applied to the live ledger (David's OK).
+- Task 6 (#193): Scans shows each portal's newest scan and its share of the Top 10 ([analysis](../../research/analysis/2026-11-18_portal-mix-and-duplicates.md)).
+- Task 7 (#195): docs/plans/color-team.md, a proposal only. Task 9 (#196): Home's Top 10 line from the data; picks closed since are marked.
+- Test fixes #187 and #194; Next.js 16.4.6 (#197). The live container was rebuilt after each merge.
+
+### Key Decisions
+- The Top 10 keeps the 6 Nov ranking; rating a pick is kept apart from deciding it; Fit's note box stays three lines (David).
+- No source merging until a call turns up on two portals; none has since 24 Oct (David).
+- Task work runs in the worktree C:\Projects\velocity-bd-team-tasks, so the scan PC's checkout stays on main.
+
+### In Progress
+- Task 8: velocity-bd-team-ac is to add three docs to its unpushed PRO-477 branch (what runs on the PC, a stage 2 plan, the open values); no reply yet.
+- Shaun's written Top 10 feedback has not arrived; it becomes new tasks.
+
+### Blockers
+- PRO-477: Alec. Gmail API for sign-in codes: a Workspace super admin.
+
+## Session: 2026-11-18
+
 **Date**: 2026-11-18 (covers 16 to 18 Nov, the session beside the one below)
 **Focus**: Ask Grok docked beside the page, Decide menu (reasons, Unsure, umbrella tag), Vulcan SOF scanning again, fit ratings
 
