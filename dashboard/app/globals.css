@@ -5142,3 +5142,8 @@ button[disabled] {
 .portal-scans td.look-at .badge {
   white-space: nowrap;
 }
+
+/* Home's Top 10: a pick that has closed since the Monday brief picked it (Task 9, 18 Nov 2026). */
+.top-ten .meta.closed-since {
+  color: var(--caution);
+}

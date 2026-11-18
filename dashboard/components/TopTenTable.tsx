@@ -131,7 +131,10 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide, rate, 
                 </td>
                 <td className="when">
                   {formatDue(call.due_date, tz) || <span className="muted">no deadline</span>}
-                  {call.days_left !== null ? <div className="meta">{daysLeftText(call.days_left)}</div> : null}
+                  {call.days_left !== null ? (
+                    // A pick that has closed since the brief picked it says so in the caution tone (Task 9, 18 Nov 2026).
+                    <div className={call.days_left < 0 ? "meta closed-since" : "meta"}>{daysLeftText(call.days_left)}</div>
+                  ) : null}
                 </td>
                 <td className="fit">
                   {fitBadge(call) ? <FitBadge row={call} /> : <span className="muted">not yet</span>}
