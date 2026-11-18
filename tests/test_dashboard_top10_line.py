@@ -2,8 +2,8 @@
 live ledger.
 
 The line above the Top 10 says when the Monday brief picked it, from how many portals' scans, which calls, and the rule
-the brief stored for ranking them. A pick that has closed since says so in the caution tone. Calls' Top 10 lists the
-calls in Home's order.
+the brief stored for ranking them. A pick that has closed since leaves the list (David, 18 Nov 2026), and the ranks close
+up. Calls' Top 10 lists the calls in Home's order.
 
 Opt in with WORKSPACE_TESTS=1 after `npm run build` in dashboard/. The tests start a postgres:17-alpine container
 (Docker) and the built dashboard on port 8014 against it, and remove both at the end.
@@ -153,18 +153,18 @@ def test_the_top_10_line_says_when_it_was_picked_from_what_and_by_which_rule(pag
     assert "Forecasts, announcements and umbrellas are on the next tab." in text
 
 
-def test_a_pick_that_has_closed_since_says_so_in_the_caution_tone(page: Any) -> None:
+def test_a_pick_that_has_closed_since_leaves_the_top_10(page: Any) -> None:
     page.goto(f"{WEB}/", wait_until="load", timeout=120_000)
-    closed = page.locator("#top-panel-calls tr[data-call-id='line-closed'] .meta.closed-since")
-    assert closed.inner_text().strip() == "closed yesterday"
-    assert page.locator("#top-panel-calls tr[data-call-id='line-first'] .meta.closed-since").count() == 0
+    assert page.locator("#top-panel-calls tr[data-call-id='line-closed']").count() == 0
+    assert "a pick that has closed since leaves the list" in page.locator("section.top-ten").inner_text()
 
 
 def test_calls_top_10_lists_the_picks_in_homes_order(page: Any) -> None:
     page.goto(f"{WEB}/", wait_until="load", timeout=120_000)
     home = [r.get_attribute("data-call-id") for r in page.locator("#top-panel-calls tbody tr[data-call-id]").all()]
-    assert [t.strip() for t in page.locator("#top-panel-calls tbody td.rank").all_inner_texts()] == ["1", "2", "3"]
+    assert [t.strip() for t in page.locator("#top-panel-calls tbody td.rank").all_inner_texts()] == ["1", "2"]
     page.goto(f"{WEB}/review?view=top10", wait_until="load", timeout=120_000)
     calls = [r.get_attribute("data-call-id") for r in page.locator("table.calls-table tbody tr[data-call-id]").all()]
-    assert home == ORDER
-    assert calls == ORDER
+    open_picks = [c for c in ORDER if c != "line-closed"]   # the closed pick has left both lists
+    assert home == open_picks
+    assert calls == open_picks

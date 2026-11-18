@@ -103,7 +103,7 @@ test("the Top 10's line says when the brief picked it, from how many portals, wh
     + "the keyword filter kept, that Claude rated yes or maybe and that the fit score had not ruled out. Ranked by yes from "
     + "both judges, then yes from one; inside each, what closes within 60 days, then the highest fit score, the nearest "
     + "deadline and the newest. It holds until next Monday's brief: each decision shows as of now, and a pick that has "
-    + "closed since says so under its deadline. Forecasts, announcements and umbrellas are on the next tab.");
+    + "closed since leaves the list. Forecasts, announcements and umbrellas are on the next tab.");
 });
 
 test("before the first brief the line says the ranking is live, and a brief without its rule takes today's", () => {
