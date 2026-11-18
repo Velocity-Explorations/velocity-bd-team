@@ -129,6 +129,22 @@ def test_both_judges_saying_no_makes_a_call_weak_at_best() -> None:
     assert already_weak is not None and already_weak.score == 39
 
 
+def test_a_direct_to_phase_ii_topic_is_possible_at_best() -> None:
+    """A Direct to Phase II topic needs Phase I-level work the company did itself, which no tag can show (David,
+    18 Nov 2026): three DSIP Release 1 topics scored 94 and 95 and failed exactly that gate."""
+    capped = fit.score_call(call(type="SBIR Direct to Phase II"), {}, BOTH_SOFTWARE, RATINGS)
+    assert capped is not None and capped.score == 69 and capped.band == "possible"
+    assert fit.D2P2_WHY in capped.why
+    titled = fit.score_call(call(title="DTRA Direct-to-Phase-II topic"), {}, BOTH_SOFTWARE, RATINGS)
+    assert titled is not None and titled.score == 69
+    phase_one = fit.score_call(call(type="SBIR Phase I"), {}, BOTH_SOFTWARE, RATINGS)
+    assert phase_one is not None and phase_one.score == 73 and phase_one.band == "strong"
+    weak = fit.score_call(call(type="STTR Direct to Phase II"), {}, {"claude": "Hardware", "grok": "Hardware"}, RATINGS)
+    assert weak is not None and weak.score == 39 and fit.D2P2_WHY not in weak.why   # already below strong: unchanged
+    both_no = fit.score_call(call(type="SBIR Direct to Phase II"), {}, BOTH_SOFTWARE, RATINGS, {"claude": "no", "grok": "no"})
+    assert both_no is not None and both_no.score == 49   # both caps apply: the lower holds
+
+
 def seed(call_id: str, **fields: Any) -> None:
     run_id = lq.start_run("Vulcan SOF")
     lq.upsert_call({"id": call_id, "portal": "Vulcan SOF", "title": "C2 software", "description": "software", **fields}, run_id)
