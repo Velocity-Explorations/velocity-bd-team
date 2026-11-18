@@ -12,7 +12,7 @@ import { isoNow } from "./format";
 import type { RequestChoice } from "./requests";
 import type { DecidedCall, DecisionRow, JudgmentRow } from "./scoreboard";
 import { escapeLike, noteLine, withoutTypedNote, writeNoteLine } from "./text";
-import { isDecision, keepsCallDecision, planDecision, unsurePlan, type Decision, type Vote } from "./values";
+import { alreadySaved, isDecision, keepsCallDecision, planDecision, unsurePlan, type Decision, type Vote } from "./values";
 import { parseTop } from "./brief";
 import type { AskMessage } from "./ask";
 import type { SuggestionRow } from "./suggest";
@@ -658,7 +658,7 @@ export function callsPage(f: CallFilters, limit = PAGE_SIZE, offset = 0): CallId
 }
 
 export type DecideResult =
-  | { ok: true; title: string; plan: "decide" | "add" | "note" | "clear"; callStatus: Decision | null }
+  | { ok: true; title: string; plan: "decide" | "add" | "note" | "clear" | "already"; callStatus: Decision | null }
   | { ok: false; reason: string };
 
 /**
@@ -682,14 +682,6 @@ export async function setTeamListing(input: { id: string; listing: "Umbrella" | 
   return result;
 }
 
-/** The newest decision recorded under any of these names on a call, or null. */
-async function latestDecisionBy(db: Db, callId: string, aliases: string[]): Promise<string | null> {
-  if (aliases.length === 0) return null;
-  const [row] = await db<{ status: string }[]>`
-    SELECT status FROM decisions WHERE call_id = ${callId} AND decided_by IN ${db(aliases)} ORDER BY id DESC LIMIT 1`;
-  return row?.status ?? null;
-}
-
 /**
  * The dashboard's one write, and since 2026-10-17 the only place decisions are made:
  * human_status, human_by, human_at, plus an optional note appended in append_note()'s
@@ -703,6 +695,8 @@ async function latestDecisionBy(db: Db, callId: string, aliases: string[]): Prom
  * includes it: the box saved it already (saveNote), so the decision's line takes that line's place.
  * Unsure (migration 020) is a vote only: it never becomes the call's decision, and when the call's decision was the
  * person's own it takes it off the call ("clear"), which then waits for the team again (unsurePlan).
+ * Choosing the vote the person already has, with no note, writes nothing and says so ("already"), even from a page that
+ * had not reloaded since the first choice: a double click is never refused (alreadySaved, Task 1, 18 Nov 2026).
  */
 export async function decideCall(input: {
   id: string;
@@ -718,13 +712,19 @@ export async function decideCall(input: {
   const history = await hasTable(db, "decisions");
   const drafts = (input.status === "submitted" || input.status === "unsure") && (await hasTable(db, "pursuits"));
   if (input.status === "unsure" && !history) return { ok: false, reason: "Unsure needs the decisions table (migration 004)." };
-  const mine = history ? await latestDecisionBy(db, input.id, input.aliases) : null;
   const now = isoNow();
   const line = noteLine(now, input.by, input.note) || null;
   const result = await db.begin(async (tx): Promise<DecideResult> => {
     const [call] = await tx<{ title: string | null; human_status: string | null; human_by: string | null; human_notes: string | null }[]>`
       SELECT title, human_status, human_by, human_notes FROM calls WHERE id = ${input.id} FOR UPDATE`;
     if (!call) return { ok: false, reason: "That call is no longer in the ledger." };
+    // The person's newest decision under any of their names, read after the lock: a second click that waited on the first
+    // sees the vote the first saved (Task 1, 18 Nov 2026).
+    const [latest] = history && input.aliases.length > 0
+      ? await tx<{ status: string }[]>`
+          SELECT status FROM decisions WHERE call_id = ${input.id} AND decided_by IN ${tx(input.aliases)} ORDER BY id DESC LIMIT 1`
+      : [];
+    const mine = latest?.status ?? null;
     if (drafts) {
       // A call whose draft is under way is marked submitted at its Submit gate, which records the confirmation (P7).
       const [working] = await tx`SELECT 1 FROM pursuits WHERE call_id = ${input.id} AND state = 'working'`;
@@ -739,6 +739,9 @@ export async function decideCall(input: {
     }
     const current = isDecision(call.human_status) ? call.human_status : null;
     const keep = keepsCallDecision(input.keepCallDecision, history, call.human_by, input.aliases);
+    if (history && alreadySaved({ chosen: input.status, mine, current, keep, note: input.note })) {
+      return { ok: true, title: call.title ?? input.id, plan: "already", callStatus: current };
+    }
     if (current !== input.expected && !keep) {
       return {
         ok: false,

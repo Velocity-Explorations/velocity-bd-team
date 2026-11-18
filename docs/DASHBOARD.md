@@ -338,6 +338,18 @@ who decided, what, when and the note, so every person's decision is kept. On `ca
 - `human_notes`: when a note is typed, one line appended in the pipeline's `[at by] text`
   format, the same as `append_note()` and Slack thread replies
 
+While a choice saves, the Decide button reads Saving... with a turning ring (still under reduced motion) and every
+choice in the menu is disabled, so a second click cannot send it again (Task 1 of the 9 Nov review, 18 Nov 2026; on
+9 Nov a Pursue saved on the first click but showed nothing while it went over the slow link, and its answer came back
+at the top of the page). The page then comes back to the call's row (`#call-<id>`, `lib/decide.ts` rowAnchor, with
+`row=<id>` in the address), and under the button the cell says Saved, Already saved, or why nothing was saved, in the
+tone of the notice at the top. A call that has left the list, as one does from Needs review once decided, has no row to
+come back to, so the notice brings itself into view. Choosing the vote you already have, with no note, writes nothing
+and says Already saved, even from a page that had not reloaded since the first choice (`lib/values.ts` alreadySaved);
+the person's vote is read after the call's row is locked, so a second click that waited on the first sees it. A call
+someone else changed since the page showed it is still refused, at the row, so the person sees what it is now.
+`tests/test_dashboard_decide.py` drives this in a browser against a throwaway Postgres (WORKSPACE_TESTS=1).
+
 `saveNoteAction` saves the note box under Add a note (David, 16 Nov 2026), on Home's Top 10, Needs
 review and All calls, a second after the typing stops or when the box is left, with no Save button
 and no decision: one `[at by] text` line on `human_notes` under the person signed in, and nothing

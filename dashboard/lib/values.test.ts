@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DECISIONS, HUMAN_STATUSES, isDecision, isVote, keepsCallDecision, pickAllowed, pickQueueMode, planDecision, STATUS_LABELS, unsurePlan } from "./values.ts";
+import { alreadySaved, DECISIONS, HUMAN_STATUSES, isDecision, isVote, keepsCallDecision, pickAllowed, pickQueueMode, planDecision, STATUS_LABELS, unsurePlan } from "./values.ts";
 
 test("the Decide menu offers the call's four decisions and Unsure, which is a vote only (David, 16 Nov 2026)", () => {
   assert.deepEqual(DECISIONS.map((d) => d.value), ["pursue", "not_relevant", "unsure", "submitted", "dismissed"]);
@@ -66,4 +66,24 @@ test("Unsure clears the call's decision only when it was the person's own, and o
   assert.equal(unsurePlan({ mine: "pursue", note: "", own: true }), "clear");   // David pursued, now unsure: the call waits again
   assert.equal(unsurePlan({ mine: "unsure", note: "", own: false }), "noop");
   assert.equal(unsurePlan({ mine: "unsure", note: "who owns the data?", own: false }), "note");
+});
+
+test("choosing the vote you already have again is already saved, never refused (Task 1, 18 Nov 2026)", () => {
+  // A double click, or a second click before the page came back: the call is yours at Pursue and you choose Pursue.
+  assert.equal(alreadySaved({ chosen: "pursue", mine: "pursue", current: "pursue", keep: false, note: "" }), true);
+  // From the queue, your Pursue sits beside Shaun's Not relevant: choosing Pursue again changes nothing.
+  assert.equal(alreadySaved({ chosen: "pursue", mine: "pursue", current: "not_relevant", keep: true, note: "" }), true);
+  // Unsure never becomes the call's decision, so repeating it changes nothing whatever the call holds.
+  assert.equal(alreadySaved({ chosen: "unsure", mine: "unsure", current: null, keep: false, note: "" }), true);
+  assert.equal(alreadySaved({ chosen: "unsure", mine: "unsure", current: "pursue", keep: false, note: "" }), true);
+});
+
+test("a repeat that carries a note, a different choice, or a call that moved underneath is not already saved", () => {
+  assert.equal(alreadySaved({ chosen: "pursue", mine: "pursue", current: "pursue", keep: false, note: "call the PM" }), false);
+  assert.equal(alreadySaved({ chosen: "not_relevant", mine: "pursue", current: "pursue", keep: false, note: "" }), false);
+  assert.equal(alreadySaved({ chosen: "pursue", mine: null, current: "pursue", keep: false, note: "" }), false);
+  // On All calls Shaun changed the call to Not relevant since your page showed it: the refusal must still say so.
+  assert.equal(alreadySaved({ chosen: "pursue", mine: "pursue", current: "not_relevant", keep: false, note: "" }), false);
+  // Shaun's decision was cleared since (his Unsure), leaving your Pursue beside nothing: choosing it again decides the call.
+  assert.equal(alreadySaved({ chosen: "pursue", mine: "pursue", current: null, keep: true, note: "" }), false);
 });

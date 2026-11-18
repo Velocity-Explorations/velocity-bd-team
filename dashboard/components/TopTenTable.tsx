@@ -5,7 +5,7 @@ import { DraftBadge } from "@/components/DraftBadge";
 import { PersonName } from "@/components/PersonName";
 import { PortalLogo } from "@/components/PortalLogo";
 import { Badge, FitBadge, TitleLink } from "@/components/bits";
-import { asksReason, yourVote } from "@/lib/decide";
+import { asksReason, rowAnchor, yourVote } from "@/lib/decide";
 import { descriptionCell } from "@/lib/description";
 import { formatDue } from "@/lib/format";
 import { daysLeftText, topTenOrder } from "@/lib/home";
@@ -98,6 +98,8 @@ export async function TopTenTable({ ids, description, tz, nameOf, decide, watch 
             return (
               <tr
                 key={id}
+                id={rowAnchor(id)}
+                data-call-id={id}
                 className={watch ? undefined : "row-link"}
                 data-href={watch ? undefined : `/review?view=top10&focus=${encodeURIComponent(id)}`}
                 tabIndex={watch ? undefined : 0}

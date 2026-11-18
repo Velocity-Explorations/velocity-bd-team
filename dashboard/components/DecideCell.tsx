@@ -2,6 +2,7 @@ import { ChevronDown } from "lucide-react";
 import { decide } from "@/app/actions";
 import { Badge, toneOf } from "@/components/bits";
 import { CallNote } from "@/components/CallNote";
+import { DecideButton, DecideLabel, DecideOutcome } from "@/components/DecideControls";
 import { decideLabel, dueLine, NOT_RELEVANT_REASONS, type VoteLike } from "@/lib/decide";
 import { listingChoice } from "@/lib/listing";
 import { formatTime } from "@/lib/format";
@@ -27,7 +28,8 @@ export type DecideMode = "waiting" | "mixed" | "all";
  * Start the draft; one with a draft, Open workspace with its current step (Q17, PRO-576). On a page without the Start
  * the draft dialog (Home), `startIn` names the page that has it, and Start the draft opens it there. With `askReason`
  * (a call Claude rated yes or maybe), Not relevant opens its reasons, and the one chosen becomes the decision's note,
- * which the judges learn from (David, 5 Nov).
+ * which the judges learn from (David, 5 Nov). While a choice saves, the button says Saving and the menu's choices are
+ * disabled; the page then comes back to the row, where the cell says Saved, Already saved or why not (Task 1, 18 Nov 2026).
  */
 export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, returnTo, keep, note, tz, draft, drafting, start, startIn, askReason }: {
   call: { id: string; title: string | null; human_status: string | null; human_at?: string | null; days_left: number | null; listing?: string | null };
@@ -81,7 +83,7 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
         <input type="hidden" name="return_to" value={returnTo} />
         <details className="menu decide-menu">
           <summary className={waitingForYou ? "btn decide-button needs-you" : "btn decide-button"}>
-            {label}
+            <DecideLabel label={label} />
             <span className="sr-only"> on {call.title || call.id}</span>
             <ChevronDown aria-hidden="true" />
           </summary>
@@ -97,33 +99,33 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
                   <div className="reason-body">
                     <p className="hint">Why is it not for Velocity? The judges learn from it.</p>
                     {NOT_RELEVANT_REASONS.map((r) => (
-                      <button key={r.key} type="submit" name="status" value={`not_relevant:${r.key}`} className="menu-item">
+                      <DecideButton key={r.key} value={`not_relevant:${r.key}`} className="menu-item">
                         {r.label}
-                      </button>
+                      </DecideButton>
                     ))}
                     <input type="text" name="reason_text" maxLength={300} placeholder="Another reason" aria-label={`Another reason ${call.title || call.id} is not relevant`} />
-                    <button type="submit" name="status" value="not_relevant:other" className="menu-item">
+                    <DecideButton value="not_relevant:other" className="menu-item">
                       Save another reason
-                    </button>
+                    </DecideButton>
                   </div>
                 </details>
               ) : (
-                <button key={d.value} type="submit" name="status" value={d.value} className={`menu-item tone-${toneOf(d.value)}`}>
+                <DecideButton key={d.value} value={d.value} className={`menu-item tone-${toneOf(d.value)}`}>
                   <span className="sq" aria-hidden="true" />
                   {d.label}
-                </button>
+                </DecideButton>
               ),
             )}
             {draft ? null : (
-              <button type="submit" name="status" value="pursue_draft" className="menu-item tone-good" disabled={!drafting || Boolean(start.block)}>
+              <DecideButton value="pursue_draft" className="menu-item tone-good" disabled={!drafting || Boolean(start.block)}>
                 <span className="sq" aria-hidden="true" />
                 Pursue and start the draft
-              </button>
+              </DecideButton>
             )}
-            <button type="submit" name="status" value={listingChoice(call.listing).value} className="menu-item menu-listing">
+            <DecideButton value={listingChoice(call.listing).value} className="menu-item menu-listing">
               <span className="sq" aria-hidden="true" />
               {listingChoice(call.listing).label}
-            </button>
+            </DecideButton>
             <p className="hint">
               {draft || (drafting && !start.block)
                 ? "Choosing records it at once."
@@ -133,6 +135,7 @@ export function DecideCell({ call, mode, viewer, yours, eligible, decidedBy, ret
             </p>
           </div>
         </details>
+        <DecideOutcome callId={call.id} />
         {draft ? (
           <div className="draft-action">
             <a className="btn" href={`/proposals/${encodeURIComponent(call.id)}`}>
