@@ -206,3 +206,23 @@ def test_a_call_outside_the_top_10_shows_why_it_scored_without_a_rank(page: Any)
     expect(why).to_be_visible(timeout=5_000)
     expect(why.locator(".why-headline")).to_have_text("Fit 55, possible")
     expect(why.locator(".why-rank")).to_have_count(0)
+
+
+def test_homes_top_10_headers_line_up_with_their_cells(page: Any) -> None:
+    """Every header is a table cell over its column. On 18 Nov the Claude and Grok headers took a class another style made a
+    flex box, which stacked them in one column and shifted every header after them."""
+    log_in(page, "David Wood")
+    for width in (1024, 1440):
+        page.set_viewport_size({"width": width, "height": 900})
+        page.goto(f"{WEB}/", wait_until="load", timeout=120_000)
+        page.wait_for_timeout(800)
+        found = page.evaluate("""() => {
+          const table = document.querySelector('#top-panel-calls table');
+          const shown = (el) => getComputedStyle(el).display !== 'none';
+          const heads = [...table.querySelectorAll('thead th')].filter(shown);
+          const cells = [...table.querySelector('tbody tr').children].filter(shown);
+          return { displays: heads.map((th) => getComputedStyle(th).display),
+                   pairs: heads.map((th, i) => [Math.round(th.getBoundingClientRect().left), Math.round(cells[i] ? cells[i].getBoundingClientRect().left : -1)]) };
+        }""")
+        assert set(found["displays"]) == {"table-cell"}, (width, found["displays"])
+        assert all(head == cell for head, cell in found["pairs"]), (width, found["pairs"])
