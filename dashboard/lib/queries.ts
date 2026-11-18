@@ -81,8 +81,8 @@ function keepFor(): number {
 function panelWhere(db: Db, f: PanelFilters) {
   return db`
     ${f.portals.length ? db`AND portal IN ${db(f.portals)}` : db``}
-    ${f.state === "open" ? db`AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})` : db``}
-    ${f.state === "closed" ? db`AND extra ~ ${CLOSED_PATTERN}` : db``}
+    ${f.state === "open" ? db`AND ${openWhere(db)}` : db``}
+    ${f.state === "closed" ? db`AND ${closedWhere(db)}` : db``}
     ${f.judges === "disagree" ? db`AND ${newestVerdict(db, "claude")} <> ${newestVerdict(db, "grok")}` : db``}
     ${f.judges === "agree" ? db`AND ${newestVerdict(db, "claude")} = ${newestVerdict(db, "grok")}` : db``}
     ${f.tag ? db`AND EXISTS (SELECT 1 FROM call_tags AS t WHERE t.call_id = calls.id AND t.tag = ${f.tag})` : db``}`;
@@ -91,6 +91,20 @@ function panelWhere(db: Db, f: PanelFilters) {
 /** One judge's newest verdict on the outer query's call (judgments table); NULL when it has not judged. */
 function newestVerdict(db: Db, judge: string) {
   return db`(SELECT j.verdict FROM judgments AS j WHERE j.call_id = calls.id AND j.judge = ${judge} ORDER BY j.id DESC LIMIT 1)`;
+}
+
+/**
+ * A call is closed when its portal flagged it closed (any extra key ending in _closed set true) or its deadline has passed
+ * (David, 18 Nov 2026: a closed call stays in the ledger and on All calls, but leaves the Top 10, Needs review and the
+ * Open filter). A call with no deadline, or one the dashboard cannot read, is open unless flagged. Fragments, so never
+ * awaited.
+ */
+function openWhere(db: Db | Tx) {
+  return (db as Db)`((extra IS NULL OR extra !~ ${CLOSED_PATTERN}) AND (${dueDate(db)} IS NULL OR ${dueDate(db)} >= CURRENT_DATE))`;
+}
+
+function closedWhere(db: Db | Tx) {
+  return (db as Db)`(extra ~ ${CLOSED_PATTERN} OR ${dueDate(db)} < CURRENT_DATE)`;
 }
 
 /** due_date as a date, from either shape the portals write: "27 OCT 2026 : 21:59 MDT" or "2026-10-27". */
@@ -214,9 +228,7 @@ export async function fitOverview(): Promise<{ bands: Record<string, number>; jo
   const [bands, jobs] = await Promise.all([
     db<{ fit_band: string; n: number }[]>`
       SELECT fit_band, COUNT(*)::int AS n FROM calls
-      WHERE filter_result = 'kept' AND human_status IS NULL AND fit_band IS NOT NULL
-        AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
-        AND (${dueDate(db)} >= CURRENT_DATE OR ${dueDate(db)} IS NULL)
+      WHERE filter_result = 'kept' AND human_status IS NULL AND fit_band IS NOT NULL AND ${openWhere(db)}
       GROUP BY fit_band`,
     db<{ state: string; finished_at: string | null }[]>`
       SELECT state, finished_at FROM worker_jobs WHERE kind = 'fit_scores' ORDER BY id DESC LIMIT 1`,
@@ -272,6 +284,7 @@ async function hasTable(db: Db, name: string): Promise<boolean> {
 function waitingWhere(db: Db, perPerson: boolean, waitingFor: string[] | null) {
   return db`ai_verdict IN ('yes', 'maybe')
       AND filter_result = 'kept'
+      AND ${openWhere(db)}
       AND ${perPerson
         ? db`NOT EXISTS (SELECT 1 FROM decisions AS d WHERE d.call_id = calls.id AND d.decided_by IN ${db(waitingFor ?? [])})`
         : db`human_status IS NULL`}`;
@@ -283,6 +296,7 @@ function waitingWhere(db: Db, perPerson: boolean, waitingFor: string[] | null) {
  */
 function heldWhere(db: Db) {
   return db`human_status IS NULL
+      AND ${openWhere(db)}
       AND EXISTS (SELECT 1 FROM decisions AS d WHERE d.call_id = calls.id AND d.status = 'unsure'
                   AND d.id = (SELECT MAX(n.id) FROM decisions AS n WHERE n.call_id = d.call_id AND n.decided_by = d.decided_by))`;
 }
@@ -496,8 +510,6 @@ export async function liveTopTen(watch = false): Promise<string[]> {
   const rows = await db<{ id: string }[]>`
     SELECT id FROM calls
     WHERE ${waitingWhere(db, false, null)}
-      AND (extra IS NULL OR extra !~ ${CLOSED_PATTERN})
-      AND (${dueDate(db)} >= CURRENT_DATE OR ${dueDate(db)} IS NULL)
       ${scored ? db`AND fit_band IS DISTINCT FROM 'ruled out'` : db``}
       ${kinds ? (watch ? db`AND listing IN ${db(WATCH)}` : db`AND (listing IS NULL OR listing NOT IN ${db(WATCH)})`) : db``}
     ORDER BY CASE ai_verdict WHEN 'yes' THEN 1 ELSE 0 END
@@ -529,10 +541,22 @@ async function readTopTenIds(): Promise<TopTen> {
   const top = newest ? parseTop(newest.body) : null;
   if (newest && top) {
     const watch = top.watch ? top.watch.map((c) => c.id) : await liveTopTen(true);
-    return { ids: top.top.map((c) => c.id), watch, week: newest.week_of, madeAt: newest.created_at, rankedBy: top.rankedBy };
+    const picked = top.top.map((c) => c.id);
+    // A pick that has closed since the brief leaves the list; the ranks close up (David, 18 Nov 2026).
+    const open = await openAmong([...picked, ...watch]);
+    return { ids: picked.filter((id) => open.has(id)), watch: watch.filter((id) => open.has(id)), week: newest.week_of,
+      madeAt: newest.created_at, rankedBy: top.rankedBy };
   }
   const [ids, watch] = await Promise.all([liveTopTen(), liveTopTen(true)]);
   return { ids, watch, week: null, madeAt: null, rankedBy: "" };
+}
+
+/** Which of these calls are open (openWhere): in the ledger, not flagged closed, and not past their deadline. */
+async function openAmong(ids: string[]): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const db = sql();
+  const rows = await db<{ id: string }[]>`SELECT id FROM calls WHERE id IN ${db(ids)} AND ${openWhere(db)}`;
+  return new Set(rows.map((r) => r.id));
 }
 
 /** How many portals a scan has completed for (Task 9, 18 Nov 2026): what the Top 10 is drawn from. */

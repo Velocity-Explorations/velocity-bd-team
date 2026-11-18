@@ -176,5 +176,5 @@ export function topTenLine(input: { madeAt: string | null; rankedBy: string; por
   return `Picked ${input.madeAt} by the Monday brief, from the open calls across ${across} that nobody had decided, that the `
     + "keyword filter kept, that Claude rated yes or maybe and that the fit score had not ruled out. "
     + `Ranked by ${input.rankedBy || RANKING}. It holds until next Monday's brief: each decision shows as of now, and a pick `
-    + `that has closed since says so under its deadline. ${elsewhere}`;
+    + `that has closed since leaves the list. ${elsewhere}`;
 }
