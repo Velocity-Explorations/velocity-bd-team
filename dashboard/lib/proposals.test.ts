@@ -10,6 +10,7 @@ import {
   overdueFirst,
   proposalCards,
   pushDate,
+  startedNotice,
   resultExpected,
   resultWord,
   sortIntoViews,
@@ -190,4 +191,10 @@ test("a draft page's address names its call; the Proposals views and deeper path
   assert.equal(draftPageCallId("/proposals/a/b"), null);
   assert.equal(draftPageCallId("/calls"), null);
   assert.equal(draftPageCallId("/proposals/%E0%A4%A"), null);   // not a valid encoding
+});
+
+test("the notice after Start the draft says where the draft shows up (Task 2, 18 Nov 2026)", () => {
+  assert.equal(startedNotice("Radar data fusion"),
+    "Started the draft for Radar data fusion. Discovery is queued for the worker. Follow it here under Drafting and in its "
+    + "workspace; its files go in its own folder in the Proposal Library's 02 Submissions on Drive.");
 });

@@ -508,8 +508,15 @@ main {
 }
 
 .suggest-bar .error-text {
-  flex-basis: 100%;
   margin: 0;
+}
+
+/* A failed or lost suggestion says why, with Retry beside it (Task 2, 18 Nov 2026). */
+.suggest-error {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: 12px;
 }
 
 .suggest-why {
@@ -2362,17 +2369,24 @@ details.decide-menu .menu-body {
   margin-bottom: 6px;
 }
 
-/* While a decision saves (Task 1, 18 Nov 2026): Saving... with a turning ring in the button, which reduced motion stills. */
-.decide-button .spin {
+/* A turning ring while something waits on the server (Tasks 1 and 2, 18 Nov 2026): the Decide button's Saving..., the
+   suggestion line and Start's Starting... Reduced motion stills it; the words still say what is happening. */
+.spin {
+  flex: none;
   width: 14px;
   height: 14px;
-  animation: decide-spin 0.9s linear infinite;
+  animation: spin 0.9s linear infinite;
 }
 
-@keyframes decide-spin { to { transform: rotate(360deg); } }
+.hint > .spin {
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .decide-button .spin { animation: none; }
+  .spin { animation: none; }
 }
 
 /* Under the Decide button of the call a decision came back to: Saved, Already saved, or why nothing was saved. */

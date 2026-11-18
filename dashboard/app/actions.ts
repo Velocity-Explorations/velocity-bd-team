@@ -16,7 +16,7 @@ import { aliasesFor } from "@/lib/people";
 import { BAR_THEMES, DEFAULT_BAR_THEME } from "@/lib/barthemes";
 import { MAX_PICTURE_BYTES, PICTURE_SIZE, sniffImage } from "@/lib/picture";
 import { profileFromForm } from "@/lib/profile";
-import { FORMATS } from "@/lib/proposals";
+import { FORMATS, startedNotice } from "@/lib/proposals";
 import {
   acceptAllChanges,
   addMaterial,
@@ -428,7 +428,7 @@ export async function startDraftAction(formData: FormData): Promise<void> {
     backTo(returnTo, "error", `Could not start the draft: ${detail}`);
   }
   revalidatePath("/", "layout");
-  if (result.ok) backTo("/proposals?view=drafting", "notice", `Started the draft for ${result.title}. Discovery is queued for the worker.`);
+  if (result.ok) backTo("/proposals?view=drafting", "notice", startedNotice(result.title));
   backTo(returnTo, "error", result.reason);
 }
 

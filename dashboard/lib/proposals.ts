@@ -223,6 +223,15 @@ export function folderName(date: string, portal: string, title: string): string 
   return `02 Submissions/${date}_${slug(portal)}_${short}/`;
 }
 
+/**
+ * The notice after Start the draft (Task 2, 18 Nov 2026): what was started and where it shows up, since on 9 Nov it was
+ * not clear where to look. Proposals' Drafting view and the workspace follow it; the worker makes its Drive folder.
+ */
+export function startedNotice(title: string): string {
+  return `Started the draft for ${title}. Discovery is queued for the worker. Follow it here under Drafting and in its `
+    + "workspace; its files go in its own folder in the Proposal Library's 02 Submissions on Drive.";
+}
+
 /** Minutes without a heartbeat after which the worker counts as offline. */
 export const WORKER_STALE_MINUTES = 10;
 
