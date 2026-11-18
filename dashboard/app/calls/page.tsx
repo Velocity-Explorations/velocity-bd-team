@@ -11,7 +11,7 @@ import { ViewCards } from "@/components/ViewCards";
 import { Badge, Flash, PageLinks } from "@/components/bits";
 import { weekLabel } from "@/lib/brief";
 import { shows } from "@/lib/columns";
-import { asksReason, yourVote } from "@/lib/decide";
+import { asksReason, rowAnchor, yourVote } from "@/lib/decide";
 import { callDetails, deadlineNote } from "@/lib/details";
 import { detailSources } from "@/lib/description";
 import {
@@ -267,7 +267,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Search
                   const rank = top.ids.indexOf(r.id);
                   const draft = drafts.get(r.id);
                   return [
-                    <tr key={r.id} data-call-id={r.id}>
+                    <tr key={r.id} id={rowAnchor(r.id)} data-call-id={r.id}>
                       <CallCell
                         row={r}
                         tags={show("tags") ? (tagsFor.get(r.id) ?? []) : []}

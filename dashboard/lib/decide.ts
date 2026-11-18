@@ -23,6 +23,27 @@ export function dueLine(daysLeft: number | null): string {
   return `due in ${daysLeft} days`;
 }
 
+/**
+ * The id of a call's row (Task 1, 18 Nov 2026), so a decision comes back to the row it was made on: `call-` and the call
+ * id with anything but letters, digits, `_` and `-` replaced, safe as an HTML id and in a URL's fragment.
+ */
+export function rowAnchor(callId: string): string {
+  return `call-${callId.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+}
+
+/**
+ * What the Decide cell of the call a decision came back to says (Task 1, 18 Nov 2026): `row` names that call, and the
+ * notice or error is what the decision did. Saved, Already saved, or the reason nothing was saved, beside the button the
+ * person used, since the notice at the top of the page can be out of view.
+ */
+export function rowOutcome(params: { row?: string | null; notice?: string | null; error?: string | null }, callId: string):
+  { tone: "good" | "conflict"; text: string } | null {
+  if (!params.row || params.row !== callId) return null;
+  if (params.error) return { tone: "conflict", text: params.error };
+  if (params.notice) return { tone: "good", text: params.notice.startsWith("Already saved") ? "Already saved" : "Saved" };
+  return null;
+}
+
 /** Notes from a Slack thread reply carry the member's Slack id (U08V7ULPH1N); the dashboard's carry a name. */
 export function noteSource(by: string | null | undefined): "Slack thread reply" | "on the dashboard" {
   return by && /^[UW][A-Z0-9]{6,}$/.test(by) ? "Slack thread reply" : "on the dashboard";

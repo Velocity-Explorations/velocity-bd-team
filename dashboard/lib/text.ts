@@ -133,8 +133,9 @@ export function buildHref(base: string, params: Record<string, string | null | u
 
 /** The notice after a decision. A vote from the review queue takes the call out of the voter's
  *  queue, so the notice says so (PRO-554); `stays` names the call's decision when it is not yours. */
-export function decidedNotice(plan: "decide" | "add" | "note", label: string, title: string, stays: string, fromQueue: boolean): string {
+export function decidedNotice(plan: "decide" | "add" | "note" | "already", label: string, title: string, stays: string, fromQueue: boolean): string {
   if (plan === "note") return `Note added: ${title}`;
+  if (plan === "already") return `Already saved: ${label} on ${title}.${stays}`;   // a repeat changes nothing (Task 1, 18 Nov 2026)
   const moved = fromQueue ? " It has left your queue." : "";
   if (plan === "decide") return fromQueue ? `${label}: ${title}.${moved}` : `${label}: ${title}`;
   return `Added your decision, ${label}: ${title}.${stays}${moved}`;

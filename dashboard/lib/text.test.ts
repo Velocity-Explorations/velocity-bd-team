@@ -196,6 +196,12 @@ test("a vote from the review queue says the call has left your queue; elsewhere 
   assert.equal(decidedNotice("note", "Pursue", "ISOF Range 2027", "", true), "Note added: ISOF Range 2027");
 });
 
+test("choosing the vote you already have says it is already saved (Task 1, 18 Nov 2026)", () => {
+  assert.equal(decidedNotice("already", "Pursue", "ISOF Range 2027", "", false), "Already saved: Pursue on ISOF Range 2027.");
+  assert.equal(decidedNotice("already", "Pursue", "ISOF Range 2027", " The call stays Not relevant.", true),
+    "Already saved: Pursue on ISOF Range 2027. The call stays Not relevant.");
+});
+
 test("the link after a vote finds the call on All calls by its title", () => {
   assert.equal(votedHref("PY26.2 TACFI Notice of Opportunity"), "/calls?q=PY26.2+TACFI+Notice+of+Opportunity");
   assert.equal(votedHref("x".repeat(200)), "/calls?q=" + "x".repeat(120));   // the title filter reads 120 characters

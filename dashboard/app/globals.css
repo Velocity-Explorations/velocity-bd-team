@@ -2362,6 +2362,40 @@ details.decide-menu .menu-body {
   margin-bottom: 6px;
 }
 
+/* While a decision saves (Task 1, 18 Nov 2026): Saving... with a turning ring in the button, which reduced motion stills. */
+.decide-button .spin {
+  width: 14px;
+  height: 14px;
+  animation: decide-spin 0.9s linear infinite;
+}
+
+@keyframes decide-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .decide-button .spin { animation: none; }
+}
+
+/* Under the Decide button of the call a decision came back to: Saved, Already saved, or why nothing was saved. */
+.decide-outcome {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 4px 0 0;
+  color: var(--tone);
+  font: var(--type-detail);
+}
+
+.decide-outcome svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+/* A decision comes back to its row (#call-...), which the scroll leaves a little below the window's top. */
+tr[id^="call-"] {
+  scroll-margin-top: 16px;
+}
+
 .due-line {
   margin-top: 3px;
   font: 500 11.5px/1.3 var(--font-label);

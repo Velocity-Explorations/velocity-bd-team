@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { asksReason, decideLabel, dueLine, NOT_RELEVANT_REASONS, noteSource, readChoice, reasonNote, yourVote } from "./decide.ts";
+import { asksReason, decideLabel, dueLine, NOT_RELEVANT_REASONS, noteSource, readChoice, reasonNote, rowAnchor, rowOutcome, yourVote } from "./decide.ts";
 
 const VOTES = [
   { person: "Shaun Jones", status: "pursue", decided_at: "2026-10-27T10:00:00Z" },
@@ -75,4 +75,21 @@ test("the reason becomes the decision's note, with the person's own words after 
 test("Umbrella announcement only is a listing tag now, not a Not relevant reason (David, 16 Nov 2026)", () => {
   assert.equal(NOT_RELEVANT_REASONS.some((r) => r.key === "umbrella"), false);
   assert.deepEqual(readChoice("not_relevant:umbrella"), { status: "not_relevant", reason: null });   // an old form: the words alone
+});
+
+test("a call's row has an id safe in a URL fragment, so a decision can come back to it (Task 1, 18 Nov 2026)", () => {
+  assert.equal(rowAnchor("afwerx-dow-sttr-specific-topic-27-tz-release-1"), "call-afwerx-dow-sttr-specific-topic-27-tz-release-1");
+  assert.equal(rowAnchor("dsip-AF27T-001"), "call-dsip-AF27T-001");
+  assert.equal(rowAnchor("nstxl:4521/spec x"), "call-nstxl_4521_spec_x");
+});
+
+test("the Decide cell of the call a decision came back to says Saved, Already saved, or why not", () => {
+  const id = "sam-123";
+  assert.deepEqual(rowOutcome({ row: id, notice: "Pursue: Radar study." }, id), { tone: "good", text: "Saved" });
+  assert.deepEqual(rowOutcome({ row: id, notice: "Already saved: Pursue on Radar study." }, id), { tone: "good", text: "Already saved" });
+  assert.deepEqual(rowOutcome({ row: id, error: "It was changed meanwhile to not_relevant by Shaun Jones. Nothing saved; reload and try again." }, id),
+    { tone: "conflict", text: "It was changed meanwhile to not_relevant by Shaun Jones. Nothing saved; reload and try again." });
+  assert.equal(rowOutcome({ row: "other-call", notice: "Pursue: Other." }, id), null);   // only the call that was decided
+  assert.equal(rowOutcome({ notice: "Pursue: Radar study." }, id), null);
+  assert.equal(rowOutcome({ row: id }, id), null);
 });

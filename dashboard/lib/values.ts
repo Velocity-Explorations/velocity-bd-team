@@ -80,6 +80,18 @@ export function keepsCallDecision(keepFlag: boolean, history: boolean, decidedBy
   return keepFlag && history && !(decidedBy !== null && aliases.includes(decidedBy));
 }
 
+/**
+ * Whether choosing a vote again only repeats what is saved (Task 1, 18 Nov 2026): the person's latest vote is already
+ * `chosen`, no note comes with it, and the call has not moved away underneath (its decision is `chosen`, or the person's
+ * vote sits beside someone else's decision, `keep`, while that decision stands). Unsure never becomes the call's
+ * decision, so repeating it changes nothing whatever the call holds. A double click, or a second click before the page came back, lands here and is told
+ * it is already saved; a call someone else changed since the page showed it is still refused, so the person sees that.
+ */
+export function alreadySaved(input: { chosen: Vote; mine: string | null; current: Decision | null; keep: boolean; note: string }): boolean {
+  if (input.note.trim() || input.mine !== input.chosen) return false;
+  return input.chosen === "unsure" || input.current === input.chosen || (input.keep && input.current !== null);
+}
+
 export type QueueMode = "each" | "shared";
 
 /**

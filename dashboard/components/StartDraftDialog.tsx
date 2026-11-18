@@ -52,7 +52,7 @@ export function StartDraftDialog({ people, owner, readiness, lastSeen, pastWork,
       opener.current = trigger;
       const url = new URL(window.location.href);
       url.searchParams.delete("start");
-      for (const key of ["notice", "error", "voted"]) url.searchParams.delete(key);
+      for (const key of ["notice", "error", "voted", "row"]) url.searchParams.delete(key);
       setReturnTo(`${url.pathname}${url.search}`);
       const chosen = { id: data.startDraft ?? "", title: data.title ?? "", portal: data.portal ?? "", due: data.due ?? "", format: data.format ?? FORMATS[0] };
       setFormat(FORMATS.includes(chosen.format) ? chosen.format : FORMATS[0]);

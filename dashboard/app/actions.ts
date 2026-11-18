@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { COLUMNS, COLUMNS_COOKIE, hiddenFromForm, hideColumn, readHidden, type TablePage } from "@/lib/columns";
 import { signIn, signOut } from "@/auth";
 import { MAX_QUESTION, threadIdOk } from "@/lib/ask";
-import { readChoice, reasonNote } from "@/lib/decide";
+import { readChoice, reasonNote, rowAnchor } from "@/lib/decide";
 import { readListingChoice } from "@/lib/listing";
 import { isRating, sectionOfKey } from "@/lib/fitratings";
 import { isoNow, zonedToIso } from "@/lib/format";
@@ -111,14 +111,22 @@ export async function suggestDraftAction(input: { callId?: unknown }): Promise<S
   }
 }
 
-function backTo(returnTo: string, key: "notice" | "error", message: string, voted?: string, anchor?: string): never {
+function backTo(returnTo: string, key: "notice" | "error", message: string, voted?: string, anchor?: string, row?: string): never {
   const url = new URL(returnTo, "http://dashboard.local");
   url.searchParams.delete("notice");
   url.searchParams.delete("error");
   url.searchParams.delete("voted");
+  url.searchParams.delete("row");
   url.searchParams.set(key, message);
   if (voted) url.searchParams.set("voted", voted);   // the queue links the notice to the call on All calls
+  if (row) url.searchParams.set("row", row);   // the call whose Decide cell says what happened (Task 1, 18 Nov 2026)
   redirect(`${url.pathname}${url.search}${anchor ? `#${anchor}` : ""}`);
+}
+
+/** Back to the row a decision was made on (Task 1, 18 Nov 2026): the page scrolls to it and its Decide cell says what
+ *  happened, since the notice at the top can be out of view. A call that left the list leaves only the notice. */
+function backToRow(returnTo: string, key: "notice" | "error", message: string, id: string, voted?: string): never {
+  backTo(returnTo, key, message, voted, rowAnchor(id), id);
 }
 
 /**
@@ -148,7 +156,7 @@ export async function decide(formData: FormData): Promise<void> {
   const keepCallDecision = formData.get("keep") === "1";
 
   const viewer = await currentViewer();
-  if (!viewer) backTo(returnTo, "error", "Log in (top right) before deciding.");
+  if (!viewer) backToRow(returnTo, "error", "Log in (top right) before deciding.", id);
 
   let result: DecideResult;
   try {
@@ -157,7 +165,7 @@ export async function decide(formData: FormData): Promise<void> {
     result = await decideCall({ id, status, expected, keepCallDecision, by: viewer, aliases: aliasesFor(viewer, allowlist()), note, typed: carried });
   } catch (err) {
     const detail = err instanceof Error ? err.message.slice(0, 160) : "database error";
-    backTo(returnTo, "error", `Could not save the decision: ${detail}`);
+    backToRow(returnTo, "error", `Could not save the decision: ${detail}`, id);
   }
   revalidatePath("/", "layout");
   if (result.ok) {
@@ -167,9 +175,9 @@ export async function decide(formData: FormData): Promise<void> {
       ? `Unsure: ${result.title}. Your decision is off the call, which waits for the team under Unsure.`
       : decidedNotice(result.plan, STATUS_LABELS[status], result.title, stays, queue);
     if (thenDraft && result.callStatus === "pursue") backTo(`/proposals?start=${encodeURIComponent(id)}`, "notice", `${notice} Start the draft below.`);
-    backTo(returnTo, "notice", notice, queue && result.plan !== "note" ? result.title : undefined);
+    backToRow(returnTo, "notice", notice, id, queue && result.plan !== "note" && result.plan !== "already" ? result.title : undefined);
   }
-  backTo(returnTo, "error", result.reason);
+  backToRow(returnTo, "error", result.reason, id);
 }
 
 /** The Decide menu's listing item: a tag, not a decision, so nothing is voted and the judges learn nothing from it. */
