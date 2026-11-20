@@ -9,6 +9,26 @@ portal content.
 
 ## Current Session
 
+**Date**: 2026-11-19 (the evening of 18 Nov, after the nine-task entry below)
+**Focus**: The fit score's rules on Fit ratings, closed calls off the open lists, DSIP go/no-go work
+
+### What Was Done
+- #199: Fit ratings has "How the fit score works" (weights, bands, what rules a call out, the caps); tests/test_fit.py keeps its numbers equal to review/fit.py's.
+- #201: a call is closed when flagged or past its deadline. Closed calls leave this week's Top 10, Needs review, the Unsure view and the Open filter, and stay in the ledger and on All calls.
+- DSIP go/no-go work for David on Release 1 and the Release 2 pursuits. The decisions and notes stay local in data/tasks/ and data/dsip/, not in this public repo.
+- Task 8 done by velocity-bd-team-ac (6c68365 on the local PRO-477 branch).
+
+### Key Decisions
+- A closed call never leaves the ledger; only the open lists drop it (David).
+
+### In Progress
+- David applies the Release 2 go/no-go gates on the dashboard; the local notes list them.
+
+### Blockers
+- PRO-477: Alec. Gmail API for sign-in codes: a Workspace super admin.
+
+## Session: 2026-11-18
+
 **Date**: 2026-11-18 (beside the two 18 Nov entries below)
 **Focus**: Screening the strong DSIP topics, Direct to Phase II on fit, PRO-477's hosting plan
 
